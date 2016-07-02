@@ -1,0 +1,15 @@
+## Gradle stuff
+.gradle/
+build/
+
+## IntelliJ stuff
+.idea/f
+*.ipr
+*.iml
+*.iws
+
+## OSX stuff
+.DS_Store
+
+## Project stuff
+playground/

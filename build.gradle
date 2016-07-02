@@ -1,0 +1,48 @@
+description 'Game Environment Creator'
+
+apply plugin: 'kotlin'
+apply plugin: 'application'
+
+mainClassName = 'com.grimfox.gec.Main'
+
+tasks.withType(Tar) {
+    compression = Compression.GZIP
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.14'
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath group: 'org.jetbrains.kotlin', name: 'kotlin-gradle-plugin', version: kotlin_version
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    compile group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib', version: kotlin_version
+
+    compile group: 'io.airlift', name: 'airline', version: airline_version
+    compile group: 'org.reflections', name: 'reflections', version: reflections_version
+
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
+    compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: jackson_version
+
+    compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+    runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+}
