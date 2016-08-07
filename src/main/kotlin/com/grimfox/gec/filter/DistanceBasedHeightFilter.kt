@@ -16,7 +16,6 @@ class DistanceBasedHeightFilter() : ClosestPointsDataFilter<Float> {
         height += coeff3 * (closestPoints[2]?.second ?: 0.0f)
         height += coeff4 * (closestPoints[3]?.second ?: 0.0f)
         height += coeff5 * (closestPoints[4]?.second ?: 0.0f)
-        height += coeff6 * (closestPoints[5]?.second ?: 0.0f)
         height
     }
 
@@ -42,7 +41,4 @@ class DistanceBasedHeightFilter() : ClosestPointsDataFilter<Float> {
 
     @Option(name = arrayOf("-c5", "--coeff-5"), description = "The coefficient to use with term 5.", required = false)
     var coeff5: Float = 0.0f
-
-    @Option(name = arrayOf("-c6", "--coeff-6"), description = "The coefficient to use with term 6.", required = false)
-    var coeff6: Float = 0.0f
 }

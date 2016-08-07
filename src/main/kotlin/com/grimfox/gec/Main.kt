@@ -18,15 +18,17 @@ object Main {
                 listOf("com.grimfox.gec.input"),
                 listOf("com.grimfox.gec.generator"),
                 listOf("com.grimfox.gec.filter"),
-                listOf("com.grimfox.gec.output")
+                listOf("com.grimfox.gec.output"),
+                listOf("com.grimfox.gec.pipeline")
         ).launch(*args)
     }
 
     internal class Launcher(val commandPackages: List<String>,
-                           val inputPackages: List<String>,
-                           val generatorPackages: List<String>,
-                           val filterPackages: List<String>,
-                           val outputPackages: List<String>) {
+                            val inputPackages: List<String>,
+                            val generatorPackages: List<String>,
+                            val filterPackages: List<String>,
+                            val outputPackages: List<String>,
+                            val pipelinePackages: List<String>) {
 
         internal fun launch(vararg args: String) {
             val commands = getCommandsFromPackages(commandPackages)
@@ -34,6 +36,7 @@ object Main {
             val generators = getCommandsFromPackages(generatorPackages)
             val filters = getCommandsFromPackages(filterPackages)
             val outputs = getCommandsFromPackages(outputPackages)
+            val pipelines = getCommandsFromPackages(pipelinePackages)
             val help = Help::class.java
             val cliBuilder = Cli.builder<Runnable>("gec")
                     .withDescription("Game Environment Generator. A toolkit for procedurally generating game-friendly environments.")
@@ -59,6 +62,10 @@ object Main {
                     .withDescription("Output data in a usable format.")
                     .withDefaultCommand(help)
                     .withCommands(outputs.map { toRunnableClass(it) }.filterNotNull())
+            cliBuilder.withGroup("pipeline")
+                    .withDescription("Run a preset pipeline which includes multiple tasks.")
+                    .withDefaultCommand(help)
+                    .withCommands(pipelines.map { toRunnableClass(it) }.filterNotNull())
             cliBuilder.build().parse(*args).run()
         }
 

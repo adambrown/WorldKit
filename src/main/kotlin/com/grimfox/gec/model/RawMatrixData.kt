@@ -196,7 +196,7 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
         private val ZERO_INT_FLOAT_PAIR = Pair(0, 0.0f)
         private val METADATA_BYTES = 12
 
-        fun <T> createAndUse(file: File, size: Int, format: Format<T>, rasterWidth: Int = 2.pow(size).pow(2), segmentWidth: Int = 1, codeBlock: (RawMatrixData<T>) -> Unit) {
+        fun <T> createAndUse(file: File, size: Int, format: Format<T>, rasterWidth: Int = 2.pow(size), segmentWidth: Int = 1, codeBlock: (RawMatrixData<T>) -> Unit) {
             if (file.exists()) {
                 file.delete()
             }
@@ -245,7 +245,7 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
     private val dataFormat = format.dataFormat
     private val stride = if (size > 10) 2.pow(11) else 2.pow(size)
     private val chunkSize = stride.pow(2) * dataFormat.size
-    private val chunkStride = if (size < 14) 1 else 2.pow(size - 13)
+    private val chunkStride = if (size < 12) 1 else 2.pow(size - 11)
     private val chunkCount = chunkStride.pow(2)
     private val chunks = channel.mapChunks(mode, METADATA_BYTES, chunkSize, chunkCount)
     private var open = true
