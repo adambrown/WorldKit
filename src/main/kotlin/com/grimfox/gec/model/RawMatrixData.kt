@@ -79,11 +79,11 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
 
     private class ClosestPointsFormat() : BaseFormat<ClosestPoints>(
             type = ClosestPoints::class.java,
-            size = 65,
+            size = 36,
             get = { buffer, offset ->
                 val cursor = AtomicInteger(offset)
                 val counter = AtomicInteger(0)
-                val nullMask = buffer.getShort(cursor.getAndAdd(2)).toInt()
+                val nullMask = buffer.get(cursor.andIncrement).toInt()
                 fun readPair(): Pair<Int, Float>? {
                     val pair = Pair(buffer.readUint24(cursor.getAndAdd(3)), buffer.getFloat(cursor.getAndAdd(4)))
                     val mask = (0x01 shl counter.andIncrement)
@@ -93,14 +93,12 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
                         return null
                     }
                 }
-                ClosestPoints(readPair(), readPair(), readPair(),
-                        readPair(), readPair(), readPair(),
-                        readPair(), readPair(), readPair())
+                ClosestPoints(readPair(), readPair(), readPair(), readPair(), readPair())
             },
             put = { buffer, offset, value ->
                 val cursor = AtomicInteger(offset)
                 var nullMask = 0x1F
-                for (i in 0..8) {
+                for (i in 0..4) {
                     if (value[i] == null) {
                         nullMask = (0x01 shl i) xor nullMask
                     }
@@ -109,8 +107,8 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
                     buffer.writeUint24(cursor.getAndAdd(3), pair.first)
                     buffer.putFloat(cursor.getAndAdd(4), pair.second)
                 }
-                buffer.putShort(cursor.getAndAdd(2), nullMask.toShort())
-                for (i in 0..8) {
+                buffer.put(cursor.getAndAdd(1), nullMask.toByte())
+                for (i in 0..4) {
                     writePair(value[i] ?: ZERO_INT_FLOAT_PAIR)
                 }
             }

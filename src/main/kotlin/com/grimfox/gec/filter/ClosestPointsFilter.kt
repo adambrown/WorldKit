@@ -81,10 +81,6 @@ class ClosestPointsFilter : Runnable {
                 closestPoints[1],
                 closestPoints[2],
                 closestPoints[3],
-                closestPoints[4],
-                closestPoints[5],
-                closestPoints[6],
-                closestPoints[7],
-                closestPoints[8])
+                closestPoints[4])
     }
 }

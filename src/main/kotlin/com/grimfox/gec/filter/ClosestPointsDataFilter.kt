@@ -1,12 +1,10 @@
 package com.grimfox.gec.filter
 
-import com.grimfox.gec.util.Utils.pow
-import com.grimfox.gec.util.Utils.exp2FromSize
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.RawMatrixData
 import com.grimfox.gec.model.RawMatrixData.Format
+import com.grimfox.gec.util.Utils.exp2FromSize
 import java.io.File
-import java.util.*
 
 interface ClosestPointsDataFilter<T> : Runnable {
 
@@ -30,5 +28,4 @@ interface ClosestPointsDataFilter<T> : Runnable {
             }
         }
     }
-
 }
