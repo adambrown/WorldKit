@@ -12,7 +12,7 @@ import io.airlift.airline.Option
 import java.io.File
 import java.util.*
 
-@Command(name = "coastline", description = "Create coastline from points and closest points.")
+@Command(name = "coastline-create", description = "Create coastline from closest points.")
 class CoastlineFilter : Runnable {
 
     @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
@@ -60,9 +60,45 @@ class CoastlineFilter : Runnable {
             buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, skips)
 
             removeLakes(edgeGraph, borderPoints, waterPoints)
+            removeIslands(edgeGraph, waterPoints, pointCount)
 
             writeOutput(pointCount, waterPoints)
         }
+    }
+
+    private fun removeIslands(edgeGraph: ArrayList<List<Int>>, waterPoints: HashSet<Int>, pointCount: Int) {
+        val landPoints = HashSet<Int>(pointCount)
+        for (i in 0..pointCount - 1) {
+            if (!waterPoints.contains(i)) {
+                landPoints.add(i)
+            }
+        }
+        val landBodies = ArrayList<Set<Int>>()
+        while (landPoints.isNotEmpty()) {
+            landBodies.add(buildLandBody(edgeGraph, landPoints))
+        }
+        landBodies.sortBy { it.size }
+        landBodies.removeAt(landBodies.size - 1)
+        landBodies.forEach {
+            waterPoints.addAll(it)
+        }
+    }
+
+    private fun buildLandBody(edgeGraph: List<List<Int>>, landPoints: MutableSet<Int>): Set<Int> {
+        val landBody = HashSet<Int>()
+        var growSet = HashSet<Int>()
+        growSet.add(landPoints.first())
+        var iterateSet: HashSet<Int>
+        while (growSet.isNotEmpty()) {
+            landBody.addAll(growSet)
+            landPoints.removeAll(growSet)
+            iterateSet = growSet
+            growSet = HashSet<Int>()
+            iterateSet.forEach { index ->
+                addAllConnectedPoints(edgeGraph, landPoints, landBody, growSet, index)
+            }
+        }
+        return landBody
     }
 
     private fun removeLakes(edgeGraph: ArrayList<List<Int>>, borderPoints: HashSet<Int>, waterPoints: HashSet<Int>) {
@@ -74,9 +110,8 @@ class CoastlineFilter : Runnable {
             iterateSet = growSet
             growSet = HashSet<Int>()
             iterateSet.forEach { index ->
-                addAllConnectedWater(edgeGraph, waterPoints, oceanPoints, growSet, index)
+                addAllConnectedPoints(edgeGraph, waterPoints, oceanPoints, growSet, index)
             }
-
         }
         val lakeSet = HashSet<Int>()
         waterPoints.forEach {
@@ -87,9 +122,9 @@ class CoastlineFilter : Runnable {
         waterPoints.removeAll(lakeSet)
     }
 
-    private fun addAllConnectedWater(edgeGraph: List<List<Int>>, waterPoints: Set<Int>, oceanPoints: Set<Int>, growSet: MutableSet<Int>, index: Int) {
+    private fun addAllConnectedPoints(edgeGraph: List<List<Int>>, positiveFilter: Set<Int>, negativeFilter: Set<Int>, growSet: MutableSet<Int>, index: Int) {
         edgeGraph[index].forEach { adjacentIndex ->
-            if (waterPoints.contains(adjacentIndex) && !oceanPoints.contains(adjacentIndex)) {
+            if (positiveFilter.contains(adjacentIndex) && !negativeFilter.contains(adjacentIndex)) {
                 growSet.add(adjacentIndex)
             }
         }
