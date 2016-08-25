@@ -4,12 +4,9 @@ import com.grimfox.gec.Main
 import com.grimfox.gec.generator.Point
 import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.DataFiles
-import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.util.Utils.pow
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
-import java.util.*
 
 @Command(name = "mask-points", description = "Create points mask based on raster mask.")
 class MaskPointsFilter : Runnable {
