@@ -3,7 +3,6 @@ package com.grimfox.gec.pipeline
 import com.grimfox.gec.Main
 import com.grimfox.gec.filter.ClosestPointsFilter
 import com.grimfox.gec.filter.DistanceBasedHeightFilter
-import com.grimfox.gec.generator.PointsGenerator
 import com.grimfox.gec.output.PngGray16Output
 import io.airlift.airline.Command
 import io.airlift.airline.Option
@@ -32,12 +31,12 @@ class MountainPermutationPipeline() : Runnable {
         val pointsFile = File("$filePrefix-points.bin")
         val closePointsFile = File("$filePrefix-closest-points.bin")
 
-        val pointsGen = PointsGenerator()
-        pointsGen.size = size
-        pointsGen.outputFile = pointsFile
-        pointsGen.pointSpacing = pointSpacing
-        pointsGen.seed = seed
-        pointsGen.run()
+//        val pointsGen = PointsGenerator()
+//        pointsGen.size = size
+//        pointsGen.outputFile = pointsFile
+//        pointsGen.pointSpacing = pointSpacing
+//        pointsGen.seed = seed
+//        pointsGen.run()
 
         val closePointsFilter = ClosestPointsFilter()
         closePointsFilter.inputFile = pointsFile

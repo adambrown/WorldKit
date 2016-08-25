@@ -7,9 +7,9 @@ import com.grimfox.gec.util.Utils.mapChunks
 import com.grimfox.gec.util.Utils.pow
 import com.grimfox.gec.util.Utils.primitiveToWrapper
 import com.grimfox.gec.util.Utils.readInt
+import com.grimfox.gec.util.Utils.readUint24
 import com.grimfox.gec.util.Utils.toRandomAccessFileMode
 import com.grimfox.gec.util.Utils.writeInt
-import com.grimfox.gec.util.Utils.readUint24
 import com.grimfox.gec.util.Utils.writeUint24
 import java.io.File
 import java.io.RandomAccessFile
@@ -21,7 +21,7 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 
-class RawMatrixData<T> private constructor(private val mode: MapMode, private val channel: FileChannel, private val size: Int, val rasterWidth: Int, val segmentWidth: Int, val format: Format<T>) {
+class DeprecatedRawMatrixData<T> private constructor(private val mode: MapMode, private val channel: FileChannel, private val size: Int, val rasterWidth: Int, val segmentWidth: Int, val format: Format<T>) {
 
     private constructor(mode: MapMode, channel: FileChannel, format: Format<T>) : this(mode, channel, channel.imageSizeAsExp2(format.dataFormat.size, METADATA_BYTES), channel.readInt(4), channel.readInt(8), format)
 
@@ -194,43 +194,43 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
         private val ZERO_INT_FLOAT_PAIR = Pair(0, 0.0f)
         private val METADATA_BYTES = 12
 
-        fun <T> createAndUse(file: File, size: Int, format: Format<T>, rasterWidth: Int = 2.pow(size), segmentWidth: Int = 1, codeBlock: (RawMatrixData<T>) -> Unit) {
+        fun <T> createAndUse(file: File, size: Int, format: Format<T>, rasterWidth: Int = 2.pow(size), segmentWidth: Int = 1, codeBlock: (DeprecatedRawMatrixData<T>) -> Unit) {
             if (file.exists()) {
                 file.delete()
             }
-            RawMatrixData(file, size, rasterWidth, segmentWidth, format).use(codeBlock)
+            DeprecatedRawMatrixData(file, size, rasterWidth, segmentWidth, format).use(codeBlock)
         }
 
-        fun <T : Any> openAndUse(file: File, type: Class<T>, mode: MapMode = MapMode.READ_ONLY, codeBlock: (RawMatrixData<T>) -> Unit) {
+        fun <T : Any> openAndUse(file: File, type: Class<T>, mode: MapMode = MapMode.READ_ONLY, codeBlock: (DeprecatedRawMatrixData<T>) -> Unit) {
             checkRawMatrixDataType(createRawMatrixDataUntyped(file, mode), type).use(codeBlock)
         }
 
-        fun <T : Any> openAndUse(file: File, type: KClass<T>, mode: MapMode = MapMode.READ_ONLY, codeBlock: (RawMatrixData<T>) -> Unit) {
+        fun <T : Any> openAndUse(file: File, type: KClass<T>, mode: MapMode = MapMode.READ_ONLY, codeBlock: (DeprecatedRawMatrixData<T>) -> Unit) {
             openAndUse(file, type.java, mode, codeBlock)
         }
 
-        inline fun <reified T : Any> openAndUse(file: File, mode: MapMode = MapMode.READ_ONLY, noinline codeBlock: (RawMatrixData<T>) -> Unit) {
+        inline fun <reified T : Any> openAndUse(file: File, mode: MapMode = MapMode.READ_ONLY, noinline codeBlock: (DeprecatedRawMatrixData<T>) -> Unit) {
             openAndUse(file, T::class.java, mode, codeBlock)
         }
 
-        fun openAndUseUntyped(file: File, mode: MapMode = MapMode.READ_ONLY, codeBlock: (RawMatrixData<Any>) -> Unit) {
+        fun openAndUseUntyped(file: File, mode: MapMode = MapMode.READ_ONLY, codeBlock: (DeprecatedRawMatrixData<Any>) -> Unit) {
             openAndUse(file, Any::class.java, mode, codeBlock)
         }
 
-        private fun <T : Any> checkRawMatrixDataType(data: RawMatrixData<*>, type: Class<T>): RawMatrixData<T> {
+        private fun <T : Any> checkRawMatrixDataType(data: DeprecatedRawMatrixData<*>, type: Class<T>): DeprecatedRawMatrixData<T> {
             if (type.isAssignableFrom(data.format.dataFormat.type) || type.isAssignableFrom(primitiveToWrapper(data.format.dataFormat.type))) {
-                @Suppress("UNCHECKED_CAST") return data as RawMatrixData<T>
+                @Suppress("UNCHECKED_CAST") return data as DeprecatedRawMatrixData<T>
             } else {
                 throw IllegalArgumentException("RawMatrixData type does not match: ${type.canonicalName}")
             }
         }
 
-        private fun createRawMatrixDataUntyped(file: File, mode: MapMode): RawMatrixData<*> {
+        private fun createRawMatrixDataUntyped(file: File, mode: MapMode): DeprecatedRawMatrixData<*> {
             if (!file.isFile) {
                 throw IllegalArgumentException("File ${file.canonicalPath} does not exist.")
             }
             val channel = RandomAccessFile(file, mode.toRandomAccessFileMode()).channel
-            return RawMatrixData(mode, channel, Format.fromFileUntyped(channel))
+            return DeprecatedRawMatrixData(mode, channel, Format.fromFileUntyped(channel))
         }
     }
 
@@ -265,7 +265,7 @@ class RawMatrixData<T> private constructor(private val mode: MapMode, private va
         throw IllegalStateException("Calling get on closed buffers.")
     }
 
-    internal fun use(codeBlock: (RawMatrixData<T>) -> Unit) {
+    internal fun use(codeBlock: (DeprecatedRawMatrixData<T>) -> Unit) {
         try {
             codeBlock(this)
         } finally {

@@ -2,8 +2,7 @@ package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
 import com.grimfox.gec.generator.Point
-import com.grimfox.gec.model.ClosestPoints
-import com.grimfox.gec.model.ClosestPointsMatrix
+import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.util.Utils.pow
@@ -12,17 +11,17 @@ import io.airlift.airline.Option
 import java.io.File
 import java.util.*
 
-@Command(name = "closest-points", description = "Create a matrix of the closest points to each pixel from points.")
-class ClosestPointsFilter : Runnable {
+@Command(name = "point-mask", description = "Create a matrix masked by values assigned to each point.")
+class PointMaskFilter : Runnable {
 
-    @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
-    var inputFile: File = File(Main.workingDir, "input.bin")
+    @Option(name = arrayOf("-p", "--points-file"), description = "The points file to read as input.", required = true)
+    var pointsFile: File = File(Main.workingDir, "points.bin")
+
+    @Option(name = arrayOf("-m", "--mask-file"), description = "The mask file to read as input.", required = true)
+    var maskFile: File = File(Main.workingDir, "mask.bin")
 
     @Option(name = arrayOf("-e", "--exponent"), description = "The size of the output as an exponent of 2. The output width and height will be equal to 2 to the power of size.", required = false)
     var exponent: Int? = null
-
-    @Option(name = arrayOf("-p", "--point-count"), description = "The number of closest points to output per fragment.", required = false)
-    var pointCount: Int = 2
 
     @Option(name = arrayOf("-f", "--file"), description = "The data file to write as output.", required = true)
     var outputFile: File = File(Main.workingDir, "output.bin")
@@ -31,39 +30,32 @@ class ClosestPointsFilter : Runnable {
     var wrapEdges: Boolean = false
 
     override fun run() {
-        DataFiles.openAndUse<Point>(inputFile) { points ->
-            val outputExponent = exponent ?: points.exponent + 3
-            val outputWidth = 2.pow(outputExponent)
-            val gridStride = points.width
-            val gridSquareSize = outputWidth / gridStride
-            val pointWrapOffset = outputWidth.toFloat()
-            val pointsPerFragment = Math.min(Math.max(pointCount, 2), 5)
-            fun <M : ClosestPointsMatrix> execute(format: Class<M>) {
-                DataFiles.createAndUse(outputFile, outputExponent, format) { heightMap ->
+        DataFiles.openAndUse<Point>(pointsFile) { points ->
+            DataFiles.openAndUse<Int>(maskFile) { mask ->
+                val outputExponent = exponent ?: points.exponent + 3
+                val outputWidth = 2.pow(outputExponent)
+                val gridStride = points.width
+                val gridSquareSize = outputWidth / gridStride
+                val pointWrapOffset = outputWidth.toFloat()
+                DataFiles.createAndUse<BitMatrix>(outputFile, outputExponent) { heightMap ->
                     val end = heightMap.width - 1
                     for (y in 0..end) {
                         for (x in 0..end) {
                             val gridX = x / gridSquareSize
                             val gridY = y / gridSquareSize
-                            val closestPoints = getClosestPoints(points, gridX, gridY, gridStride, pointWrapOffset, Point(x.toFloat(), y.toFloat()), outputWidth)
-                            heightMap[x, y] = closestPoints
+                            val closestPoint = getClosestPoint(points, gridX, gridY, gridStride, pointWrapOffset, Point(x.toFloat(), y.toFloat()), outputWidth)
+                            heightMap[x, y] = mask[closestPoint % mask.width, closestPoint / mask.width]
                         }
                     }
                 }
             }
-            when (pointsPerFragment) {
-                3 -> execute(ClosestPointsMatrix.M3::class.java)
-                4 -> execute(ClosestPointsMatrix.M4::class.java)
-                5 -> execute(ClosestPointsMatrix.M5::class.java)
-                else -> execute(ClosestPointsMatrix.M2::class.java)
-            }
         }
     }
 
-    private fun getClosestPoints(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int): ClosestPoints {
-        val closestPoints = ArrayList<Pair<Int, Float>>(49)
-        for (yOff in -3..3) {
-            for (xOff in -3..3) {
+    private fun getClosestPoint(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int): Int {
+        val closestPoints = ArrayList<Pair<Int, Float>>(25)
+        for (yOff in -1..1) {
+            for (xOff in -1..1) {
                 var ox = x + xOff
                 var oy = y + yOff
                 var xDistAdjust = 0.0f
@@ -95,10 +87,6 @@ class ClosestPointsFilter : Runnable {
         closestPoints.sort { p1, p2 ->
             p1.second.compareTo(p2.second)
         }
-        return ClosestPoints(closestPoints[0],
-                closestPoints[1],
-                closestPoints[2],
-                closestPoints[3],
-                closestPoints[4])
+        return closestPoints[0].first
     }
 }

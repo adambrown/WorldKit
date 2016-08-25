@@ -13,9 +13,6 @@ class PngGray8Output : PngGrayOutput {
 
     override val rangeMax: Int = 255
 
-    @Option(name = arrayOf("-b", "--binary"), description = "If the input file is a binary mask or not.", required = false)
-    override var binaryInput: Boolean = false
-
     @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
     override var inputFile: File = File(Main.workingDir, "input.bin")
 

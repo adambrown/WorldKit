@@ -2,13 +2,13 @@ package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.ClosestPoints
-import com.grimfox.gec.model.RawMatrixData.Format
+import com.grimfox.gec.model.FloatMatrix
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
 
 @Command(name = "mountains", description = "Create mountains from points.")
-class DistanceBasedHeightFilter() : ClosestPointsDataFilter<Float> {
+class DistanceBasedHeightFilter() : ClosestPointsDataFilter<Float, FloatMatrix> {
 
     override val heightFunction = { closestPoints: ClosestPoints ->
         var height = coeff1 * (closestPoints[0]?.second ?: 0.0f)
@@ -19,7 +19,7 @@ class DistanceBasedHeightFilter() : ClosestPointsDataFilter<Float> {
         height
     }
 
-    override val format = Format.FLOAT
+    override val format = FloatMatrix::class.java
 
     @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
     override var inputFile: File = File(Main.workingDir, "input.bin")

@@ -1,7 +1,6 @@
 package com.grimfox.gec.output
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.RawMatrixData.Format
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.awt.image.BufferedImage
@@ -13,9 +12,6 @@ class PngGray16Output : PngGrayOutput {
     override val bufferedImageType: Int = BufferedImage.TYPE_USHORT_GRAY
 
     override val rangeMax: Int = 65535
-
-    @Option(name = arrayOf("-b", "--binary"), description = "If the input file is a binary mask or not.", required = false)
-    override var binaryInput: Boolean = false
 
     @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
     override var inputFile: File = File(Main.workingDir, "input.bin")

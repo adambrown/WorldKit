@@ -3,16 +3,14 @@ package com.grimfox.gec.filter
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.ClosestPoints
-import com.grimfox.gec.model.RawMatrixData
+import com.grimfox.gec.model.DataFiles
+import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.util.Utils.exp2FromSize
+import com.grimfox.gec.util.Utils.pow
+import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
 import java.util.*
-import com.grimfox.gec.util.Utils
-import com.grimfox.gec.util.Utils.pow
-import com.grimfox.gec.util.Utils.toRandomAccessFileMode
-import io.airlift.airline.Command
-import java.io.RandomAccessFile
-import java.nio.channels.FileChannel
 
 @Command(name = "coastline", description = "Create coastline from points and closest points.")
 class CoastlineFilter : Runnable {
@@ -30,8 +28,8 @@ class CoastlineFilter : Runnable {
     var seed: Long = System.currentTimeMillis()
 
     override fun run() {
-        RawMatrixData.openAndUse<ClosestPoints>(inputFile) { closestPoints ->
-            val stride = closestPoints.rasterWidth
+        DataFiles.openAndUse<ClosestPoints>(inputFile) { closestPoints ->
+            val stride = closestPoints.width
             val strideMinusOne = stride - 1
 
             val edges = buildEdgeMap(closestPoints)
@@ -41,11 +39,11 @@ class CoastlineFilter : Runnable {
             val waterPoints = buildCornerPoints(closestPoints, stride, strideMinusOne)
             waterPoints.addAll(borderPoints)
 
-            val points = edges.keys.toList().sorted()
+            val pointCount = edges.size
 
-            val edgeGraph = buildEdgeGraph(edges, points)
+            val edgeGraph = buildEdgeGraph(edges, pointCount)
 
-            val landPointCount = points.size - waterPoints.size
+            val landPointCount = pointCount - waterPoints.size
 
             val coastalPoints = buildCoastalPoints(edgeGraph, waterPoints)
 
@@ -63,7 +61,7 @@ class CoastlineFilter : Runnable {
 
             removeLakes(edgeGraph, borderPoints, waterPoints)
 
-            writeOutput(closestPoints, waterPoints)
+            writeOutput(pointCount, waterPoints)
         }
     }
 
@@ -97,17 +95,14 @@ class CoastlineFilter : Runnable {
         }
     }
 
-    private fun writeOutput(closestPoints: RawMatrixData<ClosestPoints>, waterPoints: HashSet<Int>) {
-        val bitMatrix = BitMatrix(RandomAccessFile(outputFile, FileChannel.MapMode.READ_WRITE.toRandomAccessFileMode()).channel, FileChannel.MapMode.READ_WRITE, Utils.exp2FromSize(closestPoints.rasterWidth), 0)
-        try {
-            val rasterEnd = closestPoints.rasterWidth - 1
-            for (y in 0..rasterEnd) {
-                for (x in 0..rasterEnd) {
-                    bitMatrix[x, y] = if (!waterPoints.contains(closestPoints[x, y].p0?.first)) { 1 } else { 0 }
-                }
+    private fun writeOutput(pointCount: Int, waterPoints: HashSet<Int>) {
+        val exponent = exp2FromSize(Math.round(Math.sqrt(pointCount.toDouble())).toInt())
+        DataFiles.createAndUse<BitMatrix>(outputFile, exponent) { bitMatrix ->
+            for (i in 0..pointCount - 1) {
+                val y = i / bitMatrix.width
+                val x = i % bitMatrix.width
+                bitMatrix[x, y] = if (!waterPoints.contains(i)) { 1 } else { 0 }
             }
-        } finally {
-            bitMatrix.close()
         }
     }
 
@@ -224,15 +219,15 @@ class CoastlineFilter : Runnable {
         return coastalPoints
     }
 
-    private fun buildEdgeGraph(edges: HashMap<Int, MutableSet<Int>>, points: List<Int>): ArrayList<List<Int>> {
-        val edgeGraph = ArrayList<List<Int>>(points.last())
-        for (i in points) {
+    private fun buildEdgeGraph(edges: HashMap<Int, MutableSet<Int>>, pointCount: Int): ArrayList<List<Int>> {
+        val edgeGraph = ArrayList<List<Int>>(pointCount)
+        for (i in 0..pointCount - 1) {
             edgeGraph.add(i, edges[i]!!.toList().sorted())
         }
         return edgeGraph
     }
 
-    private fun buildCornerPoints(closestPoints: RawMatrixData<ClosestPoints>, stride: Int, strideMinusOne: Int): HashSet<Int> {
+    private fun buildCornerPoints(closestPoints: Matrix<ClosestPoints>, stride: Int, strideMinusOne: Int): HashSet<Int> {
         val cornerPoints = HashSet<Int>()
         val cornerWidth = Math.round(stride * 0.293f) - 1
         fun addPoint(x: Int, y: Int) {
@@ -252,7 +247,7 @@ class CoastlineFilter : Runnable {
         return cornerPoints
     }
 
-    private fun buildBorderPoints(closestPoints: RawMatrixData<ClosestPoints>, strideMinusOne: Int): HashSet<Int> {
+    private fun buildBorderPoints(closestPoints: Matrix<ClosestPoints>, strideMinusOne: Int): HashSet<Int> {
         val borderPoints = HashSet<Int>()
         fun addPoint(x: Int, y: Int) {
             val closePoint = closestPoints[x, y].p0?.first
@@ -269,7 +264,7 @@ class CoastlineFilter : Runnable {
         return borderPoints
     }
 
-    private fun buildEdgeMap(closestPoints: RawMatrixData<ClosestPoints>): HashMap<Int, MutableSet<Int>> {
+    private fun buildEdgeMap(closestPoints: Matrix<ClosestPoints>): HashMap<Int, MutableSet<Int>> {
         val edges = HashMap<Int, MutableSet<Int>>()
         val end = closestPoints.width - 1
         for (y in 0..end) {

@@ -37,14 +37,14 @@ class ClosestPoints private constructor(private val internalPoints: Array<Pair<I
     get() { return Arrays.copyOf(internalPoints, internalPoints.size) }
 
     operator fun get(index: Int): Pair<Int, Float>? {
-        return points[index]
+        return internalPoints[index]
     }
 
     operator fun set(index: Int, value: Pair<Int, Float>?) {
-        points[index] = value
+        internalPoints[index] = value
     }
 
     override fun iterator(): Iterator<Pair<Int, Float>?> {
-        return points.toList().iterator()
+        return internalPoints.toList().iterator()
     }
 }
