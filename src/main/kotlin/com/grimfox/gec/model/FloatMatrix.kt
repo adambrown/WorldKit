@@ -12,14 +12,14 @@ class FloatMatrix(channel: FileChannel, mode: FileChannel.MapMode, override val 
 
     private val data = RawData(32, size, channel, mode, offset)
 
-    override fun set(x: Int, y: Int, value: Float) {
+    override fun set(i: Int, value: Float) {
         val buffer = ByteBuffer.wrap(ByteArray(4)).order(ByteOrder.LITTLE_ENDIAN)
         buffer.putFloat(0, value)
-        data[y * width + x] = buffer.array()
+        data[i] = buffer.array()
     }
 
-    override fun get(x: Int, y: Int): Float {
-        val buffer = ByteBuffer.wrap(data[y * width + x]).order(ByteOrder.LITTLE_ENDIAN)
+    override fun get(i: Int): Float {
+        val buffer = ByteBuffer.wrap(data[i]).order(ByteOrder.LITTLE_ENDIAN)
         return buffer.getFloat(0)
     }
 

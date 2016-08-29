@@ -1,12 +1,10 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.DataFiles
-import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.util.Utils.exp2FromSize
-import com.grimfox.gec.util.Utils.pow
+import com.grimfox.gec.util.Utils.buildEdgeGraph
+import com.grimfox.gec.util.Utils.buildEdgeMap
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
@@ -59,11 +57,11 @@ class CoastlineCreateFilter : CoastlineFilter {
             var iterations = Math.min(landPointCount, Math.round(landPointCount * percent))
             var skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, iterations)
             iterations = (iterations - skips) / 2
-            skips = buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, iterations)
+            skips = buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, null, random, iterations)
             iterations -= skips
             skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, iterations)
             iterations -= skips
-            buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, skips)
+            buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, null, random, skips)
 
             removeLakes(edgeGraph, borderPoints, waterPoints)
             removeIslands(edgeGraph, waterPoints, pointCount, smallIsland, largeIsland)

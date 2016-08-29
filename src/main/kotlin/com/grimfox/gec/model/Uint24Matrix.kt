@@ -14,14 +14,14 @@ class Uint24Matrix(channel: FileChannel, mode: FileChannel.MapMode, override val
 
     private val data = RawData(24, size, channel, mode, offset)
 
-    override fun set(x: Int, y: Int, value: Int) {
+    override fun set(i: Int, value: Int) {
         val buffer = ByteBuffer.wrap(ByteArray(3)).order(ByteOrder.LITTLE_ENDIAN)
         buffer.writeUint24(0, value)
-        data[y * width + x] = buffer.array()
+        data[i] = buffer.array()
     }
 
-    override fun get(x: Int, y: Int): Int {
-        val buffer = ByteBuffer.wrap(data[y * width + x]).order(ByteOrder.LITTLE_ENDIAN)
+    override fun get(i: Int): Int {
+        val buffer = ByteBuffer.wrap(data[i]).order(ByteOrder.LITTLE_ENDIAN)
         return buffer.readUint24(0)
     }
 

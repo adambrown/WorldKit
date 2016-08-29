@@ -1,6 +1,9 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.Main
+import com.grimfox.gec.generator.Point
+import com.grimfox.gec.model.ClosestPoints
+import com.grimfox.gec.model.Matrix
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -132,5 +135,85 @@ object Utils {
         put(position, (value and 0xFF).toByte())
         put(position + 1, ((value ushr 8) and 0xFF).toByte())
         put(position + 2, ((value ushr 16) and 0xFF).toByte())
+    }
+
+    fun findClosestPoint(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int, wrapEdges: Boolean): Int {
+        return findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 1)[0].first
+    }
+
+
+    fun findClosestPoints(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int, wrapEdges: Boolean): ClosestPoints {
+        val closestPoints = findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 3)
+        return ClosestPoints(closestPoints[0],
+                closestPoints[1],
+                closestPoints[2],
+                closestPoints[3],
+                closestPoints[4])
+    }
+
+    private fun findClosestPoints(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int, wrapEdges: Boolean, ringCount: Int): ArrayList<Pair<Int, Float>> {
+        val ringWidth = ringCount * 2 + 1
+        val closestPoints = ArrayList<Pair<Int, Float>>(ringWidth * ringWidth)
+        for (yOff in -ringCount..ringCount) {
+            for (xOff in -ringCount..ringCount) {
+                var ox = x + xOff
+                var oy = y + yOff
+                var xDistAdjust = 0.0f
+                var yDistAdjust = 0.0f
+                if (wrapEdges) {
+                    val ox1 = ox
+                    ox = (ox + gridStride) % gridStride
+                    if (ox1 > ox) {
+                        xDistAdjust = pointWrapOffset
+                    } else if (ox1 < ox) {
+                        xDistAdjust = -pointWrapOffset
+                    }
+                    val oy1 = oy
+                    oy = (oy + gridStride) % gridStride
+                    if (oy1 > oy) {
+                        yDistAdjust = pointWrapOffset
+                    } else if (oy1 < oy) {
+                        yDistAdjust = -pointWrapOffset
+                    }
+                }
+                if (oy >= 0 && oy < gridStride && ox >= 0 && ox < gridStride) {
+                    val index = oy * gridStride + ox
+                    val other = points[ox, oy]
+                    val distance = point.distanceSquaredTo(Point(other.x * outputWidth + xDistAdjust, other.y * outputWidth + yDistAdjust))
+                    closestPoints.add(Pair(index, distance))
+                }
+            }
+        }
+        closestPoints.sort { p1, p2 ->
+            p1.second.compareTo(p2.second)
+        }
+        return closestPoints
+    }
+
+    fun buildEdgeMap(closestPoints: Matrix<ClosestPoints>): HashMap<Int, MutableSet<Int>> {
+        val edges = HashMap<Int, MutableSet<Int>>()
+        val end = closestPoints.width - 1
+        for (y in 0..end) {
+            for (x in 0..end) {
+                val points = closestPoints[x, y]
+                val p0 = points.p0?.first
+                val p1 = points.p1?.first
+                if (p0 != null && p1 != null) {
+                    val p0Cons = edges.getOrPut(p0, { HashSet() })
+                    p0Cons.add(p1)
+                    val p1Cons = edges.getOrPut(p1, { HashSet() })
+                    p1Cons.add(p0)
+                }
+            }
+        }
+        return edges
+    }
+
+    fun buildEdgeGraph(edges: HashMap<Int, MutableSet<Int>>, pointCount: Int): ArrayList<ArrayList<Int>> {
+        val edgeGraph = ArrayList<ArrayList<Int>>(pointCount)
+        for (i in 0..pointCount - 1) {
+            edgeGraph.add(i, ArrayList(edges[i]!!.toList().sorted()))
+        }
+        return edgeGraph
     }
 }

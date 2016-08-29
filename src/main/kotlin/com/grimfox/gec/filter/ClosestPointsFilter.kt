@@ -2,15 +2,13 @@ package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
 import com.grimfox.gec.generator.Point
-import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.ClosestPointsMatrix
 import com.grimfox.gec.model.DataFiles
-import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.util.Utils
 import com.grimfox.gec.util.Utils.pow
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
-import java.util.*
 
 @Command(name = "closest-points", description = "Create a matrix of the closest points to each pixel from points.")
 class ClosestPointsFilter : Runnable {
@@ -45,7 +43,7 @@ class ClosestPointsFilter : Runnable {
                         for (x in 0..end) {
                             val gridX = x / gridSquareSize
                             val gridY = y / gridSquareSize
-                            val closestPoints = getClosestPoints(points, gridX, gridY, gridStride, pointWrapOffset, Point(x.toFloat(), y.toFloat()), outputWidth)
+                            val closestPoints = Utils.findClosestPoints(points, gridX, gridY, gridStride, pointWrapOffset, Point(x.toFloat(), y.toFloat()), outputWidth, wrapEdges)
                             heightMap[x, y] = closestPoints
                         }
                     }
@@ -58,47 +56,5 @@ class ClosestPointsFilter : Runnable {
                 else -> execute(ClosestPointsMatrix.M2::class.java)
             }
         }
-    }
-
-    private fun getClosestPoints(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int): ClosestPoints {
-        val closestPoints = ArrayList<Pair<Int, Float>>(49)
-        for (yOff in -3..3) {
-            for (xOff in -3..3) {
-                var ox = x + xOff
-                var oy = y + yOff
-                var xDistAdjust = 0.0f
-                var yDistAdjust = 0.0f
-                if (wrapEdges) {
-                    val ox1 = ox
-                    ox = (ox + gridStride) % gridStride
-                    if (ox1 > ox) {
-                        xDistAdjust = pointWrapOffset
-                    } else if (ox1 < ox) {
-                        xDistAdjust = -pointWrapOffset
-                    }
-                    val oy1 = oy
-                    oy = (oy + gridStride) % gridStride
-                    if (oy1 > oy) {
-                        yDistAdjust = pointWrapOffset
-                    } else if (oy1 < oy) {
-                        yDistAdjust = -pointWrapOffset
-                    }
-                }
-                if (oy >= 0 && oy < gridStride && ox >= 0 && ox < gridStride) {
-                    val index = oy * gridStride + ox
-                    val other = points[ox, oy]
-                    val distance = point.distanceSquaredTo(Point(other.x * outputWidth + xDistAdjust, other.y * outputWidth + yDistAdjust))
-                    closestPoints.add(Pair(index, distance))
-                }
-            }
-        }
-        closestPoints.sort { p1, p2 ->
-            p1.second.compareTo(p2.second)
-        }
-        return ClosestPoints(closestPoints[0],
-                closestPoints[1],
-                closestPoints[2],
-                closestPoints[3],
-                closestPoints[4])
     }
 }

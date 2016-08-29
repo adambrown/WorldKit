@@ -10,12 +10,12 @@ class BitMatrix(channel: FileChannel, mode: FileChannel.MapMode, override val ex
 
     private val data = RawData(1, size, channel, mode, offset)
 
-    override fun set(x: Int, y: Int, value: Int) {
-        data[y * width + x] = if (value > 0) { 1 } else { 0 }
+    override fun set(i: Int, value: Int) {
+        data[i] = if (value > 0) { 1 } else { 0 }
     }
 
-    override fun get(x: Int, y: Int): Int {
-        return data[y * width + x][0].toInt()
+    override fun get(i: Int): Int {
+        return data[i][0].toInt()
     }
 
     override fun close() {

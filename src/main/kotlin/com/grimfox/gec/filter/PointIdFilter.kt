@@ -4,14 +4,15 @@ import com.grimfox.gec.Main
 import com.grimfox.gec.generator.Point
 import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.DataFiles
+import com.grimfox.gec.model.Uint24Matrix
 import com.grimfox.gec.util.Utils.findClosestPoint
 import com.grimfox.gec.util.Utils.pow
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import java.io.File
 
-@Command(name = "point-mask", description = "Create a matrix masked by values assigned to each point.")
-class PointMaskFilter : Runnable {
+@Command(name = "point-id-mask", description = "Create a matrix masked by values assigned to each point.")
+class PointIdFilter : Runnable {
 
     @Option(name = arrayOf("-p", "--points-file"), description = "The points file to read as input.", required = true)
     var pointsFile: File = File(Main.workingDir, "points.bin")
@@ -36,7 +37,7 @@ class PointMaskFilter : Runnable {
                 val gridStride = points.width
                 val gridSquareSize = outputWidth / gridStride
                 val pointWrapOffset = outputWidth.toFloat()
-                DataFiles.createAndUse<BitMatrix>(outputFile, outputExponent) { heightMap ->
+                DataFiles.createAndUse<Uint24Matrix>(outputFile, outputExponent) { heightMap ->
                     val end = heightMap.width - 1
                     for (y in 0..end) {
                         for (x in 0..end) {

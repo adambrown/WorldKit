@@ -28,13 +28,13 @@ abstract class ClosestPointsMatrix private constructor(channel: FileChannel, mod
 
     private val data = RawData(bitsPerFragment, size, channel, mode, offset)
 
-    override fun set(x: Int, y: Int, value: ClosestPoints) {
+    override fun set(i: Int, value: ClosestPoints) {
         val buffer = ByteBuffer.wrap(ByteArray(bytesPerFragment)).order(ByteOrder.LITTLE_ENDIAN)
         val cursor = AtomicInteger(0)
         var nullMask = 0x1F
-        for (i in 0..4) {
-            if (value[i] == null) {
-                nullMask = (0x01 shl i) xor nullMask
+        for (j in 0..4) {
+            if (value[j] == null) {
+                nullMask = (0x01 shl j) xor nullMask
             }
         }
         fun writePair(pair: Pair<Int, Float>) {
@@ -42,14 +42,14 @@ abstract class ClosestPointsMatrix private constructor(channel: FileChannel, mod
             buffer.putFloat(cursor.getAndAdd(4), pair.second)
         }
         buffer.put(cursor.getAndAdd(1), nullMask.toByte())
-        for (i in 0..pointCount - 1) {
-            writePair(value[i] ?: ZERO_INT_FLOAT_PAIR)
+        for (j in 0..pointCount - 1) {
+            writePair(value[j] ?: ZERO_INT_FLOAT_PAIR)
         }
-        data[y * width + x] = buffer.array()
+        data[i] = buffer.array()
     }
 
-    override fun get(x: Int, y: Int): ClosestPoints {
-        val buffer = ByteBuffer.wrap(data[y * width + x]).order(ByteOrder.LITTLE_ENDIAN)
+    override fun get(i: Int): ClosestPoints {
+        val buffer = ByteBuffer.wrap(data[i]).order(ByteOrder.LITTLE_ENDIAN)
         val cursor = AtomicInteger(0)
         val counter = AtomicInteger(0)
         val nullMask = buffer.get(cursor.andIncrement).toInt()
@@ -63,8 +63,8 @@ abstract class ClosestPointsMatrix private constructor(channel: FileChannel, mod
             }
         }
         val points = ClosestPoints()
-        for (i in 0..pointCount - 1) {
-            points[i] = readPair()
+        for (j in 0..pointCount - 1) {
+            points[j] = readPair()
         }
         return points
     }
