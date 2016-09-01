@@ -12,7 +12,7 @@ import java.util.*
 interface CoastlineFilter : Runnable {
 
 
-    fun removeIslands(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, pointCount: Int, smallIsland: Int, largeIsland: Int) {
+    fun removeIslands(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, idMask: Matrix<Int>?, pointCount: Int, smallIsland: Int, largeIsland: Int) {
         val landPoints = HashSet<Int>(pointCount)
         for (i in 0..pointCount - 1) {
             if (!waterPoints.contains(i)) {
@@ -28,6 +28,11 @@ interface CoastlineFilter : Runnable {
         landBodies.forEach {
             if (it.size < smallIsland || it.size > largeIsland) {
                 waterPoints.addAll(it)
+                if (idMask != null) {
+                    it.forEach {
+                        idMask[it] = 0
+                    }
+                }
             }
         }
     }
@@ -49,7 +54,7 @@ interface CoastlineFilter : Runnable {
         return landBody
     }
 
-    fun removeLakes(edgeGraph: ArrayList<ArrayList<Int>>, borderPoints: HashSet<Int>, waterPoints: HashSet<Int>) {
+    fun removeLakes(edgeGraph: ArrayList<ArrayList<Int>>, borderPoints: HashSet<Int>, waterPoints: HashSet<Int>, idMask: Matrix<Int>?) {
         val oceanPoints = HashSet<Int>()
         var growSet = HashSet<Int>(borderPoints)
         var iterateSet: HashSet<Int>
@@ -68,6 +73,21 @@ interface CoastlineFilter : Runnable {
             }
         }
         waterPoints.removeAll(lakeSet)
+        if (idMask != null) {
+            while (lakeSet.isNotEmpty()) {
+                val lakeShore = ArrayList<Int>()
+                lakeSet.forEach {
+                    edgeGraph[it].forEach { adjacent ->
+                        val adjacentMask = idMask[adjacent]
+                        if (adjacentMask > 0) {
+                            lakeShore.add(it)
+                            idMask[it] = adjacentMask
+                        }
+                    }
+                }
+                lakeSet.removeAll(lakeShore)
+            }
+        }
     }
 
     private fun addAllConnectedPoints(edgeGraph: List<List<Int>>, positiveFilter: Set<Int>, negativeFilter: Set<Int>, growSet: MutableSet<Int>, index: Int) {
@@ -89,7 +109,7 @@ interface CoastlineFilter : Runnable {
         }
     }
 
-    fun reduceCoastline(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, random: Random, iterations: Int): Int {
+    fun reduceCoastline(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, idMask: Matrix<Int>?, random: Random, iterations: Int): Int {
         var skips = 0
         for (i in 1..iterations) {
             val pickList = degreeWeightedPick(coastalPointDegrees, random)
@@ -99,6 +119,9 @@ interface CoastlineFilter : Runnable {
             }
             val pickPoint = pickList.removeAt(random.nextInt(pickList.size))
             waterPoints.add(pickPoint)
+            if (idMask != null) {
+                idMask[pickPoint] = 0
+            }
             coastalPoints.remove(pickPoint)
             edgeGraph[pickPoint].forEach { adjacentPointIndex ->
                 if (!waterPoints.contains(adjacentPointIndex)) {

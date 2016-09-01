@@ -80,16 +80,16 @@ class CoastlineRefineFilter : CoastlineFilter {
 
         val random = Random(seed)
         var iterations = Math.min(landPointCount, Math.round(landPointCount * percent))
-        var skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, iterations)
+        var skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, iterations)
         iterations -= skips
         skips = buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, iterations)
         iterations -= skips
-        skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, random, iterations)
+        skips = reduceCoastline(edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, iterations)
         iterations -= skips
         buildUpCoastline(borderPoints, edgeGraph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, iterations)
 
-        removeLakes(edgeGraph, borderPoints, waterPoints)
-        removeIslands(edgeGraph, waterPoints, pointCount, smallIsland, largeIsland)
+        removeLakes(edgeGraph, borderPoints, waterPoints, idMask)
+        removeIslands(edgeGraph, waterPoints, idMask, pointCount, smallIsland, largeIsland)
 
         writeOutput(outputFile, pointCount, waterPoints)
     }
