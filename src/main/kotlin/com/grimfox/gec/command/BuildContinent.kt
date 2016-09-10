@@ -1,12 +1,14 @@
 package com.grimfox.gec.command
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.Graph
+import com.grimfox.gec.filter.RegionsFilter
+import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
-import com.grimfox.gec.model.Point
 import com.grimfox.gec.util.Coastline.buildCoastline
 import com.grimfox.gec.util.Coastline.refineCoastline
-import com.grimfox.gec.util.Triangulate
+import com.grimfox.gec.util.Mask.applyMask
+import com.grimfox.gec.util.Regions
+import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.generatePoints
 import io.airlift.airline.Command
@@ -37,13 +39,14 @@ class CellFilter() : Runnable {
     var outputFile: File = File(Main.workingDir, "output.bin")
 
     override fun run() {
-        for (test in 226..10000) {
+        for (test in 1..10000) {
             val virtualWidth = 100000.0f
-            val outputWidth = 2048
+            val outputWidth = 512
             val random = Random(test.toLong())
             var stride = startStride
             var lastGraph: Graph? = null
             var lastMask = HashSet<Int>()
+            var regionMask: Matrix<Int>? = null
             for (i in 1..iterations) {
                 val points = generatePoints(stride, virtualWidth, random)
                 val graph = buildGraph(stride, virtualWidth, points)
@@ -51,74 +54,26 @@ class CellFilter() : Runnable {
                     buildCoastline(graph, random, landPercent = 0.6f, maxIterations = 5, largeIsland = 1.0f, smallIsland = 0.05f)
                 } else {
                     val preMask = applyMask(graph, lastGraph, lastMask)
+                    if (regionMask != null) {
+                        regionMask = applyMask(graph, lastGraph, regionMask)
+                    }
 //                drawMask(graph, preMask, outputWidth, "test-mask-${String.format("%05d", i)}-pre")
-                    refineCoastline(graph, random, preMask, landPercent = 0.4f, minPerturbation = 0.1f - (i * 0.03f), maxIterations = Math.max(1, 4 - (i / 2)), largeIsland = 2.0f, smallIsland = 0.02f)
+                    refineCoastline(graph, random, preMask, landPercent = 0.4f, minPerturbation = 0.1f - (i * 0.03f), maxIterations = Math.max(1, 4 - (i / 2)), largeIsland = 2.0f, smallIsland = 0.02f, idMask = regionMask)
+                }
+                if (i == 4) {
+                    regionMask = buildRegions(graph, random, 8, waterMask)
+//                    drawRegions(graph, regions, outputWidth, "test2-${String.format("%05d", i)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW)
+//                    drawMask(graph, waterMask, outputWidth, "test2-${String.format("%05d", i)}-m")
                 }
                 stride = Math.floor(stride.toDouble() * multiplier).toInt()
 //            drawGraph(graph, outputWidth, "test-graph-${String.format("%05d", i)}")
 //            drawBorder(graph, outputWidth, "test-border-${String.format("%05d", i)}")
-//            drawMask(graph, waterMask, outputWidth, "test-mask-${String.format("%05d", i)}")
                 lastGraph = graph
                 lastMask = waterMask
             }
-            drawMask(lastGraph!!, lastMask, outputWidth, "test-new-${String.format("%05d", test)}")
+            drawMask(lastGraph!!, lastMask, outputWidth, "test-new-${String.format("%05d", test)}-m")
+            drawRegions(lastGraph, regionMask!!, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW)
         }
-    }
-
-    fun applyMask(graph: Graph, maskGraph: Graph, mask: Set<Int>, negate: Boolean = false) : HashSet<Int> {
-        val vertices = graph.vertices
-        val newMask = HashSet<Int>()
-        for (y in 0..graph.stride - 1) {
-            for (x in 0..graph.stride - 1) {
-                val vertex = vertices[x, y]
-                val point = vertex.point
-                val closePoint = getClosestPoint(maskGraph, point, getClosePoints(maskGraph, point))
-                val masked = mask.contains(closePoint)
-                if (masked) {
-                    if (!negate) {
-                        newMask.add(vertex.id)
-                    }
-                } else if (negate) {
-                    newMask.add(vertex.id)
-                }
-            }
-        }
-        return newMask
-    }
-
-    private fun getClosestPoint(graph: Graph, point: Point, closePoints: Set<Int>): Int {
-        val vertices = graph.vertices
-        var closestPoint: Int = -1
-        var minD2 = Float.MAX_VALUE
-        closePoints.forEach {
-            val d2 = vertices.getPoint(it).distanceSquaredTo(point)
-            if (d2 < minD2) {
-                closestPoint = it
-                minD2 = d2
-            }
-        }
-        return closestPoint
-    }
-
-    private fun getClosePoints(graph: Graph, point: Point): Set<Int> {
-        val vertices = graph.vertices
-        val strideMinus1 = graph.stride - 1
-        val gridX = Math.round(point.x * (strideMinus1))
-        val gridY = Math.round(point.y * (strideMinus1))
-        val seed = vertices[gridX, gridY].id
-        val nearPoints = HashSet<Int>()
-        nearPoints.add(seed)
-        var nextPoints = HashSet<Int>(nearPoints)
-        for (i in 0..2) {
-            val newPoints = HashSet<Int>()
-            nextPoints.forEach {
-                newPoints.addAll(vertices.getAdjacentVertices(it))
-            }
-            newPoints.removeAll(nearPoints)
-            nearPoints.addAll(newPoints)
-            nextPoints = newPoints
-        }
-        return nearPoints
     }
 
     /*-------------------------------------------------------------------------------------------------------------
@@ -210,6 +165,26 @@ class CellFilter() : Runnable {
         graph.vertices.forEach {
             val cell = it.cell
             if (!mask.contains(cell.id)) {
+                drawCell(graphics, multiplier, cell)
+            }
+        }
+
+        ImageIO.write(image, "png", File("output/$name.png"))
+    }
+
+    private fun drawRegions(graph: Graph, mask: Matrix<Int>, outputWidth: Int, name: String, vararg regionColors: Color) {
+        val multiplier = outputWidth.toFloat()
+        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
+        val graphics = image.createGraphics()
+        graphics.background = Color.BLACK
+        graphics.clearRect(0, 0, outputWidth, outputWidth)
+        graphics.color = Color.WHITE
+
+        graph.vertices.forEach {
+            val cell = it.cell
+            val regionId = mask[it.id]
+            if (regionId != 0) {
+                graphics.color = regionColors[regionId]
                 drawCell(graphics, multiplier, cell)
             }
         }

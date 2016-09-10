@@ -1,5 +1,7 @@
 package com.grimfox.gec.model
 
+import java.util.*
+
 
 class Graph(val stride: Int,
             val vertexIdsToPoints: FloatArray,
@@ -9,6 +11,8 @@ class Graph(val stride: Int,
             val triangleToVertices: IntArray,
             val triangleToTriangles: IntArray) {
 
+    var useVirtualConnections = false
+    var virtualConnections = HashMap<Int, HashSet<Int>>()
     val vertices = Vertices()
     val triangles = Triangles()
 
@@ -102,6 +106,12 @@ class Graph(val stride: Int,
         }
 
         fun getAdjacentVertices(id: Int): List<Int> {
+            if (useVirtualConnections) {
+                val virtual = virtualConnections[id]
+                if (virtual != null) {
+                    return (vertexToVertices[id] + virtual).toList()
+                }
+            }
             return vertexToVertices[id]
         }
 
@@ -135,4 +145,38 @@ class Graph(val stride: Int,
 
         override fun iterator(): Iterator<Triangle> = (0..size - 1).map { Triangle(it) }.iterator()
     }
+
+    fun getClosestPoint(point: Point, closePoints: Set<Int> = getClosePoints(point)): Int {
+        var closestPoint: Int = -1
+        var minD2 = Float.MAX_VALUE
+        closePoints.forEach {
+            val d2 = vertices.getPoint(it).distanceSquaredTo(point)
+            if (d2 < minD2) {
+                closestPoint = it
+                minD2 = d2
+            }
+        }
+        return closestPoint
+    }
+
+    fun getClosePoints(point: Point, expansions: Int = 3): Set<Int> {
+        val strideMinus1 = stride - 1
+        val gridX = Math.round(point.x * (strideMinus1))
+        val gridY = Math.round(point.y * (strideMinus1))
+        val seed = vertices[gridX, gridY].id
+        val nearPoints = HashSet<Int>()
+        nearPoints.add(seed)
+        var nextPoints = HashSet<Int>(nearPoints)
+        for (i in 0..expansions - 1) {
+            val newPoints = HashSet<Int>()
+            nextPoints.forEach {
+                newPoints.addAll(vertices.getAdjacentVertices(it))
+            }
+            newPoints.removeAll(nearPoints)
+            nearPoints.addAll(newPoints)
+            nextPoints = newPoints
+        }
+        return nearPoints
+    }
+
 }
