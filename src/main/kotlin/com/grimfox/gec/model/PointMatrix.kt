@@ -1,6 +1,6 @@
 package com.grimfox.gec.model
 
-import com.grimfox.gec.generator.Point
+import com.grimfox.gec.model.Point
 import com.grimfox.gec.util.Utils.pow
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

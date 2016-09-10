@@ -1,21 +1,16 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.generator.Point
-import java.awt.Color
-import java.awt.Graphics2D
-import java.awt.image.BufferedImage
-import java.io.File
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.Point
 import java.util.*
-import java.util.concurrent.atomic.AtomicInteger
-import javax.imageio.ImageIO
 
 object Triangulate {
 
-    data class Circle(var c: Point = Point(0.0f, 0.0f), var r: Float = -1.0f)
+    private data class Circle(var c: Point = Point(0.0f, 0.0f), var r: Float = -1.0f)
     
-    data class PointWrapper(var p: Point = Point(0.0f, 0.0f), var e: Point = Point(0.0f, 0.0f), var d2: Float = 0.0f, var id: Int = 0, var tId: Int = 0)
+    private data class PointWrapper(var p: Point = Point(0.0f, 0.0f), var e: Point = Point(0.0f, 0.0f), var d2: Float = 0.0f, var id: Int = 0, var tId: Int = 0)
 
-    data class Triangle(var a: Int = 0, var b: Int = 0, var c: Int = 0, var ab: Int = -1, var bc: Int = -1, var ac: Int = -1, var cc: Circle = Circle()) {
+    private data class Triangle(var a: Int = 0, var b: Int = 0, var c: Int = 0, var ab: Int = -1, var bc: Int = -1, var ac: Int = -1, var cc: Circle = Circle()) {
 
         fun copy(other: Triangle): Triangle {
             a = other.a
@@ -27,18 +22,13 @@ object Triangulate {
             ac = other.ac
 
             cc.r = other.cc.r
-            cc.c.x = other.cc.c.x
-            cc.c.y = other.cc.c.y
+            cc.c = other.cc.c
 
             return this
         }
-
-        override fun toString(): String {
-            return "\ntriangle:\n=====\na: $a\nb: $b\nc: $c\nab: $ab\nbc: $bc\nac: $ac\ncc.r: ${cc.r}\ncc.x: ${cc.c.x}\ncc.y: ${cc.c.y}\n"
-        }
     }
 
-    class VisibilityTest(p1: Point, p2: Point, var dx: Float = p1.x - p2.x, var dy: Float = p1.y - p2.y) {
+    private class VisibilityTest(p1: Point, p2: Point, var dx: Float = p1.x - p2.x, var dy: Float = p1.y - p2.y) {
 
         constructor(p1: PointWrapper, p2: PointWrapper) : this(p1.p, p2.p)
 
@@ -47,77 +37,137 @@ object Triangulate {
         }
     }
 
-    val debug = false
-    val drawCount = AtomicInteger(0)
+    fun buildGraph(stride: Int, width: Float, points: List<Point>): Graph {
+        val wrappedPoints = wrapPoints(points)
 
-    val virtualWidth = 100000.0f
-    val stride = 10
-    val outputWidth = 1024
-    val gridSquare = virtualWidth / stride
-    val minDistSquared = (gridSquare / 4.0f) * (gridSquare / 4.0f)
+        val p1 = chooseSeedPoint(wrappedPoints, stride)
+        val p2 = findClosestPointToSeed(wrappedPoints, p1)
+        val p3 = findPointWithSmallestCircle(p1, p2, wrappedPoints)
 
-    var points = ArrayList<PointWrapper>()
-    var pointIndex = IntArray(0)
-    var triangles = ArrayList<Triangle>()
-    var hull = ArrayList<PointWrapper>()
+        val midCircle = findAndSortByCenter(wrappedPoints, p1, p2, p3)
 
-    @JvmStatic fun main(vararg args: String) {
+        val pointIndex = buildPointIndex(wrappedPoints)
 
-        val random = Random(78907890)
+        val triangles = ArrayList<Triangle>()
 
-        points = generatePoints(stride, random, gridSquare, minDistSquared)
+        val hull = buildInitialHull(triangles, p1, p2, p3, midCircle)
 
-        val p1 = chooseSeedPoint(points, stride)
-        val p2 = findClosestPointToSeed(points, p1)
-        val p3 = findPointWithSmallestCircle(p1, p2, points)
+        buildTriangles(wrappedPoints, triangles, hull)
 
-        val midCircle = findAndSortByCenter(points, p1, p2, p3)
-
-        pointIndex = buildPointIndex(points)
-
-        triangles = ArrayList<Triangle>()
-
-        hull = buildInitialHull(triangles, p1, p2, p3, midCircle)
-
-        buildTriangles(points, triangles, hull)
-
-        var ids = flipTriangles(points, pointIndex, triangles)
+        var ids = flipTriangles(wrappedPoints, pointIndex, triangles)
 
         var iteration = 0
         while (ids.size > 0 && iteration < 50) {
-            ids = flipTriangles(points, pointIndex, triangles, ids)
+            ids = flipTriangles(wrappedPoints, pointIndex, triangles, ids)
             iteration++
         }
 
-        ids = flipEdges(points, pointIndex, triangles)
+        ids = flipEdges(wrappedPoints, pointIndex, triangles)
 
         iteration = 0
         while(ids.size > 0 && iteration < 100){
-            ids = flipTriangles(points, pointIndex, triangles, ids)
+            ids = flipTriangles(wrappedPoints, pointIndex, triangles, ids)
             iteration++
-            draw(true)
         }
-        draw(true)
 
-        val vertices = FloatArray(triangles.size * 2)
-        val edges = IntArray(triangles.size * 3)
+        return buildGraph(stride, wrappedPoints, pointIndex, triangles, width)
+    }
 
+    private fun wrapPoints(points: List<Point>): ArrayList<PointWrapper> {
+        val wrappedPoints = ArrayList<PointWrapper>(points.size)
+        points.forEachIndexed { id, point ->
+            wrappedPoints.add(PointWrapper(point, id = id))
+        }
+        return wrappedPoints
+    }
+
+    private fun buildGraph(stride: Int, points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, width: Float): Graph {
+        val vertexIdsToPoints = FloatArray(points.size * 2)
+        pointIndex.forEachIndexed { i, pointId ->
+            val point = points[pointId]
+            val o = i * 2
+            vertexIdsToPoints[o] = point.p.x / width
+            vertexIdsToPoints[o + 1] = point.p.y / width
+        }
+        val triangleToCenters = FloatArray(triangles.size * 2)
+        val triangleToTriangles = IntArray(triangles.size * 3)
+        val triangleToVertices = IntArray(triangles.size * 3)
+        val vertexToTrianglesTemp = ArrayList<ArrayList<Int>>(points.size)
+        for (i in 0..points.size - 1) {
+            vertexToTrianglesTemp.add(ArrayList(5))
+        }
         triangles.forEachIndexed { i, triangle ->
             val vertex = findCircleCenter(points[pointIndex[triangle.a]], points[pointIndex[triangle.b]], points[pointIndex[triangle.c]])
             var o = i * 2
-            vertices[o++] = vertex.x
-            vertices[o] = vertex.y
+            triangleToCenters[o++] = vertex.x / width
+            triangleToCenters[o] = vertex.y / width
             o = i * 3
-            edges[o++] = triangle.ab
-            edges[o++] = triangle.bc
-            edges[o] = triangle.ac
+            triangleToTriangles[o++] = triangle.ab
+            triangleToTriangles[o++] = triangle.bc
+            triangleToTriangles[o] = triangle.ac
+            o = i * 3
+            triangleToVertices[o++] = triangle.a
+            triangleToVertices[o++] = triangle.b
+            triangleToVertices[o] = triangle.c
+            vertexToTrianglesTemp[triangle.a].add(i)
+            vertexToTrianglesTemp[triangle.b].add(i)
+            vertexToTrianglesTemp[triangle.c].add(i)
         }
-
-        drawDualGraph(vertices, edges)
-
-        drawVoronoi(vertices, edges)
-
-        drawDelaunay(vertices, edges)
+        val vertexToTriangles = ArrayList<List<Int>>(points.size)
+        val vertexToVertices = ArrayList<List<Int>>(points.size)
+        for (i in 0..points.size - 1) {
+            val trianglesToOrder = vertexToTrianglesTemp[i].filter { it >= 0 }
+            val hullEdges = ArrayList<Triple<Int, Int, Int>>(trianglesToOrder.size)
+            trianglesToOrder.forEach {
+                val triangle = triangles[it]
+                if (triangle.a == i) {
+                    hullEdges.add(Triple(it, triangle.b, triangle.c))
+                } else if (triangle.b == i) {
+                    hullEdges.add(Triple(it, triangle.c, triangle.a))
+                } else {
+                    hullEdges.add(Triple(it, triangle.a, triangle.b))
+                }
+            }
+            val newHullEdges = ArrayList<Triple<Int, Int, Int>>(trianglesToOrder.size)
+            newHullEdges.add(hullEdges.removeAt(0))
+            for (j in 0..hullEdges.size - 1) {
+                for (k in 0..hullEdges.size - 1) {
+                    val nextEdge = hullEdges[k]
+                    if (newHullEdges.last().third == nextEdge.second) {
+                        newHullEdges.add(hullEdges.removeAt(k))
+                        break
+                    } else if (newHullEdges.last().third == nextEdge.third) {
+                        newHullEdges.add(hullEdges.removeAt(k).copy(second = nextEdge.third, third = nextEdge.second))
+                        break
+                    } else if (newHullEdges.first().second == nextEdge.second) {
+                        newHullEdges.add(0, hullEdges.removeAt(k).copy(second = nextEdge.third, third = nextEdge.second))
+                        break
+                    } else if (newHullEdges.first().second == nextEdge.third) {
+                        newHullEdges.add(0, hullEdges.removeAt(k))
+                        break
+                    }
+                }
+            }
+            val adjacentTriangles = newHullEdges.map { it.first }.toMutableList()
+            val adjacentPoints = newHullEdges.map { it.second }.toMutableList()
+            val possibleExtraPoint = newHullEdges.last().third
+            if (adjacentPoints.first() != possibleExtraPoint) {
+                adjacentPoints.add(possibleExtraPoint)
+            }
+            val a = adjacentPoints[0]
+            val b = adjacentPoints[1]
+            val center = i
+            val pa = points[pointIndex[a]]
+            val pb = points[pointIndex[b]]
+            val pc = points[pointIndex[center]]
+            if (areCounterClockwise(pa, pb, pc)) {
+                adjacentTriangles.reverse()
+                adjacentPoints.reverse()
+            }
+            vertexToTriangles.add(adjacentTriangles)
+            vertexToVertices.add(adjacentPoints)
+        }
+        return Graph(stride, vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles)
     }
 
     private fun buildInitialHull(triangles: ArrayList<Triangle>, p1: PointWrapper, p2: PointWrapper, p3: PointWrapper, midCircle: Circle): ArrayList<PointWrapper> {
@@ -129,44 +179,6 @@ object Triangulate {
             buildInitialTriangleAndAddToHull(hull, triangles, p1, p3, p2, midCircle)
         }
         return hull
-    }
-
-    private fun generatePoints(stride: Int, random: Random, gridSquare: Float, minDistSquared: Float): ArrayList<PointWrapper> {
-        val points = ArrayList<PointWrapper>()
-        for (y in 0..stride - 1) {
-            val oy = y * gridSquare
-            for (x in 0..stride - 1) {
-                while (true) {
-                    val px = x * gridSquare + random.nextFloat() * gridSquare
-                    val py = oy + random.nextFloat() * gridSquare
-                    val point = Point(px, py)
-                    if (checkDistances(points, x, y, stride, minDistSquared, point)) {
-                        points.add(PointWrapper(point, id = points.size))
-                        break
-                    }
-                }
-            }
-        }
-        return points
-    }
-
-    private fun checkDistances(points: List<PointWrapper>, x: Int, y: Int, stride: Int, minDistance: Float, point: Point): Boolean {
-        for (yOff in -3..3) {
-            for (xOff in -3..3) {
-                val ox = x + xOff
-                val oy = y + yOff
-                if (oy >= 0 && oy < stride && ox >= 0 && ox < stride) {
-                    if (oy < y || (oy == y && ox < x)) {
-                        if (point.distanceSquaredTo(points[oy * stride + ox].p) < minDistance) {
-                            return false
-                        }
-                    } else {
-                        return true
-                    }
-                }
-            }
-        }
-        return true
     }
 
     private fun chooseSeedPoint(points: ArrayList<PointWrapper>, stride: Int): PointWrapper {
@@ -244,18 +256,15 @@ object Triangulate {
         val p2 = p2w.p
         val p3 = p3w.p
 
-        p1w.e.x = p2.x - p1.x
-        p1w.e.y = p2.y - p1.y
+        p1w.e = Point(p2.x - p1.x, p2.y - p1.y)
         p1w.tId = 0
         hull.add(p1w)
 
-        p2w.e.x = p3.x - p2.x
-        p2w.e.y = p3.y - p2.y
+        p2w.e = Point(p3.x - p2.x, p3.y - p2.y)
         p2w.tId = 0
         hull.add(p2w)
 
-        p3w.e.x = p1.x - p3.x
-        p3w.e.y = p1.y - p3.y
+        p3w.e = Point(p1.x - p3.x, p1.y - p3.y)
         p3w.tId = 0
         hull.add(p3w)
 
@@ -263,9 +272,6 @@ object Triangulate {
         tri.cc = midCircle.copy()
 
         triangles.add(tri)
-
-        draw()
-        return
     }
 
     private fun isRightHanded(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Boolean {
@@ -286,7 +292,20 @@ object Triangulate {
         return df < 0
     }
 
-    fun buildCircle(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Circle {
+    private fun areCounterClockwise(a: PointWrapper, b: PointWrapper, c: PointWrapper): Boolean {
+        val pa = a.p
+        val pb = b.p
+        val pc = c.p
+        val ax = pa.x
+        val ay = pa.y
+        val bx = pb.x
+        val by = pb.y
+        val cx = pc.x
+        val cy = pc.y
+        return (((ax - cx) * (ay + cy)) + ((bx - ax) * (by + ay)) + ((cx - bx) * (cy + by))) > 0
+    }
+
+    private fun buildCircle(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Circle {
         val p1 = p1w.p
         val p2 = p2w.p
         val p3 = p3w.p
@@ -315,7 +334,7 @@ object Triangulate {
         return Circle(Point(cx, cy), radius)
     }
 
-    fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Point {
+    private fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Point {
         val p1 = p1w.p
         val p2 = p2w.p
         val p3 = p3w.p
@@ -376,16 +395,10 @@ object Triangulate {
             newTriangle.ac = triangles.size + 1
             indexTriangles(triangles, triIndex, newTriangle, p)
             triangles.add(Triangle().copy(newTriangle))
-
-            draw()
-
             p++
         }
         triangles[triangles.size - 1].ac = -1
         setTriangleIdsInHull(hull, hullId, triangles.size - 1, triOffset)
-
-        draw()
-        return
     }
 
     private fun addSingleTriangle(hull: ArrayList<PointWrapper>, pointIndex: ArrayList<Int>, triIndex: ArrayList<Int>, hullId: Int, newTriangle: Triangle, triangles: ArrayList<Triangle>) {
@@ -397,9 +410,6 @@ object Triangulate {
         indexTriangles(triangles, triIndex, newTriangle, 0)
         setTriangleIdsInHull(hull, hullId, triangles.size, triangles.size)
         triangles.add(newTriangle)
-
-        draw()
-        return
     }
 
     private fun setTriangleIdsInHull(hull: ArrayList<PointWrapper>, hullId: Int, triId1: Int, triId2: Int) {
@@ -483,177 +493,8 @@ object Triangulate {
     }
 
     private fun connectPointsInHull(last: PointWrapper, next: PointWrapper, newPoint: PointWrapper) {
-        newPoint.e.x = next.p.x - newPoint.p.x
-        newPoint.e.y = next.p.y - newPoint.p.y
-
-        last.e.x = newPoint.p.x - last.p.x
-        last.e.y = newPoint.p.y - last.p.y
-    }
-
-    private fun drawDualGraph(vertices: FloatArray, edges: IntArray) {
-        val multiplier = outputWidth / virtualWidth
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.WHITE
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.RED
-
-        triangles.forEach {
-            drawTriangle(graphics, multiplier, points, pointIndex, it)
-        }
-
-        graphics.color = Color.BLACK
-
-        for (i in 0..triangles.size - 1) {
-            val p0 = vertices.getPoint(i)
-            val o = i * 3
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o)
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o + 1)
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o + 2)
-        }
-
-        graphics.color = Color.GREEN
-
-        points.forEach {
-            drawPoint(graphics, multiplier, it, 2)
-        }
-
-        ImageIO.write(image, "png", File("output/testing-${String.format("%05d", drawCount.incrementAndGet())}.png"))
-    }
-
-    private fun drawVoronoi(vertices: FloatArray, edges: IntArray) {
-        val multiplier = outputWidth / virtualWidth
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.WHITE
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-
-        graphics.color = Color.BLACK
-
-        for (i in 0..triangles.size - 1) {
-            val p0 = vertices.getPoint(i)
-            val o = i * 3
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o)
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o + 1)
-            drawEdgeIfExists(graphics, multiplier, vertices, edges, p0, o + 2)
-        }
-
-        graphics.color = Color.RED
-
-        points.forEach {
-            drawPoint(graphics, multiplier, it, 2)
-        }
-
-        ImageIO.write(image, "png", File("output/testing-${String.format("%05d", drawCount.incrementAndGet())}.png"))
-    }
-
-    private fun drawDelaunay(vertices: FloatArray, edges: IntArray) {
-        val multiplier = outputWidth / virtualWidth
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.WHITE
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.BLACK
-
-        triangles.forEach {
-            drawTriangle(graphics, multiplier, points, pointIndex, it)
-        }
-
-        graphics.color = Color.RED
-
-        points.forEach {
-            drawPoint(graphics, multiplier, it, 2)
-        }
-
-        ImageIO.write(image, "png", File("output/testing-${String.format("%05d", drawCount.incrementAndGet())}.png"))
-    }
-
-    private fun drawEdgeIfExists(graphics: Graphics2D, multiplier: Float, vertices: FloatArray, edges: IntArray, point: Point, offset: Int) {
-        val id = edges[offset]
-        if (id > 0) {
-            drawLine(graphics, multiplier, point, vertices.getPoint(id))
-        }
-    }
-
-    private fun FloatArray.getPoint(i: Int): Point {
-        val o = i * 2
-        return Point(this[o], this[o + 1])
-    }
-
-    private fun draw(vararg highlightPoints: PointWrapper) {
-        draw(false, *highlightPoints)
-    }
-
-    private fun draw(force: Boolean, vararg highlightPoints: PointWrapper) {
-        if (debug || force) {
-            if (debug) {
-                println("\n\n\n========================\n\n\n$triangles\n\n\n")
-            }
-            val multiplier = outputWidth / virtualWidth
-            val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-            val graphics = image.createGraphics()
-            graphics.background = Color.WHITE
-            graphics.clearRect(0, 0, outputWidth, outputWidth)
-            graphics.color = Color.BLACK
-
-            triangles.forEach {
-                drawTriangle(graphics, multiplier, points, pointIndex, it)
-            }
-
-            points.forEach {
-                drawPoint(graphics, multiplier, it, 1)
-            }
-
-            graphics.color = Color.GREEN
-
-            hull.forEach {
-                drawHullPoint(graphics, multiplier, it, 2)
-            }
-
-            graphics.color = Color.RED
-
-            highlightPoints.forEach {
-                drawHullPoint(graphics, multiplier, it, 3)
-            }
-
-            ImageIO.write(image, "png", File("output/testing-${String.format("%05d", drawCount.incrementAndGet())}.png"))
-        }
-    }
-
-    private fun drawHullPoint(graphics: Graphics2D, multiplier: Float, point: PointWrapper, radius: Int) {
-        drawPoint(graphics, multiplier, point, radius)
-        if (point.e.x != 0.0f || point.e.y != 0.0f) {
-            val endPoint = Point(point.p.x + point.e.x, point.p.y + point.e.y)
-            drawLine(graphics, multiplier, point.p, endPoint)
-        }
-    }
-
-    private fun drawPoint(graphics: Graphics2D, multiplier: Float, point: PointWrapper, radius: Int) {
-        val diameter = radius * 2 + 1
-        graphics.fillOval(Math.round(point.p.x * multiplier) - radius, Math.round(point.p.y * multiplier) - radius, diameter, diameter)
-    }
-
-    private fun drawTriangle(graphics: Graphics2D, multiplier: Float, points: ArrayList<PointWrapper>, pointIndex: IntArray, triangle: Triangle) {
-        val p1 = points[pointIndex[triangle.a]]
-        val p2 = points[pointIndex[triangle.b]]
-        val p3 = points[pointIndex[triangle.c]]
-        val p1x = Math.round(p1.p.x * multiplier)
-        val p1y = Math.round(p1.p.y * multiplier)
-        val p2x = Math.round(p2.p.x * multiplier)
-        val p2y = Math.round(p2.p.y * multiplier)
-        val p3x = Math.round(p3.p.x * multiplier)
-        val p3y = Math.round(p3.p.y * multiplier)
-        graphics.drawLine(p1x, p1y, p2x, p2y)
-        graphics.drawLine(p2x, p2y, p3x, p3y)
-        graphics.drawLine(p3x, p3y, p1x, p1y)
-    }
-
-    private fun drawLine(graphics: Graphics2D, multiplier: Float, p1: Point, p2: Point) {
-        val p1x = Math.round(p1.x * multiplier)
-        val p1y = Math.round(p1.y * multiplier)
-        val p2x = Math.round(p2.x * multiplier)
-        val p2y = Math.round(p2.y * multiplier)
-        graphics.drawLine(p1x, p1y, p2x, p2y)
+        newPoint.e = Point(next.p.x - newPoint.p.x, next.p.y - newPoint.p.y)
+        last.e = Point(newPoint.p.x - last.p.x, newPoint.p.y - last.p.y)
     }
 
     private fun needsFlipping(pa: PointWrapper, pb: PointWrapper, pc: PointWrapper, pd: PointWrapper): Boolean {
@@ -689,8 +530,8 @@ object Triangulate {
         }
     }
 
-    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): ArrayList<Int> {
-        val ids = ArrayList<Int>()
+    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): HashSet<Int> {
+        val ids = HashSet<Int>()
         for (id in 0..triangles.size - 1) {
             val triangle1 = triangles[id]
             tryFlipTriangle(points, pointIndex, triangles, triangle1, id, ids)
@@ -698,8 +539,8 @@ object Triangulate {
         return ids
     }
 
-    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, ids: ArrayList<Int>) : ArrayList<Int> {
-        val ids2 = ArrayList<Int>()
+    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, ids: HashSet<Int>) : HashSet<Int> {
+        val ids2 = HashSet<Int>()
         ids.forEach { id ->
             val triangle1 = triangles[id]
             tryFlipTriangle(points, pointIndex, triangles, triangle1, id, ids2)
@@ -707,7 +548,7 @@ object Triangulate {
         return ids2
     }
 
-    private fun tryFlipTriangle(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, triangle1: Triangle, id1: Int, ids: ArrayList<Int>) {
+    private fun tryFlipTriangle(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, triangle1: Triangle, id1: Int, ids: HashSet<Int>) {
         var flipped = false
         if (triangle1.bc >= 0) {
             flipped = tryFlipEdge(points, pointIndex, triangles, id1, triangle1, ids)
@@ -722,8 +563,8 @@ object Triangulate {
         }
     }
 
-    fun flipEdges(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): ArrayList<Int> {
-        val ids = ArrayList<Int>()
+    private fun flipEdges(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): HashSet<Int> {
+        val ids = HashSet<Int>()
         for (id in 0..triangles.size - 1) {
             val triangle1 = triangles[id]
             var flipped = false
@@ -742,7 +583,7 @@ object Triangulate {
         return ids
     }
 
-    private fun tryFlipEdge(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, id1: Int, augmented: Triangle, ids: ArrayList<Int>, safe: Boolean = true): Boolean {
+    private fun tryFlipEdge(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, id1: Int, augmented: Triangle, ids: HashSet<Int>, safe: Boolean = true): Boolean {
         val pd: Int
         val id3: Int
         val limb3: Int
@@ -791,7 +632,7 @@ object Triangulate {
         return false
     }
 
-    private fun performEdgeFlip(triangles: ArrayList<Triangle>, id1: Int, id2: Int, id3: Int, limb3: Int, limb4: Int, augmented: Triangle, ids: ArrayList<Int>, safe: Boolean = true): Boolean {
+    private fun performEdgeFlip(triangles: ArrayList<Triangle>, id1: Int, id2: Int, id3: Int, limb3: Int, limb4: Int, augmented: Triangle, ids: HashSet<Int>, safe: Boolean = true): Boolean {
         var flipped = false
         val triangle2 = triangles[id2]
         val limb1 = augmented.ab

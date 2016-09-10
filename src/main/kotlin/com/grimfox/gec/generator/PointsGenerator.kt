@@ -3,6 +3,7 @@ package com.grimfox.gec.generator
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.Point
 import com.grimfox.gec.model.PointMatrix
 import com.grimfox.gec.util.Utils.pow
 import io.airlift.airline.Command

@@ -1,7 +1,7 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.generator.Point
+import com.grimfox.gec.model.Point
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.Matrix
 import org.slf4j.LoggerFactory
@@ -215,5 +215,53 @@ object Utils {
             edgeGraph.add(i, ArrayList(edges[i]!!.toList().sorted()))
         }
         return edgeGraph
+    }
+
+    fun generatePoints(stride: Int, width: Float, random: Random): ArrayList<Point> {
+        val gridSquare = width / stride
+        val minDistSquared = (gridSquare / 3.0f) * (gridSquare / 3.0f)
+        val points = ArrayList<Point>()
+        for (y in 0..stride - 1) {
+            val oy = y * gridSquare
+            for (x in 0..stride - 1) {
+                while (true) {
+                    val px = x * gridSquare + random.nextFloat() * gridSquare
+                    val py = oy + random.nextFloat() * gridSquare
+                    val point = Point(px, py)
+                    if (checkDistances(points, x, y, stride, minDistSquared, point)) {
+                        points.add(point)
+                        break
+                    }
+                }
+            }
+        }
+        return points
+    }
+
+    private fun checkDistances(points: List<Point>, x: Int, y: Int, stride: Int, minDistance: Float, point: Point): Boolean {
+        for (yOff in -3..3) {
+            for (xOff in -3..3) {
+                val ox = x + xOff
+                val oy = y + yOff
+                if (oy >= 0 && oy < stride && ox >= 0 && ox < stride) {
+                    if (oy < y || (oy == y && ox < x)) {
+                        if (point.distanceSquaredTo(points[oy * stride + ox]) < minDistance) {
+                            return false
+                        }
+                    } else {
+                        return true
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    fun <T, ML : MutableList<T>> ML.init(size: Int, init: (Int) -> T): ML {
+        this.clear()
+        for (i in 0..size - 1) {
+            this.add(init(i))
+        }
+        return this
     }
 }

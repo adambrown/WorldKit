@@ -1,6 +1,6 @@
-package com.grimfox.gec.generator
+package com.grimfox.gec.model
 
-data class Point(var x: Float, var y: Float) {
+open class Point(val x: Float, val y: Float) {
 
     fun distanceSquaredTo(other: Point): Float {
         val deltaX = x - other.x

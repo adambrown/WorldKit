@@ -1,7 +1,7 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.generator.Point
+import com.grimfox.gec.model.Point
 import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.DataFiles
 import io.airlift.airline.Command
