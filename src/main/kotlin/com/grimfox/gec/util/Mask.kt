@@ -27,6 +27,25 @@ object Mask {
         return newMask
     }
 
+    fun reverseMask(graph: Graph, maskGraph: Graph, mask: Set<Int>, negate: Boolean = false) : HashMap<Int, HashSet<Int>> {
+        val reverseMask = HashMap<Int, HashSet<Int>>()
+        val vertices = maskGraph.vertices
+        if (negate) {
+            for (i in 0..vertices.size - 1) {
+                if (!mask.contains(i)) {
+                    val closest = graph.getClosestPoint(vertices[i].point)
+                    reverseMask.getOrPut(closest, { HashSet<Int>() }).add(i)
+                }
+            }
+        } else {
+            mask.forEach {
+                val closest = graph.getClosestPoint(vertices[it].point)
+                reverseMask.getOrPut(closest, { HashSet<Int>() }).add(it)
+            }
+        }
+        return reverseMask
+    }
+
     fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Int>) : Matrix<Int> {
         val vertices = graph.vertices
         val newMask = ArrayListMatrix(graph.stride) { vertexId ->
