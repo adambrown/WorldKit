@@ -248,6 +248,20 @@ class Graph(val stride: Int,
         }
     }
 
+    fun getPointsWithinRadius(point: Point, radius: Float): Set<Int> {
+        val gridSize = 1.0f / stride
+        val expansions = Math.ceil((radius / gridSize).toDouble()).toInt() + 1
+        val testPoints = getClosePoints(point, expansions)
+        val pointsWithin = HashSet<Int>()
+        val r2 = radius * radius
+        testPoints.forEach {
+            if (point.distanceSquaredTo(vertices[it].point) <= r2) {
+                pointsWithin.add(it)
+            }
+        }
+        return pointsWithin
+    }
+
     fun getClosePointDegrees(id: Int, expansions: Int = 1): ArrayList<HashSet<Int>> {
         val degrees = ArrayList<HashSet<Int>>()
         val nearPoints = HashSet<Int>()
@@ -333,5 +347,106 @@ class Graph(val stride: Int,
             nextEdges = newEdges
         }
         return connectedEdges
+    }
+
+    fun findBorderIds(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): HashSet<Int> {
+        val borderIds = HashSet<Int>()
+        ids.forEach { id ->
+            val adjacents = vertices.getAdjacentVertices(id)
+            for (i in 0..adjacents.size - 1) {
+                val adjacent = adjacents[i]
+                if (!ids.contains(adjacent)) {
+                    if (mask == null) {
+                        borderIds.add(id)
+                        break
+                    } else {
+                        if (!negate && mask.contains(adjacent)) {
+                            borderIds.add(id)
+                            break
+                        } else if (negate && !mask.contains(adjacent)) {
+                            borderIds.add(id)
+                            break
+                        }
+                    }
+                }
+            }
+        }
+        return borderIds
+    }
+
+    fun findBorder(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): Polygon? {
+        val edges = ArrayList(findBorderEdges(ids, mask, negate))
+        if (edges.isEmpty()) {
+            return null
+        }
+        val border = ArrayList<Point>(edges.size + 1)
+        val seedEdge = edges.removeAt(0)
+        border.add(seedEdge.tri1.center)
+        border.add(seedEdge.tri2.center)
+        var currentEdge = seedEdge
+        while (edges.isNotEmpty()) {
+            var nextEdge: CellEdge? = null
+            for (i in 0..edges.size - 1) {
+                if (currentEdge.tri1 == edges[i].tri2) {
+                    nextEdge = edges.removeAt(i)
+                    break
+                }
+            }
+            if (nextEdge == null) {
+                break
+            }
+            border.add(0, nextEdge.tri1.center)
+            currentEdge = nextEdge
+        }
+        currentEdge = seedEdge
+        while (edges.isNotEmpty()) {
+            var nextEdge: CellEdge? = null
+            for (i in 0..edges.size - 1) {
+                if (currentEdge.tri2 == edges[i].tri1) {
+                    nextEdge = edges.removeAt(i)
+                    break
+                }
+            }
+            if (nextEdge == null) {
+                break
+            }
+            border.add(nextEdge.tri2.center)
+            currentEdge = nextEdge
+        }
+        var isClosed = false
+        if (border.first() == border.last()) {
+            border.removeAt(border.size - 1)
+            isClosed = true
+        }
+        return Polygon(border, isClosed)
+    }
+
+    fun findBorderEdges(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): HashSet<CellEdge> {
+        val borderIds = HashSet<CellEdge>()
+        ids.forEach { id ->
+            vertices.getAdjacentVertices(id).forEach { adjacentId ->
+                if (!ids.contains(adjacentId)) {
+                    if (mask == null) {
+                        addBorderEdge(borderIds, id, adjacentId)
+                    } else {
+                        if (!negate && mask.contains(adjacentId)) {
+                            addBorderEdge(borderIds, id, adjacentId)
+                        } else if (negate && !mask.contains(adjacentId)) {
+                            addBorderEdge(borderIds, id, adjacentId)
+                        }
+                    }
+                }
+            }
+        }
+        return borderIds
+    }
+
+    private fun addBorderEdge(borderIds: HashSet<CellEdge>, id: Int, adjacentId: Int) {
+        val cell1 = vertices[id].cell
+        val cell2 = vertices[adjacentId].cell
+        val edge = cell1.sharedEdge(cell2)
+        if (edge != null) {
+            borderIds.add(edge)
+        }
     }
 }

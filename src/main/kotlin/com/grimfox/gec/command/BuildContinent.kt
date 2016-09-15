@@ -3,8 +3,9 @@ package com.grimfox.gec.command
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.util.Coastline
+import com.grimfox.gec.util.Coastline.applyMask
 import com.grimfox.gec.util.Coastline.refineCoastline
-import com.grimfox.gec.util.Mask.applyMask
 import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.generatePoints
@@ -29,7 +30,38 @@ class BuildContinent() : Runnable {
     @Option(name = arrayOf("-f", "--file"), description = "The data file to write as output.", required = true)
     var outputFile: File = File(Main.workingDir, "output.bin")
 
+    data class Parameters(
+            var stride: Int,
+            var landPercent: Float,
+            var minPerturbation: Float,
+            var maxIterations: Int,
+            var protectedInset: Float,
+            var protectedRadius: Float,
+            var minRegionSize: Float,
+            var largeIsland: Float,
+            var smallIsland: Float)
+
+    data class ParameterSet(
+            var seed: Long = System.currentTimeMillis(),
+            var stride: Int = 7,
+            var regionCount: Int = 8,
+            var connectedness: Float = 0.11f,
+            var regionSize: Float = 0.035f,
+            var initialReduction: Int = 7,
+            var regionPoints: Int = 2,
+            var maxRegionTries: Int = 500,
+            var maxIslandTries: Int = 10000,
+            var islandDesire: Int = 3,
+            var parameters: ArrayList<Parameters> = arrayListOf(
+                    Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
+                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f),
+                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
+            ),
+            var currentIteration: Int = 0)
+
     override fun run() {
+        val parameterSet = ParameterSet()
         if (strides.isEmpty()) {
             strides.addAll(listOf(7, 40, 80, 140, 256))
         } else {
@@ -38,31 +70,33 @@ class BuildContinent() : Runnable {
         for (test in 1..10000) {
             val virtualWidth = 100000.0f
             val outputWidth = 256
-            val random = Random(test.toLong())
-            var lastGraph: Graph? = null
-            var regionMask: Matrix<Int> = ArrayListMatrix(0)
-            strides.forEachIndexed { i, stride ->
+            parameterSet.seed = test.toLong()
+            val random = Random(parameterSet.seed)
+            var (lastGraph, regionMask) = buildRegions(parameterSet)
+            drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-ri", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+            parameterSet.parameters.forEachIndexed { i, parameters ->
+                parameterSet.currentIteration = i
                 val localLastGraph = lastGraph
                 val graph: Graph
-                if (localLastGraph == null) {
-                    val (g, m) = buildRegions(stride, random, 8)
-                    graph = g
-                    regionMask = m
-                } else {
-                    val points = generatePoints(stride, virtualWidth, random)
-                    graph = buildGraph(stride, virtualWidth, points)
-                    regionMask = applyMask(graph, localLastGraph, regionMask)
-                    refineCoastline(graph, random, regionMask, landPercent = 0.4f, minPerturbation = 0.17f - (i * 0.04f), maxIterations = 5 - i, largeIsland = 2.0f, smallIsland = 0.02f)
-                }
+                val points = generatePoints(parameters.stride, virtualWidth, random)
+                graph = buildGraph(parameters.stride, virtualWidth, points)
+                drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-pre", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+                regionMask = applyMask(graph, localLastGraph, regionMask)
+                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-post", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+//                drawOffLimits(graph, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o$i")
+//                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+                refineCoastline(graph, random, regionMask, parameters)
                 lastGraph = graph
 //                drawGraph(graph, outputWidth, "test-graph-${String.format("%05d", i)}")
 //                drawBorder(graph, outputWidth, "test-border-${String.format("%05d", i)}")
 //                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
             }
+//            drawOffLimits(lastGraph!!, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o")
+//            drawBorders(lastGraph!!, regionMask, borders, 2048, "test-new-${String.format("%05d", test)}-b")
 //            drawMask(lastGraph, spokes, outputWidth, "test-new-${String.format("%05d", test)}-rs")
 //            drawSpokes(spokes, outputWidth, "test-new-${String.format("%05d", test)}-m")
 //            drawMask(lastGraph, lastMask, outputWidth, "test-new-${String.format("%05d", test)}-m", false)
-            drawRegions(lastGraph!!, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+            drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
 //            drawConcavity(lastGraph, concavityWeights, outputWidth, "test-new-${String.format("%05d", test)}-c")
         }
     }
@@ -178,6 +212,66 @@ class BuildContinent() : Runnable {
                 graphics.color = regionColors[regionId]
                 drawCell(graphics, multiplier, cell)
             }
+        }
+
+        ImageIO.write(image, "png", File("output/$name.png"))
+    }
+
+    private fun drawBorders(graph: Graph, mask: Matrix<Int>, borders: Pair<List<Polygon>, List<Polygon>>, outputWidth: Int, name: String) {
+        val multiplier = outputWidth.toFloat()
+        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
+        val graphics = image.createGraphics()
+        graphics.background = Color.BLACK
+        graphics.clearRect(0, 0, outputWidth, outputWidth)
+        graphics.color = Color.WHITE
+
+        graph.vertices.forEach {
+            val cell = it.cell
+            val regionId = mask[it.id]
+            if (regionId != 0) {
+                drawCell(graphics, multiplier, cell)
+            }
+        }
+
+        graphics.color = Color.RED
+
+        borders.first.forEach {
+            for (i in 1..it.points.size - if (it.isClosed) 0 else 1) {
+                drawEdge(graphics, multiplier, it.points[i - 1], it.points[i % it.points.size])
+            }
+        }
+
+        graphics.color = Color.BLUE
+
+        borders.second.forEach {
+            for (i in 1..it.points.size - if (it.isClosed) 0 else 1) {
+                drawEdge(graphics, multiplier, it.points[i - 1], it.points[i % it.points.size])
+            }
+        }
+
+        ImageIO.write(image, "png", File("output/$name.png"))
+    }
+
+    private fun drawOffLimits(graph: Graph, mask: Matrix<Int>, offLimits: HashSet<Int>, outputWidth: Int, name: String) {
+        val multiplier = outputWidth.toFloat()
+        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
+        val graphics = image.createGraphics()
+        graphics.background = Color.BLACK
+        graphics.clearRect(0, 0, outputWidth, outputWidth)
+        graphics.color = Color.WHITE
+
+        graph.vertices.forEach {
+            val cell = it.cell
+            val regionId = mask[it.id]
+            if (regionId != 0) {
+                drawCell(graphics, multiplier, cell)
+            }
+        }
+
+        graphics.color = Color.RED
+
+        offLimits.forEach {
+            drawCell(graphics, multiplier, graph.vertices[it].cell)
         }
 
         ImageIO.write(image, "png", File("output/$name.png"))

@@ -3,6 +3,8 @@ package com.grimfox.gec.util
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.Point
 import com.grimfox.gec.model.ClosestPoints
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.Graph.CellEdge
 import com.grimfox.gec.model.Matrix
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
@@ -263,5 +265,65 @@ object Utils {
             this.add(init(i))
         }
         return this
+    }
+
+    fun edgesIntersect(edge1: CellEdge, edge2: CellEdge): Boolean {
+        return linesIntersect(Pair(edge1.tri1.center, edge1.tri2.center), Pair(edge2.tri1.center, edge2.tri2.center))
+    }
+
+    fun linesIntersect(line1: Pair<Point, Point>, line2: Pair<Point, Point>): Boolean {
+        val o1 = orientation(line1.first, line1.second, line2.first)
+        val o2 = orientation(line1.first, line1.second, line2.second)
+        val o3 = orientation(line2.first, line2.second, line1.first)
+        val o4 = orientation(line2.first, line2.second, line1.second)
+        if (o1 != o2 && o3 != o4) {
+            return true
+        }
+        return (o1 == 0 && (onSegment(line1.first, line2.first, line1.second)
+                || onSegment(line1.first, line2.second, line1.second)
+                || onSegment(line2.first, line1.first, line2.second)
+                || onSegment(line2.first, line1.second, line2.second)))
+    }
+
+    private fun orientation(p1: Point, p2: Point, p3: Point): Int {
+        val det = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y)
+        if (det == 0.0f) return 0
+        return if (det > 0.0f) 1 else -1
+    }
+
+    private fun onSegment(p1: Point, p2: Point, p3: Point): Boolean {
+        return (p2.x <= Math.max(p1.x, p3.x)
+                && p2.x >= Math.min(p1.x, p3.x)
+                && p2.y <= Math.max(p1.y, p3.y)
+                && p2.y >= Math.min(p1.y, p3.y))
+    }
+
+    fun findConcavityWeightsSmall(graph: Graph, water: HashSet<Int>, body: HashSet<Int>, testPoints: HashSet<Int>): ArrayList<Pair<Int, Float>> {
+        val weights = ArrayList<Pair<Int, Float>>(testPoints.size)
+        testPoints.forEach { it ->
+            var landWaterRatio = calculateConcavityRatio(graph, water, body, it, 2, 0.000075f)
+            landWaterRatio *= calculateConcavityRatio(graph, water, body, it, 4, 0.00035f)
+            landWaterRatio *= calculateConcavityRatio(graph, water, body, it, 6, 0.00075f)
+            weights.add(Pair(it, landWaterRatio))
+        }
+        return weights
+    }
+
+    fun findConcavityWeightsLarge(graph: Graph, water: HashSet<Int>, body: HashSet<Int>, testPoints: HashSet<Int>): ArrayList<Pair<Int, Float>> {
+        return ArrayList(testPoints.map { Pair(it, calculateConcavityRatio(graph, water, body, it, 12, 0.035f)) }.sortedBy { it.second })
+    }
+
+    private fun calculateConcavityRatio(graph: Graph, mask: HashSet<Int>, body: HashSet<Int>, vertexId: Int, expansions: Int, radiusSquared: Float): Float {
+        val vertices = graph.vertices
+        val vertex = vertices[vertexId]
+        val point = vertex.point
+        val closeVertices = graph.getClosePoints(point, expansions).map { vertices[it] }.filter { !mask.contains(it.id) && point.distanceSquaredTo(it.point) < radiusSquared }
+        var inCount = 0
+        closeVertices.forEach {
+            if (body.contains(it.id)) {
+                inCount++
+            }
+        }
+        return inCount.toFloat() / closeVertices.size
     }
 }
