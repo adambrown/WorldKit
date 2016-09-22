@@ -46,7 +46,7 @@ object Regions {
         var tries = 0
         while (tries < parameters.maxRegionTries) {
             val virtualWidth = 100000.0f
-            val graph = buildGraph(parameters.stride, virtualWidth, generatePoints(parameters.stride, virtualWidth, random))
+            val graph = buildGraph(virtualWidth, generatePoints(parameters.stride, virtualWidth, random), parameters.stride)
             val (interiorVertices, islandCount) = findInteriorVertices(graph, random, parameters, islandDesire, parameters.maxIslandTries)
             val possibleRegions = pickStartRegions(graph, interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
             var bestValue = Float.MIN_VALUE
@@ -111,14 +111,13 @@ object Regions {
             if (bestValueId < 0) {
                 if (fixerValue > bestGraphValue) {
                     bestGraphValue = fixerValue
-                    bestPair = Triple(graph, ArrayListMatrix(graph.stride) { findRegionId(possibleRegions[fixerId], it) }, islandCount)
+                    bestPair = Triple(graph, ArrayListMatrix(graph.stride!!) { findRegionId(possibleRegions[fixerId], it) }, islandCount)
                 }
             } else {
-                return Triple(graph, ArrayListMatrix(graph.stride) { findRegionId(possibleRegions[bestValueId], it) }, islandCount)
+                return Triple(graph, ArrayListMatrix(graph.stride!!) { findRegionId(possibleRegions[bestValueId], it) }, islandCount)
             }
             tries++
         }
-        println("check1Fails: $check1Fails\ncheck2Fails: $check2Fails\ncheck3Fails: $check3Fails\ncheck4Fails: $check4Fails\n")
         return bestPair!!
     }
 

@@ -13,7 +13,8 @@ object Coastline {
         val approximateAreaPerPoint = 1.0f / graph.vertices.size
         val pointsPerRegion = Math.round(parameters.minRegionSize / approximateAreaPerPoint)
         val borderPoints = buildBorderPoints(graph)
-        val water = extractWaterFromIds(borderPoints, graph, idMask)
+        val water = extractWaterFromIds(graph, idMask)
+        applyBorderConstraintsToWater(water, borderPoints, idMask)
         val offLimitPoints = getOffLimitPoints(graph, idMask, water, parameters.protectedInset, parameters.protectedRadius)
         erodeCoastline(graph, water, borderPoints, idMask, random, offLimitPoints, parameters.landPercent, parameters.smallIsland, parameters.largeIsland, parameters.minPerturbation, parameters.maxIterations, pointsPerRegion)
         forceClaimUnwantedLand(graph, idMask, forceGiveUpDisconnectedLand(graph, idMask))
@@ -21,9 +22,10 @@ object Coastline {
 
     fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Int>) : Matrix<Int> {
         val borderPoints = buildBorderPoints(maskGraph)
-        val land = extractLandFromIds(borderPoints, maskGraph, mask)
+        val land = extractLandFromIds(maskGraph, mask)
+        applyBorderConstraintsToLand(land, borderPoints, mask)
         val bodies = maskGraph.getConnectedBodies(land).sortedByDescending { it.size }
-        val bodyIds = ArrayListMatrix(maskGraph.stride) { vertexId ->
+        val bodyIds = ArrayListMatrix(maskGraph.stride!!) { vertexId ->
             var bodyId = 0
             for (i in 0..bodies.size - 1) {
                 val body = bodies[i]
@@ -39,7 +41,7 @@ object Coastline {
             bodyBorders.addAll(maskGraph.findBorderEdges(it))
         }
         val vertices = graph.vertices
-        val newBodyIds = ArrayListMatrix(graph.stride) { 0 }
+        val newBodyIds = ArrayListMatrix(graph.stride!!) { 0 }
         val newMask = ArrayListMatrix(graph.stride) { vertexId ->
             val vertex = vertices[vertexId]
             val point = vertex.point
@@ -72,7 +74,9 @@ object Coastline {
 
         }
         val newBorderPoints = buildBorderPoints(graph)
-        val water = extractWaterFromIds(newBorderPoints, graph, newMask)
+        val water = extractWaterFromIds(graph, newMask)
+        applyBorderConstraintsToWater(water, newBorderPoints, newMask)
+
         val waterBodies = graph.getConnectedBodies(water)
         if (waterBodies.size > 1) {
             waterBodies.sortBy { it.size }
@@ -113,6 +117,22 @@ object Coastline {
         return newMask
     }
 
+    fun getCoastline(graph: Graph, idMask: Matrix<Int>): ArrayList<Polygon> {
+        val land = extractLandFromIds(graph, idMask)
+        val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
+        return ArrayList(bodies.map { graph.findBorder(it)!! })
+    }
+
+    fun getBorders(graph: Graph, idMask: Matrix<Int>, body: HashSet<Int>): ArrayList<Polygon> {
+        return getBorders(graph, idMask, body, false)
+    }
+
+    fun getBorders(graph: Graph, idMask: Matrix<Int>): ArrayList<ArrayList<Polygon>> {
+        val land = extractLandFromIds(graph, idMask)
+        val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
+        return ArrayList(bodies.map { getBorders(graph, idMask, it) })
+    }
+
     private fun isOceanConnected(vertices: Vertices, ocean: HashSet<Int>, id: Int): Boolean {
         vertices.getAdjacentVertices(id).forEach {
             if (ocean.contains(it)) {
@@ -132,7 +152,7 @@ object Coastline {
     }
 
     private fun getOffLimitPoints(graph: Graph, idMask: Matrix<Int>, water: HashSet<Int>, inset: Float, radius: Float): HashSet<Int> {
-        val borderPoints = insetBorders(getBorders(graph, idMask, water), inset).flatMap { it.points }.toSet()
+        val borderPoints = insetBorders(getBorders(graph, idMask, water, true), inset).flatMap { it.points }.toSet()
         val offLimitPoints = HashSet<Int>()
         borderPoints.forEach {
             offLimitPoints.addAll(graph.getPointsWithinRadius(it, radius))
@@ -140,11 +160,11 @@ object Coastline {
         return offLimitPoints
     }
 
-    private fun getBorders(graph: Graph, idMask: Matrix<Int>, water: HashSet<Int>): ArrayList<Polygon> {
+    private fun getBorders(graph: Graph, idMask: Matrix<Int>, mask: HashSet<Int>, negate: Boolean = false): ArrayList<Polygon> {
         val regions = extractRegionsFromIds(graph, idMask)
         val borders = ArrayList<Polygon>()
         regions.forEach {
-            val border = graph.findBorder(it, water, true)
+            val border = graph.findBorder(it, mask, negate)
             if (border != null) {
                 borders.add(border)
             }
@@ -187,30 +207,36 @@ object Coastline {
         return reducedBorders
     }
 
-    private fun extractWaterFromIds(borderPoints: HashSet<Int>, graph: Graph, idMask: Matrix<Int>): HashSet<Int> {
+    private fun extractWaterFromIds(graph: Graph, idMask: Matrix<Int>): HashSet<Int> {
         val water = HashSet<Int>()
         for (i in 0..graph.vertices.size - 1) {
             if (idMask[i] == 0) {
                 water.add(i)
             }
         }
+        return water
+    }
+
+    private fun applyBorderConstraintsToWater(water: HashSet<Int>, borderPoints: HashSet<Int>, idMask: Matrix<Int>) {
         water.addAll(borderPoints)
         borderPoints.forEach {
             idMask[it] = 0
         }
-        return water
     }
 
-    private fun extractLandFromIds(borderPoints: HashSet<Int>, graph: Graph, idMask: Matrix<Int>): HashSet<Int> {
+    private fun applyBorderConstraintsToLand(land: HashSet<Int>, borderPoints: HashSet<Int>, idMask: Matrix<Int>) {
+        land.removeAll(borderPoints)
+        borderPoints.forEach {
+            idMask[it] = 0
+        }
+    }
+
+    private fun extractLandFromIds(graph: Graph, idMask: Matrix<Int>): HashSet<Int> {
         val land = HashSet<Int>()
         for (i in 0..graph.vertices.size - 1) {
             if (idMask[i] != 0) {
                 land.add(i)
             }
-        }
-        land.removeAll(borderPoints)
-        borderPoints.forEach {
-            idMask[it] = 0
         }
         return land
     }
@@ -484,7 +510,7 @@ object Coastline {
                 continue
             }
             val randomizedPickList = ArrayList((0..pickList.size - 1).toList())
-            Collections.shuffle(randomizedPickList)
+            Collections.shuffle(randomizedPickList, random)
             var coastPick: Int = -1
             var pickPoint: Int = -1
             for (j in 0..randomizedPickList.size - 1) {

@@ -2,21 +2,30 @@ package com.grimfox.gec.command
 
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
-import com.grimfox.gec.model.Graph.*
-import com.grimfox.gec.util.Coastline
+import com.grimfox.gec.model.Graph.CellEdge
+import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.util.Coastline.applyMask
+import com.grimfox.gec.util.Coastline.getBorders
+import com.grimfox.gec.util.Coastline.getCoastline
 import com.grimfox.gec.util.Coastline.refineCoastline
+import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.Regions.buildRegions
+import com.grimfox.gec.util.Rivers
+import com.grimfox.gec.util.Rivers.RiverNode
+import com.grimfox.gec.util.Rivers.buildRiverGraph
+import com.grimfox.gec.util.Rivers.buildRivers
 import com.grimfox.gec.util.Triangulate.buildGraph
+import com.grimfox.gec.util.Utils
 import com.grimfox.gec.util.Utils.generatePoints
+import com.grimfox.gec.util.Utils.getLineIntersection
+import com.grimfox.gec.util.Utils.midPoint
+import com.sun.scenario.animation.SplineInterpolator
 import io.airlift.airline.Command
 import io.airlift.airline.Option
+import java.awt.BasicStroke
 import java.awt.Color
-import java.awt.Graphics2D
-import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*
-import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
 class BuildContinent() : Runnable {
@@ -29,6 +38,8 @@ class BuildContinent() : Runnable {
 
     @Option(name = arrayOf("-f", "--file"), description = "The data file to write as output.", required = true)
     var outputFile: File = File(Main.workingDir, "output.bin")
+
+    var draw = false
 
     data class Parameters(
             var stride: Int,
@@ -49,9 +60,9 @@ class BuildContinent() : Runnable {
             var regionSize: Float = 0.035f,
             var initialReduction: Int = 7,
             var regionPoints: Int = 2,
-            var maxRegionTries: Int = 500,
-            var maxIslandTries: Int = 10000,
-            var islandDesire: Int = 3,
+            var maxRegionTries: Int = 200,
+            var maxIslandTries: Int = 2000,
+            var islandDesire: Int = 1,
             var parameters: ArrayList<Parameters> = arrayListOf(
                     Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
                     Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
@@ -69,303 +80,361 @@ class BuildContinent() : Runnable {
         }
         for (test in 1..10000) {
             val virtualWidth = 100000.0f
-            val outputWidth = 256
+            val outputWidth = 4096
             parameterSet.seed = test.toLong()
             val random = Random(parameterSet.seed)
-            var (lastGraph, regionMask) = buildRegions(parameterSet)
+            var (graph, regionMask) = buildRegions(parameterSet)
 //            drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-ri", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
-                val localLastGraph = lastGraph
-                val graph: Graph
+                val localLastGraph = graph
+                val localGraph: Graph
                 val points = generatePoints(parameters.stride, virtualWidth, random)
-                graph = buildGraph(parameters.stride, virtualWidth, points)
+                localGraph = buildGraph(virtualWidth, points, parameters.stride)
 //                drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-pre", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
-                regionMask = applyMask(graph, localLastGraph, regionMask)
-//                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-post", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
-//                drawOffLimits(graph, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o$i")
-//                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
-                refineCoastline(graph, random, regionMask, parameters)
-                lastGraph = graph
+                regionMask = applyMask(localGraph, localLastGraph, regionMask)
+//                drawRegions(localGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-post", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+//                drawOffLimits(localGraph, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o$i")
+//                drawRegions(localGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+                refineCoastline(localGraph, random, regionMask, parameters)
+                graph = localGraph
 //                drawGraph(graph, outputWidth, "test-graph-${String.format("%05d", i)}")
 //                drawBorder(graph, outputWidth, "test-border-${String.format("%05d", i)}")
 //                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
             }
+            val rivers = buildRivers(graph, regionMask, random)
+//            draw(outputWidth, "test-new-${String.format("%05d", test)}-concavity") {
+//                graphics.color = Color.BLACK
+//                drawConcavity(graph, rivers.first)
+//            }
+            val borders = getBorders(graph, regionMask)
+            rivers.forEachIndexed { i, body ->
+                val coastline = body.first
+                val coastSpline = Spline(coastline)
+                val riverSet = body.second
+                val border = borders[i]
+                val riverGraph = buildRiverGraph(riverSet)
+                val riverFlows = calculateRiverFlows(riverGraph.vertices, coastline, riverSet, 1600000000.0f)
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", Color(160, 200, 255)) {
+                    drawRivers(graph, regionMask, riverSet, listOf(coastSpline), border)
+                }
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", Color.WHITE) {
+                    drawGraph(riverGraph)
+                }
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-mask$i", Color.BLACK) {
+                    graphics.color = Color.WHITE
+                    fillSpline(coastSpline)
+                }
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
+                    graphics.color = Color.BLACK
+                    drawSpline(coastSpline, false)
+                }
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-ids$i") {
+                    graphics.color = Color.BLACK
+                    drawVertexIds(riverGraph)
+                }
+                val riverSplines = calculateRiverSplines(riverGraph, riverSet, riverFlows)
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-splines$i") {
+                    graphics.color = Color.BLACK
+                    graphics.stroke = BasicStroke(3.0f)
+                    riverSplines.forEach {
+                        drawSpline(it, false)
+                    }
+                }
+            }
+
+//            drawSlopes(graph, slopes, outputWidth, "test-new-${String.format("%05d", test)}-slopes")
 //            drawOffLimits(lastGraph!!, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o")
 //            drawBorders(lastGraph!!, regionMask, borders, 2048, "test-new-${String.format("%05d", test)}-b")
 //            drawMask(lastGraph, spokes, outputWidth, "test-new-${String.format("%05d", test)}-rs")
 //            drawSpokes(spokes, outputWidth, "test-new-${String.format("%05d", test)}-m")
 //            drawMask(lastGraph, lastMask, outputWidth, "test-new-${String.format("%05d", test)}-m", false)
-            drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
+//            drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
 //            drawConcavity(lastGraph, concavityWeights, outputWidth, "test-new-${String.format("%05d", test)}-c")
         }
     }
 
-    /*-------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-    =============================================== Draw Functions ================================================
-                                                             |
-                                                             |
-                                                             |
-                                                            \|/
-                                                             '
-    -------------------------------------------------------------------------------------------------------------*/
-
-    private fun drawGraph(graph: Graph, outputWidth: Int, name: String, vararg features: Any) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.WHITE
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.RED
-
-        graph.triangles.forEach {
-            drawTriangle(graphics, multiplier, it)
+    private fun calculateRiverSplines(graph: Graph, rivers: HashSet<RiverNode>, flows: FloatArray): Collection<Spline> {
+        val splines = ArrayList<Spline>()
+        rivers.forEach { outlet ->
+            calculateRiverSplines(graph, null, outlet,  flows, splines)
         }
+        return splines
+    }
 
-        graphics.color = Color.BLACK
-
-        graph.triangles.forEach { mid ->
-            val center = mid.center
-            mid.adjacentTriangles.forEach {
-                drawEdge(graphics, multiplier, center, it.center)
+    private fun calculateRiverSplines(graph: Graph, parentNode: RiverNode?, node: RiverNode, flows: FloatArray, globalSplines: ArrayList<Spline>) {
+//        if (node.pointIndex == 569) {
+//            println("start this bitch")
+//            draw = true
+//        }
+        val localSplines = ArrayList<Spline>()
+        val vertex = graph.vertices[node.pointIndex]
+        val cell = vertex.cell
+        val drainVector: Point
+        val cellEdges = cell.borderEdges
+        var drainEdgeIndex = -1
+        val drainPoint = if (parentNode == null) {
+            if (node.children.isEmpty()) {
+                drainVector = Point(0.0f, 0.0f)
+            } else {
+                drainVector = toUnitVector(toVector(vertex.point, node.children.first().pointLocation))
+            }
+            vertex.point
+        } else {
+            val parentVertex = graph.vertices[parentNode.pointIndex]
+            val parentCell = parentVertex.cell
+            val sharedEdge = cell.sharedEdge(parentCell)!!
+            for (i in 0..cellEdges.size - 1) {
+                if (cellEdges[i] == sharedEdge) {
+                    drainEdgeIndex = i
+                }
+            }
+            val edge = Pair(sharedEdge.tri1.center, sharedEdge.tri2.center)
+            drainVector = calculateEntryVectorFromEdge(edge)
+            getLineIntersection(edge, Pair(parentVertex.point, vertex.point)) ?: midPoint(edge.first, edge.second)
+        }
+        val entryPoints = ArrayList<Pair<Triple<Point, Float, Point>, Int>>()
+        var inFlow = 0.0f
+        node.children.forEach {
+            val childVertex = graph.vertices[it.pointIndex]
+            val childCell = childVertex.cell
+            var childEdge: CellEdge? = null
+            try {
+                childEdge = cell.sharedEdge(childCell)!!
+            } catch (e: Exception) {
+                if (draw) {
+                    draw(4096, "testing") {
+                        graphics.color = Color.BLACK
+                        cell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                        graphics.color = Color.BLUE
+                        childCell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                        graphics.color = Color.RED
+                        drawPoint(vertex.point, 3)
+                        graphics.color = Color.ORANGE
+                        drawPoint(childVertex.point, 3)
+                        graphics.color = Color.CYAN
+                        drawPoint(drainPoint, 3)
+                        graphics.color = Color.GREEN
+                        drawEdge(vertex.point, childVertex.point)
+                    }
+                }
+                e.printStackTrace()
+            }
+            inFlow += flows[it.pointIndex]
+            for (i in 0..cellEdges.size - 1) {
+                val cellEdge = cellEdges[i]
+                if (cellEdge == childEdge) {
+                    try {
+                        val edge = Pair(cellEdge.tri1.center, cellEdge.tri2.center)
+                        val entryPoint = getLineIntersection(edge, Pair(vertex.point, childVertex.point)) ?: midPoint(edge.first, edge.second)
+                        entryPoints.add(Pair(Triple(entryPoint, flows[it.pointIndex], calculateEntryVectorFromEdge(edge)), i))
+                    } catch (e: Exception) {
+                        if (draw) {
+                            draw(4096, "testing") {
+                                graphics.color = Color.BLACK
+                                cell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                                graphics.color = Color.RED
+                                drawPoint(vertex.point, 3)
+                                graphics.color = Color.BLUE
+                                entryPoints.forEach { drawPoint(it.first.first, 3) }
+                                graphics.color = Color.CYAN
+                                drawPoint(drainPoint, 3)
+                                graphics.color = Color.ORANGE
+                                drawEdge(childEdge!!.tri1.center, childEdge!!.tri2.center)
+                                graphics.color = Color.GREEN
+                                drawEdge(vertex.point, childVertex.point)
+                            }
+                        }
+                        e.printStackTrace()
+                    }
+                }
             }
         }
-
-        graphics.color = Color.BLUE
-
-        graph.vertices.forEach {
-            drawVertex(graphics, multiplier, it, 2)
+        val entries = ArrayList(entryPoints.sortedBy { if (it.second < drainEdgeIndex) { it.second + cellEdges.size } else { it.second } }.map { it.first })
+        var currentEntry = if (entries.isEmpty()) {
+            Triple(vertex.point, 0.0f, toUnitVector(toVector(vertex.point, drainPoint)))
+        } else {
+            entries.removeAt(0)
         }
-
-        features.forEach {
-            if (it is Vertex) {
+        val junctions = ArrayList<Point>()
+        while (entries.isNotEmpty()) {
+            val newEntry = entries.removeAt(0)
+            val (junction, junctionSplines) = connectRiverEntries(drainPoint, currentEntry.first, currentEntry.second, currentEntry.third, newEntry.first, newEntry.second, newEntry.third)
+            if (draw) {
+                draw(4096, "testing") {
+                    graphics.color = Color.BLACK
+                    cell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                    graphics.color = Color.RED
+                    drawPoint(vertex.point, 3)
+                    graphics.color = Color.BLUE
+                    localSplines.forEach { drawSpline(it, false) }
+                    graphics.color = Color.MAGENTA
+                    entryPoints.forEach { drawPoint(it.first.first, 3) }
+                    graphics.color = Color.CYAN
+                    drawPoint(drainPoint, 3)
+                    graphics.color = Color.ORANGE
+                    drawSpline(junctionSplines.first)
+                    graphics.color = Color.PINK
+                    drawSpline(junctionSplines.second)
+                    graphics.color = Color.GREEN
+                    drawPoint(junction.first, 3)
+                }
+            }
+            junctions.add(junction.first)
+            currentEntry = junction
+            localSplines.add(junctionSplines.first)
+            localSplines.add(junctionSplines.second)
+        }
+        if (currentEntry.first != vertex.point || drainPoint != vertex.point) {
+            localSplines.add(connectEntryToDrain(currentEntry.first, currentEntry.third, drainPoint, drainVector))
+        }
+        if (draw) {
+            draw(4096, "testing") {
+                graphics.color = Color.BLACK
+                cell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                graphics.color = Color.RED
+                drawPoint(vertex.point, 3)
+                graphics.color = Color.BLUE
+                localSplines.forEach { drawSpline(it, false) }
                 graphics.color = Color.MAGENTA
-                drawVertex(graphics, multiplier, it, 4)
-            } else if (it is Point) {
+                entryPoints.forEach { drawPoint(it.first.first, 3) }
                 graphics.color = Color.CYAN
-                drawPoint(graphics, multiplier, it, 4)
-            } else if (it is Triangle) {
+                drawPoint(drainPoint, 3)
                 graphics.color = Color.GREEN
-                drawTriangle(graphics, multiplier, it)
-            } else if (it is Cell) {
+                junctions.forEach {
+                    drawPoint(it, 3)
+                }
+            }
+        }
+        node.children.forEach {
+            calculateRiverSplines(graph, node, it,  flows, globalSplines)
+        }
+        globalSplines.addAll(localSplines)
+    }
+
+    private fun  connectEntryToDrain(junction: Point, junctionVector: Point, drain: Point, drainVector: Point): Spline {
+        val dist = Math.sqrt(junction.distanceSquaredTo(drain).toDouble()) * 0.3666666667
+        val cp1 = Point(junction.x + (junctionVector.x * dist).toFloat(), junction.y + (junctionVector.y * dist).toFloat())
+        val cp2 = Point(drain.x + (drainVector.x * dist).toFloat(), drain.y + (drainVector.y * dist).toFloat())
+        val sp1 = SplinePoint(junction, junction, cp1)
+        val sp2 = SplinePoint(drain, cp2, drain)
+        val ret = Spline(mutableListOf(sp1, sp2), false)
+        if (draw) {
+            draw(4096, "testing") {
+                graphics.color = Color.BLACK
+                drawPoint(drain, 3)
+                graphics.color = Color.RED
+                drawPoint(junction, 3)
+                graphics.color = Color.BLUE
+                drawEdge(junction, Point(junction.x + junctionVector.x, junction.y + junctionVector.y))
+                graphics.color = Color.MAGENTA
+                drawEdge(drain, Point(drain.x + drainVector.x, drain.y + drainVector.y))
+                graphics.color = Color.GREEN
+                drawSpline(ret)
+            }
+        }
+        return ret
+    }
+
+    private fun calculateEntryVectorFromEdge(edge: Pair<Point, Point>): Point {
+        return toUnitVector(Point(edge.first.y - edge.second.y, -(edge.first.x - edge.second.x)))
+    }
+
+    private fun toUnitVector(vector: Point): Point {
+        val length = Math.sqrt((vector.x * vector.x + vector.y * vector.y).toDouble())
+        return Point((vector.x / length).toFloat(), (vector.y / length).toFloat())
+    }
+
+    private fun toVector(p1: Point, p2: Point): Point {
+        return Point(p2.x - p1.x, p2.y - p1.y)
+    }
+
+    private fun connectRiverEntries(drainPoint: Point, entry1: Point, flow1: Float, entryVector1: Point, entry2: Point, flow2: Float, entryVector2: Point): Pair<Triple<Point, Float, Point>, Pair<Spline, Spline>> {
+        val nanSafeFlow1 = if (flow1 < 0.00000001f) { 0.00000001f } else { flow1 }
+        val nanSafeFlow2 = if (flow1 < 0.00000001f) { 0.00000001f } else { flow2 }
+        val totalDist = (Math.sqrt(drainPoint.distanceSquaredTo(entry1).toDouble()) + Math.sqrt(drainPoint.distanceSquaredTo(entry2).toDouble()) * 0.3)
+        val totalFlow = nanSafeFlow1 + nanSafeFlow2
+        val junctionOffset = nanSafeFlow1 / totalFlow
+        val dist1 = junctionOffset * totalDist
+        val dist2 = (nanSafeFlow2 / totalFlow) * totalDist
+        val cp1 = Point(entry1.x + (entryVector1.x * dist1).toFloat(), entry1.y + (entryVector1.y * dist1).toFloat())
+        val cp2 = Point(entry2.x + (entryVector2.x * dist2).toFloat(), entry2.y + (entryVector2.y * dist2).toFloat())
+        val sp1 = SplinePoint(entry1, entry1, cp1)
+        val sp2 = SplinePoint(entry2, cp2, entry2)
+        val sp3 = sp1.interpolate(sp2, 1.0f - junctionOffset)
+        if (draw) {
+            draw(4096, "testing") {
+                graphics.color = Color.BLACK
+                drawPoint(drainPoint, 3)
+                graphics.color = Color.RED
+                drawPoint(entry1, 3)
+                graphics.color = Color.BLUE
+                drawPoint(entry2, 3)
+                graphics.color = Color.MAGENTA
+                drawEdge(entry1, Point(entry1.x + entryVector1.x, entry1.y + entryVector1.y))
+                graphics.color = Color.CYAN
+                drawEdge(entry2, Point(entry2.x + entryVector2.x, entry2.y + entryVector2.y))
                 graphics.color = Color.ORANGE
-                drawCell(graphics, multiplier, it)
+                drawPoint(sp3.point, 3)
+                graphics.color = Color.GREEN
+                drawSpline(Spline(mutableListOf(sp1, sp2), false))
             }
         }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-    private fun drawBorder(graph: Graph, outputWidth: Int, name: String) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            if (!cell.isBorder) {
-                drawCell(graphics, multiplier, cell)
+        sp1.cp2 = Point(entry1.x + (entryVector1.x * dist1 * 0.3).toFloat(), entry1.y + (entryVector1.y * dist1 * 0.3).toFloat())
+        sp2.cp1 = entry2
+        sp2.cp2 = Point(entry2.x + (entryVector2.x * dist2 * 0.3).toFloat(), entry2.y + (entryVector2.y * dist2 * 0.3).toFloat())
+        val junction = sp3.point
+        val entry1ToDrain = toVector(entry1, drainPoint)
+        val entry2ToDrain = toVector(entry2, drainPoint)
+        val normalizedFlowVector = toUnitVector(Point(((entry1ToDrain.x + entry2ToDrain.x) * totalDist * 0.5).toFloat(), ((entry1ToDrain.y + entry2ToDrain.y) * totalDist * 0.5).toFloat()))
+        val avgX = entryVector1.x * dist1 + entryVector2.x * dist2 + normalizedFlowVector.x
+        val avgY = entryVector1.y * dist1 + entryVector2.y * dist2 + normalizedFlowVector.y
+        val length3 = Math.sqrt((avgX * avgX + avgY * avgY).toDouble())
+        val junctionOutput = Point((avgX / length3).toFloat(), (avgY / length3).toFloat())
+        sp3.cp1 = Point((junction.x + ((-junctionOutput.x * totalDist) * 0.15)).toFloat(), (junction.y + ((-junctionOutput.y * totalDist) * 0.15)).toFloat())
+        val ret =  Pair(Triple(junction, totalFlow, junctionOutput), Pair(Spline(mutableListOf(sp1, sp3), false), Spline(mutableListOf(sp2, sp3), false)))
+        if (draw) {
+            draw(4096, "testing") {
+                graphics.color = Color.BLACK
+                drawPoint(drainPoint, 3)
+                graphics.color = Color.RED
+                drawPoint(entry1, 3)
+                graphics.color = Color.BLUE
+                drawPoint(entry2, 3)
+                graphics.color = Color.MAGENTA
+                drawEdge(entry1, Point(entry1.x + entryVector1.x, entry1.y + entryVector1.y))
+                graphics.color = Color.CYAN
+                drawEdge(entry2, Point(entry2.x + entryVector2.x, entry2.y + entryVector2.y))
+                graphics.color = Color.ORANGE
+                drawPoint(junction, 3)
+                graphics.color = Color.PINK
+                drawEdge(junction, Point(junction.x + junctionOutput.x, junction.y + junctionOutput.y))
+                graphics.color = Color.GREEN
+                drawSpline(ret.second.first)
+                drawSpline(ret.second.second)
             }
         }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
+        return ret
     }
 
-    private fun drawMask(graph: Graph, mask: Set<Int>, outputWidth: Int, name: String, positive: Boolean = true) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            if ((positive && mask.contains(cell.id)) || (!positive && !mask.contains(cell.id))) {
-                drawCell(graphics, multiplier, cell)
-            }
+    private fun calculateRiverFlows(vertices: Vertices, coastline: Polygon, rivers: HashSet<RiverNode>, simulationSizeM2: Float): FloatArray {
+        val flows = FloatArray(vertices.size)
+        rivers.forEach {
+            calculateRiverFlow(vertices, coastline, it, simulationSizeM2, flows)
         }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
+        return flows
     }
 
-    private fun drawRegions(graph: Graph, mask: Matrix<Int>, outputWidth: Int, name: String, vararg regionColors: Color) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            val regionId = mask[it.id]
-            if (regionId != 0) {
-                graphics.color = regionColors[regionId]
-                drawCell(graphics, multiplier, cell)
-            }
+    private fun calculateRiverFlow(vertices: Vertices, coastline: Polygon, river: RiverNode, simulationSizeM2: Float, flows: FloatArray): Double {
+        var shedArea = 0.0
+        river.children.forEach {
+            shedArea += calculateRiverFlow(vertices, coastline, it, simulationSizeM2, flows)
         }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-    private fun drawBorders(graph: Graph, mask: Matrix<Int>, borders: Pair<List<Polygon>, List<Polygon>>, outputWidth: Int, name: String) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            val regionId = mask[it.id]
-            if (regionId != 0) {
-                drawCell(graphics, multiplier, cell)
-            }
+        val cell = vertices[river.pointIndex].cell
+        if (!cell.isBorder && !Polygon(cell.border, true).doesEdgeIntersect(coastline)) {
+            shedArea += cell.area
         }
-
-        graphics.color = Color.RED
-
-        borders.first.forEach {
-            for (i in 1..it.points.size - if (it.isClosed) 0 else 1) {
-                drawEdge(graphics, multiplier, it.points[i - 1], it.points[i % it.points.size])
-            }
-        }
-
-        graphics.color = Color.BLUE
-
-        borders.second.forEach {
-            for (i in 1..it.points.size - if (it.isClosed) 0 else 1) {
-                drawEdge(graphics, multiplier, it.points[i - 1], it.points[i % it.points.size])
-            }
-        }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-    private fun drawOffLimits(graph: Graph, mask: Matrix<Int>, offLimits: HashSet<Int>, outputWidth: Int, name: String) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            val regionId = mask[it.id]
-            if (regionId != 0) {
-                drawCell(graphics, multiplier, cell)
-            }
-        }
-
-        graphics.color = Color.RED
-
-        offLimits.forEach {
-            drawCell(graphics, multiplier, graph.vertices[it].cell)
-        }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-    private fun drawConcavity(graph: Graph, mask: Matrix<Float>, outputWidth: Int, name: String) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        var minConcavity = Float.MAX_VALUE
-        var maxConcavity = Float.MIN_VALUE
-        graph.vertices.forEach {
-            val concavity = mask[it.id]
-            if (concavity > 0.0f) {
-                if (concavity < minConcavity) {
-                    minConcavity = concavity
-                }
-                if (concavity > maxConcavity) {
-                    maxConcavity = concavity
-                }
-            }
-        }
-        val concavityRange = maxConcavity - minConcavity
-
-        graph.vertices.forEach {
-            val cell = it.cell
-            val concavity = mask[it.id]
-            if (concavity > 0.0f) {
-                val adjusted = (concavity - minConcavity) / concavityRange
-                graphics.color = Color(adjusted, 1.0f - adjusted, 0.0f)
-                drawCell(graphics, multiplier, cell)
-            }
-        }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-    private fun drawSpokes(spokes: ArrayList<Pair<Point, Point>>, outputWidth: Int, name: String) {
-        val multiplier = outputWidth.toFloat()
-        val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
-        val graphics = image.createGraphics()
-        graphics.background = Color.BLACK
-        graphics.clearRect(0, 0, outputWidth, outputWidth)
-        graphics.color = Color.WHITE
-
-        spokes.forEach {
-            drawEdge(graphics, multiplier, it.first, it.second)
-        }
-
-        ImageIO.write(image, "png", File("output/$name.png"))
-    }
-
-
-    private fun drawVertex(graphics: Graphics2D, multiplier: Float, vertex: Vertex, radius: Int) {
-        drawPoint(graphics, multiplier, vertex.point, radius)
-    }
-
-    private fun drawPoint(graphics: Graphics2D, multiplier: Float, point: Point, radius: Int) {
-        val diameter = radius * 2 + 1
-        graphics.fillOval(Math.round(point.x * multiplier) - radius, Math.round(point.y * multiplier) - radius, diameter, diameter)
-    }
-
-    private fun drawTriangle(graphics: Graphics2D, multiplier: Float, triangle: Triangle) {
-        val p1 = triangle.a.point
-        val p2 = triangle.b.point
-        val p3 = triangle.c.point
-        val p1x = Math.round(p1.x * multiplier)
-        val p1y = Math.round(p1.y * multiplier)
-        val p2x = Math.round(p2.x * multiplier)
-        val p2y = Math.round(p2.y * multiplier)
-        val p3x = Math.round(p3.x * multiplier)
-        val p3y = Math.round(p3.y * multiplier)
-        graphics.drawLine(p1x, p1y, p2x, p2y)
-        graphics.drawLine(p2x, p2y, p3x, p3y)
-        graphics.drawLine(p3x, p3y, p1x, p1y)
-    }
-
-    private fun drawEdge(graphics: Graphics2D, multiplier: Float, p1: Point, p2: Point) {
-        val p1x = Math.round(p1.x * multiplier)
-        val p1y = Math.round(p1.y * multiplier)
-        val p2x = Math.round(p2.x * multiplier)
-        val p2y = Math.round(p2.y * multiplier)
-        graphics.drawLine(p1x, p1y, p2x, p2y)
-    }
-
-    private fun drawCell(graphics: Graphics2D, multiplier: Float, cell: Cell) {
-        if (cell.isClosed) {
-            val xVals = cell.border.map { Math.round(it.x * multiplier) }.toIntArray()
-            val yVals = cell.border.map { Math.round(it.y * multiplier) }.toIntArray()
-            graphics.fillPolygon(xVals, yVals, xVals.size)
-        }
+        flows[river.pointIndex] = (0.42 * Math.pow(shedArea, 0.69)).toFloat()
+        return shedArea
     }
 }

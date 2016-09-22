@@ -143,7 +143,6 @@ object Utils {
         return findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 1)[0].first
     }
 
-
     fun findClosestPoints(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point, outputWidth: Int, wrapEdges: Boolean): ClosestPoints {
         val closestPoints = findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 3)
         return ClosestPoints(closestPoints[0],
@@ -298,32 +297,145 @@ object Utils {
                 && p2.y >= Math.min(p1.y, p3.y))
     }
 
-    fun findConcavityWeightsSmall(graph: Graph, water: HashSet<Int>, body: HashSet<Int>, testPoints: HashSet<Int>): ArrayList<Pair<Int, Float>> {
-        val weights = ArrayList<Pair<Int, Float>>(testPoints.size)
-        testPoints.forEach { it ->
-            var landWaterRatio = calculateConcavityRatio(graph, water, body, it, 2, 0.000075f)
-            landWaterRatio *= calculateConcavityRatio(graph, water, body, it, 4, 0.00035f)
-            landWaterRatio *= calculateConcavityRatio(graph, water, body, it, 6, 0.00075f)
-            weights.add(Pair(it, landWaterRatio))
+    private fun pointInBetween(p0_x: Float, p0_y: Float, p1_x: Float, p1_y: Float, p2_x: Float, p2_y: Float): Boolean {
+        return (p1_x <= Math.max(p0_x, p2_x)
+                && p1_x >= Math.min(p0_x, p2_x)
+                && p1_y <= Math.max(p0_y, p2_y)
+                && p1_y >= Math.min(p0_y, p2_y))
+    }
+
+    fun getLineIntersection(line1: Pair<Point, Point>, line2: Pair<Point, Point>): Point? {
+        return getLineIntersection(line1.first.x, line1.first.y, line1.second.x, line1.second.y, line2.first.x, line2.first.y, line2.second.x, line2.second.y)
+    }
+
+    fun getLineIntersection(p0_x: Float, p0_y: Float, p1_x: Float, p1_y: Float, p2_x: Float, p2_y: Float, p3_x: Float, p3_y: Float): Point? {
+        val s1_x = p1_x - p0_x
+        val s1_y = p1_y - p0_y
+        val s2_x = p3_x - p2_x
+        val s2_y = p3_y - p2_y
+        val denominator = -s2_x * s1_y + s1_x * s2_y
+        if (denominator == 0.0f) {
+            if (pointInBetween(p0_x, p0_y, p2_x, p2_y, p1_x, p1_y)) {
+                return Point(p2_x, p2_y)
+            }
+            if (pointInBetween(p0_x, p0_y, p3_x, p3_y, p1_x, p1_y)) {
+                return Point(p3_x, p3_y)
+            }
+            if (pointInBetween(p2_x, p2_y, p0_x, p0_y, p3_x, p3_y)) {
+                return Point(p0_x, p0_y)
+            }
+            if (pointInBetween(p2_x, p2_y, p1_x, p1_y, p3_x, p3_y)) {
+                return Point(p1_x, p1_y)
+            }
+            return null
+        }
+        val tNumerator = (s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x))
+//        if ((tNumerator > denominator) || (tNumerator < 0.0f && denominator > 0.0f)) {
+//            return null
+//        }
+        val sNumerator = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y))
+//        if ((sNumerator > denominator) || (sNumerator < 0.0f && denominator > 0.0f)) {
+//            return null
+//        }
+        val s = sNumerator / denominator
+        val t = tNumerator / denominator
+        if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
+            return Point(p0_x + (t * s1_x), p0_y + (t * s1_y))
+        }
+        return null
+    }
+
+    fun findConcavityWeights(graph: Graph, body: HashSet<Int>, vertexIds: HashSet<Int>, vararg radii: Float): ArrayList<Pair<Int, Float>> {
+        return findConcavityWeights(graph, body, vertexIds, null, *radii)
+    }
+
+    fun findConcavityWeights(graph: Graph, body: HashSet<Int>, vertexIds: HashSet<Int>, mask: HashSet<Int>?, vararg radii: Float): ArrayList<Pair<Int, Float>> {
+        val weights = ArrayList<Pair<Int, Float>>(vertexIds.size)
+        vertexIds.forEach { vertexId ->
+            weights.add(Pair(vertexId, findConcavityWeight(graph, body, vertexId, mask, *radii)))
         }
         return weights
     }
 
-    fun findConcavityWeightsLarge(graph: Graph, water: HashSet<Int>, body: HashSet<Int>, testPoints: HashSet<Int>): ArrayList<Pair<Int, Float>> {
-        return ArrayList(testPoints.map { Pair(it, calculateConcavityRatio(graph, water, body, it, 12, 0.035f)) }.sortedBy { it.second })
+    fun findConcavityWeight(graph: Graph, body: HashSet<Int>, vertexId: Int, mask: HashSet<Int>?, vararg radii: Float): Float {
+        var landWaterRatio = 1.0f
+        radii.forEach { radius ->
+            landWaterRatio *= calculateConcavityRatio(graph, body, vertexId, mask, radius)
+        }
+        return landWaterRatio
     }
 
-    private fun calculateConcavityRatio(graph: Graph, mask: HashSet<Int>, body: HashSet<Int>, vertexId: Int, expansions: Int, radiusSquared: Float): Float {
+    private fun calculateConcavityRatio(graph: Graph, body: HashSet<Int>, vertexId: Int, mask: HashSet<Int>?, radius: Float): Float {
         val vertices = graph.vertices
         val vertex = vertices[vertexId]
         val point = vertex.point
-        val closeVertices = graph.getClosePoints(point, expansions).map { vertices[it] }.filter { !mask.contains(it.id) && point.distanceSquaredTo(it.point) < radiusSquared }
+        val closeVertices = graph.getPointsWithinRadius(point, radius).filter { !(mask?.contains(it) ?: false) }
         var inCount = 0
         closeVertices.forEach {
-            if (body.contains(it.id)) {
+            if (body.contains(it)) {
                 inCount++
             }
         }
         return inCount.toFloat() / closeVertices.size
+    }
+
+    fun Pair<Point, Point>.isPointWithin(point: Point): Boolean {
+        return point.x >= first.x && point.x <= second.x && point.y >= first.y && point.y <= second.y
+    }
+
+    fun Pair<Point, Point>.doesEdgeIntersect(edge: Pair<Point, Point>): Boolean {
+        return isPointWithin(edge.first) || isPointWithin(edge.second)
+    }
+
+    fun distance2Between(line: Pair<Point, Point>, point: Point): Float {
+        val x = point.x
+        val y = point.y
+        val x1 = line.first.x
+        val y1 = line.first.y
+        val x2 = line.second.x
+        val y2 = line.second.y
+        
+        val a = x - x1
+        val b = y - y1
+        val c = x2 - x1
+        val d = y2 - y1
+
+        val dot = a * c + b * d
+        val len_sq = c * c + d * d
+        var param = -1.0f
+        if (len_sq !== 0.0f) {
+            param = dot / len_sq
+        }
+
+        val xx: Float
+        val yy: Float
+        if (param < 0) {
+            xx = x1
+            yy = y1
+        } else if (param > 1) {
+            xx = x2
+            yy = y2
+        } else {
+            xx = x1 + param * c
+            yy = y1 + param * d
+        }
+
+        val dx = x - xx
+        val dy = y - yy
+        return dx * dx + dy * dy 
+    }
+    
+    fun distance2Between(line1: Pair<Point, Point>, line2: Pair<Point, Point>): Float {
+        if (linesIntersect(line1, line2)) {
+            return 0.0f
+        }
+        var minDist = distance2Between(line1, line2.first)
+        minDist = Math.min(minDist, distance2Between(line1, line2.second))
+        minDist = Math.min(minDist, distance2Between(line2, line1.first))
+        return Math.min(minDist, distance2Between(line2, line1.second))
+    }
+
+    fun midPoint(p1: Point, p2: Point): Point {
+        return Point((p1.x + p2.x) * 0.5f, (p1.y + p2.y) * 0.5f)
     }
 }

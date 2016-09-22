@@ -3,13 +3,13 @@ package com.grimfox.gec.model
 import java.util.*
 
 
-class Graph(val stride: Int,
-            val vertexIdsToPoints: FloatArray,
+class Graph(val vertexIdsToPoints: FloatArray,
             val vertexToVertices: List<List<Int>>,
             val vertexToTriangles: List<List<Int>>,
             val triangleToCenters: FloatArray,
             val triangleToVertices: IntArray,
-            val triangleToTriangles: IntArray) {
+            val triangleToTriangles: IntArray,
+            val stride: Int? = null) {
 
     var useVirtualConnections = false
     var virtualConnections = HashMap<Int, HashSet<Int>>()
@@ -162,6 +162,7 @@ class Graph(val stride: Int,
         operator fun get(id: Int): Vertex = Vertex(id)
 
         operator fun get(x: Int, y: Int): Vertex {
+            if (stride == null) throw UnsupportedOperationException()
             return get(y * stride + x)
         }
 
@@ -225,6 +226,7 @@ class Graph(val stride: Int,
     }
 
     fun getClosePoints(point: Point, expansions: Int = 3, includeLower: Boolean = true): Set<Int> {
+        if (stride == null) throw UnsupportedOperationException()
         val strideMinus1 = stride - 1
         val gridX = Math.round(point.x * (strideMinus1))
         val gridY = Math.round(point.y * (strideMinus1))
@@ -249,6 +251,7 @@ class Graph(val stride: Int,
     }
 
     fun getPointsWithinRadius(point: Point, radius: Float): Set<Int> {
+        if (stride == null) throw UnsupportedOperationException()
         val gridSize = 1.0f / stride
         val expansions = Math.ceil((radius / gridSize).toDouble()).toInt() + 1
         val testPoints = getClosePoints(point, expansions)
@@ -374,7 +377,7 @@ class Graph(val stride: Int,
         return borderIds
     }
 
-    fun findBorder(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): Polygon? {
+    fun findBorder(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false, splices: HashMap<CellEdge, Point>? = null): Polygon? {
         val edges = ArrayList(findBorderEdges(ids, mask, negate))
         if (edges.isEmpty()) {
             return null
@@ -395,6 +398,10 @@ class Graph(val stride: Int,
             if (nextEdge == null) {
                 break
             }
+            val splice = splices?.get(nextEdge)
+            if (splice != null) {
+                border.add(0, splice)
+            }
             border.add(0, nextEdge.tri1.center)
             currentEdge = nextEdge
         }
@@ -409,6 +416,10 @@ class Graph(val stride: Int,
             }
             if (nextEdge == null) {
                 break
+            }
+            val splice = splices?.get(nextEdge)
+            if (splice != null) {
+                border.add(splice)
             }
             border.add(nextEdge.tri2.center)
             currentEdge = nextEdge

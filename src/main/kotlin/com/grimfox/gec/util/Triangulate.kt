@@ -2,6 +2,9 @@ package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Point
+import com.grimfox.gec.util.drawing.draw
+import com.grimfox.gec.util.drawing.drawPoint
+import java.awt.Color
 import java.util.*
 
 object Triangulate {
@@ -37,7 +40,7 @@ object Triangulate {
         }
     }
 
-    fun buildGraph(stride: Int, width: Float, points: List<Point>): Graph {
+    fun buildGraph(width: Float, points: List<Point>, stride: Int? = null): Graph {
         val wrappedPoints = wrapPoints(points)
 
         val p1 = chooseSeedPoint(wrappedPoints, stride)
@@ -70,7 +73,7 @@ object Triangulate {
             iteration++
         }
 
-        return buildGraph(stride, wrappedPoints, pointIndex, triangles, width)
+        return buildGraph(wrappedPoints, pointIndex, triangles, width, stride)
     }
 
     private fun wrapPoints(points: List<Point>): ArrayList<PointWrapper> {
@@ -81,7 +84,7 @@ object Triangulate {
         return wrappedPoints
     }
 
-    private fun buildGraph(stride: Int, points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, width: Float): Graph {
+    private fun buildGraph(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, width: Float, stride: Int?): Graph {
         val vertexIdsToPoints = FloatArray(points.size * 2)
         pointIndex.forEachIndexed { i, pointId ->
             val point = points[pointId]
@@ -167,7 +170,7 @@ object Triangulate {
             vertexToTriangles.add(adjacentTriangles)
             vertexToVertices.add(adjacentPoints)
         }
-        return Graph(stride, vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles)
+        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride)
     }
 
     private fun buildInitialHull(triangles: ArrayList<Triangle>, p1: PointWrapper, p2: PointWrapper, p3: PointWrapper, midCircle: Circle): ArrayList<PointWrapper> {
@@ -181,10 +184,33 @@ object Triangulate {
         return hull
     }
 
-    private fun chooseSeedPoint(points: ArrayList<PointWrapper>, stride: Int): PointWrapper {
-        val halfStride = stride / 2
-        val seedIndex = (halfStride * stride) + halfStride
-        return points[seedIndex]
+    private fun chooseSeedPoint(points: ArrayList<PointWrapper>, stride: Int?): PointWrapper {
+        if (stride != null) {
+            val halfStride = stride / 2
+            val seedIndex = (halfStride * stride) + halfStride
+            return points[seedIndex]
+        } else {
+            var minX = Float.MAX_VALUE
+            var maxX = Float.MIN_VALUE
+            var minY = Float.MAX_VALUE
+            var maxY = Float.MIN_VALUE
+            points.forEach {
+                if (it.p.x < minX) {
+                    minX = it.p.x
+                }
+                if (it.p.x > maxX) {
+                    maxX = it.p.x
+                }
+                if (it.p.y < minY) {
+                    minY = it.p.y
+                }
+                if (it.p.y > maxY) {
+                    maxY = it.p.y
+                }
+            }
+            val center = Point(minX + ((maxX - minX) / 2.0f), minY + ((maxY - minY) / 2.0f))
+            return points.minBy { center.distanceSquaredTo(it.p) }!!
+        }
     }
 
     private fun findClosestPointToSeed(points: ArrayList<PointWrapper>, seed: PointWrapper): PointWrapper {
