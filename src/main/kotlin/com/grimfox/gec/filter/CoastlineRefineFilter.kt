@@ -62,7 +62,7 @@ class CoastlineRefineFilter : CoastlineFilter {
         val edges = buildEdgeMap(closestPoints)
 
         val borderPoints = buildBorderPoints(closestPoints, strideMinusOne)
-        val waterPoints = HashSet<Int>(borderPoints)
+        val waterPoints = LinkedHashSet<Int>(borderPoints)
         val pointCount = edges.size
         for (i in 0..pointCount - 1) {
             if (mask[i] == 0) {

@@ -1,5 +1,8 @@
 package com.grimfox.gec.model
 
+import com.grimfox.gec.model.geometry.LineSegment2F
+import com.grimfox.gec.model.geometry.Point2F
+import com.grimfox.gec.model.geometry.Polygon2F
 import java.util.*
 
 
@@ -12,7 +15,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
             val stride: Int? = null) {
 
     var useVirtualConnections = false
-    var virtualConnections = HashMap<Int, HashSet<Int>>()
+    var virtualConnections = HashMap<Int, LinkedHashSet<Int>>()
     val vertices = Vertices()
     val triangles = Triangles()
 
@@ -21,11 +24,15 @@ class Graph(val vertexIdsToPoints: FloatArray,
         val graph = this@Graph
 
         val length2: Float by lazy {
-            tri1.center.distanceSquaredTo(tri2.center)
+            tri1.center.distance2(tri2.center)
         }
 
         val length: Float by lazy {
             Math.sqrt(length2.toDouble()).toFloat()
+        }
+
+        fun intersects(other: CellEdge): Boolean {
+            return LineSegment2F(tri1.center, tri2.center).intersects(LineSegment2F(other.tri1.center, other.tri2.center))
         }
 
         override fun equals(other: Any?): Boolean{
@@ -51,7 +58,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val graph = this@Graph
 
-        val point: Point by lazy { vertices.getPoint(id) }
+        val point: Point2F by lazy { vertices.getPoint(id) }
 
         val adjacentVertices: List<Vertex> by lazy { vertices.getAdjacentVertices(id).map { Vertex(it) } }
 
@@ -73,7 +80,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val graph = this@Graph
 
-        val center: Point by lazy { triangles.getCenter(id) }
+        val center: Point2F by lazy { triangles.getCenter(id) }
 
         val vertices: List<Vertex> by lazy { triangles.getVertices(id).map { Vertex(it) } }
 
@@ -99,7 +106,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val graph = this@Graph
 
-        val border: List<Point> by lazy { vertex.adjacentTriangles.map { it.center } }
+        val border: List<Point2F> by lazy { vertex.adjacentTriangles.map { it.center } }
 
         val isClosed: Boolean by lazy { vertex.adjacentTriangles.first().adjacentTriangles.contains(vertex.adjacentTriangles.last()) }
 
@@ -166,9 +173,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
             return get(y * stride + x)
         }
 
-        fun getPoint(id: Int): Point {
+        fun getPoint(id: Int): Point2F {
             val o = id * 2
-            return Point(vertexIdsToPoints[o], vertexIdsToPoints[o + 1])
+            return Point2F(vertexIdsToPoints[o], vertexIdsToPoints[o + 1])
         }
 
         fun getAdjacentVertices(id: Int): List<Int> {
@@ -194,9 +201,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         operator fun get(id: Int): Triangle = Triangle(id)
 
-        fun getCenter(id: Int): Point {
+        fun getCenter(id: Int): Point2F {
             val o = id * 2
-            return Point(triangleToCenters[o], triangleToCenters[o + 1])
+            return Point2F(triangleToCenters[o], triangleToCenters[o + 1])
         }
 
         fun getVertices(id: Int): List<Int> {
@@ -212,11 +219,11 @@ class Graph(val vertexIdsToPoints: FloatArray,
         override fun iterator(): Iterator<Triangle> = (0..size - 1).map { Triangle(it) }.iterator()
     }
 
-    fun getClosestPoint(point: Point, closePoints: Set<Int> = getClosePoints(point)): Int {
+    fun getClosestPoint(point: Point2F, closePoints: Set<Int> = getClosePoints(point)): Int {
         var closestPoint: Int = -1
         var minD2 = Float.MAX_VALUE
         closePoints.forEach {
-            val d2 = vertices.getPoint(it).distanceSquaredTo(point)
+            val d2 = vertices.getPoint(it).distance2(point)
             if (d2 < minD2) {
                 closestPoint = it
                 minD2 = d2
@@ -225,17 +232,17 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return closestPoint
     }
 
-    fun getClosePoints(point: Point, expansions: Int = 3, includeLower: Boolean = true): Set<Int> {
+    fun getClosePoints(point: Point2F, expansions: Int = 3, includeLower: Boolean = true): Set<Int> {
         if (stride == null) throw UnsupportedOperationException()
         val strideMinus1 = stride - 1
         val gridX = Math.round(point.x * (strideMinus1))
         val gridY = Math.round(point.y * (strideMinus1))
         val seed = vertices[gridX, gridY].id
-        val nearPoints = HashSet<Int>()
+        val nearPoints = LinkedHashSet<Int>()
         nearPoints.add(seed)
-        var nextPoints = HashSet<Int>(nearPoints)
+        var nextPoints = LinkedHashSet<Int>(nearPoints)
         for (i in 0..expansions - 1) {
-            val newPoints = HashSet<Int>()
+            val newPoints = LinkedHashSet<Int>()
             nextPoints.forEach {
                 newPoints.addAll(vertices.getAdjacentVertices(it))
             }
@@ -250,28 +257,28 @@ class Graph(val vertexIdsToPoints: FloatArray,
         }
     }
 
-    fun getPointsWithinRadius(point: Point, radius: Float): Set<Int> {
+    fun getPointsWithinRadius(point: Point2F, radius: Float): Set<Int> {
         if (stride == null) throw UnsupportedOperationException()
         val gridSize = 1.0f / stride
         val expansions = Math.ceil((radius / gridSize).toDouble()).toInt() + 1
         val testPoints = getClosePoints(point, expansions)
-        val pointsWithin = HashSet<Int>()
+        val pointsWithin = LinkedHashSet<Int>()
         val r2 = radius * radius
         testPoints.forEach {
-            if (point.distanceSquaredTo(vertices[it].point) <= r2) {
+            if (point.distance2(vertices[it].point) <= r2) {
                 pointsWithin.add(it)
             }
         }
         return pointsWithin
     }
 
-    fun getClosePointDegrees(id: Int, expansions: Int = 1): ArrayList<HashSet<Int>> {
-        val degrees = ArrayList<HashSet<Int>>()
-        val nearPoints = HashSet<Int>()
+    fun getClosePointDegrees(id: Int, expansions: Int = 1): ArrayList<LinkedHashSet<Int>> {
+        val degrees = ArrayList<LinkedHashSet<Int>>()
+        val nearPoints = LinkedHashSet<Int>()
         nearPoints.add(id)
-        var nextPoints = HashSet<Int>(nearPoints)
+        var nextPoints = LinkedHashSet<Int>(nearPoints)
         for (i in 0..expansions - 1) {
-            val newPoints = HashSet<Int>()
+            val newPoints = LinkedHashSet<Int>()
             nextPoints.forEach {
                 newPoints.addAll(vertices.getAdjacentVertices(it))
             }
@@ -283,9 +290,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return degrees
     }
 
-    fun getConnectedBodies(mask: HashSet<Int>): ArrayList<HashSet<Int>> {
-        val bodies = ArrayList<HashSet<Int>>()
-        val unconnected = HashSet<Int>(mask)
+    fun getConnectedBodies(mask: LinkedHashSet<Int>): ArrayList<LinkedHashSet<Int>> {
+        val bodies = ArrayList<LinkedHashSet<Int>>()
+        val unconnected = LinkedHashSet<Int>(mask)
         while (unconnected.isNotEmpty()) {
             val seed = unconnected.first()
             unconnected.remove(seed)
@@ -296,12 +303,12 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return bodies
     }
 
-    fun getConnectedIds(seed: Int, mask: HashSet<Int>): HashSet<Int> {
-        val connectedPoints = HashSet<Int>()
+    fun getConnectedIds(seed: Int, mask: LinkedHashSet<Int>): LinkedHashSet<Int> {
+        val connectedPoints = LinkedHashSet<Int>()
         connectedPoints.add(seed)
-        var nextPoints = HashSet<Int>(connectedPoints)
+        var nextPoints = LinkedHashSet<Int>(connectedPoints)
         while (nextPoints.isNotEmpty()) {
-            val newPoints = HashSet<Int>()
+            val newPoints = LinkedHashSet<Int>()
             nextPoints.forEach {
                 vertices.getAdjacentVertices(it).forEach {
                     if (mask.contains(it)) {
@@ -316,9 +323,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return connectedPoints
     }
 
-    fun getConnectedEdgeSegments(edgeSet: HashSet<CellEdge>): ArrayList<HashSet<CellEdge>> {
-        val segments = ArrayList<HashSet<CellEdge>>()
-        val unconnected = HashSet<CellEdge>(edgeSet)
+    fun getConnectedEdgeSegments(edgeSet: LinkedHashSet<CellEdge>): ArrayList<LinkedHashSet<CellEdge>> {
+        val segments = ArrayList<LinkedHashSet<CellEdge>>()
+        val unconnected = LinkedHashSet<CellEdge>(edgeSet)
         while (unconnected.isNotEmpty()) {
             val seed = unconnected.first()
             unconnected.remove(seed)
@@ -329,12 +336,12 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return segments
     }
 
-    fun getConnectedEdges(edge: CellEdge, edgeSet: HashSet<CellEdge>): HashSet<CellEdge> {
-        val connectedEdges = HashSet<CellEdge>()
+    fun getConnectedEdges(edge: CellEdge, edgeSet: LinkedHashSet<CellEdge>): LinkedHashSet<CellEdge> {
+        val connectedEdges = LinkedHashSet<CellEdge>()
         connectedEdges.add(edge)
-        var nextEdges = HashSet<CellEdge>(connectedEdges)
+        var nextEdges = LinkedHashSet<CellEdge>(connectedEdges)
         while (nextEdges.isNotEmpty()) {
-            val newEdges = HashSet<CellEdge>()
+            val newEdges = LinkedHashSet<CellEdge>()
             nextEdges.forEach { edge ->
                 edgeSet.forEach {
                     if (edge.tri1.id == it.tri1.id
@@ -352,8 +359,8 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return connectedEdges
     }
 
-    fun findBorderIds(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): HashSet<Int> {
-        val borderIds = HashSet<Int>()
+    fun findBorderIds(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): LinkedHashSet<Int> {
+        val borderIds = LinkedHashSet<Int>()
         ids.forEach { id ->
             val adjacents = vertices.getAdjacentVertices(id)
             for (i in 0..adjacents.size - 1) {
@@ -377,12 +384,12 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    fun findBorder(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false, splices: HashMap<CellEdge, Point>? = null): Polygon? {
+    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: HashMap<CellEdge, Point2F>? = null): Polygon2F? {
         val edges = ArrayList(findBorderEdges(ids, mask, negate))
         if (edges.isEmpty()) {
             return null
         }
-        val border = ArrayList<Point>(edges.size + 1)
+        val border = ArrayList<Point2F>(edges.size + 1)
         val seedEdge = edges.removeAt(0)
         border.add(seedEdge.tri1.center)
         border.add(seedEdge.tri2.center)
@@ -429,11 +436,11 @@ class Graph(val vertexIdsToPoints: FloatArray,
             border.removeAt(border.size - 1)
             isClosed = true
         }
-        return Polygon(border, isClosed)
+        return Polygon2F(border, isClosed)
     }
 
-    fun findBorderEdges(ids: HashSet<Int>, mask: HashSet<Int>? = null, negate: Boolean = false): HashSet<CellEdge> {
-        val borderIds = HashSet<CellEdge>()
+    fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): LinkedHashSet<CellEdge> {
+        val borderIds = LinkedHashSet<CellEdge>()
         ids.forEach { id ->
             vertices.getAdjacentVertices(id).forEach { adjacentId ->
                 if (!ids.contains(adjacentId)) {
@@ -452,7 +459,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    private fun addBorderEdge(borderIds: HashSet<CellEdge>, id: Int, adjacentId: Int) {
+    private fun addBorderEdge(borderIds: LinkedHashSet<CellEdge>, id: Int, adjacentId: Int) {
         val cell1 = vertices[id].cell
         val cell2 = vertices[adjacentId].cell
         val edge = cell1.sharedEdge(cell2)

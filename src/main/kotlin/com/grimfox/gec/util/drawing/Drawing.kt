@@ -1,9 +1,11 @@
 package com.grimfox.gec.util.drawing
 
+import com.grimfox.gec.command.BuildContinent
+import com.grimfox.gec.command.BuildContinent.RiverSegment
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
-import com.grimfox.gec.model.Point
-import com.grimfox.gec.model.Polygon
+import com.grimfox.gec.model.geometry.*
+import com.grimfox.gec.util.Rivers
 import com.grimfox.gec.util.Rivers.RiverNode
 import java.awt.*
 import java.awt.geom.CubicCurve2D
@@ -13,16 +15,16 @@ import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
 
-class Image(val multiplier: Float, val graphics: Graphics2D)
+class Image(val multiplier: Float, val shift: Vector2F, val graphics: Graphics2D)
 
-fun draw(outputWidth: Int, name: String, background: Color = Color.WHITE, drawCalls: Image.() -> Unit) {
-    val multiplier = outputWidth.toFloat()
+fun draw(outputWidth: Int, name: String, background: Color = Color.WHITE, zoom: Float? = null, shift: Vector2F = Vector2F(0.0f, 0.0f), drawCalls: Image.() -> Unit) {
+    val multiplier = if (zoom == null) { outputWidth.toFloat() } else { outputWidth.toFloat() * zoom }
     val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
     val graphics = image.createGraphics()
     graphics.background = background
     graphics.clearRect(0, 0, outputWidth, outputWidth)
 
-    drawCalls(Image(multiplier, graphics))
+    drawCalls(Image(multiplier, shift, graphics))
 
     ImageIO.write(image, "png", File("output/$name.png"))
 }
@@ -31,24 +33,40 @@ fun Image.drawVertex(vertex: Vertex, radius: Int) {
     drawPoint(vertex.point, radius)
 }
 
-fun Image.drawPoint(point: Point, radius: Int) {
+fun Image.drawPoint(point: Point2F, radius: Int) {
     val diameter = radius * 2 + 1
-    graphics.fillOval(Math.round(point.x * multiplier) - radius, Math.round(point.y * multiplier) - radius, diameter, diameter)
+    val ip = interpolateInt(point)
+    graphics.fillOval(ip.x - radius, ip.y - radius, diameter, diameter)
 }
 
-fun Image.drawEdge(p1: Point, p2: Point) {
-    val p1x = Math.round(p1.x * multiplier)
-    val p1y = Math.round(p1.y * multiplier)
-    val p2x = Math.round(p2.x * multiplier)
-    val p2y = Math.round(p2.y * multiplier)
-    graphics.drawLine(p1x, p1y, p2x, p2y)
+fun Image.interpolateInt(point: Point2F): Point2I {
+    return Point2I(Math.round((point.x + shift.a) * multiplier), Math.round((point.y + shift.b) * multiplier))
+}
+
+fun Image.interpolateFloat(point: Point2F): Point2F {
+    return Point2F((point.x + shift.a) * multiplier, (point.y + shift.b) * multiplier)
+}
+
+fun Image.drawEdge(p1: Point2F, p2: Point2F) {
+    val ip1 = interpolateInt(p1)
+    val ip2 = interpolateInt(p2)
+    graphics.drawLine(ip1.x, ip1.y, ip2.x, ip2.y)
+}
+
+fun Image.drawEdgeWithGradient(p1: Point2F, p2: Point2F, c1: Color, c2: Color) {
+    val ip1 = interpolateInt(p1)
+    val ip2 = interpolateInt(p2)
+    val prePaint = graphics.paint
+    graphics.paint = GradientPaint(ip1.x.toFloat(), ip1.y.toFloat(), c1, ip2.x.toFloat(), ip2.y.toFloat(), c2)
+    graphics.drawLine(ip1.x, ip1.y, ip2.x, ip2.y)
+    graphics.paint = prePaint
 }
 
 fun Image.drawTriangle(triangle: Triangle, drawPoints: Boolean = true) {
-    drawPolygon(Polygon(listOf(triangle.a.point, triangle.b.point, triangle.c.point), true), drawPoints)
+    drawPolygon(Polygon2F(listOf(triangle.a.point, triangle.b.point, triangle.c.point), true), drawPoints)
 }
 
-fun Image.drawPolygon(polygon: Polygon, drawPoints: Boolean = true) {
+fun Image.drawPolygon(polygon: Polygon2F, drawPoints: Boolean = true) {
     val points = polygon.points
     for (i in 1..points.size - if (polygon.isClosed) 0 else 1) {
         drawEdge(points[i - 1], points[i % points.size])
@@ -62,8 +80,9 @@ fun Image.drawPolygon(polygon: Polygon, drawPoints: Boolean = true) {
 
 fun Image.drawCell(cell: Cell) {
     if (cell.isClosed) {
-        val xVals = cell.border.map { Math.round(it.x * multiplier) }.toIntArray()
-        val yVals = cell.border.map { Math.round(it.y * multiplier) }.toIntArray()
+        val interpolated = cell.border.map { interpolateInt(it) }
+        val xVals = interpolated.map { it.x }.toIntArray()
+        val yVals = interpolated.map { it.y }.toIntArray()
         graphics.fillPolygon(xVals, yVals, xVals.size)
     }
 }
@@ -93,7 +112,7 @@ fun Image.drawGraph(graph: Graph, vararg features: Any) {
         if (it is Vertex) {
             graphics.color = Color.MAGENTA
             drawVertex(it, 4)
-        } else if (it is Point) {
+        } else if (it is Point2F) {
             graphics.color = Color.CYAN
             drawPoint(it, 4)
         } else if (it is Triangle) {
@@ -109,7 +128,8 @@ fun Image.drawGraph(graph: Graph, vararg features: Any) {
 fun Image.drawVertexIds(graph: Graph) {
     graphics.font = Font("Courier", Font.BOLD, 12)
     graph.vertices.forEach { vertex ->
-        graphics.drawString(vertex.id.toString(), vertex.point.x * multiplier,  vertex.point.y * multiplier)
+        val ip = interpolateFloat(vertex.point)
+        graphics.drawString(vertex.id.toString(), ip.x,  ip.y)
     }
 }
 
@@ -129,7 +149,7 @@ fun Image.drawSlopes(graph: Graph, slopes: Map<Int, Float>) {
     }
 }
 
-fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<RiverNode>, coastline: Collection<Spline>, borders: Collection<Polygon>) {
+fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<TreeNode<RiverNode>>, coastline: Collection<Spline2F>, borders: Collection<Polygon2F>) {
     graphics.stroke = BasicStroke(1.5f)
 
     graphics.color = Color(180, 255, 160)
@@ -148,9 +168,7 @@ fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<RiverNo
     graphics.color = Color(0, 20, 170)
     graphics.stroke = BasicStroke(1.5f)
 
-    rivers.forEach {
-        drawRiver(it, false)
-    }
+    drawRiverElevations(rivers, false)
 
     graphics.color = Color(160, 0, 0)
     graphics.stroke = BasicStroke(3.0f)
@@ -160,14 +178,43 @@ fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<RiverNo
     }
 }
 
-fun Image.drawRiver(riverNode: RiverNode, drawPoints: Boolean = true) {
-    val p1 = riverNode.pointLocation
+fun Image.drawRiver(riverNode: TreeNode<RiverNode>, drawPoints: Boolean = true) {
+    val p1 = riverNode.value.pointLocation
     riverNode.children.forEach {
-        drawEdge(p1, it.pointLocation)
+        drawEdge(p1, it.value.pointLocation)
         drawRiver(it, drawPoints)
     }
     if (drawPoints) {
         drawPoint(p1, 2)
+    }
+}
+
+fun Image.drawRiverElevations(rivers: Collection<TreeNode<RiverNode>>, drawPoints: Boolean = true) {
+    fun maxElevation(river: TreeNode<RiverNode>): Float {
+        return Math.max(river.value.elevation, river.children.map { maxElevation(it) }.max() ?: Float.MIN_VALUE)
+    }
+    fun minElevation(river: TreeNode<RiverNode>): Float {
+        return Math.min(river.value.elevation, river.children.map { minElevation(it) }.min() ?: Float.MAX_VALUE)
+    }
+    fun drawRiverElevations(riverNode: TreeNode<RiverNode>, minElevation: Float, delta: Float, drawPoints: Boolean) {
+        val normalizedElevation = (riverNode.value.elevation - minElevation) / delta
+        val color1 = Color(normalizedElevation, 0.0f, 1.0f - normalizedElevation)
+        val p1 = riverNode.value.pointLocation
+        riverNode.children.forEach {
+            val childElevation = (it.value.elevation - minElevation) / delta
+            val color2 = Color(childElevation, 0.0f, 1.0f - childElevation)
+            drawEdgeWithGradient(p1, it.value.pointLocation, color1, color2)
+            drawRiverElevations(it, minElevation, delta, drawPoints)
+        }
+        if (drawPoints) {
+            drawPoint(p1, 2)
+        }
+    }
+    val maxElevation = rivers.map { maxElevation(it) }.max() ?: 1.0f
+    val minElevation = rivers.map { minElevation(it) }.min() ?: 0.0f
+    val delta = maxElevation - minElevation
+    rivers.forEach {
+        drawRiverElevations(it, minElevation, delta, drawPoints)
     }
 }
 
@@ -200,7 +247,7 @@ fun Image.drawRegions(graph: Graph, mask: Matrix<Int>, vararg regionColors: Colo
     }
 }
 
-fun Image.drawBorders(graph: Graph, mask: Matrix<Int>, borders: Pair<List<Polygon>, List<Polygon>>) {
+fun Image.drawBorders(graph: Graph, mask: Matrix<Int>, borders: Pair<List<Polygon2F>, List<Polygon2F>>) {
     graphics.color = Color.WHITE
 
     graph.vertices.forEach {
@@ -224,7 +271,7 @@ fun Image.drawBorders(graph: Graph, mask: Matrix<Int>, borders: Pair<List<Polygo
     }
 }
 
-fun Image.drawOffLimits(graph: Graph, mask: Matrix<Int>, offLimits: HashSet<Int>) {
+fun Image.drawOffLimits(graph: Graph, mask: Matrix<Int>, offLimits: LinkedHashSet<Int>) {
     graphics.color = Color.WHITE
 
     graph.vertices.forEach {
@@ -271,40 +318,97 @@ fun Image.drawConcavity(graph: Graph, mask: HashMap<Int, Float>) {
     }
 }
 
-fun Image.drawEdges(edges: ArrayList<Pair<Point, Point>>) {
+fun Image.drawEdges(edges: ArrayList<Pair<Point2F, Point2F>>) {
     edges.forEach {
         drawEdge(it.first, it.second)
     }
 }
 
-fun Image.fillSpline(spline: Spline) {
+fun Image.fillSpline(spline: Spline2F) {
     val path = Path2D.Float()
     val points = spline.points
     for (i in 1..points.size - if (spline.isClosed) 0 else 1) {
         val splinePoint1 = points[i - 1]
         val splinePoint2 = points[i % points.size]
-        path.append(CubicCurve2D.Float(splinePoint1.point.x * multiplier, splinePoint1.point.y * multiplier, splinePoint1.cp2.x * multiplier, splinePoint1.cp2.y * multiplier, splinePoint2.cp1.x * multiplier, splinePoint2.cp1.y * multiplier, splinePoint2.point.x * multiplier, splinePoint2.point.y * multiplier), true)
+        val p1 = interpolateFloat(splinePoint1.p)
+        val p2 = interpolateFloat(splinePoint1.cp2)
+        val p3 = interpolateFloat(splinePoint2.cp1)
+        val p4 = interpolateFloat(splinePoint2.p)
+        path.append(CubicCurve2D.Float(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y), true)
     }
     graphics.fill(path)
 }
 
-fun Image.drawSpline(spline: Spline, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints) {
-    val points = spline.points
-    for (i in 1..points.size - if (spline.isClosed) 0 else 1) {
-        drawCurve(points[i - 1], points[i % points.size], drawPoints, drawControlPoints)
+fun Image.drawRiverTree(tree: TreeNode<RiverSegment>, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints) {
+    drawSpline(tree.value.spline, drawPoints, drawControlPoints)
+    tree.children.forEach {
+        drawRiverTree(it, drawPoints, drawControlPoints)
     }
 }
 
-fun Image.drawCurve(splinePoint1: SplinePoint, splinePoint2: SplinePoint, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints) {
-    graphics.draw(CubicCurve2D.Float(splinePoint1.point.x * multiplier, splinePoint1.point.y * multiplier, splinePoint1.cp2.x * multiplier, splinePoint1.cp2.y * multiplier, splinePoint2.cp1.x * multiplier, splinePoint2.cp1.y * multiplier, splinePoint2.point.x * multiplier, splinePoint2.point.y * multiplier))
+fun Image.drawRiverPolyLines(trees: Collection<TreeNode<RiverSegment>>, desiredSegmentLength: Float, iterations: Int, drawPoints: Boolean = true) {
+    trees.forEach {
+        it.forEach {
+            drawPolygon(it.spline.toPolygon(desiredSegmentLength, iterations), drawPoints)
+        }
+    }
+}
+
+
+fun Image.drawRiverElevations(trees: Collection<TreeNode<RiverSegment>>, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints, drawControlLines: Boolean = drawControlPoints) {
+    val maxElevation = trees.map { maxElevation(it) }.max() ?: 1.0f
+    val minElevation = trees.map { minElevation(it) }.min() ?: 0.0f
+    val delta = maxElevation - minElevation
+    trees.forEach {
+        drawRiverElevations(it, minElevation, delta, drawPoints, drawControlPoints, drawControlLines)
+    }
+}
+
+private fun Image.drawRiverElevations(tree: TreeNode<RiverSegment>, minElevation: Float, delta: Float, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints, drawControlLines: Boolean = drawControlPoints, controlColor: Color? = null, pointSize: Int = 2) {
+    val normalizedElevation = (((tree.value.elevations.a + tree.value.elevations.b) * 0.5f) - minElevation) / delta
+    graphics.color = Color(normalizedElevation, 0.0f, 1.0f - normalizedElevation)
+    drawSpline(tree.value.spline, drawPoints, drawControlPoints, drawControlLines, controlColor, pointSize)
+    tree.children.forEach {
+        drawRiverElevations(it, minElevation, delta, drawPoints, drawControlPoints, drawControlLines, controlColor, pointSize)
+    }
+}
+
+private fun maxElevation(river: TreeNode<RiverSegment>): Float {
+    return Math.max(river.value.elevations.b, river.children.map { maxElevation(it) }.max() ?: Float.MIN_VALUE)
+}
+
+private fun minElevation(river: TreeNode<RiverSegment>): Float {
+    return Math.min(river.value.elevations.a, river.children.map { minElevation(it) }.min() ?: Float.MAX_VALUE)
+}
+
+fun Image.drawSpline(spline: Spline2F, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints, drawControlLines: Boolean = drawControlPoints, controlColor: Color? = null, pointSize: Int = 2) {
+    val points = spline.points
+    for (i in 1..points.size - if (spline.isClosed) 0 else 1) {
+        drawCurve(points[i - 1], points[i % points.size], drawPoints, drawControlPoints, drawControlLines, controlColor, pointSize)
+    }
+}
+
+fun Image.drawCurve(splinePoint1: SplinePoint2F, splinePoint2: SplinePoint2F, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints, drawControlLines: Boolean = drawControlPoints, controlColor: Color? = null, pointSize: Int = 2) {
+    val p1 = interpolateFloat(splinePoint1.p)
+    val p2 = interpolateFloat(splinePoint1.cp2)
+    val p3 = interpolateFloat(splinePoint2.cp1)
+    val p4 = interpolateFloat(splinePoint2.p)
+    graphics.draw(CubicCurve2D.Float(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y))
     if (drawPoints) {
-        drawPoint(splinePoint1.point, 2)
-        drawPoint(splinePoint2.point, 2)
+        drawPoint(splinePoint1.p, pointSize)
+        drawPoint(splinePoint2.p, pointSize)
+    }
+    val color = graphics.color
+    if (controlColor != null) {
+        graphics.color = controlColor
     }
     if (drawControlPoints) {
-        drawPoint(splinePoint1.cp2, 2)
-        drawPoint(splinePoint2.cp1, 2)
-        drawEdge(splinePoint1.point, splinePoint1.cp2)
-        drawEdge(splinePoint2.cp1, splinePoint2.point)
+        drawPoint(splinePoint1.cp2, pointSize)
+        drawPoint(splinePoint2.cp1, pointSize)
     }
+    if (drawControlLines) {
+        drawEdge(splinePoint1.p, splinePoint1.cp2)
+        drawEdge(splinePoint2.cp1, splinePoint2.p)
+    }
+    graphics.color = color
 }

@@ -1,7 +1,7 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.model.Matrix
@@ -26,7 +26,7 @@ class BorderDefinitionFilter : Runnable {
         ASYMMETRIC
     }
 
-    private class RiverNode(var type: NodeType, var parent: RiverNode?, var children: MutableList<RiverNode>, var pointIndex: Int, var pointLocation: Point, var priority: Int, var riverPriority: Int, var elevation: Float)
+    private class RiverNode(var type: NodeType, var parent: RiverNode?, var children: MutableList<RiverNode>, var pointIndex: Int, var pointLocation: Point2F, var priority: Int, var riverPriority: Int, var elevation: Float)
     private class WaterNode(val pointIndex: Int, var adjacentIn: WaterNode?, var adjacentOut: WaterNode?, val adjacentAll: MutableSet<Int>)
 
     companion object {
@@ -58,17 +58,17 @@ class BorderDefinitionFilter : Runnable {
     override fun run() {
         DataFiles.openAndUse<ClosestPoints>(closestPointsFile) { closestPoints ->
             DataFiles.openAndUse<Int>(maskFile) { mask ->
-                DataFiles.openAndUse<Point>(pointsFile) { points ->
+                DataFiles.openAndUse<Point2F>(pointsFile) { points ->
                     DataFiles.createAndUse<Uint24Matrix>(outputFile, mask.exponent) { output ->
                         val random = Random(seed)
                         val edges = buildEdgeMap(closestPoints)
                         val pointCount = edges.size
                         val stride = mask.width
                         val edgeGraph = buildEdgeGraph(edges, pointCount)
-                        val water = HashSet<Int>()
-                        val beach = HashSet<Int>()
-                        val coastalWater = HashSet<Int>()
-                        val regions = ArrayList<HashSet<Int>>()
+                        val water = LinkedHashSet<Int>()
+                        val beach = LinkedHashSet<Int>()
+                        val coastalWater = LinkedHashSet<Int>()
+                        val regions = ArrayList<LinkedHashSet<Int>>()
                         for (i in 0..mask.size.toInt() - 1) {
                             val maskValue = mask[i]
                             if (maskValue == 0) {
@@ -77,7 +77,7 @@ class BorderDefinitionFilter : Runnable {
                                 val regionId = maskValue - 1
                                 if (regions.size < maskValue) {
                                     for (j in 0..maskValue - regions.size) {
-                                        regions.add(HashSet<Int>())
+                                        regions.add(LinkedHashSet<Int>())
                                     }
                                 }
                                 regions[regionId].add(i)
@@ -93,7 +93,7 @@ class BorderDefinitionFilter : Runnable {
                                 coastalWater.add(i)
                             }
                         }
-                        val rivers = HashSet<RiverNode>()
+                        val rivers = LinkedHashSet<RiverNode>()
                         val riverCandidates = findRiverMouthCandidates(stride, water, beach)
                         regions.forEach { region ->
                             val border = findBorderPoints(edgeGraph, water, region)
@@ -101,14 +101,14 @@ class BorderDefinitionFilter : Runnable {
                             val furthestFromCoast = findFurthestPointFromAllInOtherSet(border, coast, stride)
                             val furthestFromBorder = findFurthestPointFromAllInOtherSet(coast, border, stride)
                             val riverSlope = buildRiverSlopeWeights(border, coast, furthestFromBorder, furthestFromCoast, region, stride)
-                            val localRiverMouths = HashSet(riverCandidates.keys)
+                            val localRiverMouths = LinkedHashSet(riverCandidates.keys)
                             localRiverMouths.retainAll(coast)
                             updateLocalRiverCandidates(stride, border, localRiverMouths, riverCandidates)
                             buildRiverNetwork(stride, random, edgeGraph, points, water, beach, rivers, riverCandidates, region, border, riverSlope, localRiverMouths)
 
                         }
 
-                        val coastalWaterEdges = HashSet<Pair<Int, Int>>()
+                        val coastalWaterEdges = LinkedHashSet<Pair<Int, Int>>()
                         coastalWater.forEach { point1 ->
                             edgeGraph[point1].forEach { point2 ->
                                 if (coastalWater.contains(point2)) {
@@ -152,15 +152,15 @@ class BorderDefinitionFilter : Runnable {
     private fun buildRiverNetwork(stride: Int,
                                   random: Random,
                                   edgeGraph: ArrayList<ArrayList<Int>>,
-                                  points: Matrix<Point>,
-                                  water: HashSet<Int>,
-                                  beach: HashSet<Int>,
-                                  rivers: HashSet<RiverNode>,
+                                  points: Matrix<Point2F>,
+                                  water: LinkedHashSet<Int>,
+                                  beach: LinkedHashSet<Int>,
+                                  rivers: LinkedHashSet<RiverNode>,
                                   riverCandidates: HashMap<Int, Float>,
-                                  region: HashSet<Int>,
+                                  region: LinkedHashSet<Int>,
                                   border: Set<Int>,
                                   riverSlope: Map<Int, Float>,
-                                  localRiverMouths: HashSet<Int>) {
+                                  localRiverMouths: LinkedHashSet<Int>) {
         val edgeRadius = buildRadiusMask(4)
         val candidateRiverNodes = findCandidateRiverNodes(stride, localRiverMouths, points, riverCandidates)
         val riverNodes = ArrayList(candidateRiverNodes)
@@ -171,7 +171,7 @@ class BorderDefinitionFilter : Runnable {
                     possibleOutlets.add(adjacent)
                 }
             }
-            val outlet = possibleOutlets.sortedBy { getPointLocation(stride, points, it).distanceSquaredTo(riverNode.pointLocation) }.first()
+            val outlet = possibleOutlets.sortedBy { getPointLocation(stride, points, it).distance2(riverNode.pointLocation) }.first()
             riverNode.parent = RiverNode(NodeType.CONTINUATION, null, mutableListOf(riverNode), outlet, getPointLocation(stride, points, outlet), riverNode.priority, riverNode.riverPriority, 0.0f)
         }
         while (true) {
@@ -183,7 +183,7 @@ class BorderDefinitionFilter : Runnable {
                 candidateRiverNodes.remove(expansionCandidate)
             } else {
                 val newPoint = getPointLocation(stride, points, newNodeCandidate)
-                val edgeDist = Math.sqrt(expansionCandidate.pointLocation.distanceSquaredTo(newPoint).toDouble()).toFloat()
+                val edgeDist = Math.sqrt(expansionCandidate.pointLocation.distance2(newPoint).toDouble()).toFloat()
                 val localRiverSlope = riverSlope[newNodeCandidate] ?: 0.0f
                 val newElevation = expansionCandidate.elevation + (localRiverSlope * edgeDist)
                 val newPriority = if (expansionCandidate.type == NodeType.CONTINUATION) {
@@ -227,14 +227,14 @@ class BorderDefinitionFilter : Runnable {
         graphics.fillOval(x0 - 2, y0 - 2, 5, 5)
     }
 
-    private fun drawPoint(stride: Int, points: Matrix<Point>, graphics: Graphics2D, pointIndex: Int, multiplier: Int) {
+    private fun drawPoint(stride: Int, points: Matrix<Point2F>, graphics: Graphics2D, pointIndex: Int, multiplier: Int) {
         val location = getPointLocation(stride, points, pointIndex)
         val x0 = Math.round(location.x * multiplier)
         val y0 = Math.round(location.y * multiplier)
         graphics.fillOval(x0 - 2, y0 - 2, 5, 5)
     }
 
-    private fun drawEdge(stride: Int, points: Matrix<Point>, graphics: Graphics2D, edge: Pair<Int, Int>, multiplier: Int) {
+    private fun drawEdge(stride: Int, points: Matrix<Point2F>, graphics: Graphics2D, edge: Pair<Int, Int>, multiplier: Int) {
         val l0 = getPointLocation(stride, points, edge.first)
         val l1 = getPointLocation(stride, points, edge.second)
         val x0 = Math.round(l0.x * multiplier)
@@ -275,22 +275,22 @@ class BorderDefinitionFilter : Runnable {
         }
     }
 
-    private fun findMostViableNewNodeCandidate(stride: Int, edgeGraph: ArrayList<ArrayList<Int>>, water: Set<Int>, beach: Set<Int>, border: Set<Int>, region: Set<Int>, mask: List<List<Boolean>>, points: Matrix<Point>, riverNodes: Collection<RiverNode>, expansionCandidate: RiverNode, byAngle: Boolean = false): Int? {
+    private fun findMostViableNewNodeCandidate(stride: Int, edgeGraph: ArrayList<ArrayList<Int>>, water: Set<Int>, beach: Set<Int>, border: Set<Int>, region: Set<Int>, mask: List<List<Boolean>>, points: Matrix<Point2F>, riverNodes: Collection<RiverNode>, expansionCandidate: RiverNode, byAngle: Boolean = false): Int? {
         val expansionPointIndex = expansionCandidate.pointIndex
         val maskOffset = mask.size / 2
         val (x0, y0) = pointFromIndex(stride, expansionPointIndex)
         var mostViableCandidate: Int? = null
         var mostViableDistanceError = Float.MAX_VALUE
-        var idealLocation: Point? = null
+        var idealLocation: Point2F? = null
         if (byAngle) {
             val l1 = expansionCandidate.parent!!.pointLocation
             val l2 = expansionCandidate.pointLocation
-            val distance = Math.sqrt(l1.distanceSquaredTo(l2).toDouble())
+            val distance = Math.sqrt(l1.distance2(l2).toDouble())
             val ndx = (l2.x - l1.x) / distance
             val ndy = (l2.y - l1.y) / distance
             val vx = ndx * IDEAL_RIVER_EDGE_DISTANCE
             val vy = ndy * IDEAL_RIVER_EDGE_DISTANCE
-            idealLocation = Point((l2.x + vx).toFloat(), (l2.y + vy).toFloat())
+            idealLocation = Point2F((l2.x + vx).toFloat(), (l2.y + vy).toFloat())
         }
         for (y in Math.max(0, y0 - maskOffset)..Math.min(stride - 1, y0 + maskOffset)) {
             for (x in Math.max(0, x0 - maskOffset)..Math.min(stride - 1, x0 + maskOffset)) {
@@ -309,15 +309,15 @@ class BorderDefinitionFilter : Runnable {
                         if (isValid) {
                             val pointLocation = getPointLocation(stride, points, pointIndex)
                             riverNodes.forEach {
-                                if (it != expansionCandidate && pointLocation.distanceSquaredTo(it.pointLocation) < IDEAL_RIVER_EDGE_DISTANCE_SQUARED) {
+                                if (it != expansionCandidate && pointLocation.distance2(it.pointLocation) < IDEAL_RIVER_EDGE_DISTANCE_SQUARED) {
                                     isValid = false
                                     return@forEach
                                 }
                             }
                             if (isValid) {
                                 if (byAngle) {
-                                    val distanceSquared = expansionCandidate.pointLocation.distanceSquaredTo(pointLocation)
-                                    val distanceError = idealLocation!!.distanceSquaredTo(pointLocation)
+                                    val distanceSquared = expansionCandidate.pointLocation.distance2(pointLocation)
+                                    val distanceError = idealLocation!!.distance2(pointLocation)
                                     if (mostViableCandidate == null || distanceError < mostViableDistanceError) {
                                         if (distanceSquared > MIN_RIVER_EDGE_DISTANCE_SQUARED) {
                                             mostViableCandidate = pointIndex
@@ -325,7 +325,7 @@ class BorderDefinitionFilter : Runnable {
                                         }
                                     }
                                 } else {
-                                    val distanceSquared = expansionCandidate.pointLocation.distanceSquaredTo(pointLocation)
+                                    val distanceSquared = expansionCandidate.pointLocation.distance2(pointLocation)
                                     val distanceError = Math.abs(IDEAL_RIVER_EDGE_DISTANCE_SQUARED - distanceSquared)
                                     if (mostViableCandidate == null || distanceError < mostViableDistanceError) {
                                         if (distanceSquared > MIN_RIVER_EDGE_DISTANCE_SQUARED) {
@@ -383,7 +383,7 @@ class BorderDefinitionFilter : Runnable {
         return minElevation
     }
 
-    private fun findCandidateRiverNodes(stride: Int, localRiverMouths: HashSet<Int>, points: Matrix<Point>, riverCandidates: HashMap<Int, Float>): ArrayList<RiverNode> {
+    private fun findCandidateRiverNodes(stride: Int, localRiverMouths: LinkedHashSet<Int>, points: Matrix<Point2F>, riverCandidates: HashMap<Int, Float>): ArrayList<RiverNode> {
         val orderedRiverMouths = ArrayList<Int>(localRiverMouths)
         orderedRiverMouths.sortedByDescending { riverCandidates[it] ?: 0.0f }
         val candidateRiverNodes = ArrayList<RiverNode>()
@@ -393,9 +393,9 @@ class BorderDefinitionFilter : Runnable {
         return candidateRiverNodes
     }
 
-    private fun getPointLocation(stride: Int, points: Matrix<Point>, pointIndex: Int): Point {
+    private fun getPointLocation(stride: Int, points: Matrix<Point2F>, pointIndex: Int): Point2F {
         val pointLocation = points[pointIndex]
-        val actualLocation = Point(stride * pointLocation.x, stride * pointLocation.y)
+        val actualLocation = Point2F(stride * pointLocation.x, stride * pointLocation.y)
         return actualLocation
     }
 
@@ -418,7 +418,7 @@ class BorderDefinitionFilter : Runnable {
         }
     }
 
-    private fun findRiverMouthCandidates(stride: Int, water: HashSet<Int>, beach: HashSet<Int>): HashMap<Int, Float> {
+    private fun findRiverMouthCandidates(stride: Int, water: LinkedHashSet<Int>, beach: LinkedHashSet<Int>): HashMap<Int, Float> {
         val riverCandidates = HashMap<Int, Float>(beach.size)
         val radiusMask1 = buildRadiusMask(3)
         val radiusMask2 = buildRadiusMask(6)
@@ -444,7 +444,7 @@ class BorderDefinitionFilter : Runnable {
         return riverCandidates
     }
 
-    private fun calculateLandWaterRatioWithMinThreshold(stride: Int, water: HashSet<Int>, radiusMask: List<List<Boolean>>, point: Int, currentRatio: Float, threshold: Float, weight: Float): Float {
+    private fun calculateLandWaterRatioWithMinThreshold(stride: Int, water: LinkedHashSet<Int>, radiusMask: List<List<Boolean>>, point: Int, currentRatio: Float, threshold: Float, weight: Float): Float {
         if (currentRatio > 0.0f) {
             val landWaterRatio = calculateLandWaterRatio(stride, water, radiusMask, point)
             if (landWaterRatio < threshold) {
@@ -593,7 +593,7 @@ class BorderDefinitionFilter : Runnable {
         return Math.sqrt(minDistance.toDouble()).toFloat()
     }
 
-    private fun findBorderPoints(edgeGraph: ArrayList<ArrayList<Int>>, water: HashSet<Int>, region: HashSet<Int>): Set<Int> {
+    private fun findBorderPoints(edgeGraph: ArrayList<ArrayList<Int>>, water: LinkedHashSet<Int>, region: LinkedHashSet<Int>): Set<Int> {
         return region.filter { isBorderPoint(edgeGraph, water, region, it) }.toSet()
     }
 
@@ -606,7 +606,7 @@ class BorderDefinitionFilter : Runnable {
         return false
     }
 
-    private fun findCoastalPoints(edgeGraph: ArrayList<ArrayList<Int>>, water: HashSet<Int>, region: HashSet<Int>): Set<Int> {
+    private fun findCoastalPoints(edgeGraph: ArrayList<ArrayList<Int>>, water: LinkedHashSet<Int>, region: LinkedHashSet<Int>): Set<Int> {
         return region.filter { isCoastalPoint(edgeGraph, water, it) }.toSet()
     }
 
@@ -622,7 +622,7 @@ class BorderDefinitionFilter : Runnable {
         return false
     }
 
-    private fun isCoastalWaterPoint(edgeGraph: ArrayList<ArrayList<Int>>, water: HashSet<Int>, testPoint: Int): Boolean {
+    private fun isCoastalWaterPoint(edgeGraph: ArrayList<ArrayList<Int>>, water: LinkedHashSet<Int>, testPoint: Int): Boolean {
         if (!water.contains(testPoint)) {
             return false
         }
@@ -646,30 +646,30 @@ class BorderDefinitionFilter : Runnable {
         return xDelta * xDelta + yDelta * yDelta
     }
 
-    private fun perpendicularLine(stride: Int, p0: Int, p1: Int): Pair<Point, Point> {
+    private fun perpendicularLine(stride: Int, p0: Int, p1: Int): Pair<Point2F, Point2F> {
         val (x0, y0) = pointFromIndex(stride, p0)
         val (x1, y1) = pointFromIndex(stride, p1)
         val xDelta = x0 - x1
         val yDelta = y0 - y1
-        val lp0 = Point(x0.toFloat(), y0.toFloat())
-        val lp1 = Point(lp0.x + yDelta.toFloat(), lp0.y - xDelta.toFloat())
+        val lp0 = Point2F(x0.toFloat(), y0.toFloat())
+        val lp1 = Point2F(lp0.x + yDelta.toFloat(), lp0.y - xDelta.toFloat())
         return Pair(lp0, lp1)
     }
 
-    private fun pointVectorToLine(stride: Int, point: Int, vector: Point): Pair<Point, Point> {
+    private fun pointVectorToLine(stride: Int, point: Int, vector: Point2F): Pair<Point2F, Point2F> {
         val x = (point % stride).toFloat()
         val y = (point / stride).toFloat()
-        val lp0 = Point(x, y)
-        val lp1 = Point(lp0.x + vector.x, lp0.y + vector.y)
+        val lp0 = Point2F(x, y)
+        val lp1 = Point2F(lp0.x + vector.x, lp0.y + vector.y)
         return Pair(lp0, lp1)
     }
 
-    private fun perpendicularVector(stride: Int, p0: Int, p1: Int): Point {
+    private fun perpendicularVector(stride: Int, p0: Int, p1: Int): Point2F {
         val (x0, y0) = pointFromIndex(stride, p0)
         val (x1, y1) = pointFromIndex(stride, p1)
         val xDelta = x0 - x1
         val yDelta = y0 - y1
-        return Point(yDelta.toFloat(), -xDelta.toFloat())
+        return Point2F(yDelta.toFloat(), -xDelta.toFloat())
     }
 
     private fun pointFromIndex(stride: Int, p0: Int): Pair<Int, Int> {
@@ -678,7 +678,7 @@ class BorderDefinitionFilter : Runnable {
         return Pair(x0, y0)
     }
 
-    private fun distanceToLine(stride: Int, line: Pair<Point, Point>, point: Int): Float {
+    private fun distanceToLine(stride: Int, line: Pair<Point2F, Point2F>, point: Int): Float {
         val x = (point % stride).toDouble()
         val y = (point / stride).toDouble()
         val a = line.first.y - line.second.y

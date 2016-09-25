@@ -1,8 +1,10 @@
-package com.grimfox.gec.model
+package com.grimfox.gec.model.geometry
 
-open class Point(val x: Float, val y: Float) {
+open class Point2F(val x: Float, val y: Float) {
 
-    fun distanceSquaredTo(other: Point): Float {
+    operator fun plus(v: Vector2F) = Point2F(x + v.a, y + v.b)
+
+    fun distance2(other: Point2F): Float {
         val deltaX = x - other.x
         val deltaXsq = deltaX * deltaX
         val deltaY = y - other.y
@@ -10,10 +12,14 @@ open class Point(val x: Float, val y: Float) {
         return deltaXsq + deltaYsq
     }
 
+    fun distance(other: Point2F): Float {
+        return Math.sqrt(distance2(other).toDouble()).toFloat()
+    }
+
     override fun equals(other: Any?): Boolean{
         if (this === other) return true
         if (other?.javaClass != javaClass) return false
-        other as Point
+        other as Point2F
         if (x != other.x) return false
         if (y != other.y) return false
         return true

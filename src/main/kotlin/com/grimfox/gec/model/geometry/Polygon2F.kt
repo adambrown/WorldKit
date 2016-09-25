@@ -1,13 +1,10 @@
-package com.grimfox.gec.model
+package com.grimfox.gec.model.geometry
 
-import com.grimfox.gec.util.Utils.distance2Between
-import com.grimfox.gec.util.Utils.doesEdgeIntersect
-import com.grimfox.gec.util.Utils.linesIntersect
 import java.util.*
 
-class Polygon(val points: List<Point>, val isClosed: Boolean) {
+class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
 
-    val bounds: Pair<Point, Point> by lazy {
+    val bounds: Bounds2F by lazy {
         var xMin = Float.MAX_VALUE
         var xMax = Float.MIN_VALUE
         var yMin = Float.MIN_VALUE
@@ -26,23 +23,23 @@ class Polygon(val points: List<Point>, val isClosed: Boolean) {
                 yMax = it.y
             }
         }
-        Pair(Point(xMin, yMin), Point(xMax, yMax))
+        Bounds2F(Point2F(xMin, yMin), Point2F(xMax, yMax))
     }
 
-    val edges: List<Pair<Point, Point>> by lazy {
-        val edges = ArrayList<Pair<Point, Point>>()
+    val edges: List<LineSegment2F> by lazy {
+        val edges = ArrayList<LineSegment2F>()
         for (i in 1..points.size - if (isClosed) 0 else 1) {
-            edges.add(Pair(points[i - 1], points[i % points.size]))
+            edges.add(LineSegment2F(points[i - 1], points[i % points.size]))
         }
         edges
     }
 
-    fun doesEdgeIntersect(edge: Pair<Point, Point>): Boolean {
-        if (!bounds.doesEdgeIntersect(edge)) {
+    fun doesEdgeIntersect(edge: LineSegment2F): Boolean {
+        if (!bounds.isWithin(edge)) {
             return false
         } else {
             edges.forEach {
-                if (linesIntersect(edge, it)) {
+                if (edge.intersects(it)) {
                     return true
                 }
             }
@@ -50,7 +47,7 @@ class Polygon(val points: List<Point>, val isClosed: Boolean) {
         return false
     }
 
-    fun doesEdgeIntersect(other: Polygon): Boolean {
+    fun doesEdgeIntersect(other: Polygon2F): Boolean {
         edges.forEach {
             if (other.doesEdgeIntersect(it)) {
                 return true
@@ -59,10 +56,10 @@ class Polygon(val points: List<Point>, val isClosed: Boolean) {
         return false
     }
 
-    fun distance2Between(point: Point): Float {
+    fun distance2(point: Point2F): Float {
         var minDist = Float.MAX_VALUE
         edges.forEach {
-            val localDist = distance2Between(it, point)
+            val localDist = it.distance2(point)
             if (localDist == 0.0f) {
                 return localDist
             }
@@ -73,10 +70,10 @@ class Polygon(val points: List<Point>, val isClosed: Boolean) {
         return minDist
     }
 
-    fun distance2Between(edge: Pair<Point, Point>): Float {
+    fun distance2(edge: LineSegment2F): Float {
         var minDist = Float.MAX_VALUE
         edges.forEach {
-            val localDist = distance2Between(edge, it)
+            val localDist = edge.distance2(it)
             if (localDist == 0.0f) {
                 return localDist
             }

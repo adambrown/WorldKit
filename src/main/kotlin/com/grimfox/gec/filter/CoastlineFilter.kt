@@ -12,8 +12,8 @@ import java.util.*
 interface CoastlineFilter : Runnable {
 
 
-    fun removeIslands(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, idMask: Matrix<Int>?, pointCount: Int, smallIsland: Int, largeIsland: Int) {
-        val landPoints = HashSet<Int>(pointCount)
+    fun removeIslands(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: LinkedHashSet<Int>, idMask: Matrix<Int>?, pointCount: Int, smallIsland: Int, largeIsland: Int) {
+        val landPoints = LinkedHashSet<Int>(pointCount)
         for (i in 0..pointCount - 1) {
             if (!waterPoints.contains(i)) {
                 landPoints.add(i)
@@ -38,15 +38,15 @@ interface CoastlineFilter : Runnable {
     }
 
     private fun buildLandBody(edgeGraph: List<List<Int>>, landPoints: MutableSet<Int>): Set<Int> {
-        val landBody = HashSet<Int>()
-        var growSet = HashSet<Int>()
+        val landBody = LinkedHashSet<Int>()
+        var growSet = LinkedHashSet<Int>()
         growSet.add(landPoints.first())
-        var iterateSet: HashSet<Int>
+        var iterateSet: LinkedHashSet<Int>
         while (growSet.isNotEmpty()) {
             landBody.addAll(growSet)
             landPoints.removeAll(growSet)
             iterateSet = growSet
-            growSet = HashSet<Int>()
+            growSet = LinkedHashSet<Int>()
             iterateSet.forEach { index ->
                 addAllConnectedPoints(edgeGraph, landPoints, landBody, growSet, index)
             }
@@ -54,19 +54,19 @@ interface CoastlineFilter : Runnable {
         return landBody
     }
 
-    fun removeLakes(edgeGraph: ArrayList<ArrayList<Int>>, borderPoints: HashSet<Int>, waterPoints: HashSet<Int>, idMask: Matrix<Int>?) {
-        val oceanPoints = HashSet<Int>()
-        var growSet = HashSet<Int>(borderPoints)
-        var iterateSet: HashSet<Int>
+    fun removeLakes(edgeGraph: ArrayList<ArrayList<Int>>, borderPoints: LinkedHashSet<Int>, waterPoints: LinkedHashSet<Int>, idMask: Matrix<Int>?) {
+        val oceanPoints = LinkedHashSet<Int>()
+        var growSet = LinkedHashSet<Int>(borderPoints)
+        var iterateSet: LinkedHashSet<Int>
         while (growSet.isNotEmpty()) {
             oceanPoints.addAll(growSet)
             iterateSet = growSet
-            growSet = HashSet<Int>()
+            growSet = LinkedHashSet<Int>()
             iterateSet.forEach { index ->
                 addAllConnectedPoints(edgeGraph, waterPoints, oceanPoints, growSet, index)
             }
         }
-        val lakeSet = HashSet<Int>()
+        val lakeSet = LinkedHashSet<Int>()
         waterPoints.forEach {
             if (!oceanPoints.contains(it)) {
                 lakeSet.add(it)
@@ -98,7 +98,7 @@ interface CoastlineFilter : Runnable {
         }
     }
 
-    fun writeOutput(outputFile: File, pointCount: Int, waterPoints: HashSet<Int>) {
+    fun writeOutput(outputFile: File, pointCount: Int, waterPoints: LinkedHashSet<Int>) {
         val exponent = exp2FromSize(Math.round(Math.sqrt(pointCount.toDouble())).toInt())
         DataFiles.createAndUse<BitMatrix>(outputFile, exponent) { bitMatrix ->
             for (i in 0..pointCount - 1) {
@@ -109,7 +109,7 @@ interface CoastlineFilter : Runnable {
         }
     }
 
-    fun reduceCoastline(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, idMask: Matrix<Int>?, random: Random, iterations: Int): Int {
+    fun reduceCoastline(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, idMask: Matrix<Int>?, random: Random, iterations: Int): Int {
         var skips = 0
         for (i in 1..iterations) {
             val pickList = degreeWeightedPick(coastalPointDegrees, random)
@@ -141,7 +141,7 @@ interface CoastlineFilter : Runnable {
         return skips
     }
 
-    fun buildUpCoastline(borderPoints: Set<Int>, edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, idMask: Matrix<Int>?, random: Random, iterations: Int): Int {
+    fun buildUpCoastline(borderPoints: Set<Int>, edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<MutableList<Int>>, idMask: Matrix<Int>?, random: Random, iterations: Int): Int {
         var skips = 0
         for (i in 1..iterations) {
             val pickList = degreeWeightedPick(coastalPointDegrees, random)
@@ -200,7 +200,7 @@ interface CoastlineFilter : Runnable {
     fun buildCoastalPointDegreeSets(coastalPoints: HashMap<Int, Int>): ArrayList<MutableList<Int>> {
         val coastalPointDegreeSets = ArrayList<MutableSet<Int>>(6)
         for (i in 0..5) {
-            coastalPointDegreeSets.add(HashSet<Int>())
+            coastalPointDegreeSets.add(LinkedHashSet<Int>())
         }
         coastalPoints.forEach { index, degree ->
             var effectiveDegree = degree - 1
@@ -216,7 +216,7 @@ interface CoastlineFilter : Runnable {
         return coastalPointDegrees
     }
 
-    fun buildCoastalPoints(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: HashSet<Int>): HashMap<Int, Int> {
+    fun buildCoastalPoints(edgeGraph: ArrayList<ArrayList<Int>>, waterPoints: LinkedHashSet<Int>): HashMap<Int, Int> {
         val coastalPoints = HashMap<Int, Int>()
         waterPoints.forEach { waterPointIndex ->
             edgeGraph[waterPointIndex].forEach { adjacentPointIndex ->
@@ -228,8 +228,8 @@ interface CoastlineFilter : Runnable {
         return coastalPoints
     }
 
-    fun buildCornerPoints(closestPoints: Matrix<ClosestPoints>, stride: Int, strideMinusOne: Int): HashSet<Int> {
-        val cornerPoints = HashSet<Int>()
+    fun buildCornerPoints(closestPoints: Matrix<ClosestPoints>, stride: Int, strideMinusOne: Int): LinkedHashSet<Int> {
+        val cornerPoints = LinkedHashSet<Int>()
         val cornerWidth = Math.round(stride * 0.293f) - 1
         fun addPoint(x: Int, y: Int) {
             val closePoint = closestPoints[x, y].p0?.first
@@ -248,8 +248,8 @@ interface CoastlineFilter : Runnable {
         return cornerPoints
     }
 
-    fun buildBorderPoints(closestPoints: Matrix<ClosestPoints>, strideMinusOne: Int): HashSet<Int> {
-        val borderPoints = HashSet<Int>()
+    fun buildBorderPoints(closestPoints: Matrix<ClosestPoints>, strideMinusOne: Int): LinkedHashSet<Int> {
+        val borderPoints = LinkedHashSet<Int>()
         fun addPoint(x: Int, y: Int) {
             val closePoint = closestPoints[x, y].p0?.first
             if (closePoint != null) {

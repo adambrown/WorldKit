@@ -3,7 +3,7 @@ package com.grimfox.gec.generator
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.PointMatrix
 import com.grimfox.gec.util.Utils.pow
 import io.airlift.airline.Command
@@ -39,7 +39,7 @@ class PointsGenerator() : Runnable {
                         val yMax = ((y + 1) * gridSquareSize)
                         val randomX = random.nextFloat() * (xMax - xMin) + xMin
                         val randomY = random.nextFloat() * (yMax - yMin) + yMin
-                        val point = Point(randomX, randomY)
+                        val point = Point2F(randomX, randomY)
                         if (checkDistances(points, x, y, gridStride, minDistanceSq, point)) {
                             points[x, y] = point
                             break
@@ -50,14 +50,14 @@ class PointsGenerator() : Runnable {
         }
     }
 
-    private fun checkDistances(points: Matrix<Point>, x: Int, y: Int, gridStride: Int, minDistance: Float, point: Point): Boolean {
+    private fun checkDistances(points: Matrix<Point2F>, x: Int, y: Int, gridStride: Int, minDistance: Float, point: Point2F): Boolean {
         for (yOff in -3..3) {
             for (xOff in -3..3) {
                 val ox = x + xOff
                 val oy = y + yOff
                 if (oy >= 0 && oy < gridStride && ox >= 0 && ox < gridStride) {
                     if (oy < y || (oy == y && ox < x)) {
-                        if (point.distanceSquaredTo(points[ox, oy]) < minDistance) {
+                        if (point.distance2(points[ox, oy]) < minDistance) {
                             return false
                         }
                     } else {

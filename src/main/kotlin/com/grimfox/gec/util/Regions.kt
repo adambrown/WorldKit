@@ -5,14 +5,14 @@ import com.grimfox.gec.model.ArrayListMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.*
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.generatePoints
 import java.util.*
 
 object Regions {
 
-    private class Region(val ids: HashSet<Int>, var area: Float) {
+    private class Region(val ids: LinkedHashSet<Int>, var area: Float) {
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -75,12 +75,12 @@ object Regions {
                     if (region.ids.size < minPoints) {
                         minPoints = region.ids.size
                     }
-                    val center = Point(sumX / region.ids.size, sumY / region.ids.size)
+                    val center = Point2F(sumX / region.ids.size, sumY / region.ids.size)
                     areaSum += region.area
                     if (minSize > region.area) {
                         minSize = region.area
                     }
-                    points.map { it.distanceSquaredTo(center) }.max()!!
+                    points.map { it.distance2(center) }.max()!!
                 }.max()!!
                 val avgArea = areaSum / regionSet.size
                 var maxDeviation = Float.MIN_VALUE
@@ -148,7 +148,7 @@ object Regions {
             val localRandom = Random(seed)
             val vertices = ArrayList(graph.vertices.toList())
             val interiorVertices = hashMapOf(*vertices.filter { !it.cell.isBorder }.map { Pair(it.id, it) }.toTypedArray())
-            val interiorVertexIds = HashSet(interiorVertices.keys)
+            val interiorVertexIds = LinkedHashSet(interiorVertices.keys)
             for (i in 1..parameters.initialReduction) {
                 val borderPoints = ArrayList(graph.findBorderIds(interiorVertexIds))
                 val idToRemove = borderPoints[localRandom.nextInt(borderPoints.size)]
@@ -181,28 +181,28 @@ object Regions {
     }
 
     private fun calculateConnectedness(graph: Graph, interiorVertices: HashMap<Int, Vertex>, region: Region, cell: Cell): Float {
-        val sharedEdges = HashSet(region.ids.filter { cell.id != it }.map {
+        val sharedEdges = LinkedHashSet(region.ids.filter { cell.id != it }.map {
             cell.sharedEdge(interiorVertices[it]!!.cell)
         }.filterNotNull())
         return graph.getConnectedEdgeSegments(sharedEdges).map { it.map { it.length }.sum() }.min() ?: 0.0f
     }
 
-    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCellSets: HashSet<HashSet<Int>>): ArrayList<ArrayList<Region>> {
-        val possibilities = HashSet<HashSet<Region>>()
+    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCellSets: LinkedHashSet<LinkedHashSet<Int>>): ArrayList<ArrayList<Region>> {
+        val possibilities = LinkedHashSet<LinkedHashSet<Region>>()
         startCellSets.forEach {
             possibilities.add(pickStartRegions(graph, interiorVertices, it))
         }
         return ArrayList(possibilities.map { ArrayList(it) })
     }
 
-    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCells: HashSet<Int>): HashSet<Region> {
+    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCells: LinkedHashSet<Int>): LinkedHashSet<Region> {
         val canPick = interiorVertices.map { it.key }.toHashSet()
         canPick.removeAll(startCells)
         val regionQueue = PriorityQueue<Region>(startCells.size) { r1: Region, r2: Region ->
             r1.area.compareTo(r2.area)
         }
-        regionQueue.addAll(startCells.map { Region(hashSetOf(it), interiorVertices[it]!!.cell.area) })
-        val regions = HashSet<Region>(startCells.size)
+        regionQueue.addAll(startCells.map { Region(LinkedHashSet(listOf(it)), interiorVertices[it]!!.cell.area) })
+        val regions = LinkedHashSet<Region>(startCells.size)
         regions.addAll(regionQueue)
         while (canPick.isNotEmpty() && regionQueue.isNotEmpty()) {
             val smallestRegion = regionQueue.remove()
@@ -220,16 +220,16 @@ object Regions {
         return regions
     }
 
-    private fun pickStartCells(graph: Graph, random: Random, interiorVertices: HashMap<Int, Vertex>, count: Int): HashSet<HashSet<Int>> {
-        val validStarts = HashSet<HashSet<Int>>()
+    private fun pickStartCells(graph: Graph, random: Random, interiorVertices: HashMap<Int, Vertex>, count: Int): LinkedHashSet<LinkedHashSet<Int>> {
+        val validStarts = LinkedHashSet<LinkedHashSet<Int>>()
         val interiorCellIds = ArrayList(interiorVertices.map { it.value.cell }.sortedByDescending { it.area }.map { it.id })
         val seeds = ArrayList((0..interiorCellIds.size - 1).toList())
         Collections.shuffle(seeds, random)
         var maxCount = 0
         for (i in 0..interiorCellIds.size - 1) {
             val seed = seeds[i]
-            val picks = HashSet<Int>()
-            val canPick = HashSet(interiorCellIds)
+            val picks = LinkedHashSet<Int>()
+            val canPick = LinkedHashSet(interiorCellIds)
             var pick = interiorCellIds[seed]
             while (canPick.isNotEmpty()) {
                 picks.add(pick)
@@ -282,13 +282,13 @@ object Regions {
         return 0
     }
 
-    fun getSubsets(superSet: HashSet<Int>, subsetSize: Int): ArrayList<HashSet<Int>> {
-        return getSubsets(superSet.toList(), subsetSize, 0, HashSet<Int>(), ArrayList())
+    fun getSubsets(superSet: LinkedHashSet<Int>, subsetSize: Int): ArrayList<LinkedHashSet<Int>> {
+        return getSubsets(superSet.toList(), subsetSize, 0, LinkedHashSet<Int>(), ArrayList())
     }
 
-    private fun getSubsets(superSet: List<Int>, subsetSize: Int, index: Int, current: HashSet<Int>, subsets: ArrayList<HashSet<Int>>): ArrayList<HashSet<Int>> {
+    private fun getSubsets(superSet: List<Int>, subsetSize: Int, index: Int, current: LinkedHashSet<Int>, subsets: ArrayList<LinkedHashSet<Int>>): ArrayList<LinkedHashSet<Int>> {
         if (current.size == subsetSize) {
-            subsets.add(HashSet(current))
+            subsets.add(LinkedHashSet(current))
             return subsets
         }
         if (index == superSet.size) {

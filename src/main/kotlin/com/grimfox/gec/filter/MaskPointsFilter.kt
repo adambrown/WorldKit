@@ -1,7 +1,7 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.BitMatrix
 import com.grimfox.gec.model.DataFiles
 import io.airlift.airline.Command
@@ -21,7 +21,7 @@ class MaskPointsFilter : Runnable {
     var outputFile: File = File(Main.workingDir, "output.bin")
 
     override fun run() {
-        DataFiles.openAndUse<Point>(pointsFile) { points ->
+        DataFiles.openAndUse<Point2F>(pointsFile) { points ->
             DataFiles.openAndUse<Int>(maskFile) { mask ->
                 val rasterWidth = mask.width
                 DataFiles.createAndUse<BitMatrix>(outputFile, points.exponent) { bitMatrix ->

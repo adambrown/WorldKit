@@ -1,7 +1,7 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.ClosestPointsMatrix
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.util.Utils
@@ -29,7 +29,7 @@ class ClosestPointsFilter : Runnable {
     var wrapEdges: Boolean = false
 
     override fun run() {
-        DataFiles.openAndUse<Point>(inputFile) { points ->
+        DataFiles.openAndUse<Point2F>(inputFile) { points ->
             val outputExponent = exponent ?: points.exponent + 3
             val outputWidth = 2.pow(outputExponent)
             val gridStride = points.width
@@ -43,7 +43,7 @@ class ClosestPointsFilter : Runnable {
                         for (x in 0..end) {
                             val gridX = x / gridSquareSize
                             val gridY = y / gridSquareSize
-                            val closestPoints = Utils.findClosestPoints(points, gridX, gridY, gridStride, pointWrapOffset, Point(x.toFloat(), y.toFloat()), outputWidth, wrapEdges)
+                            val closestPoints = Utils.findClosestPoints(points, gridX, gridY, gridStride, pointWrapOffset, Point2F(x.toFloat(), y.toFloat()), outputWidth, wrapEdges)
                             heightMap[x, y] = closestPoints
                         }
                     }

@@ -1,7 +1,7 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.drawing.draw
 import com.grimfox.gec.util.drawing.drawPoint
 import java.awt.Color
@@ -9,9 +9,9 @@ import java.util.*
 
 object Triangulate {
 
-    private data class Circle(var c: Point = Point(0.0f, 0.0f), var r: Float = -1.0f)
+    private data class Circle(var c: Point2F = Point2F(0.0f, 0.0f), var r: Float = -1.0f)
     
-    private data class PointWrapper(var p: Point = Point(0.0f, 0.0f), var e: Point = Point(0.0f, 0.0f), var d2: Float = 0.0f, var id: Int = 0, var tId: Int = 0)
+    private data class PointWrapper(var p: Point2F = Point2F(0.0f, 0.0f), var e: Point2F = Point2F(0.0f, 0.0f), var d2: Float = 0.0f, var id: Int = 0, var tId: Int = 0)
 
     private data class Triangle(var a: Int = 0, var b: Int = 0, var c: Int = 0, var ab: Int = -1, var bc: Int = -1, var ac: Int = -1, var cc: Circle = Circle()) {
 
@@ -31,16 +31,16 @@ object Triangulate {
         }
     }
 
-    private class VisibilityTest(p1: Point, p2: Point, var dx: Float = p1.x - p2.x, var dy: Float = p1.y - p2.y) {
+    private class VisibilityTest(p1: Point2F, p2: Point2F, var dx: Float = p1.x - p2.x, var dy: Float = p1.y - p2.y) {
 
         constructor(p1: PointWrapper, p2: PointWrapper) : this(p1.p, p2.p)
 
-        fun isVisible(point: Point): Boolean {
+        fun isVisible(point: Point2F): Boolean {
             return -dy * point.x + dx * point.y < 0
         }
     }
 
-    fun buildGraph(width: Float, points: List<Point>, stride: Int? = null): Graph {
+    fun buildGraph(width: Float, points: List<Point2F>, stride: Int? = null): Graph {
         val wrappedPoints = wrapPoints(points)
 
         val p1 = chooseSeedPoint(wrappedPoints, stride)
@@ -76,7 +76,7 @@ object Triangulate {
         return buildGraph(wrappedPoints, pointIndex, triangles, width, stride)
     }
 
-    private fun wrapPoints(points: List<Point>): ArrayList<PointWrapper> {
+    private fun wrapPoints(points: List<Point2F>): ArrayList<PointWrapper> {
         val wrappedPoints = ArrayList<PointWrapper>(points.size)
         points.forEachIndexed { id, point ->
             wrappedPoints.add(PointWrapper(point, id = id))
@@ -208,14 +208,14 @@ object Triangulate {
                     maxY = it.p.y
                 }
             }
-            val center = Point(minX + ((maxX - minX) / 2.0f), minY + ((maxY - minY) / 2.0f))
-            return points.minBy { center.distanceSquaredTo(it.p) }!!
+            val center = Point2F(minX + ((maxX - minX) / 2.0f), minY + ((maxY - minY) / 2.0f))
+            return points.minBy { center.distance2(it.p) }!!
         }
     }
 
     private fun findClosestPointToSeed(points: ArrayList<PointWrapper>, seed: PointWrapper): PointWrapper {
         val seedPoint = seed.p
-        points.forEach { it.d2 = seedPoint.distanceSquaredTo(it.p) }
+        points.forEach { it.d2 = seedPoint.distance2(it.p) }
         seed.d2 = 0.0f
         points.sort()
         return points[1]
@@ -249,7 +249,7 @@ object Triangulate {
         points.removeAt(0)
         points.removeAt(0)
         points.forEach {
-            it.d2 = center.distanceSquaredTo(it.p)
+            it.d2 = center.distance2(it.p)
         }
         points.sort()
         points.add(0, p3)
@@ -282,15 +282,15 @@ object Triangulate {
         val p2 = p2w.p
         val p3 = p3w.p
 
-        p1w.e = Point(p2.x - p1.x, p2.y - p1.y)
+        p1w.e = Point2F(p2.x - p1.x, p2.y - p1.y)
         p1w.tId = 0
         hull.add(p1w)
 
-        p2w.e = Point(p3.x - p2.x, p3.y - p2.y)
+        p2w.e = Point2F(p3.x - p2.x, p3.y - p2.y)
         p2w.tId = 0
         hull.add(p2w)
 
-        p3w.e = Point(p1.x - p3.x, p1.y - p3.y)
+        p3w.e = Point2F(p1.x - p3.x, p1.y - p3.y)
         p3w.tId = 0
         hull.add(p3w)
 
@@ -348,7 +348,7 @@ object Triangulate {
         val q1 = p2.y - p3.y
 
         if (e1 * -q2 + e2 * q1 == 0.0f) {
-            return Circle(Point(0.0f, 0.0f), -1.0f)
+            return Circle(Point2F(0.0f, 0.0f), -1.0f)
         }
 
         val beta = (-e2 * (b1 - a1) + e1 * (b2 - a2)) / (e2 * q1 - e1 * q2)
@@ -357,10 +357,10 @@ object Triangulate {
         val cy = b2 + q2 * beta
 
         val radius = (p1.x - cx) * (p1.x - cx) + (p1.y - cy) * (p1.y - cy)
-        return Circle(Point(cx, cy), radius)
+        return Circle(Point2F(cx, cy), radius)
     }
 
-    private fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Point {
+    private fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Point2F {
         val p1 = p1w.p
         val p2 = p2w.p
         val p3 = p3w.p
@@ -385,7 +385,7 @@ object Triangulate {
         val cx = b1 + q1 * beta
         val cy = b2 + q2 * beta
 
-        return Point(cx, cy)
+        return Point2F(cx, cy)
     }
 
     private fun buildTriangles(points: ArrayList<PointWrapper>, triangles: ArrayList<Triangle>, hull: ArrayList<PointWrapper>) {
@@ -519,8 +519,8 @@ object Triangulate {
     }
 
     private fun connectPointsInHull(last: PointWrapper, next: PointWrapper, newPoint: PointWrapper) {
-        newPoint.e = Point(next.p.x - newPoint.p.x, next.p.y - newPoint.p.y)
-        last.e = Point(newPoint.p.x - last.p.x, newPoint.p.y - last.p.y)
+        newPoint.e = Point2F(next.p.x - newPoint.p.x, next.p.y - newPoint.p.y)
+        last.e = Point2F(newPoint.p.x - last.p.x, newPoint.p.y - last.p.y)
     }
 
     private fun needsFlipping(pa: PointWrapper, pb: PointWrapper, pc: PointWrapper, pd: PointWrapper): Boolean {
@@ -556,8 +556,8 @@ object Triangulate {
         }
     }
 
-    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): HashSet<Int> {
-        val ids = HashSet<Int>()
+    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): LinkedHashSet<Int> {
+        val ids = LinkedHashSet<Int>()
         for (id in 0..triangles.size - 1) {
             val triangle1 = triangles[id]
             tryFlipTriangle(points, pointIndex, triangles, triangle1, id, ids)
@@ -565,8 +565,8 @@ object Triangulate {
         return ids
     }
 
-    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, ids: HashSet<Int>) : HashSet<Int> {
-        val ids2 = HashSet<Int>()
+    private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, ids: LinkedHashSet<Int>) : LinkedHashSet<Int> {
+        val ids2 = LinkedHashSet<Int>()
         ids.forEach { id ->
             val triangle1 = triangles[id]
             tryFlipTriangle(points, pointIndex, triangles, triangle1, id, ids2)
@@ -574,7 +574,7 @@ object Triangulate {
         return ids2
     }
 
-    private fun tryFlipTriangle(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, triangle1: Triangle, id1: Int, ids: HashSet<Int>) {
+    private fun tryFlipTriangle(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, triangle1: Triangle, id1: Int, ids: LinkedHashSet<Int>) {
         var flipped = false
         if (triangle1.bc >= 0) {
             flipped = tryFlipEdge(points, pointIndex, triangles, id1, triangle1, ids)
@@ -589,8 +589,8 @@ object Triangulate {
         }
     }
 
-    private fun flipEdges(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): HashSet<Int> {
-        val ids = HashSet<Int>()
+    private fun flipEdges(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): LinkedHashSet<Int> {
+        val ids = LinkedHashSet<Int>()
         for (id in 0..triangles.size - 1) {
             val triangle1 = triangles[id]
             var flipped = false
@@ -609,7 +609,7 @@ object Triangulate {
         return ids
     }
 
-    private fun tryFlipEdge(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, id1: Int, augmented: Triangle, ids: HashSet<Int>, safe: Boolean = true): Boolean {
+    private fun tryFlipEdge(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>, id1: Int, augmented: Triangle, ids: LinkedHashSet<Int>, safe: Boolean = true): Boolean {
         val pd: Int
         val id3: Int
         val limb3: Int
@@ -658,7 +658,7 @@ object Triangulate {
         return false
     }
 
-    private fun performEdgeFlip(triangles: ArrayList<Triangle>, id1: Int, id2: Int, id3: Int, limb3: Int, limb4: Int, augmented: Triangle, ids: HashSet<Int>, safe: Boolean = true): Boolean {
+    private fun performEdgeFlip(triangles: ArrayList<Triangle>, id1: Int, id2: Int, id3: Int, limb3: Int, limb4: Int, augmented: Triangle, ids: LinkedHashSet<Int>, safe: Boolean = true): Boolean {
         var flipped = false
         val triangle2 = triangles[id2]
         val limb1 = augmented.ab

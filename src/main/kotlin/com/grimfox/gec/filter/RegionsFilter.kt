@@ -1,7 +1,7 @@
 package com.grimfox.gec.filter
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.Point
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.DataFiles
 import com.grimfox.gec.model.Matrix
@@ -16,7 +16,7 @@ import java.util.*
 @Command(name = "regions", description = "Create points mask based on raster mask.")
 class RegionsFilter : Runnable {
 
-    private data class RegionGrowth(val regionPoints: HashSet<Int>, var growSet: HashSet<Int>, var iterateSet: HashSet<Int>)
+    private data class RegionGrowth(val regionPoints: LinkedHashSet<Int>, var growSet: LinkedHashSet<Int>, var iterateSet: LinkedHashSet<Int>)
 
     @Option(name = arrayOf("-i", "--input"), description = "The data file to read as input.", required = true)
     var inputFile: File = File(Main.workingDir, "input.bin")
@@ -43,10 +43,10 @@ class RegionsFilter : Runnable {
                     val edgeGraph = buildEdgeGraph(edges, pointCount)
                     val random = Random(seed)
                     val startPoints = pickStartingPoints(mask, closestPoints, random)
-                    val regions = startPoints.map { hashSetOf(it) }.toList()
+                    val regions = startPoints.map { LinkedHashSet(listOf(it)) }.toList()
                     val landPoints = findLandPoints(mask, pointCount)
                     connectIslands(edgeGraph, landPoints, pointsWidth)
-                    val unclaimedLand = HashSet(landPoints)
+                    val unclaimedLand = LinkedHashSet(landPoints)
                     unclaimedLand.removeAll(startPoints)
                     buildUpRegions(edgeGraph, unclaimedLand, regions)
                     val maxPointsPerRegion = Math.ceil(landPoints.size / regionCount.toDouble()).toInt()
@@ -73,19 +73,19 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun normalizeRegionShapes(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, random: Random, regions: List<HashSet<Int>>, iterations: Int) {
+    private fun normalizeRegionShapes(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, random: Random, regions: List<LinkedHashSet<Int>>, iterations: Int) {
         for (i in 0..iterations - 1) {
             normalizeRegionShapes(edgeGraph, landPoints, maxPointsPerRegion, pointsWidth, random, regions)
         }
     }
 
-    private fun normalizeRegionShapes(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, random: Random, regions: List<HashSet<Int>>) {
+    private fun normalizeRegionShapes(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, random: Random, regions: List<LinkedHashSet<Int>>) {
         regions.randomized(random).forEach { region ->
             normalizeRegionShape(edgeGraph, landPoints, maxPointsPerRegion, pointsWidth, region, regions)
         }
     }
 
-    private fun normalizeRegionShape(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, region: HashSet<Int>, regions: List<HashSet<Int>>) {
+    private fun normalizeRegionShape(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, region: LinkedHashSet<Int>, regions: List<LinkedHashSet<Int>>) {
         val (avgX, avgY) = findRegionCenter(pointsWidth, region)
         val farQueue = buildFurthestFirstQueue(avgX, avgY, edgeGraph, landPoints, pointsWidth, region)
         giveAwayFurthestPoints(avgX, avgY, edgeGraph, landPoints, pointsWidth, region, regions, farQueue)
@@ -93,13 +93,13 @@ class RegionsFilter : Runnable {
         takeBackNearestPoints(avgX, avgY, edgeGraph, landPoints, maxPointsPerRegion, pointsWidth, region, regions, nearQueue)
     }
 
-    private fun takeBackNearestPoints(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, region: HashSet<Int>, regions: List<HashSet<Int>>, nearQueue: PriorityQueue<Pair<Int, Int>>) {
+    private fun takeBackNearestPoints(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, maxPointsPerRegion: Int, pointsWidth: Int, region: LinkedHashSet<Int>, regions: List<LinkedHashSet<Int>>, nearQueue: PriorityQueue<Pair<Int, Int>>) {
         for (i in 0..maxPointsPerRegion - region.size - 1) {
             takeBackNearestPoint(avgX, avgY, edgeGraph, landPoints, pointsWidth, region, regions, nearQueue)
         }
     }
 
-    private fun takeBackNearestPoint(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, pointsWidth: Int, region: HashSet<Int>, regions: List<HashSet<Int>>, nearQueue: PriorityQueue<Pair<Int, Int>>) {
+    private fun takeBackNearestPoint(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, pointsWidth: Int, region: LinkedHashSet<Int>, regions: List<LinkedHashSet<Int>>, nearQueue: PriorityQueue<Pair<Int, Int>>) {
         val pointToTakeNear = nearQueue.remove()
         var take1 = false
         var take2 = false
@@ -131,7 +131,7 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun giveAwayFurthestPoints(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, pointsWidth: Int, region: HashSet<Int>, regions: List<HashSet<Int>>, farQueue: PriorityQueue<Pair<Int, Int>>) {
+    private fun giveAwayFurthestPoints(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, pointsWidth: Int, region: LinkedHashSet<Int>, regions: List<LinkedHashSet<Int>>, farQueue: PriorityQueue<Pair<Int, Int>>) {
         for (i in 0..4) {
             giveAwayFurthestPoint(avgX, avgY, edgeGraph, landPoints, pointsWidth, region, regions, farQueue)
         }
@@ -143,7 +143,7 @@ class RegionsFilter : Runnable {
         return nearQueue
     }
 
-    private fun giveAwayFurthestPoint(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, pointsWidth: Int, region: HashSet<Int>, regions: List<HashSet<Int>>, farQueue: PriorityQueue<Pair<Int, Int>>) {
+    private fun giveAwayFurthestPoint(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, pointsWidth: Int, region: LinkedHashSet<Int>, regions: List<LinkedHashSet<Int>>, farQueue: PriorityQueue<Pair<Int, Int>>) {
         val pointToTrade = farQueue.remove()
         edgeGraph[pointToTrade.first].forEach { adjacentPoint ->
             if (landPoints.contains(adjacentPoint)) {
@@ -166,7 +166,7 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun buildFurthestFirstQueue(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, pointsWidth: Int, region: HashSet<Int>): PriorityQueue<Pair<Int, Int>> {
+    private fun buildFurthestFirstQueue(avgX: Int, avgY: Int, edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, pointsWidth: Int, region: LinkedHashSet<Int>): PriorityQueue<Pair<Int, Int>> {
         val borderPoints = findBorderPoints(edgeGraph, landPoints, region)
         val farQueue = PriorityQueue<Pair<Int, Int>>(borderPoints.size) { p1, p2 -> p2.second.compareTo(p1.second) }
         borderPoints.forEach { borderPoint ->
@@ -180,7 +180,7 @@ class RegionsFilter : Runnable {
         return farQueue
     }
 
-    private fun findRegionCenter(pointsWidth: Int, region: HashSet<Int>): Pair<Int, Int> {
+    private fun findRegionCenter(pointsWidth: Int, region: LinkedHashSet<Int>): Pair<Int, Int> {
         var sumX = 0
         var sumY = 0
         region.forEach {
@@ -192,9 +192,9 @@ class RegionsFilter : Runnable {
         return Pair(avgX, avgY)
     }
 
-    private fun equalizeRegions(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, maxPointsPerRegion: Int, random: Random, regions: List<HashSet<Int>>) {
-        val unclaimedLand = HashSet<Int>()
-        var lastUnclaimedLand: HashSet<Int>? = null
+    private fun equalizeRegions(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, maxPointsPerRegion: Int, random: Random, regions: List<LinkedHashSet<Int>>) {
+        val unclaimedLand = LinkedHashSet<Int>()
+        var lastUnclaimedLand: LinkedHashSet<Int>? = null
         do {
             if (unclaimedLand.equals(lastUnclaimedLand)) {
                 forceClaimUnwantedLand(edgeGraph, random, regions, unclaimedLand)
@@ -212,7 +212,7 @@ class RegionsFilter : Runnable {
         } while (unclaimedLand.isNotEmpty())
     }
 
-    private fun forceClaimUnwantedLand(edgeGraph: ArrayList<ArrayList<Int>>, random: Random, regions: List<HashSet<Int>>, unclaimedLand: HashSet<Int>) {
+    private fun forceClaimUnwantedLand(edgeGraph: ArrayList<ArrayList<Int>>, random: Random, regions: List<LinkedHashSet<Int>>, unclaimedLand: LinkedHashSet<Int>) {
         while (unclaimedLand.isNotEmpty()) {
             regions.randomized(random).forEach { region ->
                 tryAndClaimLand(edgeGraph, unclaimedLand, region, random)
@@ -220,7 +220,7 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun giveUpLandIfTooBig(edgeGraph: ArrayList<ArrayList<Int>>, maxPointsPerRegion: Int, landPoints: HashSet<Int>, random: Random, region: HashSet<Int>, unclaimedLand: HashSet<Int>) {
+    private fun giveUpLandIfTooBig(edgeGraph: ArrayList<ArrayList<Int>>, maxPointsPerRegion: Int, landPoints: LinkedHashSet<Int>, random: Random, region: LinkedHashSet<Int>, unclaimedLand: LinkedHashSet<Int>) {
         if (region.size > maxPointsPerRegion) {
             val borderPoints = ArrayList(findBorderPoints(edgeGraph, landPoints, region))
             for (i in 0..region.size - (maxPointsPerRegion + 6)) {
@@ -233,7 +233,7 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun claimLandIfNeeded(edgeGraph: ArrayList<ArrayList<Int>>, maxPointsPerRegion: Int, random: Random, region: HashSet<Int>, unclaimedLand: HashSet<Int>) {
+    private fun claimLandIfNeeded(edgeGraph: ArrayList<ArrayList<Int>>, maxPointsPerRegion: Int, random: Random, region: LinkedHashSet<Int>, unclaimedLand: LinkedHashSet<Int>) {
         if (region.size < maxPointsPerRegion) {
             for (i in 0..maxPointsPerRegion - region.size - 1) {
                 tryAndClaimLand(edgeGraph, unclaimedLand, region, random)
@@ -247,9 +247,9 @@ class RegionsFilter : Runnable {
         return randomized
     }
 
-    private fun giveUpDisconnectedLand(edgeGraph: ArrayList<ArrayList<Int>>, unclaimedLand: HashSet<Int>, region: HashSet<Int>) {
+    private fun giveUpDisconnectedLand(edgeGraph: ArrayList<ArrayList<Int>>, unclaimedLand: LinkedHashSet<Int>, region: LinkedHashSet<Int>) {
         val regionBodies = ArrayList<Set<Int>>()
-        val regionPointsToClaim = HashSet<Int>(region)
+        val regionPointsToClaim = LinkedHashSet<Int>(region)
         while (regionPointsToClaim.isNotEmpty()) {
             regionBodies.add(buildLandBody(edgeGraph, regionPointsToClaim))
         }
@@ -261,7 +261,7 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun tryAndClaimLand(edgeGraph: ArrayList<ArrayList<Int>>, unclaimedLand: HashSet<Int>, region: HashSet<Int>, random: Random) {
+    private fun tryAndClaimLand(edgeGraph: ArrayList<ArrayList<Int>>, unclaimedLand: LinkedHashSet<Int>, region: LinkedHashSet<Int>, random: Random) {
         val landToClaim = ArrayList(unclaimedLand)
         Collections.shuffle(landToClaim, random)
         landToClaim.forEach {
@@ -274,8 +274,8 @@ class RegionsFilter : Runnable {
         }
     }
 
-    private fun findBorderPoints(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: HashSet<Int>, region: HashSet<Int>): Set<Int> {
-        val borderPoints = HashSet<Int>()
+    private fun findBorderPoints(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: LinkedHashSet<Int>, region: LinkedHashSet<Int>): Set<Int> {
+        val borderPoints = LinkedHashSet<Int>()
         region.forEach {
             edgeGraph[it].forEach inside@ { adjacentPoint ->
                 if (landPoints.contains(adjacentPoint) && !region.contains(adjacentPoint)) {
@@ -289,7 +289,7 @@ class RegionsFilter : Runnable {
 
     fun connectIslands(edgeGraph: ArrayList<ArrayList<Int>>, landPoints: Set<Int>, pointsWidth: Int) {
         val landBodies = ArrayList<Set<Int>>()
-        val unclaimedPoints = HashSet<Int>(landPoints)
+        val unclaimedPoints = LinkedHashSet<Int>(landPoints)
         while (unclaimedPoints.isNotEmpty()) {
             landBodies.add(buildLandBody(edgeGraph, unclaimedPoints))
         }
@@ -351,7 +351,7 @@ class RegionsFilter : Runnable {
         val maxX = x0 + boxRadius
         val minY = y0 - boxRadius
         val maxY = y0 + boxRadius
-        val checkPoints = HashSet<Int>()
+        val checkPoints = LinkedHashSet<Int>()
         for (x in minX..maxX) {
             if (x >= 0 && x < pointsWidth) {
                 if (minY >= 0) {
@@ -393,15 +393,15 @@ class RegionsFilter : Runnable {
     }
 
     private fun buildLandBody(edgeGraph: List<List<Int>>, landPoints: MutableSet<Int>): Set<Int> {
-        val landBody = HashSet<Int>()
-        var growSet = HashSet<Int>()
+        val landBody = LinkedHashSet<Int>()
+        var growSet = LinkedHashSet<Int>()
         growSet.add(landPoints.first())
-        var iterateSet: HashSet<Int>
+        var iterateSet: LinkedHashSet<Int>
         while (growSet.isNotEmpty()) {
             landBody.addAll(growSet)
             landPoints.removeAll(growSet)
             iterateSet = growSet
-            growSet = HashSet<Int>()
+            growSet = LinkedHashSet<Int>()
             iterateSet.forEach { index ->
                 addAllConnectedPoints(edgeGraph, landPoints, landBody, growSet, index)
             }
@@ -410,8 +410,8 @@ class RegionsFilter : Runnable {
     }
 
 
-    private fun findLandPoints(mask: Matrix<Int>, pointCount: Int): HashSet<Int> {
-        val landPoints = HashSet<Int>(pointCount)
+    private fun findLandPoints(mask: Matrix<Int>, pointCount: Int): LinkedHashSet<Int> {
+        val landPoints = LinkedHashSet<Int>(pointCount)
         for (i in 0..pointCount - 1) {
             if (mask[i] > 0) {
                 landPoints.add(i)
@@ -420,17 +420,17 @@ class RegionsFilter : Runnable {
         return landPoints
     }
 
-    private fun buildUpRegions(edgeGraph: List<List<Int>>, unclaimedPoints: MutableSet<Int>, regions: List<HashSet<Int>>) {
+    private fun buildUpRegions(edgeGraph: List<List<Int>>, unclaimedPoints: MutableSet<Int>, regions: List<LinkedHashSet<Int>>) {
         val queue = PriorityQueue<RegionGrowth>(regions.size) { g1, g2 -> g1.regionPoints.size.compareTo(g2.regionPoints.size) }
         regions.forEach {
-            queue.add(RegionGrowth(it, HashSet(it), HashSet<Int>()))
+            queue.add(RegionGrowth(it, LinkedHashSet(it), LinkedHashSet<Int>()))
         }
 
         while (queue.isNotEmpty()) {
             val region = queue.remove()
             if (region.iterateSet.isEmpty()) {
                 region.iterateSet = region.growSet
-                region.growSet = HashSet<Int>()
+                region.growSet = LinkedHashSet<Int>()
             }
             if (region.iterateSet.isNotEmpty()) {
                 val pointIndex = region.iterateSet.first()
@@ -454,7 +454,7 @@ class RegionsFilter : Runnable {
 
     private fun pickStartingPoints(mask: Matrix<Int>, points: Matrix<ClosestPoints>, random: Random): Set<Int> {
         val minDistSquared = minDistanceBetweenPointsSquared()
-        val startingPoints = HashSet<Pair<Int, Point>>()
+        val startingPoints = LinkedHashSet<Pair<Int, Point2F>>()
         while (startingPoints.size < regionCount) {
             var iterations = 0
             while (iterations < 1000 && startingPoints.size < regionCount) {
@@ -464,10 +464,10 @@ class RegionsFilter : Runnable {
                 val closestPoint = points[x, y].p0!!
                 val pointIndex = closestPoint.first
                 if (mask[pointIndex] > 0) {
-                    val point = Point(x.toFloat() / points.width, y.toFloat() / points.width)
+                    val point = Point2F(x.toFloat() / points.width, y.toFloat() / points.width)
                     var isFarEnoughApart = true
                     startingPoints.forEach { startingPoint ->
-                        if (point.distanceSquaredTo(startingPoint.second) < minDistSquared) {
+                        if (point.distance2(startingPoint.second) < minDistSquared) {
                             isFarEnoughApart = false
                             return@forEach
                         }
