@@ -18,7 +18,7 @@ object Rivers {
         ASYMMETRIC
     }
 
-    class RiverNode(var type: NodeType, var pointIndex: Int, var pointLocation: Point2F, var priority: Int, var riverPriority: Int, var elevation: Float)
+    class RiverNode(var type: NodeType, var pointIndex: Int, var pointLocation: Point2F, var priority: Int, var riverPriority: Int, var elevation: Float, var maxTerrainSlope: Float)
 
     val MAX_CANDIDATE_ELEVATION_DIFF = 0.005f
     val MIN_RIVER_MOUTH_SEPARATION = 0.001f
@@ -35,6 +35,8 @@ object Rivers {
     val SYMMETRIC_PRIORITY = 0.40f
     val MIN_RIVER_SLOPE = 0.005f
     val MAX_RIVER_SLOPE = 0.37f
+    val MIN_TERRAIN_SLOPE = 0.03f
+    val MAX_TERRAIN_SLOPE = 0.7f
     val MAX_RIVER_CHILDREN = 3
 
     fun buildRivers(graph: Graph, idMask: Matrix<Int>, random: Random): ArrayList<Pair<Polygon2F, ArrayList<TreeNode<RiverNode>>>> {
@@ -51,6 +53,7 @@ object Rivers {
             val furthestFromBorder: Int
             val interiorBorderPoints = findBorderPoints(vertices, water, region)
             val coastalBorderPoints = findCoastalPoints(vertices, water, region)
+            val terrainSlope: HashMap<Int, Float>
             val riverSlope = if (interiorBorderPoints.isEmpty() || coastalBorderPoints.isEmpty()) {
                 val regionCenter = calculateBodyCenter(vertices, region)
                 val seedId = findFurthestPoint(vertices, region, regionCenter)
@@ -71,6 +74,7 @@ object Rivers {
                     fakeInteriorBorderPoints = if (landward >= 0) twoSide else oneSide
                     val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, fakeInteriorBorderPoints, fakeCoastPoints)
                     furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, fakeCoastPoints, fakeInteriorBorderPoints)
+                    terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
                     buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
                 } else {
                     val inlandExtremeId = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalWater)
@@ -81,6 +85,7 @@ object Rivers {
                     furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, fakeCoastPoints, fakeInteriorBorderPoints)
                     riverCandidates[furthestFromBorder] = 1.0f
                     bestRiverCandidates.add(furthestFromBorder)
+                    terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
                     buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
                 }
             } else {
@@ -88,6 +93,7 @@ object Rivers {
                 fakeInteriorBorderPoints = interiorBorderPoints
                 val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalBorderPoints)
                 furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, coastalBorderPoints, interiorBorderPoints)
+                terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region)
                 buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region)
             }
             val localRiverMouths = LinkedHashSet(bestRiverCandidates)
@@ -100,7 +106,7 @@ object Rivers {
                 localRiverMouths.add(furthestFromBorder)
             }
             updateLocalRiverCandidates(vertices, fakeInteriorBorderPoints, localRiverMouths, riverCandidates)
-            buildRiverNetwork(graph, random, water, rivers, riverCandidates, region, riverSlope, localRiverMouths)
+            buildRiverNetwork(graph, random, water, rivers, riverCandidates, region, riverSlope, terrainSlope, localRiverMouths)
         }
         val landlockedRivers = LinkedHashSet<TreeNode<RiverNode>>()
         rivers.forEach { regionRivers ->
@@ -138,7 +144,7 @@ object Rivers {
             }
         }
         val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
-        val coastSplices = HashMap<CellEdge, Point2F>()
+        val coastSplices = ArrayList<Pair<LineSegment2F, Point2F>>()
         rivers.forEach { region ->
             LinkedHashSet(region).forEach { river ->
                 if (water.contains(river.value.pointIndex)) {
@@ -147,14 +153,14 @@ object Rivers {
                     val inlandVertex = vertices[inlandStart.value.pointIndex]
                     val coastEdge = rootVertex.cell.sharedEdge(inlandVertex.cell)
                     if (coastEdge != null) {
-                        val line = LineSegment2F(coastEdge.tri1.center, coastEdge.tri2.center)
+                        val line = coastEdge
                         val outlet = line.intersection(LineSegment2F(rootVertex.point, inlandVertex.point)) ?: line.interpolate(0.5f)
                         inlandStart.parent = null
                         river.children.clear()
                         inlandStart.value.pointLocation = outlet
                         region.remove(river)
                         region.add(inlandStart)
-                        coastSplices[coastEdge] = outlet
+                        coastSplices.add(Pair(coastEdge, outlet))
                     }
                 }
             }
@@ -402,6 +408,43 @@ object Rivers {
         return riverSlopeWeights
     }
 
+    private fun buildTerrainSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, region: Collection<Int>): HashMap<Int, Float> {
+        var minDistFromCoast = Float.MAX_VALUE
+        var maxDistFromCoast = Float.MIN_VALUE
+        var minDistFromBorder = Float.MAX_VALUE
+        var maxDistFromBorder = Float.MIN_VALUE
+        val distances = region.map { point ->
+            val distFromCoast = findClosestPointDistance(vertices, coast, point)
+            val distFromBorder = findClosestPointDistance(vertices, border, point)
+            if (distFromCoast > maxDistFromCoast) {
+                maxDistFromCoast = distFromCoast
+            }
+            if (distFromCoast < minDistFromCoast) {
+                minDistFromCoast = distFromCoast
+            }
+            if (distFromBorder > maxDistFromBorder) {
+                maxDistFromBorder = distFromBorder
+            }
+            if (distFromBorder < minDistFromBorder) {
+                minDistFromBorder = distFromBorder
+            }
+            Triple(point, distFromCoast, distFromBorder)
+        }
+        val coastDelta = maxDistFromCoast - minDistFromCoast
+        val borderDelta = maxDistFromBorder - minDistFromBorder
+        val borderSlopeDelta = MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
+        val coastSlopeMax = Math.max(MIN_TERRAIN_SLOPE, (MAX_TERRAIN_SLOPE / 3.0f))
+        val coastSlopeDelta = coastSlopeMax - MIN_TERRAIN_SLOPE
+        return hashMapOf(*distances.map {
+            val normalizedCoast = (it.second - minDistFromCoast) / coastDelta
+            val normalizedBorder = (it.third - minDistFromBorder) / borderDelta
+            val border2 = normalizedBorder * normalizedBorder
+            val borderWeight = MIN_TERRAIN_SLOPE + ((1.0f - border2) * borderSlopeDelta)
+            val coastWeight = MIN_TERRAIN_SLOPE + (normalizedCoast * coastSlopeDelta)
+            Pair(it.first, Math.max(coastWeight, borderWeight))
+        }.toTypedArray())
+    }
+
     private fun perpendicularVector(vertices: Vertices, id1: Int, id2: Int): Point2F {
         return perpendicularVector(vertices[id1].point, vertices[id2].point)
     }
@@ -496,10 +539,11 @@ object Rivers {
                                   riverCandidates: HashMap<Int, Float>,
                                   region: LinkedHashSet<Int>,
                                   riverSlope: Map<Int, Float>,
+                                  terrainSlope: Map<Int, Float>,
                                   localRiverMouths: LinkedHashSet<Int>) {
         val border = graph.findBorder(region)!!
         val vertices = graph.vertices
-        val candidateRiverNodes = findCandidateRiverNodes(vertices, localRiverMouths, riverCandidates)
+        val candidateRiverNodes = findCandidateRiverNodes(vertices, localRiverMouths, riverCandidates, terrainSlope)
         val riverNodes = ArrayList(candidateRiverNodes)
         ArrayList(riverNodes).forEach { riverNode ->
             val possibleOutlets = ArrayList<Int>()
@@ -510,7 +554,7 @@ object Rivers {
             }
             val outlet = possibleOutlets.sortedBy { vertices[it].point.distance2(riverNode.value.pointLocation) }.firstOrNull()
             if (outlet != null) {
-                riverNode.parent = TreeNode(RiverNode(NodeType.CONTINUATION, outlet, vertices[outlet].point, riverNode.value.priority, riverNode.value.riverPriority, 0.0f), null, mutableListOf(riverNode))
+                riverNode.parent = TreeNode(RiverNode(NodeType.CONTINUATION, outlet, vertices[outlet].point, riverNode.value.priority, riverNode.value.riverPriority, 0.0f, terrainSlope[outlet] ?: MIN_TERRAIN_SLOPE), null, mutableListOf(riverNode))
             } else {
                 var landlockedRiverNode = riverNode
                 var decrementCount = 1
@@ -534,8 +578,9 @@ object Rivers {
                     val node = landlockedRiverNode.value
                     val edgeDist = Math.sqrt(node.pointLocation.distance2(newPoint).toDouble()).toFloat()
                     val localRiverSlope = riverSlope[newNodeCandidate] ?: 0.0f
+                    val newTerrainSlope = terrainSlope[newNodeCandidate] ?: MIN_TERRAIN_SLOPE
                     val newElevation = node.elevation + (localRiverSlope * edgeDist)
-                    val newNode = TreeNode(RiverNode(NodeType.CONTINUATION, newNodeCandidate, newPoint, node.priority, node.riverPriority, newElevation), landlockedRiverNode, ArrayList())
+                    val newNode = TreeNode(RiverNode(NodeType.CONTINUATION, newNodeCandidate, newPoint, node.priority, node.riverPriority, newElevation, newTerrainSlope), landlockedRiverNode, ArrayList())
                     landlockedRiverNode.children.add(newNode)
                     riverNodes.add(newNode)
                     candidateRiverNodes.add(newNode)
@@ -568,6 +613,7 @@ object Rivers {
                 val node = expansionCandidate.value
                 val edgeDist = Math.sqrt(node.pointLocation.distance2(newPoint).toDouble()).toFloat()
                 val localRiverSlope = riverSlope[newNodeCandidate] ?: 0.0f
+                val newTerrainSlope = terrainSlope[newNodeCandidate] ?: MIN_TERRAIN_SLOPE
                 val newElevation = node.elevation + (localRiverSlope * edgeDist)
                 val newPriority = if (node.type == NodeType.CONTINUATION) {
                     candidateRiverNodes.remove(expansionCandidate)
@@ -587,7 +633,7 @@ object Rivers {
                         node.priority - 1
                     }
                 }
-                val newNode = TreeNode(RiverNode(getRandomNodeType(random), newNodeCandidate, newPoint, newPriority, node.riverPriority, newElevation), expansionCandidate, ArrayList())
+                val newNode = TreeNode(RiverNode(getRandomNodeType(random), newNodeCandidate, newPoint, newPriority, node.riverPriority, newElevation, newTerrainSlope), expansionCandidate, ArrayList())
                 expansionCandidate.children.add(newNode)
                 candidateRiverNodes.add(newNode)
             }
@@ -605,12 +651,12 @@ object Rivers {
         return false
     }
 
-    private fun findCandidateRiverNodes(vertices: Vertices, localRiverMouths: LinkedHashSet<Int>, riverCandidates: HashMap<Int, Float>): ArrayList<TreeNode<RiverNode>> {
+    private fun findCandidateRiverNodes(vertices: Vertices, localRiverMouths: LinkedHashSet<Int>, riverCandidates: HashMap<Int, Float>, terrainSlope: Map<Int, Float>): ArrayList<TreeNode<RiverNode>> {
         val orderedRiverMouths = ArrayList<Int>(localRiverMouths)
         orderedRiverMouths.sortByDescending { riverCandidates[it] ?: 0.0f }
         val candidateRiverNodes = ArrayList<TreeNode<RiverNode>>()
         orderedRiverMouths.forEachIndexed { i, pointIndex ->
-            candidateRiverNodes.add(TreeNode(RiverNode(NodeType.CONTINUATION, pointIndex, vertices[pointIndex].point, 1, (orderedRiverMouths.size - i) + 1, 0.0f), null, ArrayList()))
+            candidateRiverNodes.add(TreeNode(RiverNode(NodeType.CONTINUATION, pointIndex, vertices[pointIndex].point, 1, (orderedRiverMouths.size - i) + 1, 0.0f, terrainSlope[pointIndex] ?: MIN_TERRAIN_SLOPE), null, ArrayList()))
         }
         return candidateRiverNodes
     }
@@ -686,7 +732,7 @@ object Rivers {
 
     private fun isValidExpansionPoint(rivers: LinkedHashSet<TreeNode<RiverNode>>, border: Polygon2F, expansionCandidate: TreeNode<RiverNode>, pointLocation: Point2F, edgeLength2: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
         val newEdge = LineSegment2F(expansionCandidate.value.pointLocation, pointLocation)
-        if (border.doesEdgeIntersect(newEdge)) {
+        if (border.doesEdgeIntersect(newEdge).first) {
             return false
         }
         if (border.distance2(pointLocation) < minDistanceBorder2) {

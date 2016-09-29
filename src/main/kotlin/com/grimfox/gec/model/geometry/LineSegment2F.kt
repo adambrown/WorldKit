@@ -1,8 +1,34 @@
 package com.grimfox.gec.model.geometry
 
-class LineSegment2F(var a: Point2F, var b: Point2F) {
+import java.util.*
 
-    fun toVector() = Vector2F(this)
+open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
+
+    companion object {
+
+        fun getConnectedEdgeSegments(edgeSet: Collection<LineSegment2F>): ArrayList<ArrayList<LineSegment2F>> {
+            val segments = ArrayList<ArrayList<LineSegment2F>>()
+            val unconnected = LinkedHashSet<LineSegment2F>(edgeSet)
+            while (unconnected.isNotEmpty()) {
+                val seed = unconnected.first()
+                unconnected.remove(seed)
+                val segment = seed.getConnectedEdges(edgeSet)
+                unconnected.removeAll(segment)
+                segments.add(segment)
+            }
+            return segments
+        }
+    }
+
+    open val length2: Float by lazy {
+        a.distance2(b)
+    }
+
+    open val length: Float by lazy {
+        Math.sqrt(length2.toDouble()).toFloat()
+    }
+
+    open fun toVector() = Vector2F(this)
 
     fun intersects(other: LineSegment2F): Boolean {
         val o1 = orientation(a, b, other.a)
@@ -137,4 +163,32 @@ class LineSegment2F(var a: Point2F, var b: Point2F) {
         val vector = Vector2F(this) * interpolation
         return Point2F(a.x + vector.a, a.y + vector.b)
     }
+
+    fun epsilonEquals(other: LineSegment2F, epsilon: Float = 0.0000001f): Boolean {
+        return (a.epsilonEquals(other.a, epsilon) && b.epsilonEquals(other.b, epsilon)) || (a.epsilonEquals(other.b, epsilon) && b.epsilonEquals(other.a, epsilon))
+    }
+
+    fun getConnectedEdges(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.0000001f): ArrayList<LineSegment2F> {
+        val connectedEdges = ArrayList<LineSegment2F>()
+        connectedEdges.add(this)
+        var nextEdges = LinkedHashSet<LineSegment2F>(connectedEdges)
+        while (nextEdges.isNotEmpty()) {
+            val newEdges = LinkedHashSet<LineSegment2F>()
+            nextEdges.forEach { edge ->
+                edgeSet.forEach {
+                    if (edge.a.epsilonEquals(it.a, epsilon)
+                            || edge.a.epsilonEquals(it.b, epsilon)
+                            || edge.b.epsilonEquals(it.a, epsilon)
+                            || edge.b.epsilonEquals(it.b, epsilon)) {
+                        newEdges.add(it)
+                    }
+                }
+            }
+            newEdges.removeAll(connectedEdges)
+            connectedEdges.addAll(newEdges)
+            nextEdges = newEdges
+        }
+        return connectedEdges
+    }
+
 }

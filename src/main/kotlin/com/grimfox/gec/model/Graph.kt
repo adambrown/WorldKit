@@ -1,8 +1,7 @@
 package com.grimfox.gec.model
 
-import com.grimfox.gec.model.geometry.LineSegment2F
-import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.model.geometry.Polygon2F
+import com.grimfox.gec.model.geometry.*
+import com.grimfox.gec.model.geometry.Polygon2F.Companion.fromUnsortedEdges
 import java.util.*
 
 
@@ -18,6 +17,10 @@ class Graph(val vertexIdsToPoints: FloatArray,
     var virtualConnections = HashMap<Int, LinkedHashSet<Int>>()
     val vertices = Vertices()
     val triangles = Triangles()
+
+    companion object {
+        internal val bounds = Bounds2F(Point2F(0.0f, 0.0f), Point2F(1.0f, 1.0f))
+    }
 
     inner class CellEdge(val tri1: Triangle, val tri2: Triangle) {
 
@@ -106,45 +109,149 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val graph = this@Graph
 
-        val border: List<Point2F> by lazy { vertex.adjacentTriangles.map { it.center } }
+        private val borderRaw: List<Point2F> by lazy { vertex.adjacentTriangles.map { it.center } }
 
-        val isClosed: Boolean by lazy { vertex.adjacentTriangles.first().adjacentTriangles.contains(vertex.adjacentTriangles.last()) }
+        private val isClosedRaw: Boolean by lazy { vertex.adjacentTriangles.size > 2 && vertex.adjacentTriangles.first().adjacentTriangles.contains(vertex.adjacentTriangles.last()) }
 
-        val isBorder: Boolean by lazy {
-            if (!isClosed) return@lazy true
-            border.forEach { if (it.x < 0.0f || it.x >= 1.0f || it.y < 0.0f || it.y >= 1.0f) return@lazy true }
-            false
-        }
-
-        val borderEdges: List<CellEdge> by lazy {
+        private val borderEdgesRaw: List<CellEdge> by lazy {
             val edges = ArrayList<CellEdge>()
             val adjacentTris = vertex.adjacentTriangles
-            for (i in 1..adjacentTris.size - if (isClosed) 0 else 1) {
-                edges.add(CellEdge(adjacentTris[i - 1], adjacentTris[i % border.size]))
+            for (i in 1..adjacentTris.size - if (isClosedRaw) 0 else 1) {
+                edges.add(CellEdge(adjacentTris[i - 1], adjacentTris[i % borderRaw.size]))
             }
             edges
         }
 
-        val area: Float by lazy {
-            if (!isClosed) {
-                0.0f
+        private val borderEdgesComplete: ArrayList<Pair<LineSegment2F, Boolean>> by lazy {
+            if (!isBorder) {
+                ArrayList(borderEdgesRaw.map { Pair(LineSegment2F(it.tri1.center, it.tri2.center), true) })
+            } else if (!isClosedRaw) {
+                val edges = ArrayList<Pair<LineSegment2F, Boolean>>()
+                val otherPoint1 = vertex.adjacentVertices.first().point
+                val otherPoint2 = vertex.adjacentVertices.last().point
+                val seg1 = LineSegment2F(borderRaw.first() + Vector2F(vertex.point, otherPoint1).getPerpendicular().getUnit(), borderRaw.first())
+                val seg2 = LineSegment2F(borderRaw.last(), borderRaw.last() + Vector2F(otherPoint2, vertex.point).getPerpendicular().getUnit())
+                edges.add(Pair(seg1, bounds.isWithin(seg1)))
+                edges.addAll(borderEdgesRaw.map {
+                    val line = LineSegment2F(it.tri1.center, it.tri2.center)
+                    Pair(line, bounds.isWithin(line))
+                })
+                edges.add(Pair(seg2, bounds.isWithin(seg2)))
+                edges
             } else {
-                var sum1 = 0.0f
-                var sum2 = 0.0f
-                for (i in 1..border.size) {
-                    val p1 = border[i - 1]
-                    val p2 = border[i % border.size]
-                    sum1 += p1.x * p2.y
-                    sum2 += p1.y * p2.x
+                val borderEdges = ArrayList<Pair<LineSegment2F, Boolean>>()
+                borderEdgesRaw.forEach {
+                    val line = LineSegment2F(it.tri1.center, it.tri2.center)
+                    borderEdges.add(Pair(line, bounds.isWithin(line)))
                 }
-                Math.abs((sum1 - sum2) / 2)
+                borderEdges
             }
         }
 
-        fun sharedEdge(other: Cell): CellEdge? {
+        val borderEdges: List<LineSegment2F> by lazy {
+            if (!isBorder) {
+                borderEdgesComplete.map { it.first }
+            } else {
+                val edges = ArrayList<LineSegment2F>()
+                borderEdgesComplete.forEach {
+                    if (it.second) {
+                        edges.add(it.first)
+                    }
+                }
+                var lastIntersection: Pair<Int, Point2F?>? = null
+                var insertIndex = -1
+                var newLine1: LineSegment2F? = null
+                var newLine2: LineSegment2F? = null
+                for (i in 0..edges.size - 1) {
+                    val edge = edges[i]
+                    val intersection = bounds.singleIntersection(edge)
+                    if (intersection.first > -1) {
+                        if (bounds.isWithin(edge.a)) {
+                            edge.b = intersection.second!!
+                        } else {
+                            edge.a = intersection.second!!
+                        }
+                        if (lastIntersection == null) {
+                            lastIntersection = intersection
+                            insertIndex = i + 1
+                        } else {
+                            if (insertIndex == i) {
+                                val side1 = lastIntersection.first
+                                val side2 = intersection.first
+                                if (side1 == side2) {
+                                    newLine1 = LineSegment2F(lastIntersection.second!!, intersection.second!!)
+                                } else if ((side1 == 0 && side2 == 1) || (side2 == 0 && side1 == 1)) {
+                                    newLine1 = LineSegment2F(lastIntersection.second!!, bounds.c2)
+                                    newLine2 = LineSegment2F(bounds.c2, intersection.second!!)
+                                } else if ((side1 == 1 && side2 == 2) || (side2 == 1 && side1 == 2)) {
+                                    newLine1 = LineSegment2F(lastIntersection.second!!, bounds.c3)
+                                    newLine2 = LineSegment2F(bounds.c3, intersection.second!!)
+                                } else if ((side1 == 2 && side2 == 3) || (side2 == 2 && side1 == 3)) {
+                                    newLine1 = LineSegment2F(lastIntersection.second!!, bounds.c4)
+                                    newLine2 = LineSegment2F(bounds.c4, intersection.second!!)
+                                } else {
+                                    newLine1 = LineSegment2F(lastIntersection.second!!, bounds.c1)
+                                    newLine2 = LineSegment2F(bounds.c1, intersection.second!!)
+                                }
+                            } else {
+                                val side1 = intersection.first
+                                val side2 = lastIntersection.first
+                                if (side1 == side2) {
+                                    newLine1 = LineSegment2F(intersection.second!!, lastIntersection.second!!)
+                                } else if ((side1 == 0 && side2 == 1) || (side2 == 0 && side1 == 1)) {
+                                    newLine1 = LineSegment2F(intersection.second!!, bounds.c2)
+                                    newLine2 = LineSegment2F(bounds.c2, lastIntersection.second!!)
+                                } else if ((side1 == 1 && side2 == 2) || (side2 == 1 && side1 == 2)) {
+                                    newLine1 = LineSegment2F(intersection.second!!, bounds.c3)
+                                    newLine2 = LineSegment2F(bounds.c3, lastIntersection.second!!)
+                                } else if ((side1 == 2 && side2 == 3) || (side2 == 2 && side1 == 3)) {
+                                    newLine1 = LineSegment2F(intersection.second!!, bounds.c4)
+                                    newLine2 = LineSegment2F(bounds.c4, lastIntersection.second!!)
+                                } else {
+                                    newLine1 = LineSegment2F(intersection.second!!, bounds.c1)
+                                    newLine2 = LineSegment2F(bounds.c1, lastIntersection.second!!)
+                                }
+                                insertIndex = 0
+                            }
+                        }
+                    }
+                }
+                if (insertIndex > -1 && newLine1 != null) {
+                    if (newLine2 != null) {
+                        edges.add(insertIndex, newLine2)
+                    }
+                    edges.add(insertIndex, newLine1)
+                }
+                edges
+            }
+        }
+
+        val border: List<Point2F> by lazy {
+            borderEdges.map { it.a }
+        }
+
+        val isBorder: Boolean by lazy {
+            if (!isClosedRaw) return@lazy true
+            borderRaw.forEach { if (it.x < 0.0f || it.x >= 1.0f || it.y < 0.0f || it.y >= 1.0f) return@lazy true }
+            false
+        }
+
+        val area: Float by lazy {
+            var sum1 = 0.0f
+            var sum2 = 0.0f
+            for (i in 1..border.size) {
+                val p1 = border[i - 1]
+                val p2 = border[i % border.size]
+                sum1 += p1.x * p2.y
+                sum2 += p1.y * p2.x
+            }
+            Math.abs((sum1 - sum2) / 2)
+        }
+
+        fun sharedEdge(other: Cell): LineSegment2F? {
             borderEdges.forEach { edge1 ->
                 other.borderEdges.forEach { edge2 ->
-                    if (edge1 == edge2) {
+                    if (edge1.epsilonEquals(edge2)) {
                         return edge1
                     }
                 }
@@ -323,42 +430,6 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return connectedPoints
     }
 
-    fun getConnectedEdgeSegments(edgeSet: LinkedHashSet<CellEdge>): ArrayList<LinkedHashSet<CellEdge>> {
-        val segments = ArrayList<LinkedHashSet<CellEdge>>()
-        val unconnected = LinkedHashSet<CellEdge>(edgeSet)
-        while (unconnected.isNotEmpty()) {
-            val seed = unconnected.first()
-            unconnected.remove(seed)
-            val segment = getConnectedEdges(seed, edgeSet)
-            unconnected.removeAll(segment)
-            segments.add(segment)
-        }
-        return segments
-    }
-
-    fun getConnectedEdges(edge: CellEdge, edgeSet: LinkedHashSet<CellEdge>): LinkedHashSet<CellEdge> {
-        val connectedEdges = LinkedHashSet<CellEdge>()
-        connectedEdges.add(edge)
-        var nextEdges = LinkedHashSet<CellEdge>(connectedEdges)
-        while (nextEdges.isNotEmpty()) {
-            val newEdges = LinkedHashSet<CellEdge>()
-            nextEdges.forEach { edge ->
-                edgeSet.forEach {
-                    if (edge.tri1.id == it.tri1.id
-                            || edge.tri1.id == it.tri2.id
-                            || edge.tri2.id == it.tri1.id
-                            || edge.tri2.id == it.tri2.id) {
-                        newEdges.add(it)
-                    }
-                }
-            }
-            newEdges.removeAll(connectedEdges)
-            connectedEdges.addAll(newEdges)
-            nextEdges = newEdges
-        }
-        return connectedEdges
-    }
-
     fun findBorderIds(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): LinkedHashSet<Int> {
         val borderIds = LinkedHashSet<Int>()
         ids.forEach { id ->
@@ -384,63 +455,16 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: HashMap<CellEdge, Point2F>? = null): Polygon2F? {
-        val edges = ArrayList(findBorderEdges(ids, mask, negate))
+    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null): Polygon2F? {
+        val edges = findBorderEdges(ids, mask, negate)
         if (edges.isEmpty()) {
             return null
         }
-        val border = ArrayList<Point2F>(edges.size + 1)
-        val seedEdge = edges.removeAt(0)
-        border.add(seedEdge.tri1.center)
-        border.add(seedEdge.tri2.center)
-        var currentEdge = seedEdge
-        while (edges.isNotEmpty()) {
-            var nextEdge: CellEdge? = null
-            for (i in 0..edges.size - 1) {
-                if (currentEdge.tri1 == edges[i].tri2) {
-                    nextEdge = edges.removeAt(i)
-                    break
-                }
-            }
-            if (nextEdge == null) {
-                break
-            }
-            val splice = splices?.get(nextEdge)
-            if (splice != null) {
-                border.add(0, splice)
-            }
-            border.add(0, nextEdge.tri1.center)
-            currentEdge = nextEdge
-        }
-        currentEdge = seedEdge
-        while (edges.isNotEmpty()) {
-            var nextEdge: CellEdge? = null
-            for (i in 0..edges.size - 1) {
-                if (currentEdge.tri2 == edges[i].tri1) {
-                    nextEdge = edges.removeAt(i)
-                    break
-                }
-            }
-            if (nextEdge == null) {
-                break
-            }
-            val splice = splices?.get(nextEdge)
-            if (splice != null) {
-                border.add(splice)
-            }
-            border.add(nextEdge.tri2.center)
-            currentEdge = nextEdge
-        }
-        var isClosed = false
-        if (border.first() == border.last()) {
-            border.removeAt(border.size - 1)
-            isClosed = true
-        }
-        return Polygon2F(border, isClosed)
+        return fromUnsortedEdges(edges, splices)
     }
 
-    fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): LinkedHashSet<CellEdge> {
-        val borderIds = LinkedHashSet<CellEdge>()
+    fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): List<LineSegment2F> {
+        val borderIds = ArrayList<LineSegment2F>()
         ids.forEach { id ->
             vertices.getAdjacentVertices(id).forEach { adjacentId ->
                 if (!ids.contains(adjacentId)) {
@@ -459,7 +483,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    private fun addBorderEdge(borderIds: LinkedHashSet<CellEdge>, id: Int, adjacentId: Int) {
+    private fun addBorderEdge(borderIds: ArrayList<LineSegment2F>, id: Int, adjacentId: Int) {
         val cell1 = vertices[id].cell
         val cell2 = vertices[adjacentId].cell
         val edge = cell1.sharedEdge(cell2)

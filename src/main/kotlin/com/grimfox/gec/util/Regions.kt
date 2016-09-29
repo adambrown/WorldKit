@@ -5,6 +5,8 @@ import com.grimfox.gec.model.ArrayListMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.*
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.LineSegment2F
+import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.generatePoints
@@ -184,7 +186,7 @@ object Regions {
         val sharedEdges = LinkedHashSet(region.ids.filter { cell.id != it }.map {
             cell.sharedEdge(interiorVertices[it]!!.cell)
         }.filterNotNull())
-        return graph.getConnectedEdgeSegments(sharedEdges).map { it.map { it.length }.sum() }.min() ?: 0.0f
+        return getConnectedEdgeSegments(sharedEdges).map { it.map { it.length }.sum() }.min() ?: 0.0f
     }
 
     private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCellSets: LinkedHashSet<LinkedHashSet<Int>>): ArrayList<ArrayList<Region>> {

@@ -218,9 +218,27 @@ object Utils {
         return edgeGraph
     }
 
-    fun generatePoints(stride: Int, width: Float, random: Random): ArrayList<Point2F> {
+    fun generateSemiUniformPoints(stride: Int, width: Float, random: Random, constraint: Float = 0.5f): ArrayList<Point2F> {
+        val realConstraint = Math.min(1.0f, Math.max(0.0f, constraint))
         val gridSquare = width / stride
-        val minDistSquared = (gridSquare / 3.0f) * (gridSquare / 3.0f)
+        val quarterSquare = gridSquare * realConstraint
+        val margin = (gridSquare * (1.0f - realConstraint)) * 0.5f
+        val points = ArrayList<Point2F>()
+        for (y in 0..stride - 1) {
+            val oy = (y * gridSquare) + margin
+            for (x in 0..stride - 1) {
+                val px = (x * gridSquare) + margin + (random.nextFloat() * quarterSquare)
+                val py = oy + (random.nextFloat() * quarterSquare)
+                val point = Point2F(px, py)
+                points.add(point)
+            }
+        }
+        return points
+    }
+
+    fun generatePoints(stride: Int, width: Float, random: Random, minDist: Float = (width / stride) / 3.0f): ArrayList<Point2F> {
+        val gridSquare = width / stride
+        val minDistSquared = minDist * minDist
         val points = ArrayList<Point2F>()
         for (y in 0..stride - 1) {
             val oy = y * gridSquare

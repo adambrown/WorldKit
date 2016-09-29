@@ -3,6 +3,8 @@ package com.grimfox.gec.util
 import com.grimfox.gec.command.BuildContinent.Parameters
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.model.geometry.LineSegment2F
+import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Polygon2F
 import com.grimfox.gec.util.Utils.pow
@@ -37,7 +39,7 @@ object Coastline {
             }
             bodyId
         }
-        val bodyBorders = ArrayList<CellEdge>()
+        val bodyBorders = ArrayList<LineSegment2F>()
         bodies.forEach {
             bodyBorders.addAll(maskGraph.findBorderEdges(it))
         }
@@ -92,7 +94,7 @@ object Coastline {
                     sumY += lakePoint.y
                 }
                 val lakeCenter = Point2F(sumX / lake.size, sumY / lake.size)
-                val sortedBorders = ArrayList(bodyBorders.sortedBy { Math.min(it.tri1.center.distance2(lakeCenter), it.tri2.center.distance2(lakeCenter)) })
+                val sortedBorders = ArrayList(bodyBorders.sortedBy { Math.min(it.a.distance2(lakeCenter), it.b.distance2(lakeCenter)) })
                 while (sortedBorders.isNotEmpty()) {
                     val nearestBorder = sortedBorders.removeAt(0)
                     val lakeShore = lake.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { !lake.contains(it) }.toHashSet()
@@ -143,7 +145,7 @@ object Coastline {
         return false
     }
 
-    private fun cellIntersectsEdge(edge: CellEdge, cell: Cell): Boolean {
+    private fun cellIntersectsEdge(edge: LineSegment2F, cell: Cell): Boolean {
         cell.borderEdges.forEach {
             if (edge.intersects(it)) {
                 return true
@@ -529,7 +531,7 @@ object Coastline {
                 if (borderPoints.contains(pickId)) {
                     continue
                 }
-                val landAdjacentEdges = LinkedHashSet<CellEdge>()
+                val landAdjacentEdges = LinkedHashSet<LineSegment2F>()
                 val pickCell = vertices[pickId].cell
                 vertices.getAdjacentVertices(pickId).forEach { adjacentId ->
                     if (idMask[adjacentId] > 0) {
@@ -539,7 +541,7 @@ object Coastline {
                         }
                     }
                 }
-                if (graph.getConnectedEdgeSegments(landAdjacentEdges).size > 1) {
+                if (getConnectedEdgeSegments(landAdjacentEdges).size > 1) {
                     continue
                 }
                 coastPick = coastId

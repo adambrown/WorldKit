@@ -2,9 +2,9 @@ package com.grimfox.gec.command
 
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
-import com.grimfox.gec.model.Graph.CellEdge
-import com.grimfox.gec.model.Graph.Vertices
+import com.grimfox.gec.model.Graph.*
 import com.grimfox.gec.model.geometry.*
+import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.util.Coastline.applyMask
 import com.grimfox.gec.util.Coastline.getBorders
 import com.grimfox.gec.util.Coastline.getCoastline
@@ -18,6 +18,7 @@ import com.grimfox.gec.util.Rivers.buildRivers
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils
 import com.grimfox.gec.util.Utils.generatePoints
+import com.grimfox.gec.util.Utils.generateSemiUniformPoints
 import com.sun.scenario.animation.SplineInterpolator
 import io.airlift.airline.Command
 import io.airlift.airline.Option
@@ -83,26 +84,17 @@ class BuildContinent() : Runnable {
             parameterSet.seed = test.toLong()
             val random = Random(parameterSet.seed)
             var (graph, regionMask) = buildRegions(parameterSet)
-//            drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-ri", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
                 val localLastGraph = graph
                 val localGraph: Graph
                 val points = generatePoints(parameters.stride, virtualWidth, random)
                 localGraph = buildGraph(virtualWidth, points, parameters.stride)
-//                drawRegions(lastGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-pre", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
                 regionMask = applyMask(localGraph, localLastGraph, regionMask)
-//                drawRegions(localGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i-post", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
-//                drawOffLimits(localGraph, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o$i")
-//                drawRegions(localGraph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
                 refineCoastline(localGraph, random, regionMask, parameters)
                 graph = localGraph
-//                drawGraph(graph, outputWidth, "test-graph-${String.format("%05d", i)}")
-//                drawBorder(graph, outputWidth, "test-border-${String.format("%05d", i)}")
-//                drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r$i", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
             }
             val rivers = buildRivers(graph, regionMask, random)
-
 //            draw(outputWidth, "test-new-${String.format("%05d", test)}-concavity") {
 //                graphics.color = Color.BLACK
 //                drawConcavity(graph, rivers.first)
@@ -129,61 +121,488 @@ class BuildContinent() : Runnable {
 //                    graphics.color = Color.BLACK
 //                    drawSpline(coastSpline, false)
 //                }
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
+                    graphics.color = Color.BLACK
+                    drawPolygon(coastline, true)
+                }
 //                draw(outputWidth, "test-new-${String.format("%05d", test)}-ids$i") {
 //                    graphics.color = Color.BLACK
 //                    drawVertexIds(riverGraph)
 //                }
+                val reverseRiverMap = HashMap<Int, RiverNode>()
+                riverSet.forEach {
+                    it.forEach { node ->
+                        reverseRiverMap[node.pointIndex] = node
+                    }
+                }
+                val crestElevations = HashMap<Int, Float>(riverGraph.triangles.size)
+                riverGraph.triangles.forEach { crest ->
+                    val riverA = reverseRiverMap[crest.a.id]!!
+                    val riverB = reverseRiverMap[crest.b.id]!!
+                    val riverC = reverseRiverMap[crest.c.id]!!
+                    val elevationStart = Math.max(riverA.elevation, Math.max(riverB.elevation, riverC.elevation))
+                    val terrainSlopeAvg = (riverA.maxTerrainSlope + riverB.maxTerrainSlope + riverC.maxTerrainSlope) / 3.0f
+                    val radius = crest.center.distance(crest.a.point)
+                    crestElevations[crest.id] = elevationStart + (radius * terrainSlopeAvg)
+                }
+
                 val riverSplines = calculateRiverSegments(riverGraph, random, riverSet, riverFlows, test)
+                val cellsToRiverSegments = HashMap<Int, ArrayList<RiverSegment>>()
+                riverSplines.forEach {
+                    it.forEach {
+                        cellsToRiverSegments.getOrPut(it.vertexId, { ArrayList() }).add(it)
+                    }
+                }
 
-//                val flows = riverSplines.filter { it.value.slope != 0.0f }.map { it.value.flow }.sorted()
-//                val flowMax = flows.last()
-//                val flowMin = flows.first()
-//                val flowMed = flows[(flows.size * 0.5).toInt()]
-//                val flowAvg = flows.sum() / flows.size
-//
-//                val elevations = riverSplines.filter { it.value.slope != 0.0f }.map { (it.value.elevations.a + it.value.elevations.b) * 0.5f }.sorted()
-//                val elevationMax = elevations.last()
-//                val elevationMin = elevations.first()
-//                val elevationMed = elevations[(elevations.size * 0.6).toInt()]
-//                val elevationAvg = elevations.sum() / elevations.size
-//
-//                val slopes = riverSplines.map { it.value.slope }.filter { it != 0.0f }.sorted()
-//                val slopeMax = slopes.last()
-//                val slopeMin = slopes.first()
-//                val slopeMed = slopes[(slopes.size * 0.5).toInt()]
-//                val slopeAvg = slopes.sum() / slopes.size
+                val coastMultigon = Multigon2F(coastline, 20)
+                val coastCells = ArrayList<Int>()
+                riverGraph.vertices.forEach { vertex ->
+                    if (cellIntersectsCoast(coastMultigon, vertex)) {
+                        coastCells.add(vertex.id)
+                    }
+                }
+                val riverPoints = LinkedHashSet(riverGraph.vertices.map { Point2FKey(it.point) })
+                riverPoints.retainAll(LinkedHashSet(coastline.points.map { Point2FKey(it) }))
 
-//                println("max flow: $flowMax")
-//                println("min flow: $flowMin")
-//                println("med flow: $flowMed")
-//                println("avg flow: $flowAvg")
-//
-//                println("max elevation: $elevationMax")
-//                println("min elevation: $elevationMin")
-//                println("med elevation: $elevationMed")
-//                println("avg elevation: $elevationAvg")
-//
-//                println("max slope: $slopeMax")
-//                println("min slope: $slopeMin")
-//                println("med slope: $slopeMed")
-//                println("avg slope: $slopeAvg")
-                val segmentLength = 1.0f / 4096.0f
-                draw(outputWidth, "test-new-${String.format("%05d", test)}-splines$i") {
+                val edgePolys = HashMap<Int, Polygon2F>()
+                val unconnectedPolys = HashMap<Int, ArrayList<Polygon2F>>()
+                val riverPolys = HashMap<Int, ArrayList<Polygon2F>>()
+
+                coastCells.forEach {
+                    val vertex = riverGraph.vertices[it]
+                    val polygons = getConnectedPolygons(buildConnectedEdgeSegments(coastMultigon, coastline, vertex, cellsToRiverSegments[it]))
+                    polygons.forEach {
+                        if (riverPoints.contains(Point2FKey(vertex.point))) {
+                            if (containsPoint(it, vertex.point)) {
+                                edgePolys[vertex.id] = it
+                            } else {
+                                unconnectedPolys.getOrPut(vertex.id, { ArrayList() }).add(it)
+                            }
+                        } else {
+                            if (it.isWithin(vertex.point)) {
+                                edgePolys[vertex.id] = it
+                            } else {
+                                unconnectedPolys.getOrPut(vertex.id, { ArrayList() }).add(it)
+                            }
+                        }
+                    }
+                }
+
+                val revisedEdgePolys = HashMap<Int, Polygon2F>()
+                val adjacencyPatches = HashMap<Int, HashSet<Int>>()
+                val inclusionPatches = HashMap<Int, HashSet<Int>>()
+
+                edgePolys.forEach {
+                    val id = it.key
+                    var polygon = it.value
+                    val adjacentUnconnected = ArrayList<Pair<Int, Polygon2F>>()
+                    riverGraph.vertices.getAdjacentVertices(id).forEach { id ->
+                        unconnectedPolys[id]?.forEach { adjacentUnconnected.add(Pair(id, it)) }
+                    }
+                    val polysToTake = ArrayList<Pair<Int, Polygon2F>>()
+                    val newConnections = HashSet<Int>()
+                    adjacentUnconnected.forEach { adjacentPoly ->
+                        val secondAdjacentEdgePolys = ArrayList<Pair<Int, Polygon2F>>()
+                        riverGraph.vertices.getAdjacentVertices(adjacentPoly.first).forEach {
+                            val adjacentEdgePoly = edgePolys[it]
+                            if (adjacentEdgePoly != null) {
+                                secondAdjacentEdgePolys.add(Pair(it, adjacentEdgePoly))
+                            }
+                        }
+                        var winner = -1
+                        var winningConnection = 0.0f
+                        val localNewConnections = ArrayList<Int>()
+                        secondAdjacentEdgePolys.forEach { secondAdjacentPoly ->
+                            var connectedness = 0.0f
+                            adjacentPoly.second.edges.forEach { adjacentPolyEdge ->
+                                secondAdjacentPoly.second.edges.forEach { localPolyEdge ->
+                                    if (adjacentPolyEdge.epsilonEquals(localPolyEdge)) {
+                                        connectedness += localPolyEdge.length
+                                    }
+                                }
+                            }
+                            if (connectedness > 0.0f) {
+                                localNewConnections.add(secondAdjacentPoly.first)
+                            }
+                            if (connectedness > winningConnection) {
+                                winner = secondAdjacentPoly.first
+                                winningConnection = connectedness
+                            }
+                        }
+                        if (winner == id) {
+                            polysToTake.add(adjacentPoly)
+                            newConnections.addAll(localNewConnections)
+                            inclusionPatches.getOrPut(id, { HashSet() }).add(adjacentPoly.first)
+                        }
+                    }
+                    polysToTake.forEach {
+                        unconnectedPolys[it.first]?.remove(it.second)
+                        val combinedEdges = ArrayList<LineSegment2F>(it.second.edges)
+                        combinedEdges.addAll(polygon.edges)
+                        it.second.edges.forEach { adjacentEdge ->
+                            polygon.edges.forEach { localEdge ->
+                                if (localEdge.epsilonEquals(adjacentEdge)) {
+                                    combinedEdges.remove(localEdge)
+                                    combinedEdges.remove(adjacentEdge)
+                                }
+                            }
+                        }
+                        polygon = Polygon2F.fromUnsortedEdges(combinedEdges)
+                    }
+                    newConnections.remove(id)
+                    newConnections.removeAll(riverGraph.vertices.getAdjacentVertices(id))
+                    adjacencyPatches.getOrPut(id, { HashSet() }).addAll(newConnections)
+                    newConnections.forEach {
+                        adjacencyPatches.getOrPut(it, { HashSet() }).add(id)
+                    }
+                    val localRiverPolys = ArrayList<Polygon2F>()
+                    cellsToRiverSegments[id]?.forEach { riverSegment ->
+                        if (riverSegment.spline.points.size > 1) {
+                            val polyLine = riverSegment.spline.toPolygon(1.0f / 512, 3)
+                            val length = polyLine.edges.map { it.length }.sum()
+                            val startElevation = riverSegment.elevations.a
+                            val endElevation = riverSegment.elevations.b
+                            val elevationDelta = endElevation - startElevation
+                            val slope = elevationDelta / length
+                            val pointsIn3d = ArrayList<Point3F>()
+                            val startPoint = polyLine.points.first()
+                            var lastPoint = Point3F(startPoint.x, startPoint.y, startElevation)
+                            pointsIn3d.add(lastPoint)
+                            for (edge in polyLine.edges) {
+                                val newPoint = Point3F(edge.b.x, edge.b.y, lastPoint.z + (edge.length * slope))
+                                pointsIn3d.add(newPoint)
+                                lastPoint = newPoint
+                            }
+                            pointsIn3d.removeAt(pointsIn3d.size - 1)
+                            val endPoint = polyLine.points.last()
+                            pointsIn3d.add(Point3F(endPoint.x, endPoint.y, endElevation))
+                            localRiverPolys.add(Polygon2F(pointsIn3d, false))
+                        }
+                    }
+                    revisedEdgePolys[id] = revisePolygonIfRiverIntersects(riverGraph, edgePolys, cellsToRiverSegments, adjacencyPatches, riverGraph.vertices[id], polygon, localRiverPolys)
+                    riverPolys.put(id, localRiverPolys)
+                }
+
+                val interpolatedEdgePolys = HashMap<Int, Polygon2F>()
+
+                revisedEdgePolys.forEach {
+                    val id = it.key
+                    val polygon = it.value
+                    val vertex = riverGraph.vertices[id]
+                    val borderPoints = getUntouchablePoints(riverGraph, revisedEdgePolys, adjacencyPatches, vertex, cellsToRiverSegments[id])
+                    val interiorEdges = ArrayList<LineSegment2F>()
+                    val coastEdges = ArrayList<LineSegment2F>()
+                    polygon.edges.forEach {
+                        if (borderPoints.contains(Point2FKey(it.a)) && borderPoints.contains(Point2FKey(it.b))) {
+                            interiorEdges.add(it)
+                        } else {
+                            coastEdges.add(it)
+                        }
+                    }
+                    if (coastEdges.isNotEmpty()) {
+                        val coasts = getConnectedEdgeSegments(coastEdges)
+                        val subdividedCoastEdges = ArrayList<LineSegment2F>()
+                        coasts.forEach {
+                            if (it.isNotEmpty()) {
+                                val coast = Spline2F(Polygon2F.fromUnsortedEdges(it)).toPolygon(1.0f / 512, 3)
+                                subdividedCoastEdges.addAll(coast.edges)
+                            }
+                        }
+                        interpolatedEdgePolys[id] = Polygon2F.fromUnsortedEdges(subdividedCoastEdges + interiorEdges)
+                    } else {
+                        interpolatedEdgePolys[id] = polygon
+                    }
+                }
+
+                val edgeSkeletons = HashMap<Int, ArrayList<LineSegment3F>>()
+                val riverSkeletons = HashMap<Int, ArrayList<LineSegment3F>>()
+
+                interpolatedEdgePolys.forEach {
+                    val localEdgeSkeleton = ArrayList<LineSegment3F>()
+                    val localRiverSkeleton = ArrayList<LineSegment3F>()
+                    val id = it.key
+                    val polygon = it.value
+                    val untouchablePoints = getUntouchablePoints(riverGraph, revisedEdgePolys, adjacencyPatches, riverGraph.vertices[id], cellsToRiverSegments[id])
+                    val pointsWithHeights = HashMap<Point2FKey, Point3F>()
+                    val localRiverPolys = riverPolys[id]
+                    if (localRiverPolys != null) {
+                        localRiverSkeleton.addAll(localRiverPolys.flatMap { it.edges }.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
+                        pointsWithHeights.putAll(localRiverSkeleton.flatMap { listOf(Point2FKey(it.a), Point2FKey(it.b)) }.map { Pair(it, it.point as Point3F) })
+                    }
+                    (listOf(riverGraph.vertices[id]) + ((inclusionPatches[id] ?: HashSet()).map { riverGraph.vertices[it] })).flatMap { it.adjacentTriangles }.forEach {
+                        val height = crestElevations[it.id]
+                        if (height != null) {
+                            val point = Point3F(it.center.x, it.center.y, height)
+                            pointsWithHeights[Point2FKey(point)] = point
+                        }
+                    }
+                    polygon.edges.forEach {
+                        val a2d = it.a
+                        val b2d = it.b
+                        val aKey = Point2FKey(a2d)
+                        val a3d = pointsWithHeights[aKey] ?: Point3F(a2d.x, a2d.y, 0.0f)
+                        val bKey = Point2FKey(b2d)
+                        val b3d = pointsWithHeights[bKey] ?: Point3F(b2d.x, b2d.y, 0.0f)
+                        if (a3d.z == 0.0f && b3d.z == 0.0f && untouchablePoints.contains(aKey) && untouchablePoints.contains(bKey)) {
+                            val mid = LineSegment2F(a3d, b3d).interpolate(0.5f)
+                            val height = a3d.distance(mid) * 0.03f
+                            val c3d = Point3F(mid.x, mid.y, height)
+                            localEdgeSkeleton.addAll(LineSegment3F(a3d, c3d).subdivided2d(1.0f / 512))
+                            localEdgeSkeleton.addAll(LineSegment3F(c3d, b3d).subdivided2d(1.0f / 512))
+                        } else {
+                            localEdgeSkeleton.addAll(LineSegment3F(a3d, b3d).subdivided2d(1.0f / 512))
+                        }
+                    }
+                    edgeSkeletons[id] = localEdgeSkeleton
+                    riverSkeletons[id] = localRiverSkeleton
+                }
+
+                val fillPoints = ArrayList<Point2F>()
+
+                interpolatedEdgePolys.forEach {
+                    val id = it.key
+                    val polygon = it.value
+                    val edgeSkeleton = edgeSkeletons[id]
+                    val riverSkeleton = riverSkeletons[id] ?: arrayListOf()
+                    if (edgeSkeleton != null) {
+                        val startPoints = LinkedHashSet((riverSkeleton.flatMap { listOf(Point2FKey(it.a, 1400), Point2FKey(it.b, 1400)) } + edgeSkeleton.flatMap { listOf(Point2FKey(it.a, 1400), Point2FKey(it.b, 1400)) }).flatMap {
+                            listOf(Point2FKey(it.x - 1, it.y - 1, it.point),
+                                    Point2FKey(it.x - 1, it.y, it.point),
+                                    Point2FKey(it.x - 1, it.y + 1, it.point),
+                                    Point2FKey(it.x, it.y - 1, it.point),
+                                    Point2FKey(it.x, it.y, it.point),
+                                    Point2FKey(it.x, it.y + 1, it.point),
+                                    Point2FKey(it.x + 1, it.y - 1, it.point),
+                                    Point2FKey(it.x + 1, it.y, it.point),
+                                    Point2FKey(it.x + 1, it.y + 1, it.point))
+                        })
+                        val allPoints = LinkedHashSet(startPoints)
+                        val bounds = polygon.bounds
+                        val minX = bounds.min.x
+                        val maxX = bounds.max.x
+                        val minY = bounds.min.y
+                        val maxY = bounds.max.y
+                        val dx = maxX - minX
+                        val dy = maxY - minY
+                        var tries = 0
+                        val minDist = 1.0f / 700
+                        val pointWidth = Math.max(dx, dy)
+                        for (point in generateSemiUniformPoints(Math.round(pointWidth / minDist), pointWidth, random)) {
+                            val newPoint = Point2FKey(Point2F(point.x + minX, point.y + minY), 1400)
+                            if (allPoints.add(newPoint)) {
+                                if (!polygon.isWithin(newPoint.point)) {
+                                    allPoints.remove(newPoint)
+                                }
+                            }
+                            tries++
+                        }
+                        allPoints.removeAll(startPoints)
+                        fillPoints.addAll(allPoints.map { it.point })
+                    }
+                }
+
+
+                draw(outputWidth, "test-new-${String.format("%05d", test)}-edgePolys$i") {
+                    graphics.color = Color.MAGENTA
+                    edgeSkeletons.forEach {
+                        it.value.forEach {
+                            drawEdge(it.a, it.b)
+                            drawPoint(it.a, 2)
+                            drawPoint(it.b, 2)
+                        }
+                    }
+
+                    graphics.color = Color.BLUE
+                    riverSkeletons.forEach {
+                        it.value.forEach {
+                            drawEdge(it.a, it.b)
+                            drawPoint(it.a, 2)
+                            drawPoint(it.b, 2)
+                        }
+                    }
+
                     graphics.color = Color.BLACK
-                    graphics.stroke = BasicStroke(1.0f)
-                    drawRiverPolyLines(riverSplines, segmentLength, 3, false)
+                    fillPoints.forEach {
+                        drawPoint(it, 1)
+                    }
+                }
+
+//                val segmentLength = 1.0f / 4096.0f
+//                draw(outputWidth, "test-new-${String.format("%05d", test)}-splines$i") {
+//                    graphics.color = Color.BLACK
+//                    graphics.stroke = BasicStroke(1.0f)
+//                    drawRiverPolyLines(riverSplines, segmentLength, 3, false)
+//                }
+            }
+        }
+    }
+
+    private fun getUntouchablePoints(riverGraph: Graph, edgePolygons: HashMap<Int, Polygon2F>, adjacencyPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, riverSegments: ArrayList<RiverSegment>?): LinkedHashSet<Point2FKey> {
+        val untouchables = LinkedHashSet(vertex.cell.border.map { Point2FKey(it) })
+        untouchables.add(Point2FKey(vertex.point))
+        riverSegments?.forEach {
+            untouchables.addAll(it.splices.map { Point2FKey(it.second) })
+        }
+        (riverGraph.vertices.getAdjacentVertices(vertex.id) + (adjacencyPatches[vertex.id] ?: HashSet())).forEach { id ->
+            val adjacent = edgePolygons[id]
+            if (adjacent != null) {
+                untouchables.addAll(adjacent.points.map { Point2FKey(it) })
+            }
+        }
+        return untouchables
+    }
+
+    private fun revisePolygonIfRiverIntersects(graph: Graph, edgePolygons: HashMap<Int, Polygon2F>, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, adjacencyPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, polygon: Polygon2F, riverPolys: ArrayList<Polygon2F>): Polygon2F {
+        val untouchables = getUntouchablePoints(graph, edgePolygons, adjacencyPatches, vertex, cellsToRiverSegments[vertex.id])
+        val riverEdges = ArrayList<LineSegment2F>(riverPolys.flatMap { it.edges }.filter { !untouchables.contains(Point2FKey(it.a)) && !untouchables.contains(Point2FKey(it.b)) })
+        var adjustedPolygon = polygon
+        var adjusted = true
+        while (adjusted) {
+            adjusted = false
+            for (riverEdge in riverEdges) {
+                val newPoints = LinkedHashSet<Point2FKey>(adjustedPolygon.points.map { Point2FKey(it) })
+                val adjustedEdges = adjustedPolygon.edges
+                for (i in 0..adjustedEdges.size - 1) {
+                    val edge = adjustedEdges[i]
+                    if (riverEdge.intersects(edge)) {
+                        val key1 = Point2FKey(edge.a)
+                        if (!untouchables.contains(key1)) {
+                            newPoints.remove(key1)
+                            adjustedPolygon = Polygon2F(newPoints.map { it.point }, true)
+                            adjusted = true
+                            break
+                        }
+                        val key2 = Point2FKey(edge.b)
+                        if (!untouchables.contains(key2)) {
+                            newPoints.remove(key2)
+                            adjustedPolygon = Polygon2F(newPoints.map { it.point }, true)
+                            adjusted = true
+                            break
+                        }
+                    }
+                }
+                if (adjusted) {
+                    break
+                }
+                for (i in 0..adjustedPolygon.points.size - 1) {
+                    val point = adjustedPolygon.points[i]
+                    val key = Point2FKey(point)
+                    if (!untouchables.contains(key) && riverEdge.distance2(point) < 0.0000025f) {
+                        newPoints.remove(key)
+                        adjustedPolygon = Polygon2F(newPoints.map { it.point }, true)
+                        adjusted = true
+                        break
+                    }
+                }
+                if (adjusted) {
+                    break
                 }
             }
-
-//            drawSlopes(graph, slopes, outputWidth, "test-new-${String.format("%05d", test)}-slopes")
-//            drawOffLimits(lastGraph!!, regionMask, offLimits, 2048, "test-new-${String.format("%05d", test)}-o")
-//            drawBorders(lastGraph!!, regionMask, borders, 2048, "test-new-${String.format("%05d", test)}-b")
-//            drawMask(lastGraph, spokes, outputWidth, "test-new-${String.format("%05d", test)}-rs")
-//            drawSpokes(spokes, outputWidth, "test-new-${String.format("%05d", test)}-m")
-//            drawMask(lastGraph, lastMask, outputWidth, "test-new-${String.format("%05d", test)}-m", false)
-//            drawRegions(graph, regionMask, outputWidth, "test-new-${String.format("%05d", test)}-r", Color.BLACK, Color.BLUE, Color.GREEN, Color.RED, Color.MAGENTA, Color.CYAN, Color.ORANGE, Color.PINK, Color.YELLOW, Color.WHITE, Color.DARK_GRAY)
-//            drawConcavity(lastGraph, concavityWeights, outputWidth, "test-new-${String.format("%05d", test)}-c")
         }
+        return adjustedPolygon
+    }
+
+    private fun buildConnectedEdgeSegments(coastMultigon: Multigon2F, coastline: Polygon2F, vertex: Vertex, riverSegments: ArrayList<RiverSegment>?): ArrayList<ArrayList<LineSegment2F>> {
+        val cell = vertex.cell
+        val splices = ArrayList<Pair<LineSegment2F, Point2F>>()
+        riverSegments?.forEach { riverSegment ->
+            splices.addAll(riverSegment.splices)
+        }
+        val polygon = Polygon2F.fromUnsortedEdges(cell.borderEdges, splices)
+        val segmentedEdges = ArrayList<LineSegment2F>()
+        val intersections = ArrayList<Pair<Point2F, Int>>()
+        polygon.edges.forEach { borderEdge ->
+            val localIntersections = coastMultigon.intersections(borderEdge)
+            intersections.addAll(localIntersections)
+            if (localIntersections.isEmpty()) {
+                if (coastline.isWithin(borderEdge.interpolate(0.5f))) {
+                    segmentedEdges.add(borderEdge)
+                }
+            } else {
+                var currentPoint = borderEdge.a
+                localIntersections.sortedBy { borderEdge.a.distance2(it.first) }.forEach {
+                    val newLine = LineSegment2F(currentPoint, it.first)
+                    if (coastline.isWithin(newLine.interpolate(0.5f))) {
+                        segmentedEdges.add(newLine)
+                    }
+                    currentPoint = it.first
+                }
+                val newLine = LineSegment2F(currentPoint, borderEdge.b)
+                if (coastline.isWithin(newLine.interpolate(0.5f))) {
+                    segmentedEdges.add(newLine)
+                }
+            }
+        }
+        if (intersections.isNotEmpty()) {
+            val min = intersections.map { it.second }.min()!!
+            val coastOrderedIntersections = intersections.map {
+                val delta = Math.abs(min - it.second)
+                val negativeIndex = it.second - coastline.points.size
+                val deltaNeg = Math.abs(min - negativeIndex)
+                if (deltaNeg < delta) {
+                    Pair(it.first, negativeIndex)
+                } else {
+                    it
+                }
+            }.sortedBy { it.second }
+            var j = 1
+            while (j < coastOrderedIntersections.size) {
+                val firstSplice = coastOrderedIntersections[j - 1]
+                val lastSplice = coastOrderedIntersections[j]
+                var firstIndex = firstSplice.second + 1
+                var lastIndex = lastSplice.second + 1
+                val segment = if (firstIndex < 0) {
+                    firstIndex += coastline.points.size
+                    if (lastIndex <= 0) {
+                        lastIndex += coastline.points.size
+                        if (firstIndex > lastIndex) {
+                            ArrayList()
+                        } else {
+                            ArrayList(coastline.points.subList(firstIndex, lastIndex))
+                        }
+                    } else {
+                        ArrayList(coastline.points.subList(firstIndex, coastline.points.size) + coastline.points.subList(0, lastIndex))
+                    }
+                } else {
+                    if (firstIndex > lastIndex) {
+                        ArrayList()
+                    } else {
+                        ArrayList(coastline.points.subList(firstIndex, lastIndex))
+                    }
+                }
+                segment.add(0, firstSplice.first)
+                segment.add(lastSplice.first)
+                segmentedEdges.addAll(Polygon2F(segment, false).edges)
+                j += 2
+            }
+        }
+        return getConnectedEdgeSegments(segmentedEdges)
+    }
+
+    private fun getConnectedPolygons(connectedEdges: ArrayList<ArrayList<LineSegment2F>>): ArrayList<Polygon2F> {
+        val polygons = ArrayList<Polygon2F>()
+        connectedEdges.forEach {
+            polygons.add(Polygon2F.fromUnsortedEdges(it))
+        }
+        return polygons
+    }
+
+    private fun containsPoint(polygon: Polygon2F, point: Point2F): Boolean {
+        polygon.points.forEach {
+            if (point.epsilonEquals(it)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun cellIntersectsCoast(coastMultigon: Multigon2F, vertex: Vertex): Boolean {
+        vertex.cell.borderEdges.forEach { borderEdge ->
+            if (coastMultigon.intersects(borderEdge)) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun calculateRiverSegments(graph: Graph, random: Random, rivers: ArrayList<TreeNode<RiverNode>>, flows: FloatArray, test: Int): ArrayList<TreeNode<RiverSegment>> {
@@ -236,11 +655,27 @@ class BuildContinent() : Runnable {
         return trees
     }
 
-    class RiverNodeTransition(val elevation: Float, val point: Point2F, val vector: Vector2F, val edge: CellEdge)
+    class RiverNodeTransition(val elevation: Float, val point: Point2F, val vector: Vector2F, val edge: LineSegment2F)
 
-    class Junction(val vertexId: Int, val point: Point2F, val flow: Float, val vector: Vector2F, val elevation: Float, var splineElevation: Float? = null, var spline: Spline2F? = null, var node: TreeNode<RiverNode>? = null, var edge: CellEdge? = null)
+    class Junction(
+            val vertexId: Int,
+            val point: Point2F,
+            val flow: Float,
+            val vector: Vector2F,
+            val elevation: Float,
+            var splineElevation: Float? = null,
+            var spline: Spline2F? = null,
+            var node: TreeNode<RiverNode>? = null,
+            val splices: ArrayList<Pair<LineSegment2F, Point2F>> = ArrayList())
 
-    class RiverSegment(var spline: Spline2F, var flow: Float, var elevations: Vector2F, var slope: Float, var vertexId: Int, var profile: RiverProfile)
+    class RiverSegment(
+            var spline: Spline2F,
+            var flow: Float,
+            var elevations: Vector2F,
+            var slope: Float,
+            var vertexId: Int,
+            var profile: RiverProfile,
+            val splices: ArrayList<Pair<LineSegment2F, Point2F>> = ArrayList())
 
     private fun calculateRiverSplines(graph: Graph, transition: RiverNodeTransition? , node: TreeNode<RiverNode>, flows: FloatArray): TreeNode<RiverSegment> {
 //        if (node.pointIndex == 569) {
@@ -254,6 +689,7 @@ class BuildContinent() : Runnable {
         val cellEdges = cell.borderEdges
         var drainEdgeIndex = -1
         val drainElevation: Float
+        val transitionEdge: LineSegment2F?
         val drainPoint = if (transition == null) {
             if (node.children.isEmpty()) {
                 drainVector = Vector2F(0.0f, 0.0f)
@@ -261,6 +697,7 @@ class BuildContinent() : Runnable {
                 drainVector = Vector2F(vertex.point, node.children.first().value.pointLocation).getUnit()
             }
             drainElevation = vertexElevation
+            transitionEdge = null
             vertex.point
         } else {
             for (i in 0..cellEdges.size - 1) {
@@ -270,6 +707,7 @@ class BuildContinent() : Runnable {
             }
             drainVector = -transition.vector
             drainElevation = transition.elevation
+            transitionEdge = transition.edge
             transition.point
         }
         val entryPoints = ArrayList<Pair<Junction, Int>>()
@@ -284,17 +722,17 @@ class BuildContinent() : Runnable {
                 for (i in 0..cellEdges.size - 1) {
                     val cellEdge = cellEdges[i]
                     if (cellEdge == childEdge) {
-                        val edge = LineSegment2F(cellEdge.tri1.center, cellEdge.tri2.center)
-                        val entryPoint = edge.intersection(LineSegment2F(vertex.point, childVertex.point)) ?: edge.interpolate(0.5f)
-                        entryPoints.add(Pair(Junction(vertex.id, entryPoint, flows[child.value.pointIndex], calculateEntryVectorFromEdge(edge), (childElevation + vertexElevation) * 0.5f, node = child, edge = cellEdge), i))
+                        val edge = cellEdge
+                        val entryPoint = edge.interpolate(0.5f)
+                        entryPoints.add(Pair(Junction(vertex.id, entryPoint, flows[child.value.pointIndex], calculateEntryVectorFromEdge(edge), (childElevation + vertexElevation) * 0.5f, node = child, splices = arrayListOf(Pair(cellEdge, entryPoint))), i))
                     }
                 }
             } catch (e: Exception) {
                 draw(4096, "testing") {
                     graphics.color = Color.BLACK
-                    cell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                    cell.borderEdges.forEach { drawEdge(it.a, it.b) }
                     graphics.color = Color.RED
-                    childCell.borderEdges.forEach { drawEdge(it.tri1.center, it.tri2.center) }
+                    childCell.borderEdges.forEach { drawEdge(it.a, it.b) }
                     graphics.color = Color.BLUE
                     drawEdge(vertex.point, childVertex.point)
                     graphics.color = Color.GREEN
@@ -351,10 +789,13 @@ class BuildContinent() : Runnable {
             val elevations = Vector2F(vertexElevation, vertexElevation)
             val flow = flows[vertex.id]
             val slope = calculateSlope(spline, elevations)
-            TreeNode(RiverSegment(spline, flow, elevations, slope, vertex.id, calculateRiverType(flow, slope, elevations)))
+            TreeNode(RiverSegment(spline, flow, elevations, slope, vertex.id, calculateRiverProfile(flow, slope, elevations)))
         } else {
             junctions.value.spline = connectEntryToDrain(junctions.value.point, junctions.value.vector, drainPoint, drainVector)
             junctions.value.splineElevation = drainElevation
+            if (transitionEdge != null) {
+                junctions.value.splices.add(Pair(transitionEdge, drainPoint))
+            }
             toSplineTree(graph, junctions, flows)!!
         }
 //        if (draw) {
@@ -382,10 +823,10 @@ class BuildContinent() : Runnable {
         val spline = junctions.value.spline ?: return null
         val elevations = Vector2F(junctions.value.splineElevation!!, junctions.value.elevation)
         val slope = calculateSlope(spline, elevations)
-        val treeNode = TreeNode(RiverSegment(spline, junctions.value.flow, elevations, slope, junctions.value.vertexId, calculateRiverType(junctions.value.flow, slope, elevations)))
+        val treeNode = TreeNode(RiverSegment(spline, junctions.value.flow, elevations, slope, junctions.value.vertexId, calculateRiverProfile(junctions.value.flow, slope, elevations), junctions.value.splices))
         val riverNode = junctions.value.node
         if (riverNode != null) {
-            treeNode.children.add(calculateRiverSplines(graph, RiverNodeTransition(junctions.value.elevation, junctions.value.point, junctions.value.vector, junctions.value.edge!!), riverNode, flows))
+            treeNode.children.add(calculateRiverSplines(graph, RiverNodeTransition(junctions.value.elevation, junctions.value.point, junctions.value.vector, junctions.value.splices.first().first), riverNode, flows))
         }
         junctions.children.forEach {
             val subTree = toSplineTree(graph, it, flows)
@@ -541,7 +982,7 @@ class BuildContinent() : Runnable {
             shedArea += calculateRiverFlow(vertices, coastline, it, simulationSizeM2, standardArea, flows)
         }
         val cell = vertices[river.value.pointIndex].cell
-        if (cell.area != 0.0f && !cell.isBorder && !Polygon2F(cell.border, true).doesEdgeIntersect(coastline)) {
+        if (cell.area != 0.0f && !cell.isBorder && !Polygon2F(cell.border, true).doesEdgeIntersect(coastline).first) {
             shedArea += cell.area * simulationSizeM2
         } else {
             shedArea += standardArea
@@ -552,7 +993,7 @@ class BuildContinent() : Runnable {
 
     class RiverProfile(val spacing: Range2F, val strength: Range2F, val deviation: Range2F)
 
-    private fun calculateRiverType(flow: Float, slope: Float, elevations: Vector2F): RiverProfile {
+    private fun calculateRiverProfile(flow: Float, slope: Float, elevations: Vector2F): RiverProfile {
         val elevation = (elevations.a + elevations.b) * 0.5f
         val highElevation = elevation > 0.0085f
         val highFlow = flow > 14500.0f

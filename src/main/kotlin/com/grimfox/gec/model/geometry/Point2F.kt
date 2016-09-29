@@ -16,7 +16,7 @@ open class Point2F(val x: Float, val y: Float) {
         return Math.sqrt(distance2(other).toDouble()).toFloat()
     }
 
-    override fun equals(other: Any?): Boolean{
+    override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other?.javaClass != javaClass) return false
         other as Point2F
@@ -27,5 +27,9 @@ open class Point2F(val x: Float, val y: Float) {
 
     override fun hashCode(): Int{
         return 31 * x.hashCode() + y.hashCode()
+    }
+
+    fun epsilonEquals(other: Point2F, epsilon: Float = 0.0000001f): Boolean {
+        return Math.abs(x - other.x) < epsilon && Math.abs(y - other.y) < epsilon
     }
 }

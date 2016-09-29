@@ -14,6 +14,7 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
+import javax.sound.sampled.Line
 
 class Image(val multiplier: Float, val shift: Vector2F, val graphics: Graphics2D)
 
@@ -79,12 +80,10 @@ fun Image.drawPolygon(polygon: Polygon2F, drawPoints: Boolean = true) {
 }
 
 fun Image.drawCell(cell: Cell) {
-    if (cell.isClosed) {
-        val interpolated = cell.border.map { interpolateInt(it) }
-        val xVals = interpolated.map { it.x }.toIntArray()
-        val yVals = interpolated.map { it.y }.toIntArray()
-        graphics.fillPolygon(xVals, yVals, xVals.size)
-    }
+    val interpolated = cell.border.map { interpolateInt(it) }
+    val xVals = interpolated.map { it.x }.toIntArray()
+    val yVals = interpolated.map { it.y }.toIntArray()
+    graphics.fillPolygon(xVals, yVals, xVals.size)
 }
 
 fun Image.drawGraph(graph: Graph, vararg features: Any) {
@@ -97,8 +96,8 @@ fun Image.drawGraph(graph: Graph, vararg features: Any) {
     graphics.color = Color.BLACK
 
     graph.vertices.forEach { vertex ->
-        (vertex.cell.borderEdges.map { Pair(it.tri1.center, it.tri2.center) }).forEach {
-            drawEdge(it.first, it.second)
+        vertex.cell.borderEdges.forEach {
+            drawEdge(it.a, it.b)
         }
     }
 
@@ -121,6 +120,9 @@ fun Image.drawGraph(graph: Graph, vararg features: Any) {
         } else if (it is Cell) {
             graphics.color = Color.ORANGE
             drawCell(it)
+        } else if (it is LineSegment2F) {
+            graphics.color = Color.GREEN
+            drawEdge(it.a, it.b)
         }
     }
 }
