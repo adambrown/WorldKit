@@ -455,12 +455,17 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null): Polygon2F? {
+    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null): ArrayList<Polygon2F> {
         val edges = findBorderEdges(ids, mask, negate)
         if (edges.isEmpty()) {
-            return null
+            return arrayListOf()
         }
-        return fromUnsortedEdges(edges, splices)
+        val edgeSegments = LineSegment2F.getConnectedEdgeSegments(edges)
+        val borders = ArrayList<Polygon2F>()
+        edgeSegments.forEach {
+            borders.add(fromUnsortedEdges(it, splices))
+        }
+        return borders
     }
 
     fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): List<LineSegment2F> {

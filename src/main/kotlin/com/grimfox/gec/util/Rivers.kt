@@ -165,7 +165,7 @@ object Rivers {
                 }
             }
         }
-        val coastlines = bodies.map { graph.findBorder(it, splices = coastSplices)!! }
+        val coastlines = bodies.map { graph.findBorder(it, splices = coastSplices).first() }
         val riverSets = ArrayList<Pair<Polygon2F, ArrayList<TreeNode<RiverNode>>>>(bodies.size)
         for (i in 0..bodies.size - 1) {
             riverSets.add(Pair(coastlines[i], ArrayList()))
@@ -541,7 +541,7 @@ object Rivers {
                                   riverSlope: Map<Int, Float>,
                                   terrainSlope: Map<Int, Float>,
                                   localRiverMouths: LinkedHashSet<Int>) {
-        val border = graph.findBorder(region)!!
+        val border = graph.findBorder(region)
         val vertices = graph.vertices
         val candidateRiverNodes = findCandidateRiverNodes(vertices, localRiverMouths, riverCandidates, terrainSlope)
         val riverNodes = ArrayList(candidateRiverNodes)
@@ -701,7 +701,7 @@ object Rivers {
         return bestCandidate
     }
 
-    private fun findMostViableNewNodeCandidate(graph: Graph, border: Polygon2F, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED, byAngle: Boolean = false): Int? {
+    private fun findMostViableNewNodeCandidate(graph: Graph, border: ArrayList<Polygon2F>, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED, byAngle: Boolean = false): Int? {
         val vertices = graph.vertices
         val expansionPointIndex = expansionCandidate.value.pointIndex
         val point = vertices[expansionPointIndex].point
@@ -730,13 +730,15 @@ object Rivers {
         return null
     }
 
-    private fun isValidExpansionPoint(rivers: LinkedHashSet<TreeNode<RiverNode>>, border: Polygon2F, expansionCandidate: TreeNode<RiverNode>, pointLocation: Point2F, edgeLength2: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
+    private fun isValidExpansionPoint(rivers: LinkedHashSet<TreeNode<RiverNode>>, borders: ArrayList<Polygon2F>, expansionCandidate: TreeNode<RiverNode>, pointLocation: Point2F, edgeLength2: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
         val newEdge = LineSegment2F(expansionCandidate.value.pointLocation, pointLocation)
-        if (border.doesEdgeIntersect(newEdge).first) {
-            return false
-        }
-        if (border.distance2(pointLocation) < minDistanceBorder2) {
-            return false
+        borders.forEach { border ->
+            if (border.doesEdgeIntersect(newEdge).first) {
+                return false
+            }
+            if (border.distance2(pointLocation) < minDistanceBorder2) {
+                return false
+            }
         }
         rivers.forEach {
             if (isTooCloseToRiver(it, it, expansionCandidate, newEdge, edgeLength2)) {

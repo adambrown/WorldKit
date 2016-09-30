@@ -123,7 +123,7 @@ object Coastline {
     fun getCoastline(graph: Graph, idMask: Matrix<Int>): ArrayList<Polygon2F> {
         val land = extractLandFromIds(graph, idMask)
         val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
-        return ArrayList(bodies.map { graph.findBorder(it)!! })
+        return ArrayList(bodies.flatMap { graph.findBorder(it) })
     }
 
     fun getBorders(graph: Graph, idMask: Matrix<Int>, body: LinkedHashSet<Int>): ArrayList<Polygon2F> {
@@ -167,10 +167,7 @@ object Coastline {
         val regions = extractRegionsFromIds(graph, idMask)
         val borders = ArrayList<Polygon2F>()
         regions.forEach {
-            val border = graph.findBorder(it, mask, negate)
-            if (border != null) {
-                borders.add(border)
-            }
+            borders.addAll(graph.findBorder(it, mask, negate))
         }
         return borders
     }

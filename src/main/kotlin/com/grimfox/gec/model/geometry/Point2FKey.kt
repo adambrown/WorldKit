@@ -14,6 +14,6 @@ class Point2FKey(val x: Int, val y: Int, val point: Point2F) {
     }
 
     override fun hashCode(): Int{
-        return 31 * x + y
+        return x + y
     }
 }

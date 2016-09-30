@@ -16,6 +16,8 @@ open class Point2F(val x: Float, val y: Float) {
         return Math.sqrt(distance2(other).toDouble()).toFloat()
     }
 
+    open operator fun times(s: Float) = Point2F(x * s, y * s)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other?.javaClass != javaClass) return false

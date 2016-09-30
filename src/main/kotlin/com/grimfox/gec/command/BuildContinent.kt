@@ -15,6 +15,7 @@ import com.grimfox.gec.util.Rivers
 import com.grimfox.gec.util.Rivers.RiverNode
 import com.grimfox.gec.util.Rivers.buildRiverGraph
 import com.grimfox.gec.util.Rivers.buildRivers
+import com.grimfox.gec.util.Triangulate
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils
 import com.grimfox.gec.util.Utils.generatePoints
@@ -398,8 +399,63 @@ class BuildContinent() : Runnable {
                         }
                         allPoints.removeAll(startPoints)
                         fillPoints.addAll(allPoints.map { it.point })
+
+                        val meshPoints = ArrayList<Point2F>()
+                        meshPoints.addAll((edgeSkeleton.flatMap { listOf(it.a, it.b) } + riverSkeleton.flatMap { listOf(it.a, it.b) } + allPoints.map { it.point }).map { Point2FKey(it) }.toSet().map { it.point })
+
+                        val cellGraph = buildGraph(1.0f, meshPoints)
+                        val lines = LinkedHashSet<LineSegment2FKey>()
+                        cellGraph.triangles.forEach {
+                            val a = it.a.point
+                            val b = it.b.point
+                            val c = it.c.point
+                            val ab = LineSegment2F(a, b)
+                            val bc = LineSegment2F(b, c)
+                            val ca = LineSegment2F(c, a)
+                            lines.add(LineSegment2FKey(ab, 512))
+                            lines.add(LineSegment2FKey(bc, 512))
+                            lines.add(LineSegment2FKey(ca, 512))
+                        }
+
+                        val fixedLines = LinkedHashSet(edgeSkeleton.map { LineSegment2FKey(LineSegment2F(it.a, it.b), 512) } + riverSkeleton.map { LineSegment2FKey(LineSegment2F(it.a, it.b), 512) })
+                        lines.removeAll(fixedLines)
+                        for (line in ArrayList(lines)) {
+                            val mid = line.line.interpolate(0.5f)
+                            if (!polygon.isWithin(mid)) {
+                                lines.remove(line)
+                                continue
+                            }
+                            for (fixedLine in fixedLines) {
+                                if (fixedLine.a != line.a && fixedLine.a != line.b && fixedLine.b != line.a && fixedLine.b != line.b && fixedLine.line.intersects(line.line)) {
+                                    lines.remove(line)
+                                    break
+                                }
+                            }
+                        }
+                        val internalLines = lines.map { it.line }
+
+                        draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", Color.WHITE) {
+                            graphics.color = Color.BLACK
+                            graphics.stroke = BasicStroke(3.0f)
+                            internalLines.forEach {
+                                drawEdge(it.a, it.b)
+                                drawPoint(it.a, 3)
+                                drawPoint(it.b, 3)
+                            }
+
+                            graphics.color = Color.RED
+                            graphics.stroke = BasicStroke(1.0f)
+                            fixedLines.forEach {
+                                drawEdge(it.line.a, it.line.b)
+                                drawPoint(it.line.a, 2)
+                                drawPoint(it.line.b, 2)
+                            }
+                        }
+                        println()
                     }
                 }
+
+
 
 
                 draw(outputWidth, "test-new-${String.format("%05d", test)}-edgePolys$i") {
