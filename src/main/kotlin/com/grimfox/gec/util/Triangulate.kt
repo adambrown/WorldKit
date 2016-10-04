@@ -191,9 +191,9 @@ object Triangulate {
             return points[seedIndex]
         } else {
             var minX = Float.MAX_VALUE
-            var maxX = Float.MIN_VALUE
+            var maxX = -Float.MAX_VALUE
             var minY = Float.MAX_VALUE
-            var maxY = Float.MIN_VALUE
+            var maxY = -Float.MAX_VALUE
             points.forEach {
                 if (it.p.x < minX) {
                     minX = it.p.x
@@ -360,7 +360,7 @@ object Triangulate {
         return Circle(Point2F(cx, cy), radius)
     }
 
-    private fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper): Point2F {
+    private fun findCircleCenter(p1w: PointWrapper, p2w: PointWrapper, p3w: PointWrapper, offset1: Int = 0, offset2: Int = 1, factor: Float = 1.0f): Point2F {
         val p1 = p1w.p
         val p2 = p2w.p
         val p3 = p3w.p
@@ -377,7 +377,20 @@ object Triangulate {
         val q1 = p2.y - p3.y
 
         if (e1 * -q2 + e2 * q1 == 0.0f) {
-            throw Exception("error finding circle center")
+            val whichOne = offset1 % 6
+            val newFactor = factor * if (offset2 % 11 == 0) -1.0f else 1.0f
+            val magnitude = 0.0000001f * newFactor
+            val newOffset1 = Math.abs(31 * offset1 + 1)
+            val newOffset2 = offset2 + 1
+            when (whichOne) {
+                0 -> { return findCircleCenter(PointWrapper(Point2F(p1w.p.x + magnitude, p1w.p.y)), p2w, p3w, newOffset1, newOffset2, newFactor) }
+                1 -> { return findCircleCenter(PointWrapper(Point2F(p1w.p.x, p1w.p.y + magnitude)), p2w, p3w, newOffset1, newOffset2, newFactor) }
+                2 -> { return findCircleCenter(p1w, PointWrapper(Point2F(p2w.p.x + magnitude, p2w.p.y)), p3w, newOffset1, newOffset2, newFactor) }
+                3 -> { return findCircleCenter(p1w, PointWrapper(Point2F(p2w.p.x, p2w.p.y + magnitude)), p3w, newOffset1, newOffset2, newFactor) }
+                4 -> { return findCircleCenter(p1w, p2w, PointWrapper(Point2F(p3w.p.x + magnitude, p3w.p.y)), newOffset1, newOffset2, newFactor) }
+                else -> { return findCircleCenter(p1w, p2w, PointWrapper(Point2F(p3w.p.x, p3w.p.y + magnitude)), newOffset1, newOffset2, newFactor) }
+            }
+//            throw Exception("error finding circle center")
         }
 
         val beta = (-e2 * (b1 - a1) + e1 * (b2 - a2)) / (e2 * q1 - e1 * q2)

@@ -31,30 +31,66 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
     open fun toVector() = Vector2F(this)
 
     fun intersects(other: LineSegment2F): Boolean {
-        val o1 = orientation(a, b, other.a)
-        val o2 = orientation(a, b, other.b)
-        val o3 = orientation(other.a, other.b, a)
-        val o4 = orientation(other.a, other.b, b)
+        val o1 = sideOfLine(a, b, other.a)
+        val o2 = sideOfLine(a, b, other.b)
+        val o3 = sideOfLine(other.a, other.b, a)
+        val o4 = sideOfLine(other.a, other.b, b)
+        return o1 != o2 && o3 != o4 && o1 != 0 && o2 != 0 && o3 != 0 && o4 != 0
+    }
+
+    fun collinear(other: LineSegment2F): Boolean {
+        return sideOfLine(a, b, other.a) == 0 && sideOfLine(a, b, other.b) == 0
+    }
+
+    fun collinearEpsilon(other: LineSegment2F, epsilon: Float = 0.0001f): Boolean {
+        val u = Vector2F(this)
+        val v = Vector2F(other)
+        val det = (u.a * v.b) - (v.a * u.b)
+        return det * det < epsilon * epsilon * u.length2 * v.length2
+    }
+
+    fun collinearOverlappingEpsilon(other: LineSegment2F, slopeEpsilon: Float = 0.0001f, overlapEpsilon: Float = 0.00001f): Boolean {
+        val overlapEpsilon2 = overlapEpsilon * overlapEpsilon
+        return collinearEpsilon(other, slopeEpsilon)
+                && (overlapsLine(this, other.a, overlapEpsilon2)
+                || overlapsLine(this, other.b, overlapEpsilon2)
+                || overlapsLine(other, a, overlapEpsilon2)
+                || overlapsLine(other, b, overlapEpsilon2))
+    }
+
+    fun collinearTouching(other: LineSegment2F): Boolean {
+        return collinear(other) && (touchesLine(a, b, other.a) || touchesLine(a, b, other.b))
+    }
+
+    fun intersectsOrTouches(other: LineSegment2F): Boolean {
+        val o1 = sideOfLine(a, b, other.a)
+        val o2 = sideOfLine(a, b, other.b)
+        val o3 = sideOfLine(other.a, other.b, a)
+        val o4 = sideOfLine(other.a, other.b, b)
         if (o1 != o2 && o3 != o4) {
             return true
         }
-        return (o1 == 0 && (onSegment(a, other.a, b)
-                || onSegment(a, other.b, b)
-                || onSegment(other.a, a, other.b)
-                || onSegment(other.a, b, other.b)))
+        return ((o1 == 0 && touchesLine(a, b, other.a))
+                || (o2 == 0 && touchesLine(a, b, other.b))
+                || (o3 == 0 && touchesLine(other.a, other.b, a))
+                || (o4 == 0 && touchesLine(other.a, other.b, b)))
     }
 
-    private fun orientation(p1: Point2F, p2: Point2F, p3: Point2F): Int {
+    private fun sideOfLine(p1: Point2F, p2: Point2F, p3: Point2F): Int {
         val det = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y)
         if (det == 0.0f) return 0
         return if (det > 0.0f) 1 else -1
     }
 
-    private fun onSegment(p1: Point2F, p2: Point2F, p3: Point2F): Boolean {
-        return (p2.x <= Math.max(p1.x, p3.x)
-                && p2.x >= Math.min(p1.x, p3.x)
-                && p2.y <= Math.max(p1.y, p3.y)
-                && p2.y >= Math.min(p1.y, p3.y))
+    private fun touchesLine(p1: Point2F, p2: Point2F, p3: Point2F): Boolean {
+        return (p3.x <= Math.max(p1.x, p2.x)
+                && p3.x >= Math.min(p1.x, p2.x)
+                && p3.y <= Math.max(p1.y, p2.y)
+                && p3.y >= Math.min(p1.y, p2.y))
+    }
+
+    private fun overlapsLine(line: LineSegment2F, point: Point2F, epsilon2: Float = 0.00001f): Boolean {
+        return line.distance2(point) < epsilon2
     }
 
     private fun pointInBetween(p0_x: Float, p0_y: Float, p1_x: Float, p1_y: Float, p2_x: Float, p2_y: Float): Boolean {
@@ -105,6 +141,20 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
         return null
     }
 
+    fun distanceInfinite(point: Point2F): Float {
+        return Math.sqrt(distanceInfinite2(point).toDouble()).toFloat()
+    }
+
+    fun distanceInfinite2(point: Point2F): Float {
+        if (length2 == 0.0f) {
+            return a.distance2(point)
+        }
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val u = (((point.x - a.x) * dx) + ((point.y - a.y) * dy)) / length2
+        return point.distance2(Point2F(a.x - (u * dx), b.y - (u * dy)))
+    }
+
     fun distance2(point: Point2F): Float {
         val x = point.x
         val y = point.y
@@ -144,7 +194,7 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
     }
 
     fun distance2(line2: LineSegment2F): Float {
-        if (intersects(line2)) {
+        if (intersectsOrTouches(line2)) {
             return 0.0f
         }
         var minDist = distance2(line2.a)
@@ -190,5 +240,4 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
         }
         return connectedEdges
     }
-
 }

@@ -2,6 +2,8 @@ package com.grimfox.gec.model.geometry
 
 open class Point2I(val x: Int, val y: Int) {
 
+    constructor(point: Point2F): this(Math.round(point.x), Math.round(point.y))
+
     fun distance2(other: Point2I): Int {
         val deltaX = x - other.x
         val deltaXsq = deltaX * deltaX

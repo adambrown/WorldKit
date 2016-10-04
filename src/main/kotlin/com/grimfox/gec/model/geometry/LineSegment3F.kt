@@ -15,7 +15,7 @@ class LineSegment3F(var a: Point3F, var b: Point3F) {
     fun toVector() = Vector3F(this)
 
     fun subdivided2d(segmentLength: Float): ArrayList<LineSegment3F> {
-        val segmentCount = Math.round(LineSegment2F(a, b).length / segmentLength)
+        val segmentCount = Math.round(Vector2F(a, b).length / segmentLength)
         if (segmentCount < 2) {
             return arrayListOf(this)
         }

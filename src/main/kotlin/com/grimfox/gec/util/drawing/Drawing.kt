@@ -9,6 +9,7 @@ import com.grimfox.gec.util.Rivers
 import com.grimfox.gec.util.Rivers.RiverNode
 import java.awt.*
 import java.awt.geom.CubicCurve2D
+import java.awt.geom.Line2D
 import java.awt.geom.Path2D
 import java.awt.image.BufferedImage
 import java.io.File
@@ -193,10 +194,10 @@ fun Image.drawRiver(riverNode: TreeNode<RiverNode>, drawPoints: Boolean = true) 
 
 fun Image.drawRiverElevations(rivers: Collection<TreeNode<RiverNode>>, drawPoints: Boolean = true) {
     fun maxElevation(river: TreeNode<RiverNode>): Float {
-        return Math.max(river.value.elevation, river.children.map { maxElevation(it) }.max() ?: Float.MIN_VALUE)
+        return Math.max(river.value.elevation, river.children.map { maxElevation(it) }.max() ?: -Float.MAX_VALUE)
     }
     fun minElevation(river: TreeNode<RiverNode>): Float {
-        return Math.min(river.value.elevation, river.children.map { minElevation(it) }.min() ?: Float.MAX_VALUE)
+        return Math.min(river.value.elevation, river.children.map { minElevation(it) }.min() ?: -Float.MAX_VALUE)
     }
     fun drawRiverElevations(riverNode: TreeNode<RiverNode>, minElevation: Float, delta: Float, drawPoints: Boolean) {
         val normalizedElevation = (riverNode.value.elevation - minElevation) / delta
@@ -295,7 +296,7 @@ fun Image.drawConcavity(graph: Graph, mask: HashMap<Int, Float>) {
     graphics.color = Color.WHITE
 
     var minConcavity = Float.MAX_VALUE
-    var maxConcavity = Float.MIN_VALUE
+    var maxConcavity = -Float.MAX_VALUE
     graph.vertices.forEach {
         val concavity = mask[it.id]
         if (concavity != null) {
@@ -341,6 +342,17 @@ fun Image.fillSpline(spline: Spline2F) {
     graphics.fill(path)
 }
 
+fun Image.fillPolygon(polygon: Polygon2F) {
+    val path = Path2D.Float()
+    val points = polygon.points
+    for (i in 1..points.size - if (polygon.isClosed) 0 else 1) {
+        val p1 = interpolateFloat(points[i - 1])
+        val p2 = interpolateFloat(points[i % points.size])
+        path.append(Line2D.Float(p1.x, p1.y, p2.x, p2.y), true)
+    }
+    graphics.fill(path)
+}
+
 fun Image.drawRiverTree(tree: TreeNode<RiverSegment>, drawPoints: Boolean = true, drawControlPoints: Boolean = drawPoints) {
     drawSpline(tree.value.spline, drawPoints, drawControlPoints)
     tree.children.forEach {
@@ -376,7 +388,7 @@ private fun Image.drawRiverElevations(tree: TreeNode<RiverSegment>, minElevation
 }
 
 private fun maxElevation(river: TreeNode<RiverSegment>): Float {
-    return Math.max(river.value.elevations.b, river.children.map { maxElevation(it) }.max() ?: Float.MIN_VALUE)
+    return Math.max(river.value.elevations.b, river.children.map { maxElevation(it) }.max() ?: -Float.MAX_VALUE)
 }
 
 private fun minElevation(river: TreeNode<RiverSegment>): Float {

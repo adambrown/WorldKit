@@ -39,7 +39,7 @@ object Regions {
     }
 
     private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, Matrix<Int>, Int> {
-        var bestGraphValue = Float.MIN_VALUE
+        var bestGraphValue = -Float.MAX_VALUE
         var bestPair: Triple<Graph, Matrix<Int>, Int>? = null
         var check1Fails = 0
         var check2Fails = 0
@@ -51,9 +51,9 @@ object Regions {
             val graph = buildGraph(virtualWidth, generatePoints(parameters.stride, virtualWidth, random), parameters.stride)
             val (interiorVertices, islandCount) = findInteriorVertices(graph, random, parameters, islandDesire, parameters.maxIslandTries)
             val possibleRegions = pickStartRegions(graph, interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
-            var bestValue = Float.MIN_VALUE
+            var bestValue = -Float.MAX_VALUE
             var bestValueId = -1
-            var fixerValue = Float.MIN_VALUE
+            var fixerValue = -Float.MAX_VALUE
             var fixerId = 0
             possibleRegions.forEachIndexed { i, regionSet ->
                 var minConnectedness = Float.MAX_VALUE
@@ -85,7 +85,7 @@ object Regions {
                     points.map { it.distance2(center) }.max()!!
                 }.max()!!
                 val avgArea = areaSum / regionSet.size
-                var maxDeviation = Float.MIN_VALUE
+                var maxDeviation = -Float.MAX_VALUE
                 regionSet.forEach {
                     val deviation = Math.abs(avgArea - it.area)
                     if (deviation > maxDeviation) {

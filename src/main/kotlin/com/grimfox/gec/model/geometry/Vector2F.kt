@@ -63,4 +63,8 @@ class Vector2F(var a: Float, var b: Float) {
     fun getUnit() = Vector2F(a / length, b / length)
 
     fun getPerpendicular() = Vector2F(b, -a)
+
+    fun cross(other: Vector2F) = (a * other.b) - (b * other.a)
+
+    fun dot(other: Vector2F) = (a * other.a) + (b * other.b)
 }

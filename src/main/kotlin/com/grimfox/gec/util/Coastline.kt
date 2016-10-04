@@ -147,7 +147,7 @@ object Coastline {
 
     private fun cellIntersectsEdge(edge: LineSegment2F, cell: Cell): Boolean {
         cell.borderEdges.forEach {
-            if (edge.intersects(it)) {
+            if (edge.intersectsOrTouches(it)) {
                 return true
             }
         }

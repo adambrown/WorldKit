@@ -35,7 +35,7 @@ object Rivers {
     val SYMMETRIC_PRIORITY = 0.40f
     val MIN_RIVER_SLOPE = 0.005f
     val MAX_RIVER_SLOPE = 0.37f
-    val MIN_TERRAIN_SLOPE = 0.03f
+    val MIN_TERRAIN_SLOPE = 0.01f
     val MAX_TERRAIN_SLOPE = 0.7f
     val MAX_RIVER_CHILDREN = 3
 
@@ -201,7 +201,7 @@ object Rivers {
     private fun isViableConnection(rivers: ArrayList<TreeNode<RiverNode>>, landlockedRiverMouth: TreeNode<RiverNode>, nextCandidate: TreeNode<RiverNode>): Boolean {
         val newEdge = LineSegment2F(nextCandidate.value.pointLocation, landlockedRiverMouth.value.pointLocation)
         rivers.forEach {
-            if (isTooCloseToRiver(it, it, nextCandidate, newEdge, Float.MIN_VALUE)) {
+            if (isTooCloseToRiver(it, it, nextCandidate, newEdge, -Float.MAX_VALUE)) {
                 return false
             }
         }
@@ -334,7 +334,7 @@ object Rivers {
 
     private fun findFurthestPointFromAllInOtherSet(vertices: Vertices, testSet: Set<Int>, otherSet: Set<Int>): Int {
         var furthestAway: Int? = null
-        var distanceAway = Float.MIN_VALUE
+        var distanceAway = -Float.MAX_VALUE
         testSet.forEach { testPoint ->
             var localLeastDistance = Float.MAX_VALUE
             otherSet.forEach { otherPoint ->
@@ -361,7 +361,7 @@ object Rivers {
         var minPoint: Int? = null
         var minDist: Float = Float.MAX_VALUE
         var maxPoint: Int? = null
-        var maxDist: Float = Float.MIN_VALUE
+        var maxDist: Float = -Float.MAX_VALUE
         (border + coast).forEach {
             val localDist = distanceToLine(vertices, extremityLine, it)
             if (minPoint == null || localDist < minDist) {
@@ -385,7 +385,7 @@ object Rivers {
             distanceToLine(vertices, extremityLine, maxPoint!!)
         }
         val riverSlopeWeights = HashMap<Int, Float>(region.size)
-        var maxDistFromCoast = Float.MIN_VALUE
+        var maxDistFromCoast = -Float.MAX_VALUE
         region.forEach { point ->
             val dist = findClosestPointDistance(vertices, coast, point)
             if (dist > maxDistFromCoast) {
@@ -410,9 +410,9 @@ object Rivers {
 
     private fun buildTerrainSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, region: Collection<Int>): HashMap<Int, Float> {
         var minDistFromCoast = Float.MAX_VALUE
-        var maxDistFromCoast = Float.MIN_VALUE
+        var maxDistFromCoast = -Float.MAX_VALUE
         var minDistFromBorder = Float.MAX_VALUE
-        var maxDistFromBorder = Float.MIN_VALUE
+        var maxDistFromBorder = -Float.MAX_VALUE
         val distances = region.map { point ->
             val distFromCoast = findClosestPointDistance(vertices, coast, point)
             val distFromBorder = findClosestPointDistance(vertices, border, point)
@@ -501,7 +501,7 @@ object Rivers {
 
     private fun findFurthestPoint(vertices: Vertices, testSet: Set<Int>, point: Point2F): Int {
         var furthestPoint: Int? = null
-        var maxDistance = Float.MIN_VALUE
+        var maxDistance = -Float.MAX_VALUE
         testSet.forEach { testId ->
             val testPoint = vertices[testId].point
             val dist = point.distance2(testPoint)
@@ -516,7 +516,7 @@ object Rivers {
     private fun updateLocalRiverCandidates(vertices: Vertices, border: Set<Int>, localRiverMouths: Set<Int>, riverCandidates: HashMap<Int, Float>) {
         val orderedRiverMouths = localRiverMouths.toList()
         val mouthDistances = ArrayList<Float>(orderedRiverMouths.size)
-        var maxDist = Float.MIN_VALUE
+        var maxDist = -Float.MAX_VALUE
         orderedRiverMouths.forEach {
             val closestDist = findClosestPointDistance(vertices, border, it)
             mouthDistances.add(closestDist)

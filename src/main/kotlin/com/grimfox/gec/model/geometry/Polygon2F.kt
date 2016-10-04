@@ -74,9 +74,9 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
 
     val bounds: Bounds2F by lazy {
         var xMin = Float.MAX_VALUE
-        var xMax = Float.MIN_VALUE
+        var xMax = -Float.MAX_VALUE
         var yMin = Float.MAX_VALUE
-        var yMax = Float.MIN_VALUE
+        var yMax = -Float.MAX_VALUE
         points.forEach {
             if (it.x < xMin) {
                 xMin = it.x
@@ -128,7 +128,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
             return Pair(false, -1)
         } else {
             edges.forEachIndexed { i, it ->
-                if (edge.intersects(it)) {
+                if (edge.intersectsOrTouches(it)) {
                     return Pair(true, i)
                 }
             }
@@ -139,7 +139,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
     fun doesEdgeIntersect(edge: LineSegment2F, start: Int): Pair<Boolean, Int> {
         for (i in start..edges.size - 1) {
             val it = edges[i]
-            if (edge.intersects(it)) {
+            if (edge.intersectsOrTouches(it)) {
                 return Pair(true, i)
             }
         }

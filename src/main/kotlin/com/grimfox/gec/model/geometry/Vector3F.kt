@@ -48,7 +48,7 @@ class Vector3F(var a: Float, var b: Float, var c: Float) {
         c -= other.c
     }
 
-    operator fun times(s: Float) = Vector3F(a * s, b * s, c + s)
+    operator fun times(s: Float) = Vector3F(a * s, b * s, c * s)
 
     operator fun timesAssign(s: Float) {
         a *= s
@@ -67,4 +67,10 @@ class Vector3F(var a: Float, var b: Float, var c: Float) {
     fun toList() = listOf(a, b, c)
 
     fun getUnit() = Vector3F(a / length, b / length, c / length)
+
+    fun cross(other: Vector3F) = Vector3F((b * other.c) - (c * other.b), (c * other.a) - (a * other.c), (a * other.b) - (b * other.a))
+
+    fun dot(other: Vector3F) = (a * other.a) + (b * other.b) + (c * other.c)
+
+    fun dot(other: Point3F) = (a * other.x) + (b * other.y) + (c * other.z)
 }

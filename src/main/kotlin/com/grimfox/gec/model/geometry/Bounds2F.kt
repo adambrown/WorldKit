@@ -16,7 +16,7 @@ class Bounds2F(val min: Point2F, val max: Point2F) {
     }
 
     fun isWithin(line: LineSegment2F): Boolean {
-        return isWithin(line.a) || isWithin(line.b) || line.intersects(e1) || line.intersects(e2) || line.intersects(e3) || line.intersects(e4)
+        return isWithin(line.a) || isWithin(line.b) || line.intersectsOrTouches(e1) || line.intersectsOrTouches(e2) || line.intersectsOrTouches(e3) || line.intersectsOrTouches(e4)
     }
 
     fun singleIntersection(line: LineSegment2F): Pair<Int, Point2F?> {

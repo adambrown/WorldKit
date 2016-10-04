@@ -4,6 +4,8 @@ open class Point3F(x: Float, y: Float, val z: Float): Point2F(x, y) {
 
     operator fun plus(v: Vector3F) = Point3F(x + v.a, y + v.b, z + v.c)
 
+    operator fun minus(other: Point3F) = Vector3F(other, this)
+
     fun distance2(other: Point3F): Float {
         val deltaX = x - other.x
         val deltaY = y - other.y

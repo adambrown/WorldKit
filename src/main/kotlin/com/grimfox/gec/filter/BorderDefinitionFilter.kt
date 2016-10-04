@@ -402,7 +402,7 @@ class BorderDefinitionFilter : Runnable {
     private fun updateLocalRiverCandidates(stride: Int, border: Set<Int>, localRiverMouths: Set<Int>, riverCandidates: HashMap<Int, Float>) {
         val orderedRiverMouths = localRiverMouths.toList()
         val mouthDistances = ArrayList<Float>(orderedRiverMouths.size)
-        var maxDist = Float.MIN_VALUE
+        var maxDist = -Float.MAX_VALUE
         orderedRiverMouths.forEach {
             val closestDist = findClosestPointDistance(stride, border, it)
             mouthDistances.add(closestDist)
@@ -519,7 +519,7 @@ class BorderDefinitionFilter : Runnable {
         var minPoint: Int? = null
         var minDist: Float = Float.MAX_VALUE
         var maxPoint: Int? = null
-        var maxDist: Float = Float.MIN_VALUE
+        var maxDist: Float = -Float.MAX_VALUE
         (border + coast).forEach {
             val localDist = distanceToLine(stride, extremityLine, it)
             if (minPoint == null || localDist < minDist) {
@@ -543,7 +543,7 @@ class BorderDefinitionFilter : Runnable {
             distanceToLine(stride, extremityLine, maxPoint!!)
         }
         val distsFromCoast = HashMap<Int, Float>(region.size)
-        var maxDistFromCoast = Float.MIN_VALUE
+        var maxDistFromCoast = -Float.MAX_VALUE
         region.forEach { point ->
             val dist = findClosestPointDistance(stride, coast, point)
             if (dist > maxDistFromCoast) {

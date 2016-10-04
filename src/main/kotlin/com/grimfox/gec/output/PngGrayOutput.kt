@@ -25,7 +25,7 @@ interface PngGrayOutput : Runnable {
         DataFiles.openAndUse<Number>(inputFile) { heightMap ->
             if (normalize) {
                 minValue = Double.MAX_VALUE
-                maxValue = Double.MIN_VALUE
+                maxValue = -Double.MAX_VALUE
                 for (y in (0..heightMap.width - 1)) {
                     for (x in (0..heightMap.width - 1)) {
                         val value = heightMap[x, y].toDouble()

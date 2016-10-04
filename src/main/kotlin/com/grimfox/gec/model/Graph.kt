@@ -35,7 +35,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
         }
 
         fun intersects(other: CellEdge): Boolean {
-            return LineSegment2F(tri1.center, tri2.center).intersects(LineSegment2F(other.tri1.center, other.tri2.center))
+            return LineSegment2F(tri1.center, tri2.center).intersectsOrTouches(LineSegment2F(other.tri1.center, other.tri2.center))
         }
 
         override fun equals(other: Any?): Boolean{
