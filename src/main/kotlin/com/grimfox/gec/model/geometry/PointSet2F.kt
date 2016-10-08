@@ -1,5 +1,6 @@
 package com.grimfox.gec.model.geometry
 
+import com.grimfox.gec.util.printList
 import java.util.*
 
 class PointSet2F constructor(private val epsilon: Float = 0.000001f): MutableSet<Point2F> {
@@ -152,5 +153,9 @@ class PointSet2F constructor(private val epsilon: Float = 0.000001f): MutableSet
         pointsToRemove.removeAll(elements)
         removeAll(pointsToRemove)
         return pointsToRemove.isNotEmpty()
+    }
+
+    override fun toString(): String {
+        return "PointSet2F(points=${printList(points)})"
     }
 }

@@ -84,6 +84,13 @@ fun Image.drawCell(cell: Cell) {
     val interpolated = cell.border.map { interpolateInt(it) }
     val xVals = interpolated.map { it.x }.toIntArray()
     val yVals = interpolated.map { it.y }.toIntArray()
+    graphics.drawPolygon(xVals, yVals, xVals.size)
+}
+
+fun Image.fillCell(cell: Cell) {
+    val interpolated = cell.border.map { interpolateInt(it) }
+    val xVals = interpolated.map { it.x }.toIntArray()
+    val yVals = interpolated.map { it.y }.toIntArray()
     graphics.fillPolygon(xVals, yVals, xVals.size)
 }
 

@@ -766,9 +766,17 @@ object Rivers {
 
     private fun isTooCloseToRiver(rootNode: TreeNode<RiverNode>, riverNode: TreeNode<RiverNode>, expansionCandidate: TreeNode<RiverNode>, edge: LineSegment2F, edgeLength2: Float): Boolean {
         val node = riverNode.value
+        val parentNode = riverNode.parent?.value
         val p1 = node.pointLocation
-        if (riverNode != expansionCandidate && p1.distance2(edge.b) <= edgeLength2) {
+        val distance2 = p1.distance2(edge.b)
+        if (riverNode != expansionCandidate && distance2 <= edgeLength2) {
             return true
+        }
+        if (riverNode != expansionCandidate && parentNode != null) {
+            val otherDistance2 = node.pointLocation.distance2(parentNode.pointLocation)
+            if (distance2 <= otherDistance2) {
+                return true
+            }
         }
         riverNode.children.forEach {
             val child = it.value

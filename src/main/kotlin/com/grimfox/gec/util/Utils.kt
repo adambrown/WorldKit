@@ -13,6 +13,10 @@ import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import java.util.*
 
+fun <T> printList(list: Collection<T>, transform: (T) -> CharSequence = { it.toString() }): String {
+    return list.joinToString(", ", "arrayListOf(", ")", transform = transform)
+}
+
 object Utils {
 
     val LOG = LoggerFactory.getLogger(Main::class.java)
