@@ -76,7 +76,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 10..10000) {
+        for (test in 1..10000) {
             val virtualWidth = 100000.0f
             val outputWidth = 4096
             parameterSet.seed = test.toLong()
@@ -104,18 +104,10 @@ class BuildContinent() : Runnable {
                 val riverGraph = buildRiverGraph(riverSet)
                 val riverFlows = calculateRiverFlows(riverGraph.vertices, coastline, riverSet, 1600000000.0f, 0.39f)
 //                draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", Color(160, 200, 255)) {
-//                    drawRivers(graph, regionMask, riverSet, listOf(coastSpline), border)
+//                    drawRivers(graph, regionMask, riverSet, coastline, border)
 //                }
 //                draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", Color.WHITE) {
 //                    drawGraph(riverGraph)
-//                }
-//                draw(outputWidth, "test-new-${String.format("%05d", test)}-mask$i", Color.BLACK) {
-//                    graphics.color = Color.WHITE
-//                    fillSpline(coastSpline)
-//                }
-//                draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
-//                    graphics.color = Color.BLACK
-//                    drawSpline(coastSpline, false)
 //                }
 //                draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
 //                    graphics.color = Color.BLACK
@@ -2096,15 +2088,23 @@ class BuildContinent() : Runnable {
             try {
                 childEdge = cell.sharedEdge(childCell)!!
             } catch (e: Exception) {
-//                draw(4096, "error", Color.WHITE, 20.0f, Vector2F(-(cell.border.map { it.x } + childCell.border.map { it.x }).min()!! + 0.0001f, -(cell.border.map { it.y } + childCell.border.map { it.y }).min()!! + 0.0001f)) {
-//                    graphics.color = Color.BLUE
-//                    drawCell(cell)
-//                    graphics.color = Color.RED
-//                    drawCell(childCell)
-//                    graphics.color = Color.BLACK
-//                    drawEdge(cell.vertex.point, childCell.vertex.point)
-//                }
-//                println()
+                draw(4096, "error1", Color.WHITE, 20.0f, Vector2F(-(cell.border.map { it.x } + childCell.border.map { it.x }).min()!! + 0.0001f, -(cell.border.map { it.y } + childCell.border.map { it.y }).min()!! + 0.0001f)) {
+                    graphics.color = Color.BLUE
+                    drawCell(cell)
+                    graphics.color = Color.RED
+                    drawCell(childCell)
+                    graphics.color = Color.BLACK
+                    drawEdge(cell.vertex.point, childCell.vertex.point)
+                }
+                draw(4096, "error2", Color.WHITE) {
+                    graphics.color = Color.BLUE
+                    drawCell(cell)
+                    graphics.color = Color.RED
+                    drawCell(childCell)
+                    graphics.color = Color.BLACK
+                    drawEdge(cell.vertex.point, childCell.vertex.point)
+                }
+                println()
                 throw e
             }
             inFlow += flows[child.value.pointIndex]

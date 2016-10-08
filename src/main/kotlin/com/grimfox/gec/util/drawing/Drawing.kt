@@ -159,26 +159,24 @@ fun Image.drawSlopes(graph: Graph, slopes: Map<Int, Float>) {
     }
 }
 
-fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<TreeNode<RiverNode>>, coastline: Collection<Spline2F>, borders: Collection<Polygon2F>) {
+fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<TreeNode<RiverNode>>, coastline: Polygon2F, borders: Collection<Polygon2F>) {
     graphics.stroke = BasicStroke(1.5f)
 
     graphics.color = Color(180, 255, 160)
 
-    coastline.forEach {
-        fillSpline(it)
-    }
+    fillPolygon(coastline)
 
     graphics.color = Color(0, 0, 0)
     graphics.stroke = BasicStroke(1.3f)
 
-    coastline.forEach {
-        drawSpline(it, false)
-    }
+    drawPolygon(coastline)
 
     graphics.color = Color(0, 20, 170)
     graphics.stroke = BasicStroke(1.5f)
 
-    drawRiverElevations(rivers, false)
+    rivers.forEach {
+        drawRiver(it)
+    }
 
     graphics.color = Color(160, 0, 0)
     graphics.stroke = BasicStroke(3.0f)
