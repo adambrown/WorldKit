@@ -19,7 +19,7 @@ import javax.sound.sampled.Line
 
 class Image(val multiplier: Float, val shift: Vector2F, val graphics: Graphics2D)
 
-fun draw(outputWidth: Int, name: String, background: Color = Color.WHITE, zoom: Float? = null, shift: Vector2F = Vector2F(0.0f, 0.0f), drawCalls: Image.() -> Unit) {
+fun draw(outputWidth: Int, name: String, outputPath: String = "output", background: Color = Color.WHITE, zoom: Float? = null, shift: Vector2F = Vector2F(0.0f, 0.0f), drawCalls: Image.() -> Unit) {
     val multiplier = if (zoom == null) { outputWidth.toFloat() } else { outputWidth.toFloat() * zoom }
     val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
     val graphics = image.createGraphics()
@@ -28,7 +28,7 @@ fun draw(outputWidth: Int, name: String, background: Color = Color.WHITE, zoom: 
 
     drawCalls(Image(multiplier, shift, graphics))
 
-    ImageIO.write(image, "png", File("output/$name.png"))
+    ImageIO.write(image, "png", File("$outputPath/$name.png"))
 }
 
 fun Image.drawVertex(vertex: Vertex, radius: Int) {
@@ -187,9 +187,9 @@ fun Image.drawRivers(graph: Graph, mask: Matrix<Int>, rivers: Collection<TreeNod
 }
 
 fun Image.drawRiver(riverNode: TreeNode<RiverNode>, drawPoints: Boolean = true) {
-    val p1 = riverNode.value.pointLocation
+    val p1 = riverNode.value.point
     riverNode.children.forEach {
-        drawEdge(p1, it.value.pointLocation)
+        drawEdge(p1, it.value.point)
         drawRiver(it, drawPoints)
     }
     if (drawPoints) {
@@ -207,11 +207,11 @@ fun Image.drawRiverElevations(rivers: Collection<TreeNode<RiverNode>>, drawPoint
     fun drawRiverElevations(riverNode: TreeNode<RiverNode>, minElevation: Float, delta: Float, drawPoints: Boolean) {
         val normalizedElevation = (riverNode.value.elevation - minElevation) / delta
         val color1 = Color(normalizedElevation, 0.0f, 1.0f - normalizedElevation)
-        val p1 = riverNode.value.pointLocation
+        val p1 = riverNode.value.point
         riverNode.children.forEach {
             val childElevation = (it.value.elevation - minElevation) / delta
             val color2 = Color(childElevation, 0.0f, 1.0f - childElevation)
-            drawEdgeWithGradient(p1, it.value.pointLocation, color1, color2)
+            drawEdgeWithGradient(p1, it.value.point, color1, color2)
             drawRiverElevations(it, minElevation, delta, drawPoints)
         }
         if (drawPoints) {

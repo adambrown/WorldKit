@@ -13,7 +13,14 @@ import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import java.util.*
 
-fun <T> printList(list: Collection<T>, transform: (T) -> CharSequence = { it.toString() }): String {
+inline fun <reified T> printList(list: Collection<T>): String {
+    return printList(list, { it.toString() })
+}
+
+inline fun <reified T> printList(list: Collection<T>, noinline transform: (T) -> CharSequence): String {
+    if (list.isEmpty()) {
+        return "arrayListOf<${T::class.simpleName}>()"
+    }
     return list.joinToString(", ", "arrayListOf(", ")", transform = transform)
 }
 

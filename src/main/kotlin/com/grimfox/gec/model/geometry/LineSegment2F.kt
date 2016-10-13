@@ -240,4 +240,8 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
         }
         return connectedEdges
     }
+
+    override fun toString(): String {
+        return "LineSegment2F(a=$a, b=$b)"
+    }
 }

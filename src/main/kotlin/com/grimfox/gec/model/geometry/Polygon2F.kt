@@ -123,12 +123,23 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
         return polygons
     }
 
-    fun doesEdgeIntersect(edge: LineSegment2F): Pair<Boolean, Int> {
+    fun doesEdgeIntersect(edge: LineSegment2F, vararg exclusions: Point2F): Pair<Boolean, Int> {
         if (!bounds.isWithin(edge)) {
             return Pair(false, -1)
         } else {
-            edges.forEachIndexed { i, it ->
-                if (edge.intersectsOrTouches(it)) {
+            for (i in 0..edges.size - 1) {
+                val otherEdge = edges[i]
+                var excludeEdge = false
+                for (point in exclusions) {
+                    if (otherEdge.a.epsilonEquals(point) || otherEdge.b.epsilonEquals(point)) {
+                        excludeEdge = true
+                        break
+                    }
+                }
+                if (excludeEdge) {
+                    continue
+                }
+                if (edge.intersectsOrTouches(otherEdge)) {
                     return Pair(true, i)
                 }
             }

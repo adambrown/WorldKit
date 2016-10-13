@@ -1,13 +1,12 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.model.*
-import com.grimfox.gec.model.Graph.CellEdge
 import com.grimfox.gec.model.Graph.Vertices
-import com.grimfox.gec.model.geometry.LineSegment2F
-import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.model.geometry.Polygon2F
+import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.findConcavityWeights
+import java.lang.Math.max
+import java.lang.Math.pow
 import java.util.*
 
 object Rivers {
@@ -18,10 +17,9 @@ object Rivers {
         ASYMMETRIC
     }
 
-    class RiverNode(var type: NodeType, var pointIndex: Int, var pointLocation: Point2F, var priority: Int, var riverPriority: Int, var elevation: Float, var maxTerrainSlope: Float)
+    class RiverNode(var type: NodeType, var point: Point2F, var priority: Int, var riverPriority: Int, var elevation: Float, var maxTerrainSlope: Float, var region: Int)
 
     val MAX_CANDIDATE_ELEVATION_DIFF = 0.005f
-    val MIN_RIVER_MOUTH_SEPARATION = 0.001f
     val IDEAL_RIVER_EDGE_DISTANCE = 0.017f
     val MIN_RIVER_EDGE_DISTANCE = 0.012f
     val RIVER_EDGE_DISTANCE_SEARCH_RADIUS = 0.02f
@@ -35,8 +33,8 @@ object Rivers {
     val SYMMETRIC_PRIORITY = 0.40f
     val MIN_RIVER_SLOPE = 0.005f
     val MAX_RIVER_SLOPE = 0.37f
-    val MIN_TERRAIN_SLOPE = 0.01f
-    val MAX_TERRAIN_SLOPE = 0.7f
+    val MIN_TERRAIN_SLOPE = 0.05f
+    val MAX_TERRAIN_SLOPE = 0.8f
     val MAX_RIVER_CHILDREN = 3
 
     fun buildRivers(graph: Graph, idMask: Matrix<Int>, random: Random): ArrayList<Pair<Polygon2F, ArrayList<TreeNode<RiverNode>>>> {
@@ -46,9 +44,22 @@ object Rivers {
         val land = LinkedHashSet(regions.flatMap { it })
         val landCenter = calculateBodyCenter(vertices, land)
         val rivers = ArrayList<LinkedHashSet<TreeNode<RiverNode>>>()
-        val (bestRiverCandidates, riverCandidates) = findRiverMouthCandidates(graph, land, beach)
-        regions.forEach { region ->
-            val fakeCoastPoints: LinkedHashSet<Int>
+        val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
+        val inlandRiverMouths = LinkedHashSet<Int>()
+        val coastPoints = PointSet2F(0.002f)
+        val (coastlines, riverCandidates) = findRiverMouthCandidates(graph, coastPoints, bodies, beach)
+        val regionBodyLookup = ArrayList<Int>()
+        regions.forEachIndexed { regionId, region ->
+            val testId = region.first()
+            for (i in 0..bodies.size - 1) {
+                val body = bodies[i]
+                if (body.contains(testId)) {
+                    regionBodyLookup.add(i)
+                    break
+                }
+            }
+            val regionBorder = graph.findBorder(region).first()
+            val regionInlandBorders = graph.findBorder(region, water, true)
             val fakeInteriorBorderPoints: LinkedHashSet<Int>
             val furthestFromBorder: Int
             val interiorBorderPoints = findBorderPoints(vertices, water, region)
@@ -70,7 +81,7 @@ object Rivers {
                 }
                 if (interiorBorderPoints.isEmpty()) {
                     val landward = distanceToLine(bisector, landCenter)
-                    fakeCoastPoints = if (landward >= 0) oneSide else twoSide
+                    val fakeCoastPoints = if (landward >= 0) oneSide else twoSide
                     fakeInteriorBorderPoints = if (landward >= 0) twoSide else oneSide
                     val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, fakeInteriorBorderPoints, fakeCoastPoints)
                     furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, fakeCoastPoints, fakeInteriorBorderPoints)
@@ -79,104 +90,81 @@ object Rivers {
                 } else {
                     val inlandExtremeId = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalWater)
                     val inland = distanceToLine(bisector, vertices[inlandExtremeId].point)
-                    fakeCoastPoints = if (inland >= 0) twoSide else oneSide
+                    val fakeCoastPoints = if (inland >= 0) twoSide else oneSide
                     fakeInteriorBorderPoints = if (inland >= 0) oneSide else twoSide
                     val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, fakeInteriorBorderPoints, fakeCoastPoints)
                     furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, fakeCoastPoints, fakeInteriorBorderPoints)
-                    riverCandidates[furthestFromBorder] = 1.0f
-                    bestRiverCandidates.add(furthestFromBorder)
+                    val borderPoints = PointSet2F()
+                    regionBorder.points.forEach {
+                        borderPoints.add(it)
+                    }
+                    for (point in graph.vertices[furthestFromBorder].cell.border) {
+                        if (borderPoints[point] > -1) {
+                            val inlandMouthIndex = coastPoints.addOrGetIndex(borderPoints[borderPoints[point]]!!)
+                            riverCandidates[inlandMouthIndex] = 1.0f
+                            inlandRiverMouths.add(inlandMouthIndex)
+                        }
+                    }
                     terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
                     buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
                 }
             } else {
-                fakeCoastPoints = coastalBorderPoints
-                fakeInteriorBorderPoints = interiorBorderPoints
                 val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalBorderPoints)
                 furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, coastalBorderPoints, interiorBorderPoints)
                 terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region)
                 buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region)
             }
-            val localRiverMouths = LinkedHashSet(bestRiverCandidates)
-            localRiverMouths.retainAll(fakeCoastPoints + fakeInteriorBorderPoints)
-            if (localRiverMouths.isEmpty()) {
-                localRiverMouths.addAll(riverCandidates.keys)
-                localRiverMouths.retainAll(fakeCoastPoints + fakeInteriorBorderPoints)
+            val localRiverMouths = ArrayList<Int>()
+            regionBorder.points.forEach {
+                val index = coastPoints[it]
+                if (index > -1) {
+                    localRiverMouths.add(index)
+                }
             }
-            if (localRiverMouths.isEmpty()) {
-                localRiverMouths.add(furthestFromBorder)
-            }
-            updateLocalRiverCandidates(vertices, fakeInteriorBorderPoints, localRiverMouths, riverCandidates)
-            buildRiverNetwork(graph, random, water, rivers, riverCandidates, region, riverSlope, terrainSlope, localRiverMouths)
+            updateLocalRiverCandidates(coastPoints, regionInlandBorders, localRiverMouths, riverCandidates)
+            buildRiverNetwork(graph, random, water, rivers, coastPoints, inlandRiverMouths, riverCandidates, localRiverMouths, region, regionId + 1, riverSlope, terrainSlope)
         }
-        val landlockedRivers = LinkedHashSet<TreeNode<RiverNode>>()
-        rivers.forEach { regionRivers ->
+        rivers.forEachIndexed { i, regionRivers ->
+            val landlockedRivers = LinkedHashSet<TreeNode<RiverNode>>()
             ArrayList(regionRivers).forEach {
-                if (!water.contains(it.value.pointIndex)) {
+                if (inlandRiverMouths.contains(coastPoints[it.value.point])) {
                     landlockedRivers.add(it)
                     regionRivers.remove(it)
                 }
             }
-        }
-        landlockedRivers.forEach { landlockedRiverMouth ->
-            val thisRegion = idMask[landlockedRiverMouth.value.pointIndex]
-            val adjacentRegions = LinkedHashSet<Int>()
-            vertices.getAdjacentVertices(landlockedRiverMouth.value.pointIndex).forEach {
-                if (idMask[it] != thisRegion) {
-                    adjacentRegions.add(idMask[it] - 1)
+            landlockedRivers.forEach { landlockedRiverMouth ->
+                val possibleConnectingRivers = ArrayList<TreeNode<RiverNode>>()
+                rivers.forEachIndexed { j, subRegionRivers ->
+                    if (i != j) {
+                        subRegionRivers.forEach {
+                            if (!inlandRiverMouths.contains(coastPoints[it.value.point])) {
+                                possibleConnectingRivers.add(it)
+                            }
+                        }
+                    }
                 }
-            }
-            val adjacentRegionsRivers = ArrayList<TreeNode<RiverNode>>()
-            adjacentRegions.forEach {
-                adjacentRegionsRivers.addAll(rivers[it])
-            }
-            val nodes = ArrayList<TreeNode<RiverNode>>()
-            adjacentRegionsRivers.forEach {
-                getPoints(it, nodes)
-            }
-            nodes.sortBy { landlockedRiverMouth.value.pointLocation.distance2(it.value.pointLocation) }
-            while (nodes.isNotEmpty()) {
-                val nextCandidate = nodes.removeAt(0)
-                if (isViableConnection(adjacentRegionsRivers, landlockedRiverMouth, nextCandidate)) {
-                    landlockedRiverMouth.parent = nextCandidate
-                    nextCandidate.children.add(landlockedRiverMouth)
-                    break
+                val nodes = ArrayList<TreeNode<RiverNode>>()
+                possibleConnectingRivers.forEach {
+                    getNodes(it, nodes)
                 }
-            }
-        }
-        val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
-        val coastSplices = ArrayList<Pair<LineSegment2F, Point2F>>()
-        rivers.forEach { region ->
-            LinkedHashSet(region).forEach { river ->
-                if (water.contains(river.value.pointIndex)) {
-                    val inlandStart = river.children.first()
-                    val rootVertex = vertices[river.value.pointIndex]
-                    val inlandVertex = vertices[inlandStart.value.pointIndex]
-                    val coastEdge = rootVertex.cell.sharedEdge(inlandVertex.cell)
-                    if (coastEdge != null) {
-                        val line = coastEdge
-                        val outlet = line.intersection(LineSegment2F(rootVertex.point, inlandVertex.point)) ?: line.interpolate(0.5f)
-                        inlandStart.parent = null
-                        river.children.clear()
-                        inlandStart.value.pointLocation = outlet
-                        region.remove(river)
-                        region.add(inlandStart)
-                        coastSplices.add(Pair(coastEdge, outlet))
+                nodes.sortBy { landlockedRiverMouth.value.point.distance2(it.value.point) }
+                while (nodes.isNotEmpty()) {
+                    val nextCandidate = nodes.removeAt(0)
+                    if (isViableConnection(possibleConnectingRivers, landlockedRiverMouth, nextCandidate)) {
+                        landlockedRiverMouth.parent = nextCandidate
+                        nextCandidate.children.add(landlockedRiverMouth)
+                        break
                     }
                 }
             }
         }
-        val coastlines = bodies.map { graph.findBorder(it, splices = coastSplices).first() }
         val riverSets = ArrayList<Pair<Polygon2F, ArrayList<TreeNode<RiverNode>>>>(bodies.size)
         for (i in 0..bodies.size - 1) {
-            riverSets.add(Pair(coastlines[i], ArrayList()))
+            riverSets.add(Pair(Polygon2F(coastlines[i].map { coastPoints[it]!! }, true), ArrayList()))
         }
-        rivers.forEach { regionSet ->
+        rivers.forEachIndexed { i, regionSet ->
             regionSet.forEach { river ->
-                for (i in 0..bodies.size - 1) {
-                    if (bodies[i].contains(river.value.pointIndex)) {
-                        riverSets[i].second.add(river)
-                    }
-                }
+                riverSets[regionBodyLookup[i]].second.add(river)
             }
         }
         return riverSets
@@ -185,33 +173,32 @@ object Rivers {
     fun buildRiverGraph(rivers: ArrayList<TreeNode<RiverNode>>): Graph {
         val points = ArrayList<Point2F>()
         rivers.forEach {
-            adjustRiverPoints(it, points)
+            getPoints(it, points)
         }
         return buildGraph(1.0f, points)
     }
 
-    private fun adjustRiverPoints(river: TreeNode<RiverNode>, points: ArrayList<Point2F>) {
-        river.value.pointIndex = points.size
-        points.add(river.value.pointLocation)
+    private fun getPoints(river: TreeNode<RiverNode>, points: ArrayList<Point2F>) {
+        points.add(river.value.point)
         river.children.forEach {
-            adjustRiverPoints(it, points)
+            getPoints(it, points)
         }
     }
 
     private fun isViableConnection(rivers: ArrayList<TreeNode<RiverNode>>, landlockedRiverMouth: TreeNode<RiverNode>, nextCandidate: TreeNode<RiverNode>): Boolean {
-        val newEdge = LineSegment2F(nextCandidate.value.pointLocation, landlockedRiverMouth.value.pointLocation)
+        val newEdge = LineSegment2F(nextCandidate.value.point, landlockedRiverMouth.value.point)
         rivers.forEach {
-            if (isTooCloseToRiver(it, it, nextCandidate, newEdge, -Float.MAX_VALUE)) {
+            if (isTooCloseToRiver(it, it, nextCandidate, newEdge, newEdge.interpolate(0.5f), -Float.MAX_VALUE)) {
                 return false
             }
         }
         return true
     }
 
-    private fun getPoints(river: TreeNode<RiverNode>, points: ArrayList<TreeNode<RiverNode>>) {
+    private fun getNodes(river: TreeNode<RiverNode>, points: ArrayList<TreeNode<RiverNode>>) {
         points.add(river)
         river.children.forEach {
-            getPoints(it, points)
+            getNodes(it, points)
         }
     }
 
@@ -302,34 +289,65 @@ object Rivers {
         return false
     }
 
-    private fun findRiverMouthCandidates(graph: Graph, body: LinkedHashSet<Int>, beach: LinkedHashSet<Int>): Pair<LinkedHashSet<Int>, HashMap<Int, Float>> {
+    private fun findRiverMouthCandidates(graph: Graph, vertices: PointSet2F, bodies: List<LinkedHashSet<Int>>, beach: LinkedHashSet<Int>): Pair<ArrayList<ArrayList<Int>>, HashMap<Int, Float>> {
+        val coastlines = ArrayList<ArrayList<Int>>()
+        bodies.forEach {
+            val coastlinePolygon = graph.findBorder(it).first()
+            val coastlineIndices = ArrayList<Int>()
+            var lastIndex = -1
+            coastlinePolygon.points.forEach {
+                if (vertices.add(it)) {
+                    val nextIndex = vertices[it]
+                    coastlineIndices.add(nextIndex)
+                    lastIndex = nextIndex
+                } else {
+                    if (vertices[it] != lastIndex) {
+                        val conflictPoint = vertices[vertices[it]]!!
+                        val newPoint = conflictPoint + (Vector2F(conflictPoint, it).getUnit() * 0.0022f)
+                        if (vertices.add(newPoint)) {
+                            val nextIndex = vertices[newPoint]
+                            coastlineIndices.add(nextIndex)
+                            lastIndex = nextIndex
+                        } else {
+                            if (vertices[newPoint] != lastIndex) {
+                                val conflictPoint2 = vertices[vertices[newPoint]]!!
+                                if (conflictPoint != conflictPoint2) {
+                                    val newPoint2 = conflictPoint2 + (Vector2F(conflictPoint2, it).getUnit() * 0.0022f)
+                                    val avgNewPoint = LineSegment2F(conflictPoint, conflictPoint2).interpolate(0.5f) + ((Vector2F(conflictPoint, newPoint) + Vector2F(conflictPoint2, newPoint2)).getUnit() * 0.0022f)
+                                    if (vertices.add(avgNewPoint)) {
+                                        val nextIndex = vertices[avgNewPoint]
+                                        coastlineIndices.add(nextIndex)
+                                        lastIndex = nextIndex
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            coastlines.add(coastlineIndices)
+        }
+        val coastlineWeights = ArrayList<ArrayList<Float>>()
+        vertices.forEach { coastlineWeights.add(ArrayList(2)) }
         val approxCellSize = 1.0f / graph.stride!!
-        val concavityWeights = findConcavityWeights(graph, body, beach, approxCellSize * 3, approxCellSize * 5, approxCellSize * 7, approxCellSize * 13)
-        val riverCandidates = HashMap<Int, Float>(concavityWeights.size).apply { putAll(concavityWeights) }
-        val optimalRivers = LinkedHashSet<Int>()
-        beach.forEach {
-            if (isLocalOptimalRiver(graph, riverCandidates, it, MIN_RIVER_MOUTH_SEPARATION)) {
-                optimalRivers.add(it)
+        bodies.forEach {
+            val concavityWeights = findConcavityWeights(graph, it, beach, approxCellSize * 3, approxCellSize * 5, approxCellSize * 7, approxCellSize * 13)
+            concavityWeights.forEach {
+                val id = it.first
+                val weight = it.second
+                graph.vertices[id].cell.border.forEach { borderPoint ->
+                    val index = vertices[borderPoint]
+                    if (index > -1) {
+                        coastlineWeights[index].add(weight)
+                    }
+                }
             }
         }
-        ArrayList(riverCandidates.keys).forEach {
-            if (riverCandidates[it] == 0.0f) {
-                riverCandidates.remove(it)
-            }
+        val riverCandidates = HashMap<Int, Float>(coastlineWeights.size)
+        coastlineWeights.forEachIndexed { i, weights ->
+            riverCandidates[i] = weights.average().toFloat()
         }
-        return Pair(optimalRivers, riverCandidates)
-    }
-
-    private fun isLocalOptimalRiver(graph: Graph, riverCandidates: Map<Int, Float>, candidateId: Int, radius: Float): Boolean {
-        val candidateValue = riverCandidates[candidateId]!!
-        val candidate = graph.vertices[candidateId]
-        val candidatePoint = candidate.point
-        graph.getPointsWithinRadius(candidatePoint, radius).forEach {
-            if (riverCandidates[it] ?: 0.0f > candidateValue) {
-                return false
-            }
-        }
-        return true
+        return Pair(coastlines, riverCandidates)
     }
 
     private fun findFurthestPointFromAllInOtherSet(vertices: Vertices, testSet: Set<Int>, otherSet: Set<Int>): Int {
@@ -432,17 +450,22 @@ object Rivers {
         }
         val coastDelta = maxDistFromCoast - minDistFromCoast
         val borderDelta = maxDistFromBorder - minDistFromBorder
-        val borderSlopeDelta = MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
-        val coastSlopeMax = Math.max(MIN_TERRAIN_SLOPE, (MAX_TERRAIN_SLOPE / 3.0f))
-        val coastSlopeDelta = coastSlopeMax - MIN_TERRAIN_SLOPE
+        val slopeDelta = MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
         return hashMapOf(*distances.map {
             val normalizedCoast = (it.second - minDistFromCoast) / coastDelta
             val normalizedBorder = (it.third - minDistFromBorder) / borderDelta
-            val border2 = normalizedBorder * normalizedBorder
-            val borderWeight = MIN_TERRAIN_SLOPE + ((1.0f - border2) * borderSlopeDelta)
-            val coastWeight = MIN_TERRAIN_SLOPE + (normalizedCoast * coastSlopeDelta)
-            Pair(it.first, Math.max(coastWeight, borderWeight))
+            val borderWeight = MIN_TERRAIN_SLOPE + (sigmoidBorder(normalizedBorder) * slopeDelta)
+            val coastWeight = MIN_TERRAIN_SLOPE + (sigmoidCoast(normalizedCoast) * slopeDelta)
+            Pair(it.first, max(coastWeight, borderWeight))
         }.toTypedArray())
+    }
+
+    private fun sigmoidCoast(x: Float): Float {
+        return ((1.0 / (0.5 + pow(0.03, x - 0.7))) * 0.2).toFloat()
+    }
+
+    private fun sigmoidBorder(x: Float): Float {
+        return ((2.02 - (1.0 / (0.5 + pow(0.0000000000000001, x - 0.1)))) * 0.501).toFloat()
     }
 
     private fun perpendicularVector(vertices: Vertices, id1: Int, id2: Int): Point2F {
@@ -499,6 +522,19 @@ object Rivers {
         return Math.sqrt(minDistance.toDouble()).toFloat()
     }
 
+    private fun findClosestPointDistance(borders: ArrayList<Polygon2F>, point: Point2F): Float {
+        var minDistance = Float.MAX_VALUE
+        borders.forEach { border ->
+            border.points.forEach { borderPoint ->
+                val dist = point.distance2(borderPoint)
+                if (dist < minDistance) {
+                    minDistance = dist
+                }
+            }
+        }
+        return Math.sqrt(minDistance.toDouble()).toFloat()
+    }
+
     private fun findFurthestPoint(vertices: Vertices, testSet: Set<Int>, point: Point2F): Int {
         var furthestPoint: Int? = null
         var maxDistance = -Float.MAX_VALUE
@@ -513,21 +549,20 @@ object Rivers {
         return furthestPoint!!
     }
 
-    private fun updateLocalRiverCandidates(vertices: Vertices, border: Set<Int>, localRiverMouths: Set<Int>, riverCandidates: HashMap<Int, Float>) {
-        val orderedRiverMouths = localRiverMouths.toList()
-        val mouthDistances = ArrayList<Float>(orderedRiverMouths.size)
+    private fun updateLocalRiverCandidates(coastPoints: PointSet2F, border: ArrayList<Polygon2F>, localRiverMouths: List<Int>, riverCandidates: HashMap<Int, Float>) {
+        val mouthDistances = ArrayList<Float>(localRiverMouths.size)
         var maxDist = -Float.MAX_VALUE
-        orderedRiverMouths.forEach {
-            val closestDist = findClosestPointDistance(vertices, border, it)
+        localRiverMouths.forEach {
+            val closestDist = findClosestPointDistance(border, coastPoints[it]!!)
             mouthDistances.add(closestDist)
             if (closestDist > maxDist) {
                 maxDist = closestDist
             }
         }
-        orderedRiverMouths.forEachIndexed { i, it ->
+        localRiverMouths.forEachIndexed { i, it ->
             val normalizedDistance = mouthDistances[i] / maxDist
             val candidateWeight = riverCandidates[it] ?: 0.0f
-            val distanceWeighted = (0.1f * candidateWeight) + (0.9f * (candidateWeight * normalizedDistance))
+            val distanceWeighted = (0.2f * candidateWeight) + (0.8f * (candidateWeight * normalizedDistance))
             riverCandidates[it] = distanceWeighted
         }
     }
@@ -536,56 +571,24 @@ object Rivers {
                                   random: Random,
                                   water: LinkedHashSet<Int>,
                                   rivers: ArrayList<LinkedHashSet<TreeNode<RiverNode>>>,
+                                  coastPoints: PointSet2F,
+                                  inlandRiverMouths: LinkedHashSet<Int>,
                                   riverCandidates: HashMap<Int, Float>,
+                                  localRiverMouths: ArrayList<Int>,
                                   region: LinkedHashSet<Int>,
+                                  regionId: Int,
                                   riverSlope: Map<Int, Float>,
-                                  terrainSlope: Map<Int, Float>,
-                                  localRiverMouths: LinkedHashSet<Int>) {
-        val border = graph.findBorder(region)
+                                  terrainSlope: Map<Int, Float>) {
+        val borderWithCoast = graph.findBorder(region)
+        val borderWithoutCoast = graph.findBorder(region, water, true)
         val vertices = graph.vertices
-        val candidateRiverNodes = findCandidateRiverNodes(vertices, localRiverMouths, riverCandidates, terrainSlope)
+        val candidateRiverNodes = sortCandidateRiverNodes(coastPoints, riverCandidates, localRiverMouths, regionId)
         val riverNodes = ArrayList(candidateRiverNodes)
-        ArrayList(riverNodes).forEach { riverNode ->
-            val possibleOutlets = ArrayList<Int>()
-            vertices.getAdjacentVertices(riverNode.value.pointIndex).forEach { adjacent ->
-                if (water.contains(adjacent)) {
-                    possibleOutlets.add(adjacent)
-                }
-            }
-            val outlet = possibleOutlets.sortedBy { vertices[it].point.distance2(riverNode.value.pointLocation) }.firstOrNull()
-            if (outlet != null) {
-                riverNode.parent = TreeNode(RiverNode(NodeType.CONTINUATION, outlet, vertices[outlet].point, riverNode.value.priority, riverNode.value.riverPriority, 0.0f, terrainSlope[outlet] ?: MIN_TERRAIN_SLOPE), null, mutableListOf(riverNode))
-            } else {
-                var landlockedRiverNode = riverNode
-                var decrementCount = 1
-                while (decrementCount > 0) {
-                    var newNodeCandidate: Int? = null
-                    var radius = RIVER_EDGE_DISTANCE_SEARCH_RADIUS
-                    var distFromBorder2 = MIN_DISTANCE_FROM_BORDER_SQUARED
-                    val distFromBorderIncrement = distFromBorder2 / 4
-                    decrementCount = 0
-                    while (newNodeCandidate == null) {
-                        newNodeCandidate = findMostViableNewNodeCandidate(graph, border, region, LinkedHashSet(listOf(landlockedRiverNode)), landlockedRiverNode, radius, distFromBorder2)
-                        if (newNodeCandidate != null) {
-                            break
-                        }
-                        radius += radius
-                        distFromBorder2 = Math.max(0.0f, distFromBorder2 - (distFromBorderIncrement))
-                        decrementCount++
-                    }
-                    candidateRiverNodes.remove(landlockedRiverNode)
-                    val newPoint = vertices[newNodeCandidate!!].point
-                    val node = landlockedRiverNode.value
-                    val edgeDist = Math.sqrt(node.pointLocation.distance2(newPoint).toDouble()).toFloat()
-                    val localRiverSlope = riverSlope[newNodeCandidate] ?: 0.0f
-                    val newTerrainSlope = terrainSlope[newNodeCandidate] ?: MIN_TERRAIN_SLOPE
-                    val newElevation = node.elevation + (localRiverSlope * edgeDist)
-                    val newNode = TreeNode(RiverNode(NodeType.CONTINUATION, newNodeCandidate, newPoint, node.priority, node.riverPriority, newElevation, newTerrainSlope), landlockedRiverNode, ArrayList())
-                    landlockedRiverNode.children.add(newNode)
-                    riverNodes.add(newNode)
-                    candidateRiverNodes.add(newNode)
-                    landlockedRiverNode = newNode
-                }
+        var landlocked = false
+        for (riverNode in riverNodes) {
+            if (inlandRiverMouths.contains(coastPoints[riverNode.value.point])) {
+                landlocked = true
+                break
             }
         }
         val localRivers = LinkedHashSet<TreeNode<RiverNode>>()
@@ -595,7 +598,7 @@ object Rivers {
             val expansionCandidate = findExpansionCandidate(admissibleCandidates) ?: break
             val root = findRoot(expansionCandidate)
             if (!localRivers.contains(root)) {
-                if (isTooCloseToRiver(localRivers, expansionCandidate)) {
+                if (!landlocked && !isValidRiverStart(localRivers, rivers, borderWithoutCoast, root)) {
                     candidateRiverNodes.remove(expansionCandidate)
                     continue
                 }
@@ -605,13 +608,13 @@ object Rivers {
                 candidateRiverNodes.remove(expansionCandidate)
                 continue
             }
-            val newNodeCandidate = findMostViableNewNodeCandidate(graph, border, region, localRivers, expansionCandidate, RIVER_EDGE_DISTANCE_SEARCH_RADIUS, MIN_DISTANCE_FROM_BORDER_SQUARED, expansionCandidate.parent == findRoot(expansionCandidate))
+            val newNodeCandidate = findMostViableNewNodeCandidate(graph, borderWithCoast, region, localRivers, expansionCandidate, RIVER_EDGE_DISTANCE_SEARCH_RADIUS, MIN_DISTANCE_FROM_BORDER_SQUARED)
             if (newNodeCandidate == null) {
                 candidateRiverNodes.remove(expansionCandidate)
             } else {
                 val newPoint = vertices[newNodeCandidate].point
                 val node = expansionCandidate.value
-                val edgeDist = Math.sqrt(node.pointLocation.distance2(newPoint).toDouble()).toFloat()
+                val edgeDist = Math.sqrt(node.point.distance2(newPoint).toDouble()).toFloat()
                 val localRiverSlope = riverSlope[newNodeCandidate] ?: 0.0f
                 val newTerrainSlope = terrainSlope[newNodeCandidate] ?: MIN_TERRAIN_SLOPE
                 val newElevation = node.elevation + (localRiverSlope * edgeDist)
@@ -633,7 +636,7 @@ object Rivers {
                         node.priority - 1
                     }
                 }
-                val newNode = TreeNode(RiverNode(getRandomNodeType(random), newNodeCandidate, newPoint, newPriority, node.riverPriority, newElevation, newTerrainSlope), expansionCandidate, ArrayList())
+                val newNode = TreeNode(RiverNode(getRandomNodeType(random), newPoint, newPriority, node.riverPriority, newElevation, newTerrainSlope, regionId), expansionCandidate, ArrayList())
                 expansionCandidate.children.add(newNode)
                 candidateRiverNodes.add(newNode)
             }
@@ -641,22 +644,21 @@ object Rivers {
         rivers.add(localRivers)
     }
 
-    private fun isTooCloseToRiver(localRivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>): Boolean {
-        localRivers.forEach {
+    private fun isTooCloseToRiver(rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>): Boolean {
+        rivers.forEach {
             val riverRoot = findRoot(it)
-            if (isTooCloseToRiver(riverRoot, riverRoot, expansionCandidate)) {
+            if (isTooCloseToRiver(riverRoot, riverRoot, expansionCandidate.value)) {
                 return true
             }
         }
         return false
     }
 
-    private fun findCandidateRiverNodes(vertices: Vertices, localRiverMouths: LinkedHashSet<Int>, riverCandidates: HashMap<Int, Float>, terrainSlope: Map<Int, Float>): ArrayList<TreeNode<RiverNode>> {
-        val orderedRiverMouths = ArrayList<Int>(localRiverMouths)
-        orderedRiverMouths.sortByDescending { riverCandidates[it] ?: 0.0f }
+    private fun sortCandidateRiverNodes(coastPoints: PointSet2F, riverCandidates: HashMap<Int, Float>, riverMouths: ArrayList<Int>, region: Int): ArrayList<TreeNode<RiverNode>> {
+        riverMouths.sortByDescending { riverCandidates[it] ?: 0.0f }
         val candidateRiverNodes = ArrayList<TreeNode<RiverNode>>()
-        orderedRiverMouths.forEachIndexed { i, pointIndex ->
-            candidateRiverNodes.add(TreeNode(RiverNode(NodeType.CONTINUATION, pointIndex, vertices[pointIndex].point, 1, (orderedRiverMouths.size - i) + 1, 0.0f, terrainSlope[pointIndex] ?: MIN_TERRAIN_SLOPE), null, ArrayList()))
+        riverMouths.forEachIndexed { i, pointIndex ->
+            candidateRiverNodes.add(TreeNode(RiverNode(NodeType.CONTINUATION, coastPoints[pointIndex]!!, 1, (riverMouths.size - i) + 1, 0.0f, MIN_TERRAIN_SLOPE, region), null, ArrayList()))
         }
         return candidateRiverNodes
     }
@@ -701,57 +703,67 @@ object Rivers {
         return bestCandidate
     }
 
-    private fun findMostViableNewNodeCandidate(graph: Graph, border: ArrayList<Polygon2F>, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED, byAngle: Boolean = false): Int? {
+    private fun findMostViableNewNodeCandidate(graph: Graph, border: ArrayList<Polygon2F>, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Int? {
         val vertices = graph.vertices
-        val expansionPointIndex = expansionCandidate.value.pointIndex
-        val point = vertices[expansionPointIndex].point
-        var idealLocation: Point2F? = null
-        if (byAngle) {
-            val l1 = expansionCandidate.parent!!.value.pointLocation
-            val l2 = expansionCandidate.value.pointLocation
-            val distance = Math.sqrt(l1.distance2(l2).toDouble())
-            val ndx = (l2.x - l1.x) / distance
-            val ndy = (l2.y - l1.y) / distance
-            val vx = ndx * IDEAL_RIVER_EDGE_DISTANCE
-            val vy = ndy * IDEAL_RIVER_EDGE_DISTANCE
-            idealLocation = Point2F((l2.x + vx).toFloat(), (l2.y + vy).toFloat())
-        }
+        val point = expansionCandidate.value.point
         graph.getPointsWithinRadius(point, radius)
                 .filter { region.contains(it) }
                 .map { vertices[it] }
                 .map { Pair(it, point.distance2(it.point)) }
                 .filter { it.second >= MIN_RIVER_EDGE_DISTANCE_SQUARED }
-                .sortedBy { if (idealLocation == null) { Math.abs(it.second - IDEAL_RIVER_EDGE_DISTANCE_SQUARED) } else { idealLocation!!.distance2(it.first.point) } }.forEach { vertexPair ->
+                .sortedBy { Math.abs(it.second - IDEAL_RIVER_EDGE_DISTANCE_SQUARED) }.forEach { vertexPair ->
             val pointLocation = vertexPair.first.point
-            if (isValidExpansionPoint(rivers, border, expansionCandidate, pointLocation, vertexPair.second, minDistanceBorder2)) {
+            if (isValidExpansionPoint(rivers, border, expansionCandidate, pointLocation, minDistanceBorder2)) {
                 return vertexPair.first.id
             }
         }
         return null
     }
 
-    private fun isValidExpansionPoint(rivers: LinkedHashSet<TreeNode<RiverNode>>, borders: ArrayList<Polygon2F>, expansionCandidate: TreeNode<RiverNode>, pointLocation: Point2F, edgeLength2: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
-        val newEdge = LineSegment2F(expansionCandidate.value.pointLocation, pointLocation)
+    private fun isValidRiverStart(localRivers: LinkedHashSet<TreeNode<RiverNode>>, globalRivers: ArrayList<LinkedHashSet<TreeNode<RiverNode>>>, borders: ArrayList<Polygon2F>, expansionCandidate: TreeNode<RiverNode>, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
+        val pointLocation = expansionCandidate.value.point
         borders.forEach { border ->
-            if (border.doesEdgeIntersect(newEdge).first) {
-                return false
-            }
             if (border.distance2(pointLocation) < minDistanceBorder2) {
                 return false
             }
         }
-        rivers.forEach {
-            if (isTooCloseToRiver(it, it, expansionCandidate, newEdge, edgeLength2)) {
+        if (isTooCloseToRiver(localRivers, expansionCandidate)) {
+            return false
+        }
+        globalRivers.forEach {
+            if (isTooCloseToRiver(it, expansionCandidate)) {
                 return false
             }
         }
         return true
     }
 
-    private fun isTooCloseToRiver(rootNode: TreeNode<RiverNode>, riverNode: TreeNode<RiverNode>, expansionCandidate: TreeNode<RiverNode>): Boolean {
-        val p1 = riverNode.value.pointLocation
+    private fun isValidExpansionPoint(rivers: LinkedHashSet<TreeNode<RiverNode>>, borders: ArrayList<Polygon2F>, expansionCandidate: TreeNode<RiverNode>, pointLocation: Point2F, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Boolean {
+        val newEdge = LineSegment2F(expansionCandidate.value.point, pointLocation)
+        borders.forEach { border ->
+            if (border.doesEdgeIntersect(newEdge, newEdge.a).first) {
+                return false
+            }
+            if (border.distance2(pointLocation) < minDistanceBorder2) {
+                return false
+            }
+        }
+        var minSafeDistance2 = newEdge.length * 0.52f
+        minSafeDistance2 *= minSafeDistance2
+        rivers.forEach {
+            if (isTooCloseToRiver(it, it, expansionCandidate, newEdge, newEdge.interpolate(0.5f), minSafeDistance2)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun isTooCloseToRiver(rootNode: TreeNode<RiverNode>, riverNode: TreeNode<RiverNode>, expansionCandidate: RiverNode): Boolean {
         riverNode.children.forEach {
-            if (LineSegment2F(p1, it.value.pointLocation).distance2(expansionCandidate.value.pointLocation) < MIN_RIVER_SEPARATION_SQUARED) {
+            val line = LineSegment2F(riverNode.value.point, it.value.point)
+            var minSafeDistance2 = line.length * 0.52f
+            minSafeDistance2 *= minSafeDistance2
+            if (line.distance2(expansionCandidate.point) < MIN_RIVER_SEPARATION_SQUARED || line.interpolate(0.5f).distance2(expansionCandidate.point) < minSafeDistance2) {
                 return true
             }
             if (isTooCloseToRiver(rootNode, it, expansionCandidate)) {
@@ -759,49 +771,41 @@ object Rivers {
             }
         }
         if (riverNode == rootNode && riverNode.children.isEmpty()) {
-            return riverNode.value.pointLocation.distance2(expansionCandidate.value.pointLocation) < MIN_RIVER_SEPARATION_SQUARED
+            return riverNode.value.point.distance2(expansionCandidate.point) < MIN_RIVER_SEPARATION_SQUARED
         }
         return false
     }
 
-    private fun isTooCloseToRiver(rootNode: TreeNode<RiverNode>, riverNode: TreeNode<RiverNode>, expansionCandidate: TreeNode<RiverNode>, edge: LineSegment2F, edgeLength2: Float): Boolean {
+    private fun isTooCloseToRiver(rootNode: TreeNode<RiverNode>, riverNode: TreeNode<RiverNode>, expansionCandidate: TreeNode<RiverNode>, expansionEdge: LineSegment2F, expansionMidpoint: Point2F, minSafeDistance2: Float): Boolean {
         val node = riverNode.value
-        val parent = riverNode.parent
-        val p1 = node.pointLocation
-        val distance2 = p1.distance2(edge.b)
-        if (riverNode != expansionCandidate && distance2 <= edgeLength2) {
+        if (riverNode != expansionCandidate && expansionMidpoint.distance2(node.point) <= minSafeDistance2) {
             return true
-        }
-        if (riverNode != expansionCandidate && parent != null) {
-            val parentNode = parent.value
-            val root = findRoot(parent)
-            val parentLocation = if (root == parent.parent) {
-                root.value.pointLocation
-            } else {
-                parentNode.pointLocation
-            }
-            val otherDistance2 = node.pointLocation.distance2(parentLocation)
-            if (distance2 <= otherDistance2) {
-                return true
-            }
         }
         riverNode.children.forEach {
             val child = it.value
             if (!(it == expansionCandidate || riverNode == expansionCandidate)) {
-                if (edge.distance2(LineSegment2F(p1, child.pointLocation)) < MIN_RIVER_SEPARATION_SQUARED) {
+                if (expansionEdge.distance2(LineSegment2F(node.point, child.point)) < MIN_RIVER_SEPARATION_SQUARED) {
                     return true
                 }
             } else {
-                if (LineSegment2F(p1, child.pointLocation).distance2(edge.b) < MIN_RIVER_SEPARATION_SQUARED) {
+                if (LineSegment2F(node.point, child.point).distance2(expansionEdge.b) < MIN_RIVER_SEPARATION_SQUARED) {
                     return true
                 }
             }
-            if (isTooCloseToRiver(rootNode, it, expansionCandidate, edge, edgeLength2)) {
+            if (it != expansionCandidate) {
+                val otherLine = LineSegment2F(node.point, child.point)
+                var minSafeDistance2ToOther = otherLine.length * 0.52f
+                minSafeDistance2ToOther *= minSafeDistance2ToOther
+                if (otherLine.interpolate(0.5f).distance2(expansionEdge.b) < minSafeDistance2ToOther) {
+                    return true
+                }
+            }
+            if (isTooCloseToRiver(rootNode, it, expansionCandidate, expansionEdge, expansionMidpoint, minSafeDistance2)) {
                 return true
             }
         }
         if (riverNode == rootNode && riverNode != expansionCandidate && riverNode.children.isEmpty()) {
-            return edge.distance2(node.pointLocation) < MIN_RIVER_SEPARATION_SQUARED
+            return expansionEdge.distance2(node.point) < MIN_RIVER_SEPARATION_SQUARED || expansionMidpoint.distance2(node.point) < minSafeDistance2
         }
         return false
     }

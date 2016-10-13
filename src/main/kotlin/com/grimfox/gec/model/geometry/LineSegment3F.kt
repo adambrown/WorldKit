@@ -30,4 +30,8 @@ class LineSegment3F(var a: Point3F, var b: Point3F) {
         segments.add(LineSegment3F(lastPoint, b))
         return segments
     }
+
+    override fun toString(): String {
+        return "LineSegment3F(a=$a, b=$b)"
+    }
 }
