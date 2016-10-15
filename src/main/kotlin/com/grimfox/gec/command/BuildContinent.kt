@@ -86,7 +86,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 1..10000) {
+        for (test in 172..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -128,20 +128,20 @@ class BuildContinent() : Runnable {
                         graphics.color = Color.BLACK
                         drawVertexIds(riverGraph)
                     }
-//                draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
-//                    graphics.color = Color.BLACK
-//                    drawPolygon(coastline, true)
-//                }
-//                draw(outputWidth, "test-new-${String.format("%05d", test)}-ids$i") {
-//                    graphics.color = Color.BLACK
-//                    drawVertexIds(riverGraph)
-//                }
-//                val segmentLength = 1.0f / 4096.0f
-//                draw(outputWidth, "test-new-${String.format("%05d", test)}-splines$i") {
-//                    graphics.color = Color.BLACK
-//                    graphics.stroke = BasicStroke(1.0f)
-//                    drawRiverPolyLines(riverSplines, segmentLength, 3, false)
-//                }
+//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
+//                        graphics.color = Color.BLACK
+//                        drawPolygon(coastline, true)
+//                    }
+//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-ids$i") {
+//                        graphics.color = Color.BLACK
+//                        drawVertexIds(riverGraph)
+//                    }
+//                    val segmentLength = 1.0f / 4096.0f
+//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-splines$i") {
+//                        graphics.color = Color.BLACK
+//                        graphics.stroke = BasicStroke(1.0f)
+//                        drawRiverPolyLines(riverSplines, segmentLength, 3, false)
+//                    }
                     val reverseRiverMap = HashMap<Int, RiverNode>()
                     riverSet.forEach {
                         it.forEach { node ->
@@ -289,7 +289,7 @@ class BuildContinent() : Runnable {
         riverPoints.retainAll(coastline.points)
         val (coastalPolygons, unconnectedPolygons) = buildBasicCoastalCellPolygons(riverGraph, cellsToRiverSegments, riverPoints, coastMultigon, coastline, coastCells)
         val (riverPolygons, adjacencyPatches, inclusionPatches) = reviseCoastalCellPolygonsForRiverAndCoast(riverGraph, cellsToRiverSegments, coastalPolygons, unconnectedPolygons)
-        val smoothedCoastalCellPolys = smoothCoastline(riverGraph, cellsToRiverSegments, coastalPolygons, adjacencyPatches)
+        val smoothedCoastalCellPolys = smoothCoastline(riverGraph, cellsToRiverSegments, coastalPolygons, adjacencyPatches, inclusionPatches)
         val (edgeSkeletons, riverSkeletons) = buildCoastalCellSkeletons(riverGraph, cellsToRiverSegments, crestElevations, riverPolygons, coastalPolygons, adjacencyPatches, inclusionPatches, smoothedCoastalCellPolys)
         drawCoastalCellPolygons(reverseRiverMap, edgeSkeletons, riverSkeletons, smoothedCoastalCellPolys, heightMap, globalVertices)
         return coastCells.toSet()
@@ -385,13 +385,37 @@ class BuildContinent() : Runnable {
             val localEdgeSkeleton = ArrayList<LineSegment3F>()
             val localRiverSkeleton = ArrayList<LineSegment3F>()
             val id = it.key
-            val polygon = it.value
+            var polygon = it.value
             val polyPoints = PointSet2F(polygon.points)
-            val untouchablePoints = getUntouchablePoints(riverGraph, coastalCellPolys, adjacencyPatches, riverGraph.vertices[id], cellsToRiverSegments[id])
+            val untouchablePoints = getUntouchablePoints(riverGraph, coastalCellPolys, adjacencyPatches, inclusionPatches, riverGraph.vertices[id], cellsToRiverSegments[id])
             val pointsWithHeights = PointSet2F()
             val localRiverPolys = riverPolys[id]
+            val splices = ArrayList<Pair<LineSegment2F, Point2F>>()
             if (localRiverPolys != null) {
-                localRiverSkeleton.addAll(localRiverPolys.flatMap { it.edges }.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
+                val riverEdges = ArrayList<LineSegment2F>()
+                localRiverPolys.forEach {
+                    val revisedRiverEdges = ArrayList<LineSegment2F>()
+                    for (edge in it.edges.map { LineSegment2F(it.a, it.b) }) {
+                        val intersection = polygon.doesEdgeIntersect(edge)
+                        if (intersection.first) {
+                            val intersectionPoint = polygon.edges[intersection.second].intersection(edge)
+                            if (intersectionPoint == null) {
+                                revisedRiverEdges.add(edge)
+                            } else {
+                                val splicePoint = Point3F(intersectionPoint.x, intersectionPoint.y, 0.0f)
+                                splices.add(Pair(polygon.edges[intersection.second], splicePoint))
+                                revisedRiverEdges.add(LineSegment2F(edge.a, splicePoint))
+                            }
+                            break
+                        }
+                        if (!polygon.isWithin(edge.interpolate(0.5f))) {
+                            break
+                        }
+                        revisedRiverEdges.add(edge)
+                    }
+                    riverEdges.addAll(revisedRiverEdges)
+                }
+                localRiverSkeleton.addAll(riverEdges.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
                 pointsWithHeights.addAll(localRiverSkeleton.flatMap { listOf(it.a, it.b) })
             }
             (listOf(riverGraph.vertices[id]) + ((inclusionPatches[id] ?: HashSet()).map { riverGraph.vertices[it] })).flatMap { it.adjacentTriangles }.forEach {
@@ -401,6 +425,27 @@ class BuildContinent() : Runnable {
                     if (polyPoints.contains(point)) {
                         pointsWithHeights.add(point)
                     }
+                }
+            }
+            if (splices.isNotEmpty()) {
+                val splicedPolyPoints = ArrayList<Point2F>()
+                polygon.edges.forEach { edge ->
+                    splicedPolyPoints.add(edge.a)
+                    val splicePoints = ArrayList<Point2F>()
+                    splices.forEach { splice ->
+                        if (splice.first.epsilonEquals(edge)) {
+                            splicePoints.add(splice.second)
+                        }
+                    }
+                    splicePoints.sortBy { edge.a.distance2(it) }
+                    splicedPolyPoints.addAll(splicePoints)
+                    splicedPolyPoints.add(edge.b)
+                }
+                if (polygon.isClosed) {
+                    splicedPolyPoints.removeAt(splicedPolyPoints.size - 1)
+                    polygon = Polygon2F(splicedPolyPoints, true)
+                } else {
+                    polygon = Polygon2F(splicedPolyPoints, false)
                 }
             }
             polygon.edges.forEach {
@@ -426,13 +471,13 @@ class BuildContinent() : Runnable {
         return Pair(edgeSkeletons, riverSkeletons)
     }
 
-    private fun smoothCoastline(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, revisedEdgePolys: HashMap<Int, Polygon2F>, adjacencyPatches: HashMap<Int, HashSet<Int>>): HashMap<Int, Polygon2F> {
+    private fun smoothCoastline(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, revisedEdgePolys: HashMap<Int, Polygon2F>, adjacencyPatches: HashMap<Int, HashSet<Int>>, inclusionPatches: HashMap<Int, HashSet<Int>>): HashMap<Int, Polygon2F> {
         val interpolatedEdgePolys = HashMap<Int, Polygon2F>()
         revisedEdgePolys.forEach {
             val id = it.key
             val polygon = it.value
             val vertex = riverGraph.vertices[id]
-            val borderPoints = getUntouchablePoints(riverGraph, revisedEdgePolys, adjacencyPatches, vertex, cellsToRiverSegments[id])
+            val borderPoints = getUntouchablePoints(riverGraph, revisedEdgePolys, adjacencyPatches, inclusionPatches, vertex, cellsToRiverSegments[id])
             val interiorEdges = ArrayList<LineSegment2F>()
             val coastEdges = ArrayList<LineSegment2F>()
             polygon.edges.forEach {
@@ -464,72 +509,81 @@ class BuildContinent() : Runnable {
         val riverPolys = HashMap<Int, ArrayList<Polygon2F>>()
         val adjacencyPatches = HashMap<Int, HashSet<Int>>()
         val inclusionPatches = HashMap<Int, HashSet<Int>>()
+        val reverseInclusionPatches = HashMap<Int, HashSet<Int>>()
         edgePolys.forEach {
             val id = it.key
             var polygon = it.value
-            val adjacentUnconnected = ArrayList<Pair<Int, Polygon2F>>()
-            riverGraph.vertices.getAdjacentVertices(id).forEach { id ->
-                unconnectedPolys[id]?.forEach { adjacentUnconnected.add(Pair(id, it)) }
-            }
-            val polysToTake = ArrayList<Pair<Int, Polygon2F>>()
-            val newConnections = HashSet<Int>()
-            adjacentUnconnected.forEach { adjacentPoly ->
-                val secondAdjacentEdgePolys = ArrayList<Pair<Int, Polygon2F>>()
-                riverGraph.vertices.getAdjacentVertices(adjacentPoly.first).forEach {
-                    val adjacentEdgePoly = edgePolys[it]
-                    if (adjacentEdgePoly != null) {
-                        secondAdjacentEdgePolys.add(Pair(it, adjacentEdgePoly))
+            var modified = true
+            while (modified) {
+                modified = false
+                val adjacentUnconnected = ArrayList<Pair<Int, Polygon2F>>()
+                (riverGraph.vertices.getAdjacentVertices(id) + ((inclusionPatches[id] ?: HashSet()).flatMap { riverGraph.vertices.getAdjacentVertices(it) })).forEach { id ->
+                    unconnectedPolys[id]?.forEach { adjacentUnconnected.add(Pair(id, it)) }
+                }
+                val polysToTake = ArrayList<Pair<Int, Polygon2F>>()
+                val newConnections = HashSet<Int>()
+                adjacentUnconnected.forEach { adjacentPoly ->
+                    val secondAdjacentEdgePolys = ArrayList<Pair<Int, Polygon2F>>()
+                    (riverGraph.vertices.getAdjacentVertices(adjacentPoly.first) + (adjacencyPatches[adjacentPoly.first] ?: HashSet()))
+                            .flatMap { listOf(it) + (inclusionPatches[it]?.toList() ?: emptyList()) }
+                            .flatMap { listOf(it) + (reverseInclusionPatches[it]?.toList() ?: emptyList()) }.forEach {
+                        val adjacentEdgePoly = if (it == id) polygon else edgePolys[it]
+                        if (adjacentEdgePoly != null) {
+                            secondAdjacentEdgePolys.add(Pair(it, adjacentEdgePoly))
+                        }
+                    }
+                    var winner = -1
+                    var winningConnection = 0.0f
+                    val localNewConnections = ArrayList<Int>()
+                    secondAdjacentEdgePolys.forEach { secondAdjacentPoly ->
+                        var connectedness = 0.0f
+                        adjacentPoly.second.edges.forEach { adjacentPolyEdge ->
+                            secondAdjacentPoly.second.edges.forEach { localPolyEdge ->
+                                if (adjacentPolyEdge.epsilonEquals(localPolyEdge)) {
+                                    connectedness += localPolyEdge.length
+                                }
+                            }
+                        }
+                        if (connectedness > 0.0f) {
+                            localNewConnections.add(secondAdjacentPoly.first)
+                        }
+                        if (connectedness > winningConnection) {
+                            winner = secondAdjacentPoly.first
+                            winningConnection = connectedness
+                        }
+                    }
+                    if (winner == id) {
+                        polysToTake.add(adjacentPoly)
+                        newConnections.addAll(localNewConnections)
+                        inclusionPatches.getOrPut(id, { HashSet() }).add(adjacentPoly.first)
+                        reverseInclusionPatches.getOrPut(adjacentPoly.first, { HashSet() }).add(id)
                     }
                 }
-                var winner = -1
-                var winningConnection = 0.0f
-                val localNewConnections = ArrayList<Int>()
-                secondAdjacentEdgePolys.forEach { secondAdjacentPoly ->
-                    var connectedness = 0.0f
-                    adjacentPoly.second.edges.forEach { adjacentPolyEdge ->
-                        secondAdjacentPoly.second.edges.forEach { localPolyEdge ->
-                            if (adjacentPolyEdge.epsilonEquals(localPolyEdge)) {
-                                connectedness += localPolyEdge.length
+                polysToTake.forEach {
+                    unconnectedPolys[it.first]?.remove(it.second)
+                    val combinedEdges = ArrayList<LineSegment2F>(it.second.edges)
+                    combinedEdges.addAll(polygon.edges)
+                    it.second.edges.forEach { adjacentEdge ->
+                        polygon.edges.forEach { localEdge ->
+                            if (localEdge.epsilonEquals(adjacentEdge)) {
+                                combinedEdges.remove(localEdge)
+                                combinedEdges.remove(adjacentEdge)
                             }
                         }
                     }
-                    if (connectedness > 0.0f) {
-                        localNewConnections.add(secondAdjacentPoly.first)
-                    }
-                    if (connectedness > winningConnection) {
-                        winner = secondAdjacentPoly.first
-                        winningConnection = connectedness
-                    }
+                    polygon = Polygon2F.fromUnsortedEdges(combinedEdges)
+                    modified = true
                 }
-                if (winner == id) {
-                    polysToTake.add(adjacentPoly)
-                    newConnections.addAll(localNewConnections)
-                    inclusionPatches.getOrPut(id, { HashSet() }).add(adjacentPoly.first)
+                newConnections.remove(id)
+                newConnections.removeAll(riverGraph.vertices.getAdjacentVertices(id))
+                adjacencyPatches.getOrPut(id, { HashSet() }).addAll(newConnections)
+                newConnections.forEach {
+                    adjacencyPatches.getOrPut(it, { HashSet() }).add(id)
                 }
-            }
-            polysToTake.forEach {
-                unconnectedPolys[it.first]?.remove(it.second)
-                val combinedEdges = ArrayList<LineSegment2F>(it.second.edges)
-                combinedEdges.addAll(polygon.edges)
-                it.second.edges.forEach { adjacentEdge ->
-                    polygon.edges.forEach { localEdge ->
-                        if (localEdge.epsilonEquals(adjacentEdge)) {
-                            combinedEdges.remove(localEdge)
-                            combinedEdges.remove(adjacentEdge)
-                        }
-                    }
-                }
-                polygon = Polygon2F.fromUnsortedEdges(combinedEdges)
-            }
-            newConnections.remove(id)
-            newConnections.removeAll(riverGraph.vertices.getAdjacentVertices(id))
-            adjacencyPatches.getOrPut(id, { HashSet() }).addAll(newConnections)
-            newConnections.forEach {
-                adjacencyPatches.getOrPut(it, { HashSet() }).add(id)
             }
             val localRiverPolys = buildCellRiverPolygons(cellsToRiverSegments, id)
             riverPolys.put(id, localRiverPolys)
-            revisedEdgePolys[id] = revisePolygonIfRiverIntersects(riverGraph, edgePolys, cellsToRiverSegments, adjacencyPatches, riverGraph.vertices[id], polygon, localRiverPolys)
+            revisedEdgePolys[id] = revisePolygonIfRiverIntersects(riverGraph, edgePolys, cellsToRiverSegments, adjacencyPatches, inclusionPatches, riverGraph.vertices[id], polygon, localRiverPolys)
         }
         edgePolys.clear()
         edgePolys.putAll(revisedEdgePolys)
@@ -557,7 +611,7 @@ class BuildContinent() : Runnable {
                 }
                 pointsIn3d.removeAt(pointsIn3d.size - 1)
                 val endPoint = polyLine.points.last()
-                pointsIn3d.add(Point3F(endPoint.x, endPoint.y, endElevation))
+                pointsIn3d.add(Point3F(endPoint.x, endPoint.y, startElevation))
                 localRiverPolys.add(Polygon2F(pointsIn3d, false))
             }
         }
@@ -791,13 +845,13 @@ class BuildContinent() : Runnable {
         }
     }
 
-    private fun getUntouchablePoints(riverGraph: Graph, edgePolygons: HashMap<Int, Polygon2F>, adjacencyPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, riverSegments: ArrayList<RiverSegment>?): PointSet2F {
+    private fun getUntouchablePoints(riverGraph: Graph, edgePolygons: HashMap<Int, Polygon2F>, adjacencyPatches: HashMap<Int, HashSet<Int>>, inclusionPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, riverSegments: ArrayList<RiverSegment>?): PointSet2F {
         val untouchables = PointSet2F(vertex.cell.border)
         untouchables.add(vertex.point)
         riverSegments?.forEach {
             untouchables.addAll(it.splices.map { it.second })
         }
-        (riverGraph.vertices.getAdjacentVertices(vertex.id) + (adjacencyPatches[vertex.id] ?: HashSet())).forEach { id ->
+        (riverGraph.vertices.getAdjacentVertices(vertex.id) + (adjacencyPatches[vertex.id] ?: HashSet()) + ((inclusionPatches[vertex.id] ?: HashSet()).flatMap { riverGraph.vertices.getAdjacentVertices(it) })).forEach { id ->
             val adjacent = edgePolygons[id]
             if (adjacent != null) {
                 untouchables.addAll(adjacent.points)
@@ -806,8 +860,8 @@ class BuildContinent() : Runnable {
         return untouchables
     }
 
-    private fun revisePolygonIfRiverIntersects(graph: Graph, edgePolygons: HashMap<Int, Polygon2F>, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, adjacencyPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, polygon: Polygon2F, riverPolys: ArrayList<Polygon2F>): Polygon2F {
-        val untouchables = getUntouchablePoints(graph, edgePolygons, adjacencyPatches, vertex, cellsToRiverSegments[vertex.id])
+    private fun revisePolygonIfRiverIntersects(graph: Graph, edgePolygons: HashMap<Int, Polygon2F>, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, adjacencyPatches: HashMap<Int, HashSet<Int>>, inclusionPatches: HashMap<Int, HashSet<Int>>, vertex: Vertex, polygon: Polygon2F, riverPolys: ArrayList<Polygon2F>): Polygon2F {
+        val untouchables = getUntouchablePoints(graph, edgePolygons, adjacencyPatches, inclusionPatches, vertex, cellsToRiverSegments[vertex.id])
         val riverEdges = ArrayList<LineSegment2F>(riverPolys.flatMap { it.edges }.filter { !untouchables.contains(it.a) && !untouchables.contains(it.b) })
         var adjustedPolygon = polygon
         var adjusted = true

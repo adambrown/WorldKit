@@ -5,9 +5,16 @@ import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.findConcavityWeights
-import java.lang.Math.max
-import java.lang.Math.pow
+import com.grimfox.gec.util.drawing.draw
+import com.grimfox.gec.util.drawing.drawEdge
+import com.grimfox.gec.util.drawing.drawPoint
+import com.grimfox.gec.util.drawing.drawPolygon
+import com.grimfox.gec.util.geometry.Geometry
+import java.awt.BasicStroke
+import java.awt.Color
+import java.lang.Math.*
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 
 object Rivers {
 
@@ -114,11 +121,21 @@ object Rivers {
                 terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region)
                 buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region)
             }
+            val regionCoastBorders = graph.findBorder(region, water, false)
+
             val localRiverMouths = ArrayList<Int>()
-            regionBorder.points.forEach {
+            regionCoastBorders.flatMap { it.points }.forEach {
                 val index = coastPoints[it]
                 if (index > -1) {
                     localRiverMouths.add(index)
+                }
+            }
+            if (localRiverMouths.isEmpty()) {
+                regionBorder.points.forEach {
+                    val index = coastPoints[it]
+                    if (index > -1) {
+                        localRiverMouths.add(index)
+                    }
                 }
             }
             updateLocalRiverCandidates(coastPoints, regionInlandBorders, localRiverMouths, riverCandidates)
@@ -151,6 +168,7 @@ object Rivers {
                 while (nodes.isNotEmpty()) {
                     val nextCandidate = nodes.removeAt(0)
                     if (isViableConnection(possibleConnectingRivers, landlockedRiverMouth, nextCandidate)) {
+                        adjustElevationOfGraph(landlockedRiverMouth, nextCandidate.value.elevation)
                         landlockedRiverMouth.parent = nextCandidate
                         nextCandidate.children.add(landlockedRiverMouth)
                         break
@@ -171,14 +189,14 @@ object Rivers {
     }
 
     fun buildRiverGraph(rivers: ArrayList<TreeNode<RiverNode>>): Graph {
-        val points = ArrayList<Point2F>()
+        val points = PointSet2F()
         rivers.forEach {
             getPoints(it, points)
         }
-        return buildGraph(1.0f, points)
+        return buildGraph(1.0f, ArrayList(points))
     }
 
-    private fun getPoints(river: TreeNode<RiverNode>, points: ArrayList<Point2F>) {
+    private fun getPoints(river: TreeNode<RiverNode>, points: PointSet2F) {
         points.add(river.value.point)
         river.children.forEach {
             getPoints(it, points)
@@ -579,36 +597,98 @@ object Rivers {
                                   regionId: Int,
                                   riverSlope: Map<Int, Float>,
                                   terrainSlope: Map<Int, Float>) {
+        val drawCount = AtomicInteger(1)
         val borderWithCoast = graph.findBorder(region)
         val borderWithoutCoast = graph.findBorder(region, water, true)
         val vertices = graph.vertices
         val candidateRiverNodes = sortCandidateRiverNodes(coastPoints, riverCandidates, localRiverMouths, regionId)
-        val riverNodes = ArrayList(candidateRiverNodes)
         var landlocked = false
-        for (riverNode in riverNodes) {
+        for (riverNode in candidateRiverNodes) {
             if (inlandRiverMouths.contains(coastPoints[riverNode.value.point])) {
                 landlocked = true
                 break
             }
         }
+        val landlockedRegion = landlocked
         val localRivers = LinkedHashSet<TreeNode<RiverNode>>()
+//        draw(1024, "debug-buildRiverNetwork-${drawCount.andIncrement}", "output", Color.WHITE) {
+//            graphics.color = Color.BLACK
+//            borderWithCoast.forEach {
+//                drawPolygon(it, false)
+//            }
+//            graphics.color = Color.RED
+//            borderWithoutCoast.forEach {
+//                drawPolygon(it, false)
+//            }
+//            graphics.color = Color.MAGENTA
+//            candidateRiverNodes.forEach {
+//                drawPoint(it.value.point, 1)
+//            }
+//            graphics.color = Color.BLUE
+//            localRivers.forEach {
+//                it.nodeIterable().forEach {
+//                    val parent = it.parent
+//                    if (parent != null) {
+//                        drawEdge(parent.value.point, it.value.point)
+//                    }
+//                    drawPoint(it.value.point, 1)
+//                }
+//            }
+//        }
         while (true) {
             val lowestElevation = findElevationOfLowestRiverNode(candidateRiverNodes)
             val admissibleCandidates = findAdmissibleCandidates(candidateRiverNodes, lowestElevation)
-            val expansionCandidate = findExpansionCandidate(admissibleCandidates) ?: break
+            var expansionCandidate = findExpansionCandidate(admissibleCandidates) ?: break
             val root = findRoot(expansionCandidate)
             if (!localRivers.contains(root)) {
                 if (!landlocked && !isValidRiverStart(localRivers, rivers, borderWithoutCoast, root)) {
                     candidateRiverNodes.remove(expansionCandidate)
+                    if (candidateRiverNodes.isEmpty() && localRivers.map { it.count() }.sum() < 10) {
+                        candidateRiverNodes.addAll(localRivers.filter { it.children.isEmpty() }.sortedByDescending { it.value.priority })
+                    }
+                    if (candidateRiverNodes.isEmpty() && localRivers.isEmpty()) {
+                        landlocked = true
+                        val sortedCandidates = sortCandidateRiverNodes(coastPoints, riverCandidates, localRiverMouths, regionId)
+                        candidateRiverNodes.addAll(sortedCandidates.subList(0, min(3, sortedCandidates.size)))
+                    }
                     continue
                 }
                 localRivers.add(root)
+                landlocked = false
             }
             if (expansionCandidate.children.size >= MAX_RIVER_CHILDREN) {
                 candidateRiverNodes.remove(expansionCandidate)
                 continue
             }
-            val newNodeCandidate = findMostViableNewNodeCandidate(graph, borderWithCoast, region, localRivers, expansionCandidate, RIVER_EDGE_DISTANCE_SEARCH_RADIUS, MIN_DISTANCE_FROM_BORDER_SQUARED)
+            var newNodeCandidate = findMostViableNewNodeCandidate(graph, borderWithCoast, region, localRivers, expansionCandidate, RIVER_EDGE_DISTANCE_SEARCH_RADIUS, MIN_DISTANCE_FROM_BORDER_SQUARED)
+            if (newNodeCandidate == null && candidateRiverNodes.size < 10 && localRivers.map { it.count() }.sum() < 10) {
+                val riverEdgeMinDistIncrement = MIN_RIVER_EDGE_DISTANCE / 10.0f
+                val distFromBorderIncrement = MIN_DISTANCE_FROM_BORDER / 10.0f
+                var count = 0
+                var riverEdgeMinDist = MIN_RIVER_EDGE_DISTANCE
+                var distFromBorder = MIN_DISTANCE_FROM_BORDER
+                while (newNodeCandidate == null && count < 9) {
+                    riverEdgeMinDist -= riverEdgeMinDistIncrement
+                    val minRiverEdge2 = riverEdgeMinDist * riverEdgeMinDist
+                    distFromBorder -= distFromBorderIncrement
+                    val distFromBorder2 = distFromBorder * distFromBorder
+                    for (candidate in candidateRiverNodes) {
+                        val localRoot = findRoot(candidate)
+                        if (!localRivers.contains(localRoot)) {
+                            if (!landlocked && !isValidRiverStart(localRivers, rivers, borderWithoutCoast, localRoot)) {
+                                continue
+                            }
+                        }
+                        newNodeCandidate = findMostViableNewNodeCandidate(graph, borderWithCoast, region, localRivers, candidate, RIVER_EDGE_DISTANCE_SEARCH_RADIUS, distFromBorder2, minRiverEdge2)
+                        if (newNodeCandidate != null) {
+                            expansionCandidate = candidate
+                            localRivers.add(localRoot)
+                            break
+                        }
+                    }
+                    count++
+                }
+            }
             if (newNodeCandidate == null) {
                 candidateRiverNodes.remove(expansionCandidate)
             } else {
@@ -639,6 +719,37 @@ object Rivers {
                 val newNode = TreeNode(RiverNode(getRandomNodeType(random), newPoint, newPriority, node.riverPriority, newElevation, newTerrainSlope, regionId), expansionCandidate, ArrayList())
                 expansionCandidate.children.add(newNode)
                 candidateRiverNodes.add(newNode)
+            }
+//            draw(1024, "debug-buildRiverNetwork-${drawCount.andIncrement}", "output", Color.WHITE) {
+//                graphics.color = Color.BLACK
+//                borderWithCoast.forEach {
+//                    drawPolygon(it, false)
+//                }
+//                graphics.color = Color.RED
+//                borderWithoutCoast.forEach {
+//                    drawPolygon(it, false)
+//                }
+//                graphics.color = Color.MAGENTA
+//                candidateRiverNodes.forEach {
+//                    drawPoint(it.value.point, 1)
+//                }
+//                graphics.color = Color.BLUE
+//                localRivers.forEach {
+//                    it.nodeIterable().forEach {
+//                        val parent = it.parent
+//                        if (parent != null) {
+//                            drawEdge(parent.value.point, it.value.point)
+//                        }
+//                        drawPoint(it.value.point, 1)
+//                    }
+//                }
+//            }
+        }
+        if (landlockedRegion) {
+            ArrayList(localRivers).forEach {
+                if (it.count() == 1) {
+                    localRivers.remove(it)
+                }
             }
         }
         rivers.add(localRivers)
@@ -703,14 +814,14 @@ object Rivers {
         return bestCandidate
     }
 
-    private fun findMostViableNewNodeCandidate(graph: Graph, border: ArrayList<Polygon2F>, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED): Int? {
+    private fun findMostViableNewNodeCandidate(graph: Graph, border: ArrayList<Polygon2F>, region: Set<Int>, rivers: LinkedHashSet<TreeNode<RiverNode>>, expansionCandidate: TreeNode<RiverNode>, radius: Float, minDistanceBorder2: Float = MIN_DISTANCE_FROM_BORDER_SQUARED, minRiverEdgeLength2: Float = MIN_RIVER_EDGE_DISTANCE_SQUARED): Int? {
         val vertices = graph.vertices
         val point = expansionCandidate.value.point
         graph.getPointsWithinRadius(point, radius)
                 .filter { region.contains(it) }
                 .map { vertices[it] }
                 .map { Pair(it, point.distance2(it.point)) }
-                .filter { it.second >= MIN_RIVER_EDGE_DISTANCE_SQUARED }
+                .filter { it.second >= minRiverEdgeLength2 }
                 .sortedBy { Math.abs(it.second - IDEAL_RIVER_EDGE_DISTANCE_SQUARED) }.forEach { vertexPair ->
             val pointLocation = vertexPair.first.point
             if (isValidExpansionPoint(rivers, border, expansionCandidate, pointLocation, minDistanceBorder2)) {
@@ -828,6 +939,17 @@ object Rivers {
             increasePriorityOfDownGraph(it)
         }
         riverNode.value.priority += 1
+    }
+
+    private fun adjustElevationOfGraph(riverNode: TreeNode<RiverNode>, adjustment: Float) {
+        adjustElevationOfDownGraph(findRoot(riverNode), adjustment)
+    }
+
+    private fun adjustElevationOfDownGraph(riverNode: TreeNode<RiverNode>, adjustment: Float) {
+        riverNode.children.forEach {
+            adjustElevationOfDownGraph(it, adjustment)
+        }
+        riverNode.value.elevation += adjustment
     }
 
     private fun getRandomNodeType(random: Random): NodeType {

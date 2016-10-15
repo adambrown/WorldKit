@@ -165,31 +165,31 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
 
         val a = x - x1
         val b = y - y1
-        val c = x2 - x1
-        val d = y2 - y1
+        val dx1 = x2 - x1
+        val dy1 = y2 - y1
 
-        val dot = a * c + b * d
-        val len_sq = c * c + d * d
-        var param = -1.0f
-        if (len_sq !== 0.0f) {
-            param = dot / len_sq
+        val dot = a * dx1 + b * dy1
+        val length2 = dx1 * dx1 + dy1 * dy1
+        var interpolation = -1.0f
+        if (length2 !== 0.0f) {
+            interpolation = dot / length2
         }
 
-        val xx: Float
-        val yy: Float
-        if (param < 0) {
-            xx = x1
-            yy = y1
-        } else if (param > 1) {
-            xx = x2
-            yy = y2
+        val closeX: Float
+        val closeY: Float
+        if (interpolation < 0.0f) {
+            closeX = x1
+            closeY = y1
+        } else if (interpolation > 1.0f) {
+            closeX = x2
+            closeY = y2
         } else {
-            xx = x1 + param * c
-            yy = y1 + param * d
+            closeX = x1 + interpolation * dx1
+            closeY = y1 + interpolation * dy1
         }
 
-        val dx = x - xx
-        val dy = y - yy
+        val dx = x - closeX
+        val dy = y - closeY
         return dx * dx + dy * dy
     }
 

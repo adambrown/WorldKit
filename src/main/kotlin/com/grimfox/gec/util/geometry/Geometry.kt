@@ -8,9 +8,12 @@ import com.grimfox.gec.util.geometry.Geometry.debug
 import com.grimfox.gec.util.geometry.Geometry.debugCount
 import com.grimfox.gec.util.geometry.Geometry.debugIteration
 import com.grimfox.gec.util.geometry.Geometry.debugResolution
+import com.grimfox.gec.util.geometry.Geometry.trace
 import com.grimfox.gec.util.printList
 import java.awt.BasicStroke
 import java.awt.Color
+import java.lang.Math.max
+import java.lang.Math.min
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -31,9 +34,10 @@ private fun doNothing() {}
 object Geometry {
 
     var debug = false
+    var trace = false
     var debugCount = AtomicInteger(1)
     var debugIteration = AtomicInteger(1)
-    var debugResolution = 4096
+    var debugResolution = 1024
 
     @JvmStatic fun main(vararg args: String) {
 
@@ -49,8 +53,14 @@ object Geometry {
             triangulatePolygon(vertices, polygon)
         }
 
-        val tests = listOf<() -> Any?>(
+        val keeper3 = {
+            val vertices = PointSet2F(points=arrayListOf(Point3F(x=0.6364898f, y=0.13193336f, z=0.0f), Point3F(x=0.6378628f, y=0.1320265f, z=0.0f), Point3F(x=0.6391836f, y=0.13241278f, z=0.0f), Point3F(x=0.6396885f, y=0.13422023f, z=0.0f), Point3F(x=0.63971555f, y=0.13609673f, z=0.0f), Point3F(x=0.64053226f, y=0.13778624f, z=0.0f), Point3F(x=0.6418955f, y=0.13788795f, z=0.0f), Point3F(x=0.6429973f, y=0.13707797f, z=0.0f), Point3F(x=0.6435763f, y=0.1358393f, z=0.0f), Point3F(x=0.6432352f, y=0.13411532f, z=0.0f), Point3F(x=0.6422254f, y=0.13267697f, z=0.0f), Point3F(x=0.641098f, y=0.13132879f, z=0.0f), Point3F(x=0.6398202f, y=0.13008195f, z=0.0f), Point3F(x=0.6384131f, y=0.12898315f, z=0.0f), Point3F(x=0.6372974f, y=0.12758936f, z=0.0f), Point3F(x=0.63703984f, y=0.12617707f, z=0.0f), Point3F(x=0.6378424f, y=0.124986924f, z=0.0f), Point3F(x=0.63951576f, y=0.125747f, z=0.0f), Point3F(x=0.6412372f, y=0.12639144f, z=0.0f), Point3F(x=0.6420176f, y=0.12519458f, z=0.0f), Point3F(x=0.6420088f, y=0.123765685f, z=0.0f), Point3F(x=0.6415246f, y=0.12242131f, z=0.0f), Point3F(x=0.64016795f, y=0.121693045f, z=0.0f), Point3F(x=0.6386363f, y=0.121534325f, z=0.0f), Point3F(x=0.6376598f, y=0.12150804f, z=0.0f), Point3F(x=0.639048f, y=0.120437786f, z=0.0012693903f), Point3F(x=0.64043623f, y=0.11936753f, z=0.0025387807f), Point3F(x=0.64176255f, y=0.120578945f, z=0.0017890271f), Point3F(x=0.6430889f, y=0.12179036f, z=0.0010392736f), Point3F(x=0.64441526f, y=0.12300177f, z=2.895201E-4f), Point3F(x=0.64574164f, y=0.12421318f, z=0.0027656096f), Point3F(x=0.647068f, y=0.1254246f, z=0.0052416995f), Point3F(x=0.64839435f, y=0.12663601f, z=0.007717789f), Point3F(x=0.64834803f, y=0.12860851f, z=0.0076731755f), Point3F(x=0.6483017f, y=0.130581f, z=0.007628562f), Point3F(x=0.6482554f, y=0.1325535f, z=0.0075839483f), Point3F(x=0.6482091f, y=0.134526f, z=0.0075393347f), Point3F(x=0.6481628f, y=0.1364985f, z=0.007494721f), Point3F(x=0.64811647f, y=0.13847099f, z=0.0074501075f), Point3F(x=0.6480703f, y=0.14044349f, z=0.0074054943f), Point3F(x=0.6468344f, y=0.14177372f, z=0.0065884227f), Point3F(x=0.6455984f, y=0.14310394f, z=0.005771351f), Point3F(x=0.64285606f, y=0.14333946f, z=0.005578068f), Point3F(x=0.64145994f, y=0.14214703f, z=0.0055309264f), Point3F(x=0.6400638f, y=0.14095461f, z=0.0054837847f), Point3F(x=0.6386677f, y=0.1397622f, z=0.005436643f), Point3F(x=0.6372716f, y=0.13856977f, z=0.0053895013f), Point3F(x=0.63587546f, y=0.13737735f, z=0.0053423597f), Point3F(x=0.63447934f, y=0.13618493f, z=0.0052952175f), Point3F(x=0.63481706f, y=0.13437124f, z=0.003530145f), Point3F(x=0.6351548f, y=0.13255754f, z=0.0017650723f), Point3F(x=0.63549244f, y=0.13074385f, z=0.0f)))
+            val polygon = arrayListOf(Pair(0, 1), Pair(1, 2), Pair(2, 3), Pair(3, 4), Pair(4, 5), Pair(5, 6), Pair(6, 7), Pair(7, 8), Pair(8, 9), Pair(9, 10), Pair(10, 11), Pair(11, 12), Pair(12, 13), Pair(13, 14), Pair(14, 15), Pair(15, 16), Pair(16, 17), Pair(17, 18), Pair(18, 19), Pair(19, 20), Pair(20, 21), Pair(21, 22), Pair(22, 23), Pair(23, 24), Pair(24, 25), Pair(25, 26), Pair(26, 27), Pair(27, 28), Pair(28, 29), Pair(29, 30), Pair(30, 31), Pair(31, 32), Pair(32, 33), Pair(33, 34), Pair(34, 35), Pair(35, 36), Pair(36, 37), Pair(37, 38), Pair(38, 39), Pair(39, 40), Pair(40, 41), Pair(41, 42), Pair(42, 43), Pair(43, 44), Pair(44, 45), Pair(45, 46), Pair(46, 47), Pair(47, 48), Pair(48, 49), Pair(49, 50), Pair(50, 51), Pair(51, 0))
+            triangulatePolygon(vertices, polygon)
+        }
 
+        val tests = listOf<() -> Any?>(
+                keeper3
         )
 
         debug = true
@@ -78,7 +88,7 @@ fun triangulatePolygon(vertices: PointSet2F, polygon: ArrayList<Pair<Int, Int>>)
     while (points.size > 3) {
         val (ai, bi, ci) = findNextEar(points)
         try {
-            newEdges.add(LineSegment2F(points[bi], points[ci]))
+            newEdges.add(LineSegment2F(points[ai], points[ci]))
             if (debug) {
                 draw(debugResolution, "debug-triangulatePolygon1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
                     graphics.color = Color.BLACK
@@ -90,8 +100,8 @@ fun triangulatePolygon(vertices: PointSet2F, polygon: ArrayList<Pair<Int, Int>>)
                         drawPoint(b, 3)
                     }
                     graphics.color = Color.RED
-                    drawEdge(points[bi], points[ci])
-                    drawPoint(points[bi], 4)
+                    drawEdge(points[ai], points[ci])
+                    drawPoint(points[ai], 4)
                     drawPoint(points[ci], 4)
                     graphics.color = Color.GREEN
                     points.forEach {
@@ -100,7 +110,7 @@ fun triangulatePolygon(vertices: PointSet2F, polygon: ArrayList<Pair<Int, Int>>)
                 }
                 breakPoint()
             }
-            points.removeAt(ai)
+            points.removeAt(bi)
         } catch (e: Exception) {
             if (debug) {
                 draw(debugResolution, "debug-triangulatePolygon2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
@@ -160,7 +170,45 @@ fun triangulatePolygon(vertices: PointSet2F, polygon: ArrayList<Pair<Int, Int>>)
         reducedPolygon = polygonFromPoints(vertices, reducedPoints)
         meshMinusPatches = buildMesh(reducedPolygon + newEdges.map { Pair(vertices[it.a], vertices[it.b]) }, vertices.size)
     }
-    return flipEdges(vertices, buildMesh(polygon + newEdges.map { Pair(vertices[it.a], vertices[it.b]) }, vertices.size))
+    val triangles = buildMesh(polygon + newEdges.map { Pair(vertices[it.a], vertices[it.b]) }, vertices.size)
+    if (debug) {
+        draw(debugResolution, "debug-triangulatePolygon1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
+            graphics.color = Color.BLACK
+            triangles.forEach {
+                val tri = it.toList()
+                val a = vertices[tri[0]]!!
+                val b = vertices[tri[1]]!!
+                val c = vertices[tri[2]]!!
+                drawEdge(a, b)
+                drawEdge(b, c)
+                drawEdge(c, a)
+                drawPoint(a, 3)
+                drawPoint(b, 3)
+                drawPoint(c, 3)
+            }
+        }
+        breakPoint()
+    }
+    val flipped = flipEdges(vertices, triangles)
+    if (debug) {
+        draw(debugResolution, "debug-triangulatePolygon1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
+            graphics.color = Color.BLACK
+            flipped.forEach {
+                val tri = it.toList()
+                val a = vertices[tri[0]]!!
+                val b = vertices[tri[1]]!!
+                val c = vertices[tri[2]]!!
+                drawEdge(a, b)
+                drawEdge(b, c)
+                drawEdge(c, a)
+                drawPoint(a, 3)
+                drawPoint(b, 3)
+                drawPoint(c, 3)
+            }
+        }
+        breakPoint()
+    }
+    return flipped
 }
 
 private fun addPatchPoints(points: ArrayList<Point2F>, patch: CollinearPatch) {
@@ -186,20 +234,20 @@ private fun findNextEar(points: ArrayList<Point2F>): Triple<Int, Int, Int> {
     var index3 = -1
     var angle = -0.1
     for (i in 1..points.size) {
-        val ai = i % points.size
-        val bi = i - 1
+        val ai = i - 1
+        val bi = i % points.size
         val ci = (i + 1) % points.size
         val a = points[ai]
         val b = points[bi]
         val c = points[ci]
-        val normal = (b - a).cross(c - a)
+        val normal = (a - b).cross(c - b)
         if (normal >= 0.0f) {
             continue
         }
-        if (anyPointWithin(points, bi, ci, ai)) {
+        if (anyPointWithin(points, ai, bi, ci)) {
             continue
         }
-        val newWeight = angle(points, bi, ai, ci)
+        val newWeight = angle(points, ai, bi, ci)
         if (newWeight > angle) {
             angle = newWeight
             index1 = ai
@@ -217,7 +265,7 @@ private fun findCollinearPatches(points: ArrayList<Point2F>): ArrayList<Collinea
         val ai = i - 1
         val bi = i % points.size
         val ci = (i + 1) % points.size
-        if (debug) {
+        if (debug && trace) {
             draw(debugResolution, "debug-findCollinearPatches-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(points.map { it.x }.min()!!) + 0.0005f, -(points.map { it.y }.min()!!) + 0.0005f)) {
                 graphics.color = Color.BLACK
                 for (p in 1..points.size) {
@@ -301,8 +349,40 @@ private fun anyPointWithin(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int
         if (s > 0 && t > 0 && 1.0 - s - t > 0) {
             return true
         }
-        val angle = angle(points, ai, i, bi)
-        if (LineSegment2F(b, c).distance2(p) < 0.000005f && angle < 0.08f) {
+        if (debug && trace) {
+            draw(debugResolution, "debug-anyPointWithin-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(points.map { it.x }.min()!!) + 0.0005f, -(points.map { it.y }.min()!!) + 0.0005f)) {
+                graphics.color = Color.BLACK
+                for (pi in 1..points.size) {
+                    val p1 = points[pi - 1]
+                    val p2 = points[pi % points.size]
+                    drawEdge(p1, p2)
+                    drawPoint(p1, 7)
+                    drawPoint(p2, 7)
+                }
+                graphics.color = Color.RED
+                drawEdge(points[bi], points[ai])
+                drawEdge(points[bi], points[ci])
+                drawEdge(points[ci], points[ai])
+                drawPoint(points[ai], 5)
+                graphics.color = Color.GREEN
+                drawPoint(points[bi], 5)
+                graphics.color = Color.CYAN
+                drawPoint(points[ci], 5)
+                graphics.color = Color.MAGENTA
+                drawPoint(p, 5)
+                graphics.color = Color.BLUE
+                drawEdge(points[ai], points[ci])
+            }
+            breakPoint()
+        }
+        val distance2 = LineSegment2F(a, c).distance2(p)
+        val check1 = distance2 < 0.000000005f
+        if (!check1) {
+            continue
+        }
+        val angle = angle(points, ai, i, ci)
+        val check2 = angle < 0.08f
+        if (check2) {
             return true
         }
     }
@@ -313,6 +393,10 @@ private fun halfAngle(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int): Do
     val a = points[ai]
     val b = points[bi]
     val c = points[ci]
+    return halfAngle(a, b, c)
+}
+
+private fun halfAngle(a: Point2F, b: Point2F, c: Point2F): Double {
     val ba = Vector2F(b, a)
     val bc = Vector2F(b, c)
     val ba3d = Vector3F(ba.a, ba.b, 0.0f)
@@ -321,7 +405,14 @@ private fun halfAngle(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int): Do
 }
 
 private fun angle(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int): Double {
-    val halfAngle = halfAngle(points, ai, bi, ci)
+    return normalizeHalfAngle(halfAngle(points, ai, bi, ci))
+}
+
+private fun angle(a: Point2F, b: Point2F, c: Point2F): Double {
+    return normalizeHalfAngle(halfAngle(a, b, c))
+}
+
+private fun normalizeHalfAngle(halfAngle: Double): Double {
     return Math.abs(if (halfAngle < 0.0f) {
         halfAngle
     } else {
@@ -456,6 +547,88 @@ private fun flipEdges(vertices: PointSet2F, triangles: LinkedHashSet<Set<Int>>):
         }
         iterations++
     }
+    edgeNodes.forEach { edgeNode ->
+        val tri1 = edgeNode.t1
+        val tri2 = edgeNode.t2
+        val peaks = mutableSetOf(tri1.p1, tri1.p2, tri1.p3, tri2.p1, tri2.p2, tri2.p3)
+        val quad = ArrayList(peaks.map { vertices[it]!! })
+        peaks.remove(edgeNode.p1)
+        peaks.remove(edgeNode.p2)
+        val peakLineIds = peaks.toList()
+        val baseLine = LineSegment2F(vertices[edgeNode.p1]!!, vertices[edgeNode.p2]!!)
+        val peakLine = LineSegment2F(vertices[peakLineIds[0]]!!, vertices[peakLineIds[1]]!!)
+        val angle1 = angle(baseLine.a, peakLine.a, baseLine.b)
+        val angle2 = angle(baseLine.b, peakLine.b, baseLine.a)
+        val minAngle = min(angle1, angle2)
+        val maxAngle = max(angle1, angle2)
+        val check1 = baseLine.intersects(peakLine)
+        val check2 = !containsCollinearPoints(quad)
+        val check3 = minAngle < 0.55f && maxAngle > 2.0f
+        if (debug) {
+            draw(debugResolution, "debug-triangulatePolygon1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, 30.0f, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
+                graphics.color = Color.BLACK
+                triNodes.forEach {
+                    val a = vertices[it.p1]!!
+                    val b = vertices[it.p2]!!
+                    val c = vertices[it.p3]!!
+                    drawEdge(a, b)
+                    drawEdge(b, c)
+                    drawEdge(c, a)
+                    drawPoint(a, 3)
+                    drawPoint(b, 3)
+                    drawPoint(c, 3)
+                }
+                graphics.color = if (check1 && check2 && check3) Color.RED else Color.BLUE
+                listOf(tri1, tri2).forEach {
+                    val a = vertices[it.p1]!!
+                    val b = vertices[it.p2]!!
+                    val c = vertices[it.p3]!!
+                    drawEdge(a, b)
+                    drawEdge(b, c)
+                    drawEdge(c, a)
+                    drawPoint(a, 2)
+                    drawPoint(b, 2)
+                    drawPoint(c, 2)
+                }
+            }
+            breakPoint()
+        }
+        if (check1 && check2 && check3) {
+            val t1Edges = ArrayList(tri1.edges)
+            val t2Edges = ArrayList(tri2.edges)
+            t1Edges.remove(edgeNode)
+            t2Edges.remove(edgeNode)
+            tri1.p1 = peakLineIds[0]
+            tri1.p2 = peakLineIds[1]
+            tri1.p3 = edgeNode.p1
+            tri2.p1 = peakLineIds[0]
+            tri2.p2 = peakLineIds[1]
+            tri2.p3 = edgeNode.p2
+            edgeNode.p1 = peakLineIds[0]
+            edgeNode.p2 = peakLineIds[1]
+            tri1.edges.clear()
+            tri2.edges.clear()
+            tri1.edges.add(edgeNode)
+            tri2.edges.add(edgeNode)
+            (t1Edges + t2Edges).forEach { edge ->
+                if ((edge.p1 == tri1.p1 || edge.p1 == tri1.p2 || edge.p1 == tri1.p3) && (edge.p2 == tri1.p1 || edge.p2 == tri1.p2 || edge.p2 == tri1.p3)) {
+                    if (edge.t1 == tri1 || edge.t1 == tri2) {
+                        edge.t1 = tri1
+                    } else {
+                        edge.t2 = tri1
+                    }
+                    tri1.edges.add(edge)
+                } else {
+                    if (edge.t1 == tri1 || edge.t1 == tri2) {
+                        edge.t1 = tri2
+                    } else {
+                        edge.t2 = tri2
+                    }
+                    tri2.edges.add(edge)
+                }
+            }
+        }
+    }
     triangles.clear()
     triNodes.forEach {
         triangles.add(setOf(it.p1, it.p2, it.p3))
@@ -558,7 +731,7 @@ fun buildMesh(edgeSkeletonIn: ArrayList<LineSegment3F>, riverSkeletonIn: ArrayLi
     meshPoints.addAll(edgeSkeleton.flatMap { listOf(it.a, it.b) })
     meshPoints.addAll(riverSkeleton.flatMap { listOf(it.a, it.b) })
     val edges = LinkedHashSet<Pair<Int, Int>>()
-    fun edge(a: Int, b: Int) = edges.add(Pair(Math.min(a, b), Math.max(a, b)))
+    fun edge(a: Int, b: Int) = edges.add(Pair(min(a, b), max(a, b)))
     edgeSkeleton.forEach {
         edge(meshPoints[it.a], meshPoints[it.b])
     }
@@ -728,6 +901,39 @@ private fun moveRiverInsideBorder(globalVertices: PointSet2F, edgeSkeleton: Arra
             if (!borderPoints.contains(b) && !containsPoint(globalVertices, polygon, b)) {
                 dropVertices.add(b)
             }
+//            if (!containsPoint(globalVertices, polygon, it.interpolate(0.5f))) {
+//                val borderContainsA = borderPoints.contains(a)
+//                val borderContainsB = borderPoints.contains(b)
+//                if (!borderContainsA) {
+//                    dropVertices.add(a)
+//                }
+//                if (!borderContainsB) {
+//                    dropVertices.add(b)
+//                }
+//                if (borderContainsA && borderContainsB) {
+//                    dropVertices.add(b)
+//                }
+//            }
+//            var intersects = false
+//            for (edge in polygon) {
+//                if (LineSegment2F(globalVertices[edge.first]!!, globalVertices[edge.second]!!).intersects(it)) {
+//                    intersects = true
+//                    break
+//                }
+//            }
+//            if (intersects) {
+//                val borderContainsA = borderPoints.contains(a)
+//                val borderContainsB = borderPoints.contains(b)
+//                if (!borderContainsA) {
+//                    dropVertices.add(a)
+//                }
+//                if (!borderContainsB) {
+//                    dropVertices.add(b)
+//                }
+//                if (borderContainsA && borderContainsB) {
+//                    dropVertices.add(b)
+//                }
+//            }
         }
         if (dropVertices.isEmpty()) {
             if (segments.size == 1) {
@@ -855,7 +1061,10 @@ private fun getPolygonEdgeSets(meshPoints: PointSet2F, edges: Collection<Pair<In
 }
 
 private fun containsPoint(meshPoints: PointSet2F, polygon: ArrayList<Pair<Int, Int>>, id: Int): Boolean {
-    val point = meshPoints[id]!!
+    return containsPoint(meshPoints, polygon, meshPoints[id]!!)
+}
+
+private fun containsPoint(meshPoints: PointSet2F, polygon: ArrayList<Pair<Int, Int>>, point: Point2F): Boolean {
     val points = polygon.map { meshPoints[it.first]!! }
     var i: Int = 0
     var j: Int = points.size - 1
@@ -1213,13 +1422,13 @@ private fun addHeightPointIfNeeded(splices: LinkedHashMap<Pair<Int, Int>, Point3
     }
 }
 
-fun max(a: Int, b: Int, c: Int) = Math.max(Math.max(a, b), c)
+fun max(a: Int, b: Int, c: Int) = max(max(a, b), c)
 
-fun min(a: Int, b: Int, c: Int) = Math.min(Math.min(a, b), c)
+fun min(a: Int, b: Int, c: Int) = min(min(a, b), c)
 
-fun min(a: Float, b: Float, c: Float) = Math.min(Math.min(a, b), c)
+fun min(a: Float, b: Float, c: Float) = min(min(a, b), c)
 
-fun max(a: Float, b: Float, c: Float) = Math.max(Math.max(a, b), c)
+fun max(a: Float, b: Float, c: Float) = max(max(a, b), c)
 
-fun clamp(min: Float, max: Float, f: Float) = Math.min(Math.max(min, f), max)
+fun clamp(min: Float, max: Float, f: Float) = min(max(min, f), max)
 
