@@ -86,7 +86,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 172..10000) {
+        for (test in 1..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -517,7 +517,7 @@ class BuildContinent() : Runnable {
             while (modified) {
                 modified = false
                 val adjacentUnconnected = ArrayList<Pair<Int, Polygon2F>>()
-                (riverGraph.vertices.getAdjacentVertices(id) + ((inclusionPatches[id] ?: HashSet()).flatMap { riverGraph.vertices.getAdjacentVertices(it) })).forEach { id ->
+                (riverGraph.vertices.getAdjacentVertices(id) + ((inclusionPatches[id] ?: HashSet()).flatMap { riverGraph.vertices.getAdjacentVertices(it) })).toSet().forEach { id ->
                     unconnectedPolys[id]?.forEach { adjacentUnconnected.add(Pair(id, it)) }
                 }
                 val polysToTake = ArrayList<Pair<Int, Polygon2F>>()
@@ -526,7 +526,7 @@ class BuildContinent() : Runnable {
                     val secondAdjacentEdgePolys = ArrayList<Pair<Int, Polygon2F>>()
                     (riverGraph.vertices.getAdjacentVertices(adjacentPoly.first) + (adjacencyPatches[adjacentPoly.first] ?: HashSet()))
                             .flatMap { listOf(it) + (inclusionPatches[it]?.toList() ?: emptyList()) }
-                            .flatMap { listOf(it) + (reverseInclusionPatches[it]?.toList() ?: emptyList()) }.forEach {
+                            .flatMap { listOf(it) + (reverseInclusionPatches[it]?.toList() ?: emptyList()) }.toSet().forEach {
                         val adjacentEdgePoly = if (it == id) polygon else edgePolys[it]
                         if (adjacentEdgePoly != null) {
                             secondAdjacentEdgePolys.add(Pair(it, adjacentEdgePoly))
