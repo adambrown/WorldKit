@@ -1116,7 +1116,12 @@ private fun getPolygonEdgeSets(meshPoints: PointSet2F, edges: Collection<Pair<In
             val nonCycleSegments = getConnectedSegments(edges.filter { nonCycleNodes.contains(it.first) || nonCycleNodes.contains(it.second) })
             val orderedNonCycleSegments = ArrayList<ArrayList<Pair<Int, Int>>>()
             nonCycleSegments.forEach {
-                orderedNonCycleSegments.add(orderSegment(it))
+                val segmentSet = LinkedHashSet(it)
+                while (segmentSet.isNotEmpty()) {
+                    val newSegment = orderSegment(segmentSet)
+                    segmentSet.removeAll(newSegment.map { setOf(it.first, it.second) })
+                    orderedNonCycleSegments.add(newSegment)
+                }
             }
             if (putNonCyclesInCycles) {
                 orderedNonCycleSegments.forEach {

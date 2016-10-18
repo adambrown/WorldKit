@@ -86,7 +86,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 1..10000) {
+        for (test in 52..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -120,14 +120,14 @@ class BuildContinent() : Runnable {
                 try {
                     val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
                     val riverSplines = calculateRiverSegments(test, i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows)
-                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
-                        drawRivers(graph, regionMask, riverSet, coastline, border)
-                    }
-                    draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", "output", Color.WHITE) {
-                        drawGraph(riverGraph)
-                        graphics.color = Color.BLACK
-                        drawVertexIds(riverGraph)
-                    }
+//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
+//                        drawRivers(graph, regionMask, riverSet, coastline, border)
+//                    }
+//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", "output", Color.WHITE) {
+//                        drawGraph(riverGraph)
+//                        graphics.color = Color.BLACK
+//                        drawVertexIds(riverGraph)
+//                    }
 //                    draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
 //                        graphics.color = Color.BLACK
 //                        drawPolygon(coastline, true)

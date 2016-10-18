@@ -495,8 +495,8 @@ object Rivers {
         val borderDelta = maxDistFromBorder - minDistFromBorder
         val slopeDelta = MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
         return hashMapOf(*distances.map {
-            val normalizedCoast = (it.second - minDistFromCoast) / coastDelta
-            val normalizedBorder = (it.third - minDistFromBorder) / borderDelta
+            val normalizedCoast = if (coastDelta == 0.0f) 0.0f else (it.second - minDistFromCoast) / coastDelta
+            val normalizedBorder = if (borderDelta == 0.0f) 0.0f else (it.third - minDistFromBorder) / borderDelta
             val borderWeight = MIN_TERRAIN_SLOPE + (sigmoidBorder(normalizedBorder) * slopeDelta)
             val coastWeight = MIN_TERRAIN_SLOPE + (sigmoidCoast(normalizedCoast) * slopeDelta)
             Pair(it.first, max(coastWeight, borderWeight))
