@@ -86,7 +86,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 52..10000) {
+        for (test in 1..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -398,15 +398,16 @@ class BuildContinent() : Runnable {
                     for (edge in it.edges.map { LineSegment2F(it.a, it.b) }) {
                         val intersection = polygon.doesEdgeIntersect(edge)
                         if (intersection.first) {
-                            val intersectionPoint = polygon.edges[intersection.second].intersection(edge)
-                            if (intersectionPoint == null) {
+                            val polygonEdge = polygon.edges[intersection.second]
+                            val intersectionPoint = polygonEdge.intersection(edge)
+                            if (intersectionPoint == null || ((intersectionPoint.epsilonEquals(edge.a) || intersectionPoint.epsilonEquals(edge.b)) && (intersectionPoint.epsilonEquals(polygonEdge.a) || intersectionPoint.epsilonEquals(polygonEdge.b)))) {
                                 revisedRiverEdges.add(edge)
                             } else {
                                 val splicePoint = Point3F(intersectionPoint.x, intersectionPoint.y, 0.0f)
-                                splices.add(Pair(polygon.edges[intersection.second], splicePoint))
+                                splices.add(Pair(polygonEdge, splicePoint))
                                 revisedRiverEdges.add(LineSegment2F(edge.a, splicePoint))
+                                break
                             }
-                            break
                         }
                         if (!polygon.isWithin(edge.interpolate(0.5f))) {
                             break
@@ -1196,7 +1197,7 @@ class BuildContinent() : Runnable {
                 return polygon
             }
         }
-        throw GeometryException("unable to find the main polygon for cell")
+        throw GeometryException("unable to find the main polygon for cell: ${vertex.id}")
     }
 
     private fun toSplineTree(test: Int, body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, junctions: TreeNode<Junction>, flows: FloatArray): TreeNode<RiverSegment>? {

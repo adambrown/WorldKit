@@ -692,7 +692,7 @@ object Rivers {
                 var count = 0
                 var riverEdgeMinDist = MIN_RIVER_EDGE_DISTANCE
                 var distFromBorder = MIN_DISTANCE_FROM_BORDER
-                while (newNodeCandidate == null && count < 9) {
+                while (newNodeCandidate == null && count < 8) {
                     riverEdgeMinDist -= riverEdgeMinDistIncrement
                     val minRiverEdge2 = riverEdgeMinDist * riverEdgeMinDist
                     distFromBorder -= distFromBorderIncrement
