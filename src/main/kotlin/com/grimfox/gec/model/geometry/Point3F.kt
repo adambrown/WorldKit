@@ -36,7 +36,7 @@ open class Point3F(x: Float, y: Float, val z: Float): Point2F(x, y) {
         return result
     }
 
-    fun epsilonEquals(other: Point3F, epsilon: Float = 0.0000001f): Boolean {
+    fun epsilonEquals(other: Point3F, epsilon: Float = 0.000001f): Boolean {
         return Math.abs(x - other.x) < epsilon && Math.abs(y - other.y) < epsilon && Math.abs(z - other.z) < epsilon
     }
 

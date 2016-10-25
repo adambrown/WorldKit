@@ -86,7 +86,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 1..10000) {
+        for (test in 1095..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -114,20 +114,24 @@ class BuildContinent() : Runnable {
                 val coastline = body.first
                 val coastMultigon = Multigon2F(coastline, 20)
                 val riverSet = body.second
+                val exceptions = body.third
                 val border = borders[i]
                 val riverGraph = buildRiverGraph(riverSet)
                 val riverVertexLookup = RiverVertexLookup(riverGraph)
                 try {
+                    if (exceptions.isNotEmpty()) {
+                        throw exceptions.first()
+                    }
                     val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
                     val riverSplines = calculateRiverSegments(test, i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows)
-//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
-//                        drawRivers(graph, regionMask, riverSet, coastline, border)
-//                    }
-//                    draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", "output", Color.WHITE) {
-//                        drawGraph(riverGraph)
-//                        graphics.color = Color.BLACK
-//                        drawVertexIds(riverGraph)
-//                    }
+                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
+                        drawRivers(graph, regionMask, riverSet, coastline, border)
+                    }
+                    draw(outputWidth, "test-new-${String.format("%05d", test)}-graph$i", "output", Color.WHITE) {
+                        drawGraph(riverGraph)
+                        graphics.color = Color.BLACK
+                        drawVertexIds(riverGraph)
+                    }
 //                    draw(outputWidth, "test-new-${String.format("%05d", test)}-coast$i") {
 //                        graphics.color = Color.BLACK
 //                        drawPolygon(coastline, true)
@@ -386,8 +390,28 @@ class BuildContinent() : Runnable {
             val localRiverSkeleton = ArrayList<LineSegment3F>()
             val id = it.key
             var polygon = it.value
-            val polyPoints = PointSet2F(polygon.points)
             val untouchablePoints = getUntouchablePoints(riverGraph, coastalCellPolys, adjacencyPatches, inclusionPatches, riverGraph.vertices[id], cellsToRiverSegments[id])
+            val goodPolyPoints = ArrayList<Point2F>()
+            for (polyPoint in polygon.points) {
+                if (untouchablePoints.contains(polyPoint)) {
+                    goodPolyPoints.add(polyPoint)
+                } else {
+                    var isOk = true
+                    for (polyEdge in polygon.edges) {
+                        if (!polyEdge.a.epsilonEquals(polyPoint) && !polyEdge.b.epsilonEquals(polyPoint)) {
+                            if (polyEdge.distance2(polyPoint) < 0.000005f) {
+                                isOk = false
+                                break
+                            }
+                        }
+                    }
+                    if (isOk) {
+                        goodPolyPoints.add(polyPoint)
+                    }
+                }
+            }
+            polygon = Polygon2F(goodPolyPoints, polygon.isClosed)
+            val polyPoints = PointSet2F(polygon.points)
             val pointsWithHeights = PointSet2F()
             val localRiverPolys = riverPolys[id]
             val splices = ArrayList<Pair<LineSegment2F, Point2F>>()

@@ -24,6 +24,15 @@ inline fun <reified T> printList(list: Collection<T>, noinline transform: (T) ->
     return list.joinToString(", ", "arrayListOf(", ")", transform = transform)
 }
 
+fun <E> Collection<E>.containsAny(other: Collection<E>): Boolean {
+    other.forEach {
+        if (this.contains(it)) {
+            return true
+        }
+    }
+    return false
+}
+
 object Utils {
 
     val LOG = LoggerFactory.getLogger(Main::class.java)

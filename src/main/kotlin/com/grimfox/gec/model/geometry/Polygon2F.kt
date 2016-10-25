@@ -6,69 +6,116 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
 
     companion object {
 
-        fun fromUnsortedEdges(edges: Collection<LineSegment2F>, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null): Polygon2F {
+        fun fromUnsortedEdges(edges: Collection<LineSegment2F>, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null, reusePoints: Boolean = false): Polygon2F {
+            val polygons = ArrayList<Polygon2F>()
             val mutableEdges = ArrayList(edges)
-            val border = ArrayList<Point2F>(mutableEdges.size + 1)
-            val seedEdge = mutableEdges.removeAt(0)
-            border.add(seedEdge.a)
-            splices?.forEach {
-                if (it.first.epsilonEquals(seedEdge)) {
-                    border.add(it.second)
-                }
-            }
-            border.add(seedEdge.b)
-            var currentEdge = seedEdge
             while (mutableEdges.isNotEmpty()) {
-                var nextEdge: LineSegment2F? = null
-                for (i in 0..mutableEdges.size - 1) {
-                    if (currentEdge.a.epsilonEquals(mutableEdges[i].b)) {
-                        nextEdge = mutableEdges.removeAt(i)
-                        break
+                val border = ArrayList<Point2F>(mutableEdges.size + 1)
+                val seedEdge = mutableEdges.removeAt(0)
+                border.add(seedEdge.a)
+                splices?.forEach {
+                    if (it.first.epsilonEquals(seedEdge)) {
+                        border.add(it.second)
                     }
                 }
-                if (nextEdge == null) {
-                    break
-                }
-                splices?.forEach {
-                    val finalNextEdge = nextEdge
-                    if (finalNextEdge != null) {
-                        if (it.first.epsilonEquals(finalNextEdge)) {
-                            border.add(0, it.second)
+                border.add(seedEdge.b)
+                var currentEdge = seedEdge
+                while (mutableEdges.isNotEmpty()) {
+                    var nextEdge: LineSegment2F? = null
+                    for (i in 0..mutableEdges.size - 1) {
+                        if (currentEdge.a.epsilonEquals(mutableEdges[i].b)) {
+                            nextEdge = mutableEdges.removeAt(i)
+                            break
                         }
                     }
-                }
-                border.add(0, nextEdge.a)
-                currentEdge = nextEdge
-            }
-            currentEdge = seedEdge
-            while (mutableEdges.isNotEmpty()) {
-                var nextEdge: LineSegment2F? = null
-                for (i in 0..mutableEdges.size - 1) {
-                    if (currentEdge.b.epsilonEquals(mutableEdges[i].a)) {
-                        nextEdge = mutableEdges.removeAt(i)
+                    if (nextEdge == null) {
                         break
                     }
-                }
-                if (nextEdge == null) {
-                    break
-                }
-                splices?.forEach {
-                    val finalNextEdge = nextEdge
-                    if (finalNextEdge != null) {
-                        if (it.first.epsilonEquals(finalNextEdge)) {
-                            border.add(it.second)
+                    splices?.forEach {
+                        val finalNextEdge = nextEdge
+                        if (finalNextEdge != null) {
+                            if (it.first.epsilonEquals(finalNextEdge)) {
+                                border.add(0, it.second)
+                            }
                         }
                     }
+                    border.add(0, nextEdge.a)
+                    currentEdge = nextEdge
                 }
-                border.add(nextEdge.b)
-                currentEdge = nextEdge
+                currentEdge = seedEdge
+                while (mutableEdges.isNotEmpty()) {
+                    var nextEdge: LineSegment2F? = null
+                    for (i in 0..mutableEdges.size - 1) {
+                        if (currentEdge.b.epsilonEquals(mutableEdges[i].a)) {
+                            nextEdge = mutableEdges.removeAt(i)
+                            break
+                        }
+                    }
+                    if (nextEdge == null) {
+                        break
+                    }
+                    splices?.forEach {
+                        val finalNextEdge = nextEdge
+                        if (finalNextEdge != null) {
+                            if (it.first.epsilonEquals(finalNextEdge)) {
+                                border.add(it.second)
+                            }
+                        }
+                    }
+                    border.add(nextEdge.b)
+                    currentEdge = nextEdge
+                }
+                var isClosed = false
+                if (border.first() == border.last()) {
+                    border.removeAt(border.size - 1)
+                    isClosed = true
+                }
+                polygons.add(Polygon2F(border, isClosed))
             }
-            var isClosed = false
-            if (border.first() == border.last()) {
-                border.removeAt(border.size - 1)
-                isClosed = true
+            if (polygons.size == 1 || !reusePoints) {
+                return polygons.first()
+            } else {
+                polygons.sortByDescending { it.points.size }
+                var mainPoly = polygons.removeAt(0)
+                for (i in 0..polygons.size - 1) {
+                    val otherPoly = polygons.removeAt(0)
+                    if (!otherPoly.isClosed) {
+                        continue
+                    }
+                    var pointInCommon: Pair<Int, Int>? = null
+                    var tooMany = false
+                    for ((j, mainPoint) in mainPoly.points.withIndex()) {
+                        for ((k, otherPoint) in otherPoly.points.withIndex()) {
+                            if (mainPoint.epsilonEquals(otherPoint)) {
+                                if (pointInCommon != null) {
+                                    tooMany = true
+                                }
+                                pointInCommon = Pair(j, k)
+                            }
+                            if (tooMany) {
+                                break
+                            }
+                        }
+                        if (tooMany) {
+                            break
+                        }
+                    }
+                    if (pointInCommon == null || tooMany) {
+                        continue
+                    }
+                    mainPoly = joinPolygons(mainPoly, otherPoly, pointInCommon)
+                }
+                return mainPoly
             }
-            return Polygon2F(border, isClosed)
+        }
+
+        private fun joinPolygons(p1: Polygon2F, p2: Polygon2F, pointInCommon: Pair<Int, Int>): Polygon2F {
+            val combined = ArrayList(p1.points.subList(0, pointInCommon.first))
+            val rotated = ArrayList(p2.points)
+            Collections.rotate(rotated, -pointInCommon.second)
+            combined.addAll(rotated)
+            combined.addAll(p1.points.subList(pointInCommon.first, p1.points.size))
+            return Polygon2F(combined, true)
         }
     }
 

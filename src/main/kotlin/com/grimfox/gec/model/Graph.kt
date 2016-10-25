@@ -463,7 +463,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
         val edgeSegments = LineSegment2F.getConnectedEdgeSegments(edges)
         val borders = ArrayList<Polygon2F>()
         edgeSegments.forEach {
-            borders.add(fromUnsortedEdges(it, splices))
+            borders.add(fromUnsortedEdges(it, splices, true))
         }
         return borders
     }

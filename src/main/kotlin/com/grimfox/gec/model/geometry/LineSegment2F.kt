@@ -214,11 +214,11 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
         return Point2F(a.x + vector.a, a.y + vector.b)
     }
 
-    fun epsilonEquals(other: LineSegment2F, epsilon: Float = 0.0000001f): Boolean {
+    fun epsilonEquals(other: LineSegment2F, epsilon: Float = 0.000001f): Boolean {
         return (a.epsilonEquals(other.a, epsilon) && b.epsilonEquals(other.b, epsilon)) || (a.epsilonEquals(other.b, epsilon) && b.epsilonEquals(other.a, epsilon))
     }
 
-    fun getConnectedEdges(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.0000001f): ArrayList<LineSegment2F> {
+    fun getConnectedEdges(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.000001f): ArrayList<LineSegment2F> {
         val connectedEdges = ArrayList<LineSegment2F>()
         connectedEdges.add(this)
         var nextEdges = LinkedHashSet<LineSegment2F>(connectedEdges)

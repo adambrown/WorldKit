@@ -61,8 +61,15 @@ object Geometry {
             triangulatePolygon(vertices, polygon)
         }
 
+        val test2 = {
+            val edgeSkeleton = arrayListOf(LineSegment3F(a=Point3F(x=0.59146094f, y=0.90840524f, z=0.0f), b=Point3F(x=0.5928776f, y=0.90894204f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5928776f, y=0.90894204f, z=0.0f), b=Point3F(x=0.5943919f, y=0.90898865f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5943919f, y=0.90898865f, z=0.0f), b=Point3F(x=0.59452397f, y=0.9075442f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59452397f, y=0.9075442f, z=0.0f), b=Point3F(x=0.5939074f, y=0.90623116f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5939074f, y=0.90623116f, z=0.0f), b=Point3F(x=0.59300596f, y=0.90509474f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59300596f, y=0.90509474f, z=0.0f), b=Point3F(x=0.59200495f, y=0.9050684f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59200495f, y=0.9050684f, z=0.0f), b=Point3F(x=0.5909939f, y=0.9051601f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5909939f, y=0.9051601f, z=0.0f), b=Point3F(x=0.5919898f, y=0.90425354f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5919898f, y=0.90425354f, z=0.0f), b=Point3F(x=0.59322095f, y=0.9037076f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59322095f, y=0.9037076f, z=0.0f), b=Point3F(x=0.59413207f, y=0.9027159f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59413207f, y=0.9027159f, z=0.0f), b=Point3F(x=0.59392375f, y=0.90088826f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59392375f, y=0.90088826f, z=0.0f), b=Point3F(x=0.59262556f, y=0.899585f, z=0.0f)), LineSegment3F(a=Point3F(x=0.59262556f, y=0.899585f, z=0.0f), b=Point3F(x=0.5912024f, y=0.8999815f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5912024f, y=0.8999815f, z=0.0f), b=Point3F(x=0.5898024f, y=0.9004535f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5898024f, y=0.9004535f, z=0.0f), b=Point3F(x=0.58854765f, y=0.8992742f, z=0.0f)), LineSegment3F(a=Point3F(x=0.58854765f, y=0.8992742f, z=0.0f), b=Point3F(x=0.5874356f, y=0.897933f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5874356f, y=0.897933f, z=0.0f), b=Point3F(x=0.5893072f, y=0.8974042f, z=2.3520346E-4f)), LineSegment3F(a=Point3F(x=0.5893072f, y=0.8974042f, z=2.3520346E-4f), b=Point3F(x=0.5911788f, y=0.8968754f, z=4.7040693E-4f)), LineSegment3F(a=Point3F(x=0.5911788f, y=0.8968754f, z=4.7040693E-4f), b=Point3F(x=0.59305036f, y=0.89634657f, z=7.056104E-4f)), LineSegment3F(a=Point3F(x=0.59305036f, y=0.89634657f, z=7.056104E-4f), b=Point3F(x=0.59492195f, y=0.89581776f, z=9.4081386E-4f)), LineSegment3F(a=Point3F(x=0.59492195f, y=0.89581776f, z=9.4081386E-4f), b=Point3F(x=0.59679353f, y=0.89528894f, z=0.0011760173f)), LineSegment3F(a=Point3F(x=0.59679353f, y=0.89528894f, z=0.0011760173f), b=Point3F(x=0.5986651f, y=0.89476013f, z=0.0014112208f)), LineSegment3F(a=Point3F(x=0.5986651f, y=0.89476013f, z=0.0014112208f), b=Point3F(x=0.60053676f, y=0.8942314f, z=0.0016464242f)), LineSegment3F(a=Point3F(x=0.60053676f, y=0.8942314f, z=0.0016464242f), b=Point3F(x=0.6013329f, y=0.8950222f, z=0.0024375585f)), LineSegment3F(a=Point3F(x=0.6013329f, y=0.8950222f, z=0.0024375585f), b=Point3F(x=0.6012022f, y=0.89706016f, z=0.0024181062f)), LineSegment3F(a=Point3F(x=0.6012022f, y=0.89706016f, z=0.0024181062f), b=Point3F(x=0.6010715f, y=0.8990981f, z=0.002398654f)), LineSegment3F(a=Point3F(x=0.6010715f, y=0.8990981f, z=0.002398654f), b=Point3F(x=0.60094076f, y=0.90113604f, z=0.0023792016f)), LineSegment3F(a=Point3F(x=0.60094076f, y=0.90113604f, z=0.0023792016f), b=Point3F(x=0.60081005f, y=0.903174f, z=0.0023597493f)), LineSegment3F(a=Point3F(x=0.60081005f, y=0.903174f, z=0.0023597493f), b=Point3F(x=0.60067934f, y=0.9052119f, z=0.002340297f)), LineSegment3F(a=Point3F(x=0.60067934f, y=0.9052119f, z=0.002340297f), b=Point3F(x=0.6005486f, y=0.90724987f, z=0.0023208447f)), LineSegment3F(a=Point3F(x=0.6005486f, y=0.90724987f, z=0.0023208447f), b=Point3F(x=0.60041803f, y=0.90928775f, z=0.002301392f)), LineSegment3F(a=Point3F(x=0.60041803f, y=0.90928775f, z=0.002301392f), b=Point3F(x=0.5985861f, y=0.9091994f, z=0.0018411136f)), LineSegment3F(a=Point3F(x=0.5985861f, y=0.9091994f, z=0.0018411136f), b=Point3F(x=0.59675413f, y=0.9091111f, z=0.0013808352f)), LineSegment3F(a=Point3F(x=0.59675413f, y=0.9091111f, z=0.0013808352f), b=Point3F(x=0.5949222f, y=0.90902275f, z=9.2055683E-4f)), LineSegment3F(a=Point3F(x=0.5949222f, y=0.90902275f, z=9.2055683E-4f), b=Point3F(x=0.59309024f, y=0.9089344f, z=4.6027845E-4f)), LineSegment3F(a=Point3F(x=0.59309024f, y=0.9089344f, z=4.6027845E-4f), b=Point3F(x=0.5912582f, y=0.9088461f, z=0.0f)), LineSegment3F(a=Point3F(x=0.5912582f, y=0.9088461f, z=0.0f), b=Point3F(x=0.59146094f, y=0.90840524f, z=0.0f)))
+            val riverSkeleton = arrayListOf<LineSegment3F>()
+            val globalVertices = PointSet2F(points=arrayListOf(Point3F(x=0.59146094f, y=0.90840524f, z=0.0f), Point3F(x=0.5928776f, y=0.90894204f, z=0.0f), Point3F(x=0.5943919f, y=0.90898865f, z=0.0f), Point3F(x=0.59452397f, y=0.9075442f, z=0.0f), Point3F(x=0.5939074f, y=0.90623116f, z=0.0f), Point3F(x=0.59300596f, y=0.90509474f, z=0.0f), Point3F(x=0.59200495f, y=0.9050684f, z=0.0f), Point3F(x=0.5909939f, y=0.9051601f, z=0.0f), Point3F(x=0.5919898f, y=0.90425354f, z=0.0f), Point3F(x=0.59322095f, y=0.9037076f, z=0.0f), Point3F(x=0.59413207f, y=0.9027159f, z=0.0f), Point3F(x=0.59392375f, y=0.90088826f, z=0.0f), Point3F(x=0.59262556f, y=0.899585f, z=0.0f), Point3F(x=0.5912024f, y=0.8999815f, z=0.0f), Point3F(x=0.5898024f, y=0.9004535f, z=0.0f), Point3F(x=0.58854765f, y=0.8992742f, z=0.0f), Point3F(x=0.5874356f, y=0.897933f, z=0.0f), Point3F(x=0.5893072f, y=0.8974042f, z=2.3520346E-4f), Point3F(x=0.5911788f, y=0.8968754f, z=4.7040693E-4f), Point3F(x=0.59305036f, y=0.89634657f, z=7.056104E-4f), Point3F(x=0.59492195f, y=0.89581776f, z=9.4081386E-4f), Point3F(x=0.59679353f, y=0.89528894f, z=0.0011760173f), Point3F(x=0.5986651f, y=0.89476013f, z=0.0014112208f), Point3F(x=0.60053676f, y=0.8942314f, z=0.0016464242f), Point3F(x=0.6013329f, y=0.8950222f, z=0.0024375585f), Point3F(x=0.6012022f, y=0.89706016f, z=0.0024181062f), Point3F(x=0.6010715f, y=0.8990981f, z=0.002398654f), Point3F(x=0.60094076f, y=0.90113604f, z=0.0023792016f), Point3F(x=0.60081005f, y=0.903174f, z=0.0023597493f), Point3F(x=0.60067934f, y=0.9052119f, z=0.002340297f), Point3F(x=0.6005486f, y=0.90724987f, z=0.0023208447f), Point3F(x=0.60041803f, y=0.90928775f, z=0.002301392f), Point3F(x=0.5985861f, y=0.9091994f, z=0.0018411136f), Point3F(x=0.59675413f, y=0.9091111f, z=0.0013808352f), Point3F(x=0.5949222f, y=0.90902275f, z=9.2055683E-4f), Point3F(x=0.59309024f, y=0.9089344f, z=4.6027845E-4f), Point3F(x=0.5912582f, y=0.9088461f, z=0.0f)))
+            buildMesh(edgeSkeleton, riverSkeleton, globalVertices)
+        }
+
         val tests = listOf<() -> Any?>(
-                keeper3
+                test2
         )
 
         debug = true
@@ -955,39 +962,6 @@ private fun moveRiverInsideBorder(globalVertices: PointSet2F, edgeSkeleton: Arra
             if (!borderPoints.contains(b) && !containsPoint(globalVertices, polygon, b)) {
                 dropVertices.add(b)
             }
-//            if (!containsPoint(globalVertices, polygon, it.interpolate(0.5f))) {
-//                val borderContainsA = borderPoints.contains(a)
-//                val borderContainsB = borderPoints.contains(b)
-//                if (!borderContainsA) {
-//                    dropVertices.add(a)
-//                }
-//                if (!borderContainsB) {
-//                    dropVertices.add(b)
-//                }
-//                if (borderContainsA && borderContainsB) {
-//                    dropVertices.add(b)
-//                }
-//            }
-//            var intersects = false
-//            for (edge in polygon) {
-//                if (LineSegment2F(globalVertices[edge.first]!!, globalVertices[edge.second]!!).intersects(it)) {
-//                    intersects = true
-//                    break
-//                }
-//            }
-//            if (intersects) {
-//                val borderContainsA = borderPoints.contains(a)
-//                val borderContainsB = borderPoints.contains(b)
-//                if (!borderContainsA) {
-//                    dropVertices.add(a)
-//                }
-//                if (!borderContainsB) {
-//                    dropVertices.add(b)
-//                }
-//                if (borderContainsA && borderContainsB) {
-//                    dropVertices.add(b)
-//                }
-//            }
         }
         if (dropVertices.isEmpty()) {
             if (segments.size == 1) {
@@ -1014,9 +988,9 @@ private fun moveRiverInsideBorder(globalVertices: PointSet2F, edgeSkeleton: Arra
                 if (!dropVertices.contains(line.first) && !dropVertices.contains(line.second)) {
                     newRiverSkeleton.add(LineSegment3F(globalVertices[line.first] as Point3F, globalVertices[line.second] as Point3F))
                 } else if (dropVertices.contains(line.first)) {
-                    newRiverSkeleton.add(LineSegment3F(globalVertices[findSuitableReplacement(dropMap, line.first, line.second)] as Point3F, globalVertices[line.second] as Point3F))
+                    newRiverSkeleton.add(LineSegment3F(globalVertices[findSuitableReplacement(globalVertices, polygon, borderPoints, dropMap, line.first, line.second)] as Point3F, globalVertices[line.second] as Point3F))
                 } else {
-                    newRiverSkeleton.add(LineSegment3F(globalVertices[line.first] as Point3F, globalVertices[findSuitableReplacement(dropMap, line.second, line.first)] as Point3F))
+                    newRiverSkeleton.add(LineSegment3F(globalVertices[line.first] as Point3F, globalVertices[findSuitableReplacement(globalVertices, polygon, borderPoints, dropMap, line.second, line.first)] as Point3F))
                 }
             }
         }
@@ -1028,7 +1002,7 @@ private fun moveRiverInsideBorder(globalVertices: PointSet2F, edgeSkeleton: Arra
     riverSkeleton.addAll(newRiverSkeleton)
 }
 
-private fun findSuitableReplacement(dropMap: HashMap<Int, ArrayList<Int>>, toReplace: Int, cantUse: Int): Int {
+private fun findSuitableReplacement(globalVertices: PointSet2F, polygon: ArrayList<Pair<Int, Int>>, borderPoints: LinkedHashSet<Int>, dropMap: HashMap<Int, ArrayList<Int>>, toReplace: Int, cantUse: Int): Int {
     val cantUseSet = LinkedHashSet<Int>()
     cantUseSet.add(cantUse)
     val options = LinkedHashSet<Int>()
@@ -1045,7 +1019,30 @@ private fun findSuitableReplacement(dropMap: HashMap<Int, ArrayList<Int>>, toRep
             options.addAll(newOptions)
         }
     }
-    throw GeometryException("unable to reconnect segment")
+    val polyEdges = polygon.map { LineSegment2F(globalVertices[it.first]!!, globalVertices[it.second]!!) }
+    val orderedBorderPoints = ArrayList(borderPoints)
+    orderedBorderPoints.sortBy { globalVertices[it]!!.distance2(globalVertices[toReplace]!!) }
+    orderedBorderPoints.forEach {
+        if (isValidInteriorEdge(polyEdges, LineSegment2F(globalVertices[cantUse]!!, globalVertices[it]!!))) {
+            return it
+        }
+    }
+    return orderedBorderPoints.first()
+}
+
+fun isValidInteriorEdge(polyEdges: List<LineSegment2F>, edge: LineSegment2F): Boolean {
+    for (polyEdge in polyEdges) {
+        if (polyEdge.epsilonEquals(edge)) {
+            return false
+        }
+        if (polyEdge.a.epsilonEquals(edge.a) || polyEdge.b.epsilonEquals(edge.a) || polyEdge.a.epsilonEquals(edge.b) || polyEdge.b.epsilonEquals(edge.b)) {
+            continue
+        }
+        if (polyEdge.intersectsOrTouches(edge)) {
+            return false
+        }
+    }
+    return true
 }
 
 private fun getPolygonEdgeSets(meshPoints: PointSet2F, edges: Collection<Pair<Int, Int>>, count: Int, putNonCyclesInCycles: Boolean = true, keepNonCycles: Boolean = true): ArrayList<ArrayList<Pair<Int, Int>>> {
