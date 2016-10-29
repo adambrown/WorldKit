@@ -17,6 +17,7 @@ import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.generatePoints
 import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.geometry.*
+import com.grimfox.gec.util.geometry.Geometry.debug
 import com.grimfox.gec.util.geometry.Geometry.debugCount
 import com.grimfox.gec.util.geometry.Geometry.debugIteration
 import com.grimfox.gec.util.geometry.Geometry.debugResolution
@@ -86,7 +87,7 @@ class BuildContinent() : Runnable {
         } else {
             strides.sort()
         }
-        for (test in 1095..10000) {
+        for (test in 1162..10000) {
             if ((test + id) % count != 0) {
                 continue
             }
@@ -390,27 +391,54 @@ class BuildContinent() : Runnable {
             val localRiverSkeleton = ArrayList<LineSegment3F>()
             val id = it.key
             var polygon = it.value
+            if (debug) {
+                draw(debugResolution, "debug-buildCoastalCellSkeletons-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, Geometry.debugZoom, Vector2F(-(polygon.points.map { it.x }.min()!!) + 0.0005f, -(polygon.points.map { it.y }.min()!!) + 0.0005f)) {
+                    graphics.color = Color.BLACK
+                    for (edge in polygon.edges) {
+                        drawEdge(edge.a, edge.b)
+                        drawPoint(edge.a, 3)
+                        drawPoint(edge.b, 3)
+                    }
+                }
+                breakPoint()
+            }
             val untouchablePoints = getUntouchablePoints(riverGraph, coastalCellPolys, adjacencyPatches, inclusionPatches, riverGraph.vertices[id], cellsToRiverSegments[id])
-            val goodPolyPoints = ArrayList<Point2F>()
-            for (polyPoint in polygon.points) {
-                if (untouchablePoints.contains(polyPoint)) {
-                    goodPolyPoints.add(polyPoint)
-                } else {
-                    var isOk = true
-                    for (polyEdge in polygon.edges) {
-                        if (!polyEdge.a.epsilonEquals(polyPoint) && !polyEdge.b.epsilonEquals(polyPoint)) {
-                            if (polyEdge.distance2(polyPoint) < 0.000005f) {
-                                isOk = false
+            var modified = true
+            while (modified) {
+                modified = false
+                for (polyPoint in polygon.points) {
+                    if (!untouchablePoints.contains(polyPoint)) {
+                        for (polyEdge in polygon.edges) {
+                            if (!polyEdge.a.epsilonEquals(polyPoint) && !polyEdge.b.epsilonEquals(polyPoint) && polyEdge.distance2(polyPoint) < 0.0000002f) {
+                                if (debug) {
+                                    draw(debugResolution, "debug-buildCoastalCellSkeletons-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, Geometry.debugZoom, Vector2F(-(polygon.points.map { it.x }.min()!!) + 0.0005f, -(polygon.points.map { it.y }.min()!!) + 0.0005f)) {
+                                        graphics.color = Color.BLACK
+                                        for (edge in polygon.edges) {
+                                            drawEdge(edge.a, edge.b)
+                                            drawPoint(edge.a, 5)
+                                            drawPoint(edge.b, 5)
+                                        }
+                                        graphics.color = Color.RED
+                                        graphics.stroke = BasicStroke(2.0f)
+                                        drawEdge(polyEdge.a, polyEdge.b)
+                                        drawPoint(polyEdge.a, 3)
+                                        drawPoint(polyEdge.b, 3)
+                                        graphics.color = Color.GREEN
+                                        drawPoint(polyPoint, 7)
+                                    }
+                                    breakPoint()
+                                }
+                                polygon = Polygon2F(polygon.points.filter { it != polyPoint }, polygon.isClosed)
+                                modified = true
                                 break
                             }
                         }
-                    }
-                    if (isOk) {
-                        goodPolyPoints.add(polyPoint)
+                        if (modified) {
+                            break
+                        }
                     }
                 }
             }
-            polygon = Polygon2F(goodPolyPoints, polygon.isClosed)
             val polyPoints = PointSet2F(polygon.points)
             val pointsWithHeights = PointSet2F()
             val localRiverPolys = riverPolys[id]
@@ -607,7 +635,7 @@ class BuildContinent() : Runnable {
                 }
             }
             val localRiverPolys = buildCellRiverPolygons(cellsToRiverSegments, id)
-            riverPolys.put(id, localRiverPolys)
+            riverPolys[id] = localRiverPolys
             revisedEdgePolys[id] = revisePolygonIfRiverIntersects(riverGraph, edgePolys, cellsToRiverSegments, adjacencyPatches, inclusionPatches, riverGraph.vertices[id], polygon, localRiverPolys)
         }
         edgePolys.clear()

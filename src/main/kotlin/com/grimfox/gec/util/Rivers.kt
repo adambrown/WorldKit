@@ -725,6 +725,9 @@ object Rivers {
                 if (!localRivers.contains(root)) {
                     if (!landlocked && !isValidRiverStart(localRivers, rivers, borderWithoutCoast, root)) {
                         candidateRiverNodes.remove(expansionCandidate)
+                        if (root == expansionCandidate) {
+                            savedCandidates.add(expansionCandidate)
+                        }
                         if (candidateRiverNodes.isEmpty() && localRivers.map { it.count() }.filter { it >= 2 }.sum() < 2) {
                             candidateRiverNodes.addAll(localRivers.filter { it.children.isEmpty() }.sortedByDescending { it.value.priority })
                         }
