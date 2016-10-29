@@ -171,7 +171,11 @@ object Rivers {
                 updateLocalRiverCandidates(coastPoints, regionInlandBorders, localRiverMouths, riverCandidates)
                 val regionExceptions = ArrayList<GeometryException>()
                 try {
-                    buildRiverNetwork(graph, random, water, rivers, coastPoints, inlandRiverMouths, riverCandidates, localRiverMouths, region, regionId + 1, riverSlope, terrainSlope)
+                    if (isolatedChunks.size == 1) {
+                        buildRiverNetwork(graph, random, water, rivers, coastPoints, inlandRiverMouths, riverCandidates, localRiverMouths, region, regionUndivided, regionId + 1, riverSlope, terrainSlope)
+                    } else {
+                        buildRiverNetwork(graph, random, water, rivers, coastPoints, inlandRiverMouths, riverCandidates, localRiverMouths, region, region, regionId + 1, riverSlope, terrainSlope)
+                    }
                 } catch (e: GeometryException) {
                     regionExceptions.add(e)
                 }
@@ -659,11 +663,12 @@ object Rivers {
                                   riverCandidates: HashMap<Int, Float>,
                                   localRiverMouths: ArrayList<Int>,
                                   region: LinkedHashSet<Int>,
+                                  regionForBorders: LinkedHashSet<Int>,
                                   regionId: Int,
                                   riverSlope: Map<Int, Float>,
                                   terrainSlope: Map<Int, Float>) {
-        val borderWithCoast = graph.findBorder(region)
-        val borderWithoutCoast = graph.findBorder(region, water, true)
+        val borderWithCoast = graph.findBorder(regionForBorders)
+        val borderWithoutCoast = graph.findBorder(regionForBorders, water, true)
         val vertices = graph.vertices
         val candidateRiverNodes = sortCandidateRiverNodes(coastPoints, riverCandidates, localRiverMouths, regionId)
         var landlocked = false

@@ -573,7 +573,7 @@ private fun flipEdges(vertices: PointSet2F, triangles: LinkedHashSet<Set<Int>>):
         val check1 = baseLine.intersects(peakLine)
         val check2 = !containsCollinearPoints(quad)
         val check3 = minAngle < 0.55f && maxAngle > 2.0f
-        if (debug) {
+        if (trace) {
             draw(debugResolution, "debug-triangulatePolygon1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, debugZoom, Vector2F(-(vertices.map { it.x }.min()!!) + 0.0005f, -(vertices.map { it.y }.min()!!) + 0.0005f)) {
                 graphics.color = Color.BLACK
                 triNodes.forEach {
