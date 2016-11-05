@@ -19,6 +19,21 @@ import javax.sound.sampled.Line
 
 class Image(val multiplier: Float, val shift: Vector2F, val graphics: Graphics2D)
 
+fun draw(outputWidth: Int, name: String, outputPath: String = "output", background: Color = Color.WHITE, points: Collection<Point2F>, drawCalls: Image.() -> Unit) {
+    val xVals = points.map { it.x }
+    val yVals = points.map { it.y }
+    val xMin = xVals.min()!!
+    val xMax = xVals.max()!!
+    val yMin = yVals.min()!!
+    val yMax = yVals.max()!!
+    val xDelta = xMax - xMin
+    val yDelta = yMax - yMin
+    val delta = Math.max(xDelta, yDelta)
+    val zoom = 0.98f / delta
+    val shift = Vector2F(-(xMin) + (0.01f / zoom), -(yMin) + (0.01f / zoom))
+    draw(outputWidth, name, outputPath, background, zoom, shift, drawCalls)
+}
+
 fun draw(outputWidth: Int, name: String, outputPath: String = "output", background: Color = Color.WHITE, zoom: Float? = null, shift: Vector2F = Vector2F(0.0f, 0.0f), drawCalls: Image.() -> Unit) {
     val multiplier = if (zoom == null) { outputWidth.toFloat() } else { outputWidth.toFloat() * zoom }
     val image = BufferedImage(outputWidth, outputWidth, BufferedImage.TYPE_3BYTE_BGR)
