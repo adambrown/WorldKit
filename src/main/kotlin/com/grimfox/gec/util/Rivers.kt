@@ -7,6 +7,7 @@ import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.findConcavityWeights
 import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.geometry.Geometry
+import com.grimfox.gec.util.geometry.Geometry.debug
 import com.grimfox.gec.util.geometry.Geometry.debugCount
 import com.grimfox.gec.util.geometry.Geometry.debugResolution
 import com.grimfox.gec.util.geometry.GeometryException
@@ -36,10 +37,10 @@ object Rivers {
     val MIN_DISTANCE_FROM_BORDER_SQUARED = MIN_DISTANCE_FROM_BORDER * MIN_DISTANCE_FROM_BORDER
     val CONTINUATION_PRIORITY = 0.25f
     val SYMMETRIC_PRIORITY = 0.40f
-    val MIN_RIVER_SLOPE = 0.005f
-    val MAX_RIVER_SLOPE = 0.37f
-    val MIN_TERRAIN_SLOPE = 0.05f
-    val MAX_TERRAIN_SLOPE = 0.8f
+    val MIN_RIVER_SLOPE = 0.002f
+    val MAX_RIVER_SLOPE = 0.15f
+    val MIN_TERRAIN_SLOPE = 0.001f
+    val MAX_TERRAIN_SLOPE = 0.95f
     val MAX_RIVER_CHILDREN = 3
 
     fun buildRivers(graph: Graph, idMask: Matrix<Int>, random: Random): ArrayList<Triple<Polygon2F, ArrayList<TreeNode<RiverNode>>, ArrayList<GeometryException>>> {
@@ -223,7 +224,20 @@ object Rivers {
         nodes.sortBy { landlockedRiverMouth.value.point.distance2(it.value.point) }
         while (nodes.isNotEmpty()) {
             val nextCandidate = nodes.removeAt(0)
-            if (isViableConnection(possibleConnectingRivers, landlockedRiverMouth, nextCandidate)) {
+            val viable = isViableConnection(possibleConnectingRivers, landlockedRiverMouth, nextCandidate)
+//            if (debug) {
+//                draw(4096, "debug-buildRiverNetwork-${debugCount.andIncrement}", "output", Color.WHITE) {
+//                    graphics.color = Color.BLACK
+//                    nodes.forEach {
+//                        drawPoint(it.value.point, 4)
+//                    }
+//                    graphics.color = Color.RED
+//                    drawPoint(landlockedRiverMouth.value.point, 7)
+//                    graphics.color = if (viable) Color.MAGENTA else Color.BLUE
+//                    drawPoint(nextCandidate.value.point, 7)
+//                }
+//            }
+            if (viable) {
                 adjustElevationOfGraph(landlockedRiverMouth, nextCandidate.value.elevation)
                 landlockedRiverMouth.parent = nextCandidate
                 nextCandidate.children.add(landlockedRiverMouth)
@@ -276,6 +290,23 @@ object Rivers {
         val newEdge = LineSegment2F(nextCandidate.value.point, landlockedRiverMouth.value.point)
         rivers.forEach {
             if (isTooCloseToRiver(it, it, nextCandidate, newEdge, newEdge.interpolate(0.5f), -Float.MAX_VALUE)) {
+//                if (debug) {
+//                    draw(4096, "debug-buildRiverNetwork-${debugCount.andIncrement}", "output", Color.WHITE) {
+//                        graphics.color = Color.BLACK
+//                        val nodes = ArrayList<TreeNode<RiverNode>>()
+//                        getNodes(it, nodes)
+//                        nodes.forEach {
+//                            drawPoint(it.value.point, 4)
+//                        }
+//                        graphics.color = Color.BLUE
+//                        drawRiver(it)
+//                        graphics.color = Color.RED
+//                        drawPoint(landlockedRiverMouth.value.point, 7)
+//                        drawPoint(newEdge.a, 7)
+//                        drawEdge(newEdge.a, newEdge.b)
+//                    }
+//                    isTooCloseToRiver(it, it, nextCandidate, newEdge, newEdge.interpolate(0.5f), -Float.MAX_VALUE)
+//                }
                 return false
             }
         }
@@ -548,11 +579,11 @@ object Rivers {
     }
 
     private fun sigmoidCoast(x: Float): Float {
-        return ((1.0 / (0.5 + pow(0.03, x - 0.7))) * 0.2).toFloat()
+        return ((1.0 / (0.5 + pow(0.07, x - 0.7))) * 0.07).toFloat()
     }
 
     private fun sigmoidBorder(x: Float): Float {
-        return ((2.02 - (1.0 / (0.5 + pow(0.0000000000000001, x - 0.1)))) * 0.501).toFloat()
+        return ((2.02 - (1.0 / (0.5 + pow(0.0000000000000000000000000001, x - 0.1)))) * 0.501).toFloat()
     }
 
     private fun perpendicularVector(vertices: Vertices, id1: Int, id2: Int): Point2F {
@@ -1080,10 +1111,32 @@ object Rivers {
             val child = it.value
             if (!(it == expansionCandidate || riverNode == expansionCandidate)) {
                 if (expansionEdge.distance2(LineSegment2F(node.point, child.point)) < MIN_RIVER_SEPARATION_SQUARED) {
+//                    if (debug) {
+//                        draw(4096, "debug-buildRiverNetwork-${debugCount.andIncrement}", "output", Color.WHITE) {
+//                            graphics.color = Color.BLACK
+//                            val nodes = ArrayList<TreeNode<RiverNode>>()
+//                            getNodes(rootNode, nodes)
+//                            nodes.forEach {
+//                                drawPoint(it.value.point, 4)
+//                            }
+//                            graphics.color = Color.BLUE
+//                            drawRiver(rootNode)
+//                            graphics.color = Color.RED
+//                            drawPoint(expansionCandidate.value.point, 7)
+//                            graphics.color = Color.MAGENTA
+//                            drawPoint(expansionEdge.b, 7)
+//                            drawEdge(expansionEdge.a, expansionEdge.b)
+//                            graphics.color = Color.GREEN
+//                            drawEdge(node.point, child.point)
+//                        }
+//                    }
                     return true
                 }
             } else {
                 if (LineSegment2F(node.point, child.point).distance2(expansionEdge.b) < MIN_RIVER_SEPARATION_SQUARED) {
+                    return true
+                }
+                if (riverNode == expansionCandidate && expansionEdge.distance2(child.point) < MIN_RIVER_SEPARATION_SQUARED) {
                     return true
                 }
             }
