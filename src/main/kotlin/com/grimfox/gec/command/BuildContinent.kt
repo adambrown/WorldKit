@@ -201,7 +201,46 @@ class BuildContinent() : Runnable {
                     }
                 }
             }
+            val coastPoints = SpatialPointSet2F()
+            val nothing = -Float.MAX_VALUE
+            val widthF = heightMap.width.toFloat()
+            for (y in 0..heightMap.width - 1) {
+                for (x in 0..heightMap.width - 1) {
+                    val height = heightMap[x, y]
+                    if (height != nothing && isBesideNothing(heightMap, x, y, nothing)) {
+                        coastPoints.add(Point2F(x / widthF, y / widthF))
+                    }
+                }
+            }
+            for (y in 0..heightMap.width - 1) {
+                for (x in 0..heightMap.width - 1) {
+                    val height = heightMap[x, y]
+                    if (height == nothing) {
+                        val waterPoint = Point2F(x / widthF, y / widthF)
+                        heightMap[x, y] = underwaterHeightFunction(coastPoints.closestPoint(waterPoint)!!.distance(waterPoint))
+                    }
+                }
+            }
             writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
+        }
+    }
+
+    private fun isBesideNothing(heightMap: ArrayListMatrix<Float>, x: Int, y: Int, nothing: Float): Boolean {
+        for (i in max(y - 1, 0)..min(y + 1, heightMap.width - 1)) {
+            for (j in max(x - 1, 0)..min(x + 1, heightMap.width - 1)) {
+                if (heightMap[j, i] == nothing) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun underwaterHeightFunction(x: Float): Float {
+        if (x < 0.04f) {
+            return -5.0f * x
+        } else {
+            return ((-0.231 - (1.0 / (0.51021 + pow(0.000000000000000000000000001, x - 0.063)))) * 0.45).toFloat()
         }
     }
 

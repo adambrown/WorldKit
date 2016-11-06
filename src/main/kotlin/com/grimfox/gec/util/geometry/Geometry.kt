@@ -47,7 +47,7 @@ object Geometry {
     var trace = false
     var debugCount = AtomicInteger(1)
     var debugIteration = AtomicInteger(1)
-    var debugResolution = 512
+    var debugResolution = 4096
 }
 
 private class CollinearPatch(val start: Point2F, val end: Point2F, val points: ArrayList<Point2F>)
@@ -1962,28 +1962,38 @@ fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: ArrayListMatri
 }
 
 fun writeHeightData(name: String, heightMap: ArrayListMatrix<Float>) {
-    var minValue = Double.MAX_VALUE
-    var maxValue = -Double.MAX_VALUE
+    var maxLandValue = -Double.MAX_VALUE
+    var minWaterValue = Double.MAX_VALUE
     for (y in (0..heightMap.width - 1)) {
         for (x in (0..heightMap.width - 1)) {
             val valueF = heightMap[x, y]
             if (valueF == -Float.MAX_VALUE) {
                 continue
             }
-            val value = valueF.toDouble()
-            minValue = min(minValue, value)
-            maxValue = max(maxValue, value)
+            if (valueF < 0.0f) {
+                val value = valueF.toDouble()
+                minWaterValue = min(minWaterValue, value)
+            } else {
+                val value = valueF.toDouble()
+                maxLandValue = max(maxLandValue, value)
+            }
         }
     }
-    val adjustedMinValue = minValue - ((maxValue - minValue) * 0.1)
-    val range = 1.0 / (maxValue - adjustedMinValue)
+    val waterLine = 0.30f
+    val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
+    val waterFactor = (1.0f / -minWaterValue) * waterLine
     val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
     val raster = output.raster
     for (y in (0..heightMap.width - 1)) {
         for (x in (0..heightMap.width - 1)) {
-            val value = heightMap[x, y].toDouble()
-            val pixel = round(((min(max(value, adjustedMinValue), maxValue) - adjustedMinValue) * range) * 65535).toInt()
-            raster.setSample(x, y, 0, pixel)
+            val value = heightMap[x, y]
+            if (value < 0.0f) {
+                val pixel = (((value - minWaterValue) * waterFactor) * 65535).toInt()
+                raster.setSample(x, y, 0, pixel)
+            } else {
+                val pixel = (((value * landFactor) + waterLine) * 65535).toInt()
+                raster.setSample(x, y, 0, pixel)
+            }
         }
     }
     ImageIO.write(output, "png", File("output/$name.png"))
