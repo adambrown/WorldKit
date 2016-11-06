@@ -3341,6 +3341,68 @@ object ManualTestGeometry {
             buildMesh(edgeSkeleton, riverSkeleton, globalVertices)
         }
 
+        val test35 = {
+            val edgeSkeleton = arrayListOf(LineSegment3F(a = Point3F(x = 0.6690363f, y = 0.6654671f, z = 0.018782139f), b = Point3F(x = 0.6673583f, y = 0.66516745f, z = 0.01783739f)), LineSegment3F(a = Point3F(x = 0.6673583f, y = 0.66516745f, z = 0.01783739f), b = Point3F(x = 0.66568017f, y = 0.66486776f, z = 0.016892642f)), LineSegment3F(a = Point3F(x = 0.66568017f, y = 0.66486776f, z = 0.016892642f), b = Point3F(x = 0.6641832f, y = 0.66358197f, z = 0.016455635f)), LineSegment3F(a = Point3F(x = 0.6641832f, y = 0.66358197f, z = 0.016455635f), b = Point3F(x = 0.6626862f, y = 0.6622962f, z = 0.01601863f)), LineSegment3F(a = Point3F(x = 0.6626862f, y = 0.6622962f, z = 0.01601863f), b = Point3F(x = 0.6611892f, y = 0.6610104f, z = 0.015581621f)), LineSegment3F(a = Point3F(x = 0.6611892f, y = 0.6610104f, z = 0.015581621f), b = Point3F(x = 0.6596922f, y = 0.6597246f, z = 0.01601193f)), LineSegment3F(a = Point3F(x = 0.6596922f, y = 0.6597246f, z = 0.01601193f), b = Point3F(x = 0.65819526f, y = 0.6584388f, z = 0.016442237f)), LineSegment3F(a = Point3F(x = 0.65819526f, y = 0.6584388f, z = 0.016442237f), b = Point3F(x = 0.6566982f, y = 0.65715307f, z = 0.016872548f)), LineSegment3F(a = Point3F(x = 0.6566982f, y = 0.65715307f, z = 0.016872548f), b = Point3F(x = 0.65699697f, y = 0.6551441f, z = 0.017280752f)), LineSegment3F(a = Point3F(x = 0.65699697f, y = 0.6551441f, z = 0.017280752f), b = Point3F(x = 0.6572957f, y = 0.6531351f, z = 0.017688956f)), LineSegment3F(a = Point3F(x = 0.6572957f, y = 0.6531351f, z = 0.017688956f), b = Point3F(x = 0.65759444f, y = 0.65112615f, z = 0.01809716f)), LineSegment3F(a = Point3F(x = 0.65759444f, y = 0.65112615f, z = 0.01809716f), b = Point3F(x = 0.6578932f, y = 0.6491172f, z = 0.018505365f)), LineSegment3F(a = Point3F(x = 0.6578932f, y = 0.6491172f, z = 0.018505365f), b = Point3F(x = 0.6581919f, y = 0.64710826f, z = 0.01891357f)), LineSegment3F(a = Point3F(x = 0.6581919f, y = 0.64710826f, z = 0.01891357f), b = Point3F(x = 0.6600895f, y = 0.6461869f, z = 0.018939022f)), LineSegment3F(a = Point3F(x = 0.6600895f, y = 0.6461869f, z = 0.018939022f), b = Point3F(x = 0.66198707f, y = 0.6452655f, z = 0.018964473f)), LineSegment3F(a = Point3F(x = 0.66198707f, y = 0.6452655f, z = 0.018964473f), b = Point3F(x = 0.66388464f, y = 0.64434415f, z = 0.018989924f)), LineSegment3F(a = Point3F(x = 0.66388464f, y = 0.64434415f, z = 0.018989924f), b = Point3F(x = 0.6657823f, y = 0.64342284f, z = 0.019015372f)), LineSegment3F(a = Point3F(x = 0.6657823f, y = 0.64342284f, z = 0.019015372f), b = Point3F(x = 0.66782147f, y = 0.64474237f, z = 0.018264446f)), LineSegment3F(a = Point3F(x = 0.66782147f, y = 0.64474237f, z = 0.018264446f), b = Point3F(x = 0.66986066f, y = 0.6460619f, z = 0.017513521f)), LineSegment3F(a = Point3F(x = 0.66986066f, y = 0.6460619f, z = 0.017513521f), b = Point3F(x = 0.67189986f, y = 0.6473814f, z = 0.018238263f)), LineSegment3F(a = Point3F(x = 0.67189986f, y = 0.6473814f, z = 0.018238263f), b = Point3F(x = 0.67393905f, y = 0.648701f, z = 0.018963005f)), LineSegment3F(a = Point3F(x = 0.67393905f, y = 0.648701f, z = 0.018963005f), b = Point3F(x = 0.67418456f, y = 0.65059435f, z = 0.018201508f)), LineSegment3F(a = Point3F(x = 0.67418456f, y = 0.65059435f, z = 0.018201508f), b = Point3F(x = 0.67443f, y = 0.6524877f, z = 0.01744001f)), LineSegment3F(a = Point3F(x = 0.67443f, y = 0.6524877f, z = 0.01744001f), b = Point3F(x = 0.67467546f, y = 0.65438104f, z = 0.018108832f)), LineSegment3F(a = Point3F(x = 0.67467546f, y = 0.65438104f, z = 0.018108832f), b = Point3F(x = 0.6749209f, y = 0.6562744f, z = 0.018777654f)), LineSegment3F(a = Point3F(x = 0.6749209f, y = 0.6562744f, z = 0.018777654f), b = Point3F(x = 0.6739401f, y = 0.6578065f, z = 0.018320683f)), LineSegment3F(a = Point3F(x = 0.6739401f, y = 0.6578065f, z = 0.018320683f), b = Point3F(x = 0.6729593f, y = 0.65933865f, z = 0.017863713f)), LineSegment3F(a = Point3F(x = 0.6729593f, y = 0.65933865f, z = 0.017863713f), b = Point3F(x = 0.6719786f, y = 0.66087073f, z = 0.017406743f)), LineSegment3F(a = Point3F(x = 0.6719786f, y = 0.66087073f, z = 0.017406743f), b = Point3F(x = 0.67099786f, y = 0.66240287f, z = 0.017865209f)), LineSegment3F(a = Point3F(x = 0.67099786f, y = 0.66240287f, z = 0.017865209f), b = Point3F(x = 0.6700171f, y = 0.663935f, z = 0.018323675f)), LineSegment3F(a = Point3F(x = 0.6700171f, y = 0.663935f, z = 0.018323675f), b = Point3F(x = 0.6690363f, y = 0.6654671f, z = 0.018782139f)))
+            val riverSkeleton = arrayListOf(LineSegment3F(a = Point3F(x = 0.6663473f, y = 0.6505562f, z = 0.01662742f), b = Point3F(x = 0.6656591f, y = 0.65184706f, z = 0.016497351f)), LineSegment3F(a = Point3F(x = 0.6656591f, y = 0.65184706f, z = 0.016497351f), b = Point3F(x = 0.664941f, y = 0.65312177f, z = 0.016367262f)), LineSegment3F(a = Point3F(x = 0.664941f, y = 0.65312177f, z = 0.016367262f), b = Point3F(x = 0.66423774f, y = 0.65441966f, z = 0.016236007f)), LineSegment3F(a = Point3F(x = 0.66423774f, y = 0.65441966f, z = 0.016236007f), b = Point3F(x = 0.6639048f, y = 0.6558578f, z = 0.016104754f)), LineSegment3F(a = Point3F(x = 0.6639048f, y = 0.6558578f, z = 0.016104754f), b = Point3F(x = 0.6635512f, y = 0.65729386f, z = 0.015973255f)), LineSegment3F(a = Point3F(x = 0.6635512f, y = 0.65729386f, z = 0.015973255f), b = Point3F(x = 0.6627951f, y = 0.6585649f, z = 0.015841754f)), LineSegment3F(a = Point3F(x = 0.6627951f, y = 0.6585649f, z = 0.015841754f), b = Point3F(x = 0.6619979f, y = 0.6597916f, z = 0.015711676f)), LineSegment3F(a = Point3F(x = 0.6619979f, y = 0.6597916f, z = 0.015711676f), b = Point3F(x = 0.6611892f, y = 0.6610104f, z = 0.015581621f)), LineSegment3F(a = Point3F(x = 0.66849774f, y = 0.6503255f, z = 0.01675437f), b = Point3F(x = 0.667398f, y = 0.65021235f, z = 0.016690893f)), LineSegment3F(a = Point3F(x = 0.667398f, y = 0.65021235f, z = 0.016690893f), b = Point3F(x = 0.6663473f, y = 0.6505562f, z = 0.01662742f)), LineSegment3F(a = Point3F(x = 0.6719786f, y = 0.66087073f, z = 0.017406743f), b = Point3F(x = 0.6715f, y = 0.65955925f, z = 0.017330268f)), LineSegment3F(a = Point3F(x = 0.6715f, y = 0.65955925f, z = 0.017330268f), b = Point3F(x = 0.67118f, y = 0.6581989f, z = 0.017253716f)), LineSegment3F(a = Point3F(x = 0.67118f, y = 0.6581989f, z = 0.017253716f), b = Point3F(x = 0.6706221f, y = 0.65689844f, z = 0.0171762f)), LineSegment3F(a = Point3F(x = 0.6706221f, y = 0.65689844f, z = 0.0171762f), b = Point3F(x = 0.67052484f, y = 0.6554871f, z = 0.017098706f)), LineSegment3F(a = Point3F(x = 0.67052484f, y = 0.6554871f, z = 0.017098706f), b = Point3F(x = 0.67098135f, y = 0.6539117f, z = 0.017008858f)), LineSegment3F(a = Point3F(x = 0.67098135f, y = 0.6539117f, z = 0.017008858f), b = Point3F(x = 0.66979283f, y = 0.6527945f, z = 0.016919505f)), LineSegment3F(a = Point3F(x = 0.66979283f, y = 0.6527945f, z = 0.016919505f), b = Point3F(x = 0.66863596f, y = 0.6518232f, z = 0.01683676f)), LineSegment3F(a = Point3F(x = 0.66863596f, y = 0.6518232f, z = 0.01683676f), b = Point3F(x = 0.66849774f, y = 0.6503255f, z = 0.01675437f)), LineSegment3F(a = Point3F(x = 0.66986066f, y = 0.6460619f, z = 0.017513521f), b = Point3F(x = 0.66929495f, y = 0.6470727f, z = 0.017329078f)), LineSegment3F(a = Point3F(x = 0.66929495f, y = 0.6470727f, z = 0.017329078f), b = Point3F(x = 0.6692961f, y = 0.64823115f, z = 0.017144611f)), LineSegment3F(a = Point3F(x = 0.6692961f, y = 0.64823115f, z = 0.017144611f), b = Point3F(x = 0.6693598f, y = 0.6494555f, z = 0.016949393f)), LineSegment3F(a = Point3F(x = 0.6693598f, y = 0.6494555f, z = 0.016949393f), b = Point3F(x = 0.66849774f, y = 0.6503255f, z = 0.01675437f)), LineSegment3F(a = Point3F(x = 0.67443f, y = 0.6524877f, z = 0.01744001f), b = Point3F(x = 0.6732477f, y = 0.65163714f, z = 0.017309172f)), LineSegment3F(a = Point3F(x = 0.6732477f, y = 0.65163714f, z = 0.017309172f), b = Point3F(x = 0.6717872f, y = 0.6515888f, z = 0.017177902f)), LineSegment3F(a = Point3F(x = 0.6717872f, y = 0.6515888f, z = 0.017177902f), b = Point3F(x = 0.6702505f, y = 0.6517952f, z = 0.017038617f)), LineSegment3F(a = Point3F(x = 0.6702505f, y = 0.6517952f, z = 0.017038617f), b = Point3F(x = 0.66913384f, y = 0.65072143f, z = 0.016899455f)), LineSegment3F(a = Point3F(x = 0.66913384f, y = 0.65072143f, z = 0.016899455f), b = Point3F(x = 0.66777265f, y = 0.6500526f, z = 0.016763214f)), LineSegment3F(a = Point3F(x = 0.66777265f, y = 0.6500526f, z = 0.016763214f), b = Point3F(x = 0.6663473f, y = 0.6505562f, z = 0.01662742f)))
+            val globalVertices = PointSet2F(points = arrayListOf(Point3F(x = 0.6690363f, y = 0.6654671f, z = 0.018782139f),
+                    Point3F(x = 0.6673583f, y = 0.66516745f, z = 0.01783739f),
+                    Point3F(x = 0.66568017f, y = 0.66486776f, z = 0.016892642f),
+                    Point3F(x = 0.66418314f, y = 0.66358197f, z = 0.016455634f),
+                    Point3F(x = 0.66268617f, y = 0.6622962f, z = 0.016018627f),
+                    Point3F(x = 0.6611892f, y = 0.6610104f, z = 0.015581621f),
+                    Point3F(x = 0.65969217f, y = 0.65972465f, z = 0.016011931f),
+                    Point3F(x = 0.6581952f, y = 0.65843886f, z = 0.01644224f),
+                    Point3F(x = 0.6566982f, y = 0.65715307f, z = 0.016872548f),
+                    Point3F(x = 0.65699697f, y = 0.6551441f, z = 0.017280752f),
+                    Point3F(x = 0.6572957f, y = 0.6531351f, z = 0.017688956f),
+                    Point3F(x = 0.65759444f, y = 0.65112615f, z = 0.01809716f),
+                    Point3F(x = 0.6578932f, y = 0.6491172f, z = 0.018505365f),
+                    Point3F(x = 0.6581919f, y = 0.64710826f, z = 0.01891357f),
+                    Point3F(x = 0.6600895f, y = 0.6461869f, z = 0.018939022f),
+                    Point3F(x = 0.66198707f, y = 0.6452655f, z = 0.018964473f),
+                    Point3F(x = 0.66388464f, y = 0.64434415f, z = 0.018989924f),
+                    Point3F(x = 0.6657823f, y = 0.64342284f, z = 0.019015372f),
+                    Point3F(x = 0.66782147f, y = 0.64474237f, z = 0.018264446f),
+                    Point3F(x = 0.66986066f, y = 0.6460619f, z = 0.017513521f),
+                    Point3F(x = 0.67189986f, y = 0.6473814f, z = 0.018238263f),
+                    Point3F(x = 0.67393905f, y = 0.648701f, z = 0.018963005f),
+                    Point3F(x = 0.67418456f, y = 0.65059435f, z = 0.018201508f),
+                    Point3F(x = 0.67443f, y = 0.6524877f, z = 0.01744001f),
+                    Point3F(x = 0.67467546f, y = 0.65438104f, z = 0.018108832f),
+                    Point3F(x = 0.6749209f, y = 0.6562744f, z = 0.018777654f),
+                    Point3F(x = 0.6739401f, y = 0.6578065f, z = 0.018320683f),
+                    Point3F(x = 0.6729593f, y = 0.65933865f, z = 0.017863713f),
+                    Point3F(x = 0.6719786f, y = 0.66087073f, z = 0.017406743f),
+                    Point3F(x = 0.67099786f, y = 0.66240287f, z = 0.017865209f),
+                    Point3F(x = 0.6700171f, y = 0.663935f, z = 0.018323675f),
+                    Point3F(x = 0.6663473f, y = 0.6505562f, z = 0.01662742f),
+                    Point3F(x = 0.6656591f, y = 0.65184706f, z = 0.016497351f),
+                    Point3F(x = 0.664941f, y = 0.65312177f, z = 0.016367262f),
+                    Point3F(x = 0.66423774f, y = 0.65441966f, z = 0.016236007f),
+                    Point3F(x = 0.6639048f, y = 0.6558578f, z = 0.016104754f),
+                    Point3F(x = 0.6635512f, y = 0.65729386f, z = 0.015973255f),
+                    Point3F(x = 0.6627951f, y = 0.6585649f, z = 0.015841754f),
+                    Point3F(x = 0.6619979f, y = 0.6597916f, z = 0.015711676f),
+                    Point3F(x = 0.66849774f, y = 0.6503255f, z = 0.01675437f),
+                    Point3F(x = 0.667398f, y = 0.65021235f, z = 0.016690893f),
+                    Point3F(x = 0.6715f, y = 0.65955925f, z = 0.017330268f),
+                    Point3F(x = 0.67118f, y = 0.6581989f, z = 0.017253716f),
+                    Point3F(x = 0.6706221f, y = 0.65689844f, z = 0.0171762f),
+                    Point3F(x = 0.67052484f, y = 0.6554871f, z = 0.017098706f),
+                    Point3F(x = 0.67098135f, y = 0.6539117f, z = 0.017008858f),
+                    Point3F(x = 0.66979283f, y = 0.6527945f, z = 0.016919505f),
+                    Point3F(x = 0.66863596f, y = 0.6518232f, z = 0.01683676f),
+                    Point3F(x = 0.66929495f, y = 0.6470727f, z = 0.017329078f),
+                    Point3F(x = 0.6692961f, y = 0.64823115f, z = 0.017144611f),
+                    Point3F(x = 0.6693598f, y = 0.6494555f, z = 0.016949393f),
+                    Point3F(x = 0.6732477f, y = 0.65163714f, z = 0.017309172f),
+                    Point3F(x = 0.6717872f, y = 0.6515888f, z = 0.017177902f),
+                    Point3F(x = 0.6702505f, y = 0.6517952f, z = 0.017038617f),
+                    Point3F(x = 0.66913384f, y = 0.65072143f, z = 0.016899455f),
+                    Point3F(x = 0.66777265f, y = 0.6500526f, z = 0.016763214f)))
+            buildMesh(edgeSkeleton, riverSkeleton, globalVertices)
+        }
+
         val tests = listOf<() -> Any?>(
                 test1,
                 test2,
@@ -3375,7 +3437,8 @@ object ManualTestGeometry {
                 test31,
                 test32,
                 test33,
-                test34
+                test34,
+                test35
         )
 
         debugResolution = 512

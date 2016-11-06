@@ -285,7 +285,7 @@ private fun findNextEar(points: ArrayList<Point2F>, strict: Boolean = false): Tr
         }
     }
     if (index1 == -1 && !strict) {
-        return findNextEar(points, strict)
+        return findNextEar(points, true)
     }
     return Triple(index1, index2, index3)
 }
@@ -816,7 +816,7 @@ fun buildMesh(edgeSkeletonIn: ArrayList<LineSegment3F>, riverSkeletonIn: ArrayLi
         globalMapEdges(globalVertices, riverSkeleton)
         closeEdge(edgeSkeleton)
         globalMapEdges(globalVertices, edgeSkeleton)
-        unTwistEdges(edgeSkeleton)
+        unTwistEdges(edgeSkeleton, true)
         moveRiverInsideBorder(globalVertices, edgeSkeleton, riverSkeleton)
         unTwistEdges(riverSkeleton)
         if (debug) {
@@ -1167,7 +1167,7 @@ private fun globalMapEdges(globalVertexSet: PointSet2F, edgeSkeleton: ArrayList<
     edgeSkeleton.addAll(globalMappedEdgeSkeleton)
 }
 
-private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>) {
+private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>, secondaryCleanup: Boolean = false) {
     var hasFix = true
     while (hasFix) {
         hasFix = false
@@ -1219,12 +1219,32 @@ private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>) {
             }
         }
     }
-    var modified = false
-    for (point in ArrayList(skeleton.map { it.a })) {
-        var badPoint = false
-        for (edge in skeleton) {
-            if (!edge.a.epsilonEquals(point) && !edge.b.epsilonEquals(point) && pointIsOnLine(LineSegment2F(edge.a, edge.b), point, angle = DOUBLE_COLLINEAR_ANGLE)) {
-                badPoint = true
+    if (secondaryCleanup) {
+        var modified = false
+        for (point in ArrayList(skeleton.map { it.a })) {
+            var badPoint = false
+            for (edge in skeleton) {
+                if (!edge.a.epsilonEquals(point) && !edge.b.epsilonEquals(point) && pointIsOnLine(LineSegment2F(edge.a, edge.b), point, angle = DOUBLE_COLLINEAR_ANGLE)) {
+                    badPoint = true
+                    if (debug) {
+                        draw(debugResolution, "debug-unTwistEdges2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
+                            graphics.color = Color.BLACK
+                            skeleton.forEach {
+                                drawEdge(it.a, it.b)
+                                drawPoint(it.a, 2)
+                                drawPoint(it.b, 2)
+                            }
+                            graphics.color = Color.GREEN
+                            drawEdge(edge.a, edge.b)
+                            graphics.color = Color.RED
+                            drawPoint(point, 5)
+                        }
+                        breakPoint()
+                    }
+                    break
+                }
+            }
+            if (badPoint) {
                 if (debug) {
                     draw(debugResolution, "debug-unTwistEdges2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
                         graphics.color = Color.BLACK
@@ -1233,49 +1253,30 @@ private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>) {
                             drawPoint(it.a, 2)
                             drawPoint(it.b, 2)
                         }
-                        graphics.color = Color.GREEN
-                        drawEdge(edge.a, edge.b)
                         graphics.color = Color.RED
                         drawPoint(point, 5)
                     }
-                    val angle = angle(edge.a, point, edge.b)
                     breakPoint()
                 }
-                break
-            }
-        }
-        if (badPoint) {
-            if (debug) {
-                draw(debugResolution, "debug-unTwistEdges2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
-                    graphics.color = Color.BLACK
-                    skeleton.forEach {
-                        drawEdge(it.a, it.b)
-                        drawPoint(it.a, 2)
-                        drawPoint(it.b, 2)
+                val dropEdges = ArrayList<LineSegment3F>(2)
+                for (edge in skeleton) {
+                    if (edge.a.epsilonEquals(point) || edge.b.epsilonEquals(point)) {
+                        dropEdges.add(edge)
                     }
-                    graphics.color = Color.RED
-                    drawPoint(point, 5)
                 }
-                breakPoint()
-            }
-            val dropEdges = ArrayList<LineSegment3F>(2)
-            for (edge in skeleton) {
-                if (edge.a.epsilonEquals(point) || edge.b.epsilonEquals(point)) {
-                    dropEdges.add(edge)
+                dropEdges.forEach {
+                    skeleton.remove(it)
+                    modified = true
                 }
-            }
-            dropEdges.forEach {
-                skeleton.remove(it)
-                modified = true
             }
         }
-    }
-    if (!modified) {
-        return
-    } else {
-        val newPolygon = Polygon2F(Polygon2F.fromUnsortedEdges(skeleton.map { LineSegment2F(it.a, it.b) }).points, true)
-        skeleton.clear()
-        skeleton.addAll(newPolygon.edges.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
+        if (!modified) {
+            return
+        } else {
+            val newPolygon = Polygon2F(Polygon2F.fromUnsortedEdges(skeleton.map { LineSegment2F(it.a, it.b) }).points, true)
+            skeleton.clear()
+            skeleton.addAll(newPolygon.edges.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
+        }
     }
 }
 
