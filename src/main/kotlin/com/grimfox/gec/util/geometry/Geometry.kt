@@ -35,10 +35,14 @@ private fun doNothing() {}
 
 private const val DEG_TO_RAD = PI / 180.0
 private const val COLLINEAR_THRESHOLD_DEG = 4.0
+private const val EXTREME_COLLINEAR_THRESHOLD_DEG = 0.5
 private const val COLLINEAR_THRESHOLD = DEG_TO_RAD * COLLINEAR_THRESHOLD_DEG
+private const val EXTREME_COLLINEAR_THRESHOLD = DEG_TO_RAD * EXTREME_COLLINEAR_THRESHOLD_DEG
 private const val DOUBLE_COLLINEAR_THRESHOLD = COLLINEAR_THRESHOLD * 2
 private const val COLLINEAR_ANGLE = PI - COLLINEAR_THRESHOLD
+private const val EXTREME_COLLINEAR_ANGLE = PI - EXTREME_COLLINEAR_THRESHOLD
 private const val COLLINEAR_HALF_ANGLE = PI - (COLLINEAR_THRESHOLD * 0.5)
+private const val DOUBLE_COLLINEAR_ANGLE = PI - DOUBLE_COLLINEAR_THRESHOLD
 
 object Geometry {
 
@@ -234,7 +238,7 @@ private fun polygonFromPoints(vertices: PointSet2F, points: ArrayList<Point2F>):
     return edges
 }
 
-private fun findNextEar(points: ArrayList<Point2F>): Triple<Int, Int, Int> {
+private fun findNextEar(points: ArrayList<Point2F>, strict: Boolean = false): Triple<Int, Int, Int> {
     var index1 = -1
     var index2 = -1
     var index3 = -1
@@ -246,6 +250,25 @@ private fun findNextEar(points: ArrayList<Point2F>): Triple<Int, Int, Int> {
         val a = points[ai]
         val b = points[bi]
         val c = points[ci]
+        if (debug && trace) {
+            draw(debugResolution, "debug-triangulatePolygon4-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, points) {
+                graphics.color = Color.BLACK
+                for (j in 1..points.size) {
+                    val k = points[j - 1]
+                    val m = points[j % points.size]
+                    drawEdge(k, m)
+                    drawPoint(k, 3)
+                    drawPoint(m, 3)
+                }
+                graphics.color = Color.RED
+                drawEdge(a, b)
+                drawEdge(b, c)
+                drawPoint(a, 4)
+                drawPoint(b, 4)
+                drawPoint(c, 4)
+            }
+            breakPoint()
+        }
         val normal = (a - b).cross(c - b)
         if (normal >= 0.0f) {
             continue
@@ -260,6 +283,9 @@ private fun findNextEar(points: ArrayList<Point2F>): Triple<Int, Int, Int> {
             index2 = bi
             index3 = ci
         }
+    }
+    if (index1 == -1 && !strict) {
+        return findNextEar(points, strict)
     }
     return Triple(index1, index2, index3)
 }
@@ -331,7 +357,20 @@ private fun buildCollinearPatch(points: ArrayList<Point2F>, collinearIds: Linked
     return (CollinearPatch(start, end, collinearPoints))
 }
 
-private fun anyPointWithin(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int): Boolean {
+fun isOnBorder(edgeSkeleton: ArrayList<LineSegment3F>, point: Point2F): Boolean {
+    for (edge in edgeSkeleton) {
+        if (pointIsOnLine(LineSegment2F(edge.a, edge.b), point)) {
+            return true
+        }
+    }
+    return false
+}
+
+private fun pointIsOnLine(edge: LineSegment2F, point: Point2F, strict: Boolean = false, distance2: Float = if (strict) 0.000000005f else 0.0000005f, angle: Double = if (strict) EXTREME_COLLINEAR_ANGLE else COLLINEAR_ANGLE): Boolean {
+    return edge.distance2(point) < distance2 && angle(edge.a, point, edge.b) > angle
+}
+
+private fun anyPointWithin(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int, strict: Boolean = false): Boolean {
     val a = points[ai]
     val b = points[bi]
     val c = points[ci]
@@ -345,6 +384,8 @@ private fun anyPointWithin(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int
     val t1 = a.x * b.y - a.y*b.x
     val tx = a.y - b.y
     val ty = b.x - a.x
+
+    val ac = LineSegment2F(a, c)
 
     for (i in 0..points.size - 1) {
         if (i == ai || i == bi || i == ci) {
@@ -382,14 +423,7 @@ private fun anyPointWithin(points: ArrayList<Point2F>, ai: Int, bi: Int, ci: Int
             }
             breakPoint()
         }
-        val distance2 = LineSegment2F(a, c).distance2(p)
-        val check1 = distance2 < 0.000000005f
-        if (!check1) {
-            continue
-        }
-        val angle = angle(points, ai, i, ci)
-        val check2 = angle > COLLINEAR_ANGLE
-        if (check2) {
+        if (pointIsOnLine(ac, p, strict)) {
             return true
         }
     }
@@ -410,7 +444,7 @@ private fun angle(a: Point2F, b: Point2F, c: Point2F): Double {
     val ba = distance(ax, ay, bx, by)
     val bc = distance(cx, cy, bx, by)
     val ac = distance(cx, cy, ax, ay)
-    return acos(max(-1.0, min(1.0, (((((ba * ba) + (bc * bc) - (ac * ac)) / (2 * ba * bc)) + 5) % 2) - 1)))
+    return acos(max(-1.0, min(1.0, (((ba * ba) + (bc * bc) - (ac * ac)) / (2 * ba * bc)))))
 }
 
 private fun distance(ax: Double, ay: Double, bx: Double, by: Double): Double {
@@ -1166,7 +1200,7 @@ private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>) {
             }
             hasFix = true
             if (debug) {
-                draw(debugResolution, "debug-unTwistEdges-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
+                draw(debugResolution, "debug-unTwistEdges1-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
                     graphics.color = Color.BLACK
                     skeleton.forEach {
                         drawEdge(it.a, it.b)
@@ -1184,6 +1218,64 @@ private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>) {
                 breakPoint()
             }
         }
+    }
+    var modified = false
+    for (point in ArrayList(skeleton.map { it.a })) {
+        var badPoint = false
+        for (edge in skeleton) {
+            if (!edge.a.epsilonEquals(point) && !edge.b.epsilonEquals(point) && pointIsOnLine(LineSegment2F(edge.a, edge.b), point, angle = DOUBLE_COLLINEAR_ANGLE)) {
+                badPoint = true
+                if (debug) {
+                    draw(debugResolution, "debug-unTwistEdges2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
+                        graphics.color = Color.BLACK
+                        skeleton.forEach {
+                            drawEdge(it.a, it.b)
+                            drawPoint(it.a, 2)
+                            drawPoint(it.b, 2)
+                        }
+                        graphics.color = Color.GREEN
+                        drawEdge(edge.a, edge.b)
+                        graphics.color = Color.RED
+                        drawPoint(point, 5)
+                    }
+                    val angle = angle(edge.a, point, edge.b)
+                    breakPoint()
+                }
+                break
+            }
+        }
+        if (badPoint) {
+            if (debug) {
+                draw(debugResolution, "debug-unTwistEdges2-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, skeleton.flatMap { listOf(it.a, it.b) }) {
+                    graphics.color = Color.BLACK
+                    skeleton.forEach {
+                        drawEdge(it.a, it.b)
+                        drawPoint(it.a, 2)
+                        drawPoint(it.b, 2)
+                    }
+                    graphics.color = Color.RED
+                    drawPoint(point, 5)
+                }
+                breakPoint()
+            }
+            val dropEdges = ArrayList<LineSegment3F>(2)
+            for (edge in skeleton) {
+                if (edge.a.epsilonEquals(point) || edge.b.epsilonEquals(point)) {
+                    dropEdges.add(edge)
+                }
+            }
+            dropEdges.forEach {
+                skeleton.remove(it)
+                modified = true
+            }
+        }
+    }
+    if (!modified) {
+        return
+    } else {
+        val newPolygon = Polygon2F(Polygon2F.fromUnsortedEdges(skeleton.map { LineSegment2F(it.a, it.b) }).points, true)
+        skeleton.clear()
+        skeleton.addAll(newPolygon.edges.map { LineSegment3F(it.a as Point3F, it.b as Point3F) })
     }
 }
 
@@ -1240,12 +1332,33 @@ private fun moveRiverInsideBorder(globalVertices: PointSet2F, edgeSkeleton: Arra
     for (segment in segments) {
         val dropVertices = LinkedHashSet<Int>()
         segment.forEach {
+            if (debug) {
+                draw(debugResolution, "debug-closeEdge-${debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE, edgeSkeleton.flatMap { listOf(it.a, it.b) }) {
+                    graphics.color = Color.BLACK
+                    edgeSkeleton.forEach {
+                        drawEdge(it.a, it.b)
+                        drawPoint(it.a, 2)
+                        drawPoint(it.b, 2)
+                    }
+                    graphics.color = Color.BLUE
+                    riverSkeleton.forEach {
+                        drawEdge(it.a, it.b)
+                        drawPoint(it.a, 2)
+                        drawPoint(it.b, 2)
+                    }
+                    graphics.color = Color.RED
+                    drawEdge(it.a, it.b)
+                    drawPoint(it.a, 3)
+                    drawPoint(it.b, 3)
+                }
+                breakPoint()
+            }
             val a = globalVertices[it.a]
             val b = globalVertices[it.b]
-            if (!borderPoints.contains(a) && !containsPoint(globalVertices, polygon, a)) {
+            if (!borderPoints.contains(a) && (!containsPoint(globalVertices, polygon, a) || isOnBorder(edgeSkeleton, it.a))) {
                 dropVertices.add(a)
             }
-            if (!borderPoints.contains(b) && !containsPoint(globalVertices, polygon, b)) {
+            if (!borderPoints.contains(b) && (!containsPoint(globalVertices, polygon, b) || isOnBorder(edgeSkeleton, it.b))) {
                 dropVertices.add(b)
             }
         }
@@ -1812,14 +1925,26 @@ fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: ArrayListMatri
     val nc = normal.c
     val minZ = min(p1.z, p2.z, p3.z)
     val maxZ = max(p1.z, p2.z, p3.z)
-
-    fun interpolateZ(x: Int, y: Int): Float {
-        val height = clamp(minZ, maxZ, -((na * x) + (nb * y) + d) / nc)
-        if (height.isNaN()) {
+    if (nc == 0.0f || p1.z.isNaN() || p2.z.isNaN() || p3.z.isNaN()) {
+        if (debug) {
             throw GeometryException("collinear triangle").with {
                 data.add("val a = $a")
                 data.add("val b = $b")
                 data.add("val c = $c")
+            }
+        }
+        return
+    }
+
+    fun interpolateZ(x: Int, y: Int): Float {
+        val height = clamp(minZ, maxZ, -((na * x) + (nb * y) + d) / nc)
+        if (height.isNaN()) {
+            if (debug) {
+                throw GeometryException("collinear triangle").with {
+                    data.add("val a = $a")
+                    data.add("val b = $b")
+                    data.add("val c = $c")
+                }
             }
         }
         return height
