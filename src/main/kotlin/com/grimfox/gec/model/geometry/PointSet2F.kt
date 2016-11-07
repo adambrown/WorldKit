@@ -31,12 +31,12 @@ class PointSet2F constructor(private val epsilon: Float = 0.000001f): MutableSet
         if (ySet.isEmpty()) {
             return -1
         }
-        val union = ySet.toHashSet()
-        union.retainAll(xSet)
-        if (union.isEmpty()) {
+        val intersection = ySet.toHashSet()
+        intersection.retainAll(xSet)
+        if (intersection.isEmpty()) {
             return -1
         }
-        union.forEach {
+        intersection.forEach {
             if (points[it]?.distance2(element) ?: Float.MAX_VALUE <= epsilon2) {
                 return it
             }

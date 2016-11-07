@@ -109,8 +109,8 @@ class BuildContinent() : Runnable {
             }
             val rivers = buildRivers(graph, regionMask, random)
             val borders = getBorders(graph, regionMask)
-            val heightMap = ArrayListMatrix(outputWidth) { -Float.MAX_VALUE }
             val globalVertices = PointSet2F(0.0001f)
+            val globalTriangles = ArrayList<Int>(2000000)
             rivers.forEachIndexed { i, body ->
                 val coastline = body.first
                 val coastMultigon = Multigon2F(coastline, 20)
@@ -179,8 +179,9 @@ class BuildContinent() : Runnable {
                         }
                     }
 
-                    val renderedCells = renderCoastalCells(riverGraph, cellsToRiverSegments, crestElevations, coastline, coastMultigon, reverseRiverMap, heightMap, globalVertices)
-                    renderInlandCells(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, heightMap, globalVertices)
+                    val renderedCells = buildCoastalMeshes(riverGraph, cellsToRiverSegments, crestElevations, coastline, coastMultigon, reverseRiverMap, globalVertices, globalTriangles)
+                    buildInlandMeshes(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, globalVertices, globalTriangles)
+
                 } catch (e: GeometryException) {
                     e.test = test
                     val dumpFile = File("debug/debug-${String.format("%05d", test)}-data$i.txt")
@@ -201,6 +202,38 @@ class BuildContinent() : Runnable {
                     }
                 }
             }
+            var minX = Float.MAX_VALUE
+            var maxX = -Float.MIN_VALUE
+            var minY = Float.MAX_VALUE
+            var maxY = -Float.MIN_VALUE
+            globalVertices.forEach {
+                if (it.x < minX) {
+                    minX = it.x
+                }
+                if (it.x > maxX) {
+                    maxX = it.x
+                }
+                if (it.y < minY) {
+                    minY = it.y
+                }
+                if (it.y > maxY) {
+                    maxY = it.y
+                }
+            }
+            val dx = maxX - minX
+            val dy = maxY - minY
+            val dMax = max(dx, dy)
+            val multiplier = 0.8455f / dMax
+            val xOff = (1.0f - (multiplier * dx)) * 0.5f
+            val yOff = (1.0f - (multiplier * dy)) * 0.5f
+            val vertices = ArrayList<Point3F>(globalVertices.size)
+            globalVertices.forEach {
+                val vertex = it as Point3F
+                vertices.add(Point3F(((vertex.x - minX) * multiplier) + xOff, ((vertex.y - minY) * multiplier) + yOff, vertex.z))
+            }
+            val heightMap = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
+            println("rendering triangles")
+            renderTriangles(vertices, globalTriangles, heightMap, 8)
             val coastPoints = SpatialPointSet2F()
             val nothing = -Float.MAX_VALUE
             val widthF = heightMap.width.toFloat()
@@ -212,20 +245,28 @@ class BuildContinent() : Runnable {
                     }
                 }
             }
-            for (y in 0..heightMap.width - 1) {
-                for (x in 0..heightMap.width - 1) {
-                    val height = heightMap[x, y]
-                    if (height == nothing) {
-                        val waterPoint = Point2F(x / widthF, y / widthF)
-                        heightMap[x, y] = underwaterHeightFunction(coastPoints.closestPoint(waterPoint)!!.distance(waterPoint))
+            println("building underwater")
+            val threadCount = 8
+            val threads = ArrayList<Thread>(threadCount)
+            for (i in 0..threadCount - 1) {
+                val thread = Thread {
+                    for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                        val height = heightMap[j]
+                        if (height == nothing) {
+                            val waterPoint = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
+                            heightMap[j] = underwaterHeightFunction(coastPoints.closestPoint(waterPoint)!!.distance(waterPoint))
+                        }
                     }
                 }
+                thread.start()
+                threads.add(thread)
             }
+            threads.forEach(Thread::join)
             writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
         }
     }
 
-    private fun isBesideNothing(heightMap: ArrayListMatrix<Float>, x: Int, y: Int, nothing: Float): Boolean {
+    private fun isBesideNothing(heightMap: Matrix<Float>, x: Int, y: Int, nothing: Float): Boolean {
         for (i in max(y - 1, 0)..min(y + 1, heightMap.width - 1)) {
             for (j in max(x - 1, 0)..min(x + 1, heightMap.width - 1)) {
                 if (heightMap[j, i] == nothing) {
@@ -237,10 +278,10 @@ class BuildContinent() : Runnable {
     }
 
     private fun underwaterHeightFunction(x: Float): Float {
-        if (x < 0.04f) {
-            return -5.0f * x
+        if (x < 0.023f) {
+            return -10.0f * x
         } else {
-            return ((-0.231 - (1.0 / (0.51021 + pow(0.000000000000000000000000001, x - 0.063)))) * 0.45).toFloat()
+            return ((-0.3 - (1.0 / (0.51021 + pow(1e-56, x - 0.0337)))) * 0.44).toFloat()
         }
     }
 
@@ -265,11 +306,11 @@ class BuildContinent() : Runnable {
         }
     }
 
-    private fun renderInlandCells(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, crestElevations: HashMap<Int, Float>, alreadyRendered: Set<Int>, heightMap: ArrayListMatrix<Float>, globalVertices: PointSet2F) {
+    private fun buildInlandMeshes(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, crestElevations: HashMap<Int, Float>, alreadyRendered: Set<Int>, globalVertices: PointSet2F, globalTriangles: ArrayList<Int>) {
         val cellPolygons = buildBasicInteriorCellPolygons(riverGraph, cellsToRiverSegments, alreadyRendered)
         val riverPolygons = buildInlandRiverPolygons(cellPolygons, cellsToRiverSegments)
         val (edgeSkeletons, riverSkeletons) = buildInlandCellSkeletons(riverGraph, crestElevations, cellPolygons, riverPolygons)
-        drawInlandCellPolygons(edgeSkeletons, riverSkeletons, cellPolygons, heightMap, globalVertices)
+        buildInlandTriangles(edgeSkeletons, riverSkeletons, cellPolygons, globalVertices, globalTriangles)
     }
 
     private fun buildInlandRiverPolygons(cellPolygons: HashMap<Int, Polygon2F>, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>): HashMap<Int, ArrayList<Polygon2F>> {
@@ -322,7 +363,7 @@ class BuildContinent() : Runnable {
         return Pair(edgeSkeletons, riverSkeletons)
     }
 
-    private fun renderCoastalCells(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, crestElevations: HashMap<Int, Float>, coastline: Polygon2F, coastMultigon: Multigon2F, reverseRiverMap: HashMap<Int, RiverNode>, heightMap: ArrayListMatrix<Float>, globalVertices: PointSet2F): Set<Int> {
+    private fun buildCoastalMeshes(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, crestElevations: HashMap<Int, Float>, coastline: Polygon2F, coastMultigon: Multigon2F, reverseRiverMap: HashMap<Int, RiverNode>, globalVertices: PointSet2F, globalTriangles: ArrayList<Int>): Set<Int> {
         val coastCells = ArrayList<Int>()
         riverGraph.vertices.forEach { vertex ->
             if (cellIntersectsCoast(coastMultigon, vertex)) {
@@ -335,16 +376,16 @@ class BuildContinent() : Runnable {
         val (riverPolygons, adjacencyPatches, inclusionPatches) = reviseCoastalCellPolygonsForRiverAndCoast(riverGraph, cellsToRiverSegments, coastalPolygons, unconnectedPolygons)
         val smoothedCoastalCellPolys = smoothCoastline(riverGraph, cellsToRiverSegments, coastalPolygons, adjacencyPatches, inclusionPatches)
         val (edgeSkeletons, riverSkeletons) = buildCoastalCellSkeletons(riverGraph, cellsToRiverSegments, crestElevations, riverPolygons, coastalPolygons, adjacencyPatches, inclusionPatches, smoothedCoastalCellPolys)
-        drawCoastalCellPolygons(reverseRiverMap, edgeSkeletons, riverSkeletons, smoothedCoastalCellPolys, heightMap, globalVertices)
+        buildCoastalTriangles(reverseRiverMap, edgeSkeletons, riverSkeletons, smoothedCoastalCellPolys, globalVertices, globalTriangles)
         return coastCells.toSet()
     }
 
-    private fun drawCoastalCellPolygons(reverseRiverMap: HashMap<Int, RiverNode>,
-                                        edgeSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
-                                        riverSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
-                                        smoothedCoastalCellPolys: HashMap<Int, Polygon2F>,
-                                        heightMap: ArrayListMatrix<Float>,
-                                        globalVertexSet: PointSet2F) {
+    private fun buildCoastalTriangles(reverseRiverMap: HashMap<Int, RiverNode>,
+                                      edgeSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
+                                      riverSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
+                                      smoothedCoastalCellPolys: HashMap<Int, Polygon2F>,
+                                      globalVertexSet: PointSet2F,
+                                      globalTriangles: ArrayList<Int>) {
         smoothedCoastalCellPolys.forEach {
             val edgeSkeleton = edgeSkeletons[it.key]
             val riverSkeleton = riverSkeletons[it.key] ?: arrayListOf()
@@ -353,7 +394,7 @@ class BuildContinent() : Runnable {
                 try {
                     val (vertices, triangles) = buildMesh(edgeSkeleton, riverSkeleton, globalVertexSet)
                     spliceZeroHeightTriangles(vertices, triangles, maxTerrainSlope)
-                    renderTriangles(vertices, triangles, heightMap)
+                    globalMapTriangles(globalVertexSet, globalTriangles, vertices, triangles)
                 } catch (e: GeometryException) {
                     throw e.with {
                         id = it.key
@@ -371,18 +412,18 @@ class BuildContinent() : Runnable {
         }
     }
 
-    private fun drawInlandCellPolygons(edgeSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
-                                       riverSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
-                                       polygons: HashMap<Int, Polygon2F>,
-                                       heightMap: ArrayListMatrix<Float>,
-                                       globalVertexSet: PointSet2F) {
+    private fun buildInlandTriangles(edgeSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
+                                     riverSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
+                                     polygons: HashMap<Int, Polygon2F>,
+                                     globalVertexSet: PointSet2F,
+                                     globalTriangles: ArrayList<Int>) {
         polygons.forEach {
             val edgeSkeleton = edgeSkeletons[it.key]
             val riverSkeleton = riverSkeletons[it.key] ?: arrayListOf()
             if (edgeSkeleton != null) {
                 try {
                     val (vertices, triangles) = buildMesh(edgeSkeleton, riverSkeleton, globalVertexSet)
-                    renderTriangles(vertices, triangles, heightMap)
+                    globalMapTriangles(globalVertexSet, globalTriangles, vertices, triangles)
                 } catch (e: GeometryException) {
                     throw e.with {
                         id = it.key
@@ -396,6 +437,21 @@ class BuildContinent() : Runnable {
                         data.add("}")
                     }
                 }
+            }
+        }
+    }
+
+    private fun globalMapTriangles(globalVertexSet: PointSet2F, globalTriangles: ArrayList<Int>, vertices: ArrayList<Point3F>, triangles: LinkedHashSet<Set<Int>>) {
+        globalVertexSet.addAll(vertices)
+        triangles.forEach {
+            val triangle = it.toList()
+            val a = globalVertexSet[vertices[triangle[0]]]
+            val b = globalVertexSet[vertices[triangle[1]]]
+            val c = globalVertexSet[vertices[triangle[2]]]
+            if (a != b && b != c && c != a) {
+                globalTriangles.add(a)
+                globalTriangles.add(b)
+                globalTriangles.add(c)
             }
         }
     }

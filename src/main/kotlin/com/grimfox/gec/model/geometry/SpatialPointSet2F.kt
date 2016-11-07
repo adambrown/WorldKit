@@ -5,10 +5,6 @@ import java.util.*
 
 class SpatialPointSet2F() {
 
-    constructor(points: Collection<Point2F>): this() {
-        points.forEach { add(it) }
-    }
-
     companion object {
         private val q1Centers = centersForLayer(4)
         private val q1Diagonal = diagonalForLayer(4)
@@ -77,113 +73,125 @@ class SpatialPointSet2F() {
 
     fun closestPoints(point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant<Quadrant<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>?>?>, Float>>(16)
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (i in 0..15) {
             val quadrant = data[i]
             if (quadrant != null) {
-                val distance = point.distance(quadrant.center)
+                val distance = point.distance2(quadrant.center)
                 quadsToCheck.add(Pair(quadrant, distance))
-                if (distance < minDist) {
-                    minDist = distance
+                if (distance < minDist2) {
+                    minDist2 = distance
                 }
             }
         }
-        return checkQuads2(quadsToCheck.filter { it.second <= minDist + q1Diagonal }, point)
+        minDist2 = (sqrt(minDist2.toDouble()) + q1Diagonal).toFloat()
+        minDist2 *= minDist2
+        return checkQuads2(quadsToCheck.filter { it.second <= minDist2 }, point)
     }
 
     private fun checkQuads2(quads: List<Pair<Quadrant<Quadrant<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>?>?>, Float>>, point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>?>, Float>>()
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (pair in quads) {
             val parent = pair.first
             for (i in 0..3) {
                 val quadrant = parent[i]
                 if (quadrant != null) {
-                    val distance = point.distance(quadrant.center)
+                    val distance = point.distance2(quadrant.center)
                     quadsToCheck.add(Pair(quadrant, distance))
-                    if (distance < minDist) {
-                        minDist = distance
+                    if (distance < minDist2) {
+                        minDist2 = distance
                     }
                 }
             }
         }
-        return checkQuads3(quadsToCheck.filter { it.second <= minDist + q2Diagonal }, point)
+        minDist2 = (sqrt(minDist2.toDouble()) + q2Diagonal).toFloat()
+        minDist2 *= minDist2
+        return checkQuads3(quadsToCheck.filter { it.second <= minDist2 }, point)
     }
 
     private fun checkQuads3(quads: List<Pair<Quadrant<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>?>, Float>>, point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>, Float>>()
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (pair in quads) {
             val parent = pair.first
             for (i in 0..3) {
                 val quadrant = parent[i]
                 if (quadrant != null) {
-                    val distance = point.distance(quadrant.center)
+                    val distance = point.distance2(quadrant.center)
                     quadsToCheck.add(Pair(quadrant, distance))
-                    if (distance < minDist) {
-                        minDist = distance
+                    if (distance < minDist2) {
+                        minDist2 = distance
                     }
                 }
             }
         }
-        return checkQuads4(quadsToCheck.filter { it.second <= minDist + q3Diagonal }, point)
+        minDist2 = (sqrt(minDist2.toDouble()) + q3Diagonal).toFloat()
+        minDist2 *= minDist2
+        return checkQuads4(quadsToCheck.filter { it.second <= minDist2 }, point)
     }
 
     private fun checkQuads4(quads: List<Pair<Quadrant<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>?>, Float>>, point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>, Float>>()
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (pair in quads) {
             val parent = pair.first
             for (i in 0..3) {
                 val quadrant = parent[i]
                 if (quadrant != null) {
-                    val distance = point.distance(quadrant.center)
+                    val distance = point.distance2(quadrant.center)
                     quadsToCheck.add(Pair(quadrant, distance))
-                    if (distance < minDist) {
-                        minDist = distance
+                    if (distance < minDist2) {
+                        minDist2 = distance
                     }
                 }
             }
         }
-        return checkQuads5(quadsToCheck.filter { it.second <= minDist + q4Diagonal }, point)
+        minDist2 = (sqrt(minDist2.toDouble()) + q4Diagonal).toFloat()
+        minDist2 *= minDist2
+        return checkQuads5(quadsToCheck.filter { it.second <= minDist2 }, point)
     }
 
     private fun checkQuads5(quads: List<Pair<Quadrant<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>?>, Float>>, point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>, Float>>()
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (pair in quads) {
             val parent = pair.first
             for (i in 0..3) {
                 val quadrant = parent[i]
                 if (quadrant != null) {
-                    val distance = point.distance(quadrant.center)
+                    val distance = point.distance2(quadrant.center)
                     quadsToCheck.add(Pair(quadrant, distance))
-                    if (distance < minDist) {
-                        minDist = distance
+                    if (distance < minDist2) {
+                        minDist2 = distance
                     }
                 }
             }
         }
-        return checkQuads6(quadsToCheck.filter { it.second <= minDist + q5Diagonal }, point)
+        minDist2 = (sqrt(minDist2.toDouble()) + q5Diagonal).toFloat()
+        minDist2 *= minDist2
+        return checkQuads6(quadsToCheck.filter { it.second <= minDist2 }, point)
     }
 
     private fun checkQuads6(quads: List<Pair<Quadrant<Pair<Point2F, ArrayList<Point2F>>?>, Float>>, point: Point2F): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Pair<Point2F, ArrayList<Point2F>>, Float>>()
-        var minDist = Float.MAX_VALUE
+        var minDist2 = Float.MAX_VALUE
         for (pair in quads) {
             val parent = pair.first
             for (i in 0..3) {
                 val quadrant = parent[i]
                 if (quadrant != null) {
-                    val distance = point.distance(quadrant.first)
+                    val distance = point.distance2(quadrant.first)
                     quadsToCheck.add(Pair(quadrant, distance))
-                    if (distance < minDist) {
-                        minDist = distance
+                    if (distance < minDist2) {
+                        minDist2 = distance
                     }
                 }
             }
         }
-        return quadsToCheck.filter { it.second <= minDist + q6Diagonal }.flatMap { it.first.second }
+        minDist2 = (sqrt(minDist2.toDouble()) + q6Diagonal).toFloat()
+        minDist2 *= minDist2
+        return quadsToCheck.filter { it.second <= minDist2 }.flatMap { it.first.second }
     }
 
     private fun pickClosest(points: List<Point2F>, point: Point2F): Point2F? {

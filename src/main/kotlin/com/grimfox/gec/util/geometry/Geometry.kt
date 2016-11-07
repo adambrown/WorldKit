@@ -1,6 +1,7 @@
 package com.grimfox.gec.util.geometry
 
 import com.grimfox.gec.model.ArrayListMatrix
+import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.geometry.Geometry.debug
@@ -1898,7 +1899,30 @@ private fun addHeightPointIfNeeded(splices: LinkedHashMap<Pair<Int, Int>, Point3
     }
 }
 
-fun renderTriangles(vertices: ArrayList<Point3F>, triangles: LinkedHashSet<Set<Int>>, heightMap: ArrayListMatrix<Float>) {
+fun renderTriangles(vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, heightMap: Matrix<Float>, threadCount: Int) {
+    val threads = ArrayList<Thread>(threadCount)
+    val step = 3 * threadCount
+    for (i in 0..threadCount - 1) {
+        val thread = Thread {
+            for (t in (i * 3)..triangles.size - 1 step step) {
+                val a = vertices[triangles[t]]
+                val b = vertices[triangles[t + 1]]
+                val c = vertices[triangles[t + 2]]
+                val cross = (b - a).cross(c - a)
+                if (cross.c < 0) {
+                    renderTriangle(a, b, c, heightMap)
+                } else {
+                    renderTriangle(a, c, b, heightMap)
+                }
+            }
+        }
+        thread.start()
+        threads.add(thread)
+    }
+    threads.forEach(Thread::join)
+}
+
+fun renderTriangles(vertices: ArrayList<Point3F>, triangles: LinkedHashSet<Set<Int>>, heightMap: Matrix<Float>) {
     triangles.forEach {
         val tri = it.toList()
         val a = vertices[tri[0]]
@@ -1913,7 +1937,7 @@ fun renderTriangles(vertices: ArrayList<Point3F>, triangles: LinkedHashSet<Set<I
     }
 }
 
-fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: ArrayListMatrix<Float>) {
+fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: Matrix<Float>) {
     val stride = heightMap.width
     val strideF = stride.toFloat()
     val p1 = Point3F(a.x * strideF, a.y * strideF, a.z)
@@ -2087,7 +2111,7 @@ fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: ArrayListMatri
     }
 }
 
-fun writeHeightData(name: String, heightMap: ArrayListMatrix<Float>) {
+fun writeHeightData(name: String, heightMap: Matrix<Float>) {
     var maxLandValue = -Double.MAX_VALUE
     var minWaterValue = Double.MAX_VALUE
     for (y in (0..heightMap.width - 1)) {
