@@ -93,6 +93,7 @@ class BuildContinent() : Runnable {
             strides.sort()
         }
         for (test in 1..10000) {
+            val startTime = System.currentTimeMillis()
             if ((test + id) % count != 0) {
                 continue
             }
@@ -263,16 +264,22 @@ class BuildContinent() : Runnable {
                         val height = heightMap[j]
                         if (height == nothing) {
                             val waterPoint = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
-                            heightMap[j] = underwaterHeightFunction(coastPoints.closestPoint(waterPoint)!!.distance(waterPoint))
+                            val point = coastPoints.closestPoint(waterPoint, 0.015625f)
+                            if (point != null) {
+                                heightMap[j] = underwaterHeightFunction(point.distance(waterPoint))
+                            } else {
+                                heightMap[j] = -1.0f
+                            }
                         }
                     }
                 })
             }
             futures.forEach { it.get() }
             nextTime = System.currentTimeMillis()
-            val time2 = nextTime - time
+            val time2 = (nextTime - time) / 1000.0
             println("time to construct point set $time1. time to use point set $time2")
             writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
+            println("totalTime = ${(System.currentTimeMillis() - startTime) / 1000.0}")
         }
     }
 

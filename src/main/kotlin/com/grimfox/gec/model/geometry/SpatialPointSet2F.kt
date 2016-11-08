@@ -68,13 +68,13 @@ class SpatialPointSet2F() {
 
     private val data = Array<Quadrant?>(16) { null }
 
-    fun closestPoint(point: Point2F): Point2F? {
-        return pickClosest(closestPoints(point), point)
+    fun closestPoint(point: Point2F, maxRange2: Float = Float.MAX_VALUE): Point2F? {
+        return pickClosest(closestPoints(point, maxRange2), point)
     }
 
-    fun closestPoints(point: Point2F): List<Point2F> {
+    fun closestPoints(point: Point2F, maxRange2: Float = Float.MAX_VALUE): List<Point2F> {
         val quadsToCheck = ArrayList<Pair<Quadrant, Float>>()
-        var nextMinDist2 = Float.MAX_VALUE
+        var nextMinDist2 = maxRange2
         for (quadrant in data) {
             if (quadrant != null) {
                 val distance = point.distance2(quadrant.center)
@@ -86,12 +86,15 @@ class SpatialPointSet2F() {
         }
         nextMinDist2 = (sqrt(nextMinDist2.toDouble()) + diagonals[0]).toFloat()
         nextMinDist2 *= nextMinDist2
-        return checkQuads(quadsToCheck, 1, nextMinDist2, point)
+        return checkQuads(quadsToCheck, 1, nextMinDist2, point, maxRange2)
     }
 
-    private fun checkQuads(quads: Collection<Pair<Quadrant, Float>>, level: Int, minDist2: Float, point: Point2F): List<Point2F> {
+    private fun checkQuads(quads: Collection<Pair<Quadrant, Float>>, level: Int, minDist2: Float, point: Point2F, maxRange2: Float): List<Point2F> {
+        if (quads.isEmpty()) {
+            return emptyList()
+        }
         val quadsToCheck = ArrayList<Pair<Quadrant, Float>>()
-        var nextMinDist2 = Float.MAX_VALUE
+        var nextMinDist2 = maxRange2
         for (pair in quads) {
             if (pair.second <= minDist2) {
                 val quadrant = pair.first
@@ -132,7 +135,7 @@ class SpatialPointSet2F() {
         nextMinDist2 = (sqrt(nextMinDist2.toDouble()) + diagonals[level]).toFloat()
         nextMinDist2 *= nextMinDist2
         if (level < levels - 1) {
-            return checkQuads(quadsToCheck, level + 1, nextMinDist2, point)
+            return checkQuads(quadsToCheck, level + 1, nextMinDist2, point, maxRange2)
         } else {
             val points = ArrayList<Point2F>()
             quadsToCheck.forEach {
@@ -158,7 +161,10 @@ class SpatialPointSet2F() {
     }
 
     fun add(point: Point2F) {
-        val i = (point.y * 4.0).toInt() * 4 + (point.x * 4.0).toInt()
+        val width = 4
+        val x = max(0, min(width - 1, (point.x * width).toInt()))
+        val y = max(0, min(width - 1, (point.y * width).toInt()))
+        val i = y * width + x
         var quadrant = data[i]
         if (quadrant == null) {
             quadrant = QuadrantBranch(baseCenters[i])
@@ -172,8 +178,8 @@ class SpatialPointSet2F() {
 
     private fun getOrCreateNextQuadrant(quadrant: Quadrant, level: Int, point: Point2F): Quadrant {
         val width = widths[level]
-        val x = (point.x * width).toInt()
-        val y = (point.y * width).toInt()
+        val x = max(0, min(width - 1, (point.x * width).toInt()))
+        val y = max(0, min(width - 1, (point.y * width).toInt()))
         val xIdx = x % 2
         val yIdx = y % 2
         val i = yIdx * 2 + xIdx
