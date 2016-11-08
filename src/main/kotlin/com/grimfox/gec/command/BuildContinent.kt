@@ -30,6 +30,10 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Math.*
 import java.util.*
+import java.util.concurrent.Future
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
@@ -81,6 +85,7 @@ class BuildContinent() : Runnable {
             var currentIteration: Int = 0)
 
     override fun run() {
+        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
         val parameterSet = ParameterSet()
         if (strides.isEmpty()) {
             strides.addAll(listOf(7, 40, 80, 140, 256))
@@ -233,7 +238,8 @@ class BuildContinent() : Runnable {
             }
             val heightMap = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
             println("rendering triangles")
-            renderTriangles(vertices, globalTriangles, heightMap, 8)
+            renderTriangles(executor, vertices, globalTriangles, heightMap, 8)
+            var time = System.currentTimeMillis()
             val coastPoints = SpatialPointSet2F()
             val nothing = -Float.MAX_VALUE
             val widthF = heightMap.width.toFloat()
@@ -245,11 +251,14 @@ class BuildContinent() : Runnable {
                     }
                 }
             }
+            var nextTime = System.currentTimeMillis()
+            val time1 = (nextTime - time) / 1000.0
+            time = nextTime
             println("building underwater")
             val threadCount = 8
-            val threads = ArrayList<Thread>(threadCount)
+            val futures = ArrayList<Future<*>>(threadCount)
             for (i in 0..threadCount - 1) {
-                val thread = Thread {
+                futures.add(executor.submit {
                     for (j in i..heightMap.size.toInt() - 1 step threadCount) {
                         val height = heightMap[j]
                         if (height == nothing) {
@@ -257,11 +266,12 @@ class BuildContinent() : Runnable {
                             heightMap[j] = underwaterHeightFunction(coastPoints.closestPoint(waterPoint)!!.distance(waterPoint))
                         }
                     }
-                }
-                thread.start()
-                threads.add(thread)
+                })
             }
-            threads.forEach(Thread::join)
+            futures.forEach { it.get() }
+            nextTime = System.currentTimeMillis()
+            val time2 = nextTime - time
+            println("time to construct point set $time1. time to use point set $time2")
             writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
         }
     }

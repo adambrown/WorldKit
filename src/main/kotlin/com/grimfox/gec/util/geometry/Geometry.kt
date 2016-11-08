@@ -17,6 +17,8 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Math.*
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
 
@@ -1899,11 +1901,11 @@ private fun addHeightPointIfNeeded(splices: LinkedHashMap<Pair<Int, Int>, Point3
     }
 }
 
-fun renderTriangles(vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, heightMap: Matrix<Float>, threadCount: Int) {
-    val threads = ArrayList<Thread>(threadCount)
+fun renderTriangles(executor: ExecutorService, vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, heightMap: Matrix<Float>, threadCount: Int) {
+    val futures = ArrayList<Future<*>>(threadCount)
     val step = 3 * threadCount
     for (i in 0..threadCount - 1) {
-        val thread = Thread {
+        futures.add(executor.submit {
             for (t in (i * 3)..triangles.size - 1 step step) {
                 val a = vertices[triangles[t]]
                 val b = vertices[triangles[t + 1]]
@@ -1915,11 +1917,11 @@ fun renderTriangles(vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, hei
                     renderTriangle(a, c, b, heightMap)
                 }
             }
-        }
-        thread.start()
-        threads.add(thread)
+        })
     }
-    threads.forEach(Thread::join)
+    futures.forEach {
+        it.get()
+    }
 }
 
 fun renderTriangles(vertices: ArrayList<Point3F>, triangles: LinkedHashSet<Set<Int>>, heightMap: Matrix<Float>) {
