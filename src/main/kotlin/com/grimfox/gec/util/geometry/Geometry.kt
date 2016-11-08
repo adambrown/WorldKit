@@ -1901,7 +1901,7 @@ private fun addHeightPointIfNeeded(splices: LinkedHashMap<Pair<Int, Int>, Point3
     }
 }
 
-fun renderTriangles(executor: ExecutorService, vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, heightMap: Matrix<Float>, threadCount: Int) {
+fun renderTriangles(executor: ExecutorService, vertices: ArrayList<Point3F>, triangles: ArrayList<Int>, heightMap: Matrix<Float>, heightMapSmall: Matrix<Float>, threadCount: Int) {
     val futures = ArrayList<Future<*>>(threadCount)
     val step = 3 * threadCount
     for (i in 0..threadCount - 1) {
@@ -1913,8 +1913,10 @@ fun renderTriangles(executor: ExecutorService, vertices: ArrayList<Point3F>, tri
                 val cross = (b - a).cross(c - a)
                 if (cross.c < 0) {
                     renderTriangle(a, b, c, heightMap)
+                    renderTriangle(a, b, c, heightMapSmall)
                 } else {
                     renderTriangle(a, c, b, heightMap)
+                    renderTriangle(a, c, b, heightMapSmall)
                 }
             }
         })

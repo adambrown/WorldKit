@@ -94,6 +94,7 @@ class BuildContinent() : Runnable {
         }
         for (test in 1..10000) {
             val startTime = System.currentTimeMillis()
+            var time = startTime
             if ((test + id) % count != 0) {
                 continue
             }
@@ -113,7 +114,13 @@ class BuildContinent() : Runnable {
                 refineCoastline(localGraph, random, regionMask, parameters)
                 graph = localGraph
             }
+            var nextTime = System.currentTimeMillis()
+            println("regions built in ${nextTime - time}")
+            time = nextTime
             val rivers = buildRivers(graph, regionMask, random)
+            nextTime = System.currentTimeMillis()
+            println("rivers built in ${nextTime - time}")
+            time = nextTime
             val borders = getBorders(graph, regionMask)
             val globalVertices = PointSet2F(0.0001f)
             val globalTriangles = ArrayList<Int>(2000000)
@@ -208,6 +215,9 @@ class BuildContinent() : Runnable {
                     }
                 }
             }
+            nextTime = System.currentTimeMillis()
+            println("meshes built in ${nextTime - time}")
+            time = nextTime
             var minX = Float.MAX_VALUE
             var maxX = -Float.MIN_VALUE
             var minY = Float.MAX_VALUE
@@ -238,49 +248,176 @@ class BuildContinent() : Runnable {
                 vertices.add(Point3F(((vertex.x - minX) * multiplier) + xOff, ((vertex.y - minY) * multiplier) + yOff, vertex.z))
             }
             val heightMap = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
-            println("rendering triangles")
-            renderTriangles(executor, vertices, globalTriangles, heightMap, 8)
-            var time = System.currentTimeMillis()
-            val coastPoints = SpatialPointSet2F()
-            val nothing = -Float.MAX_VALUE
-            val widthF = heightMap.width.toFloat()
-            for (y in 0..heightMap.width - 1) {
-                for (x in 0..heightMap.width - 1) {
-                    val height = heightMap[x, y]
-                    if (height != nothing && isBesideNothing(heightMap, x, y, nothing)) {
-                        coastPoints.add(Point2F(x / widthF, y / widthF))
-                    }
+            val heightMapSmall = FloatArrayMatrix(512) { -Float.MAX_VALUE }
+            nextTime = System.currentTimeMillis()
+            println("triangles moved in ${nextTime - time}")
+            time = nextTime
+            renderTriangles(executor, vertices, globalTriangles, heightMap, heightMapSmall, 8)
+            nextTime = System.currentTimeMillis()
+            println("triangles rendered in ${nextTime - time}")
+            time = nextTime
+            val coastPoints = extractCoastPoints(heightMapSmall)
+            nextTime = System.currentTimeMillis()
+            println("coast point spatial set built in ${nextTime - time}")
+            time = nextTime
+            buildUnderwaterPoints(executor, coastPoints, heightMapSmall, 8)
+            val heightMapBilinear = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
+            sampleUnderwaterBilinear(executor, heightMapBilinear, heightMapSmall, 8)
+            sampleUnderwaterBlurred(executor, heightMap, heightMapBilinear, 8)
+            nextTime = System.currentTimeMillis()
+            println("underwater generated in ${nextTime - time}")
+            writeHeightData("test-new-${String.format("%05d", test)}-heightMapSmall", heightMapSmall)
+            writeHeightData("test-new-${String.format("%05d", test)}-heightMapBilinear", heightMapBilinear)
+            writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
+            println("totalTime = ${System.currentTimeMillis() - startTime}")
+        }
+    }
+
+    private fun extractCoastPoints(heightMap: FloatArrayMatrix): SpatialPointSet2F {
+        val coastPoints = SpatialPointSet2F(7)
+        val nothing = -Float.MAX_VALUE
+        val widthF = heightMap.width.toFloat()
+        for (y in 0..heightMap.width - 1) {
+            for (x in 0..heightMap.width - 1) {
+                val height = heightMap[x, y]
+                if (height != nothing && isBesideNothing(heightMap, x, y, nothing)) {
+                    coastPoints.add(Point2F(x / widthF, y / widthF))
                 }
             }
-            var nextTime = System.currentTimeMillis()
-            val time1 = (nextTime - time) / 1000.0
-            time = nextTime
-            println("building underwater")
-            val threadCount = 8
-            val futures = ArrayList<Future<*>>(threadCount)
-            for (i in 0..threadCount - 1) {
-                futures.add(executor.submit {
-                    for (j in i..heightMap.size.toInt() - 1 step threadCount) {
-                        val height = heightMap[j]
-                        if (height == nothing) {
-                            val waterPoint = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
-                            val point = coastPoints.closestPoint(waterPoint, 0.015625f)
-                            if (point != null) {
-                                heightMap[j] = underwaterHeightFunction(point.distance(waterPoint))
-                            } else {
-                                heightMap[j] = -1.0f
-                            }
+        }
+        return coastPoints
+    }
+
+    private fun buildUnderwaterPoints(executor: ThreadPoolExecutor, coastPoints: SpatialPointSet2F, heightMap: Matrix<Float>, threadCount: Int) {
+        val nothing = -Float.MAX_VALUE
+        val widthF = heightMap.width.toFloat()
+        val futures = ArrayList<Future<*>>(threadCount)
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                    val height = heightMap[j]
+                    if (height == nothing) {
+                        val waterPoint = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
+                        val point = coastPoints.closestPoint(waterPoint, 0.015625f)
+                        if (point != null) {
+                            heightMap[j] = underwaterHeightFunction(point.distance(waterPoint))
+                        } else {
+                            heightMap[j] = -1.0f
                         }
                     }
-                })
-            }
-            futures.forEach { it.get() }
-            nextTime = System.currentTimeMillis()
-            val time2 = (nextTime - time) / 1000.0
-            println("time to construct point set $time1. time to use point set $time2")
-            writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
-            println("totalTime = ${(System.currentTimeMillis() - startTime) / 1000.0}")
+                }
+            })
         }
+        futures.forEach { it.get() }
+    }
+
+    private fun sampleUnderwaterBilinear(executor: ThreadPoolExecutor, heightMap: Matrix<Float>, heightMapSmall: Matrix<Float>, threadCount: Int) {
+        val widthF = heightMap.width.toFloat()
+        val futures = ArrayList<Future<*>>(threadCount)
+        val hmw = heightMap.width
+        val hmsw = heightMapSmall.width
+        val hmswm1 = hmsw - 1
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                    val xf = ((j % hmw) / widthF) * hmsw
+                    val yf = ((j / hmw) / widthF) * hmsw
+                    val xi = xf.toInt()
+                    val yi = yf.toInt()
+                    val xr = xf - xi
+                    val ixr = 1.0f - xr
+                    val yr = yf - yi
+                    val iyr = 1.0f - yr
+                    val x1 = max(0, min(hmswm1, xi))
+                    val y1 = max(0, min(hmswm1, yi))
+                    val x2 = max(0, min(hmswm1, xi + 1))
+                    val y2 = max(0, min(hmswm1, yi + 1))
+                    val top1 = heightMapSmall[x1, y1]
+                    val top2 = heightMapSmall[x2, y1]
+                    val bot1 = heightMapSmall[x1, y2]
+                    val bot2 = heightMapSmall[x2, y2]
+                    val top = top1 * ixr + top2 * xr
+                    val bot = bot1 * ixr + bot2 * xr
+                    heightMap[j] = top * iyr + bot * yr
+                }
+            })
+        }
+        futures.forEach { it.get() }
+    }
+
+    private fun sampleUnderwaterBlurred(executor: ThreadPoolExecutor, heightMap: Matrix<Float>, heightMapScaled: Matrix<Float>, threadCount: Int) {
+        val nothing = -Float.MAX_VALUE
+        val futures = ArrayList<Future<*>>(threadCount)
+        val hmw = heightMap.width
+        val hmsw = heightMapScaled.width
+        val hmswm1 = hmsw - 1
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                    val height = heightMap[j]
+                    if (height == nothing) {
+                        val xi = j % hmw
+                        val yi = j / hmw
+                        val x1 = max(0, min(hmswm1, xi - 1))
+                        val x3 = max(0, min(hmswm1, xi + 1))
+                        val y1 = max(0, min(hmswm1, yi - 1))
+                        val y3 = max(0, min(hmswm1, yi + 1))
+                        heightMap[j] = (heightMapScaled[x1, y1] + heightMapScaled[x3, y1] + heightMapScaled[x1, y3] + heightMapScaled[x3, y3]) * 0.077847f +
+                                (heightMapScaled[xi, y1] + heightMapScaled[x1, yi] + heightMapScaled[x3, yi] + heightMapScaled[xi, y3]) * 0.123317f +
+                                heightMapScaled[xi, yi] * 0.195346f
+                    }
+                }
+            })
+        }
+        futures.forEach { it.get() }
+    }
+
+    private fun sampleUnderwaterBicubic(executor: ThreadPoolExecutor, heightMap: Matrix<Float>, heightMapSmall: Matrix<Float>, threadCount: Int) {
+        val nothing = -Float.MAX_VALUE
+        val widthF = heightMap.width.toFloat()
+        val futures = ArrayList<Future<*>>(threadCount)
+        val hmw = heightMap.width
+        val hmsw = heightMapSmall.width
+        val hmswm1 = hmsw - 1
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                    val height = heightMap[j]
+                    if (height == nothing) {
+                        var sum = 0.0f
+                        var denom = 0.0f
+                        val xf = ((j % hmw) / widthF) * hmsw
+                        val yf = ((j / hmw) / widthF) * hmsw
+                        val xi = xf.toInt()
+                        val yi = yf.toInt()
+                        val xr = xf - xi
+                        val yr = yf - yi
+                        for ( m in -1..2) {
+                            for (n in -1..2) {
+                                val c = bellFunction(m - xr) * bellFunction(n - yr)
+                                sum += heightMapSmall[max(0, min(hmswm1, xi + m)), max(0, min(hmswm1, yi + n))] * c
+                                denom += c
+                            }
+                        }
+                        heightMap[j] = sum / denom
+                    }
+                }
+            })
+        }
+        futures.forEach { it.get() }
+    }
+
+    private fun bellFunction(x: Float): Float {
+        var f = x
+        if (f < 0.0f) {
+            f = -f
+        }
+        if (f >= 0.0f && f <= 1.0f) {
+            return 0.66666666666666666f + 0.5f * (f * f * f) - f * f
+        } else if (f > 1.0f && f <= 2.0f) {
+            return (0.16666666666666666 * pow(2.0 - f, 3.0)).toFloat()
+        }
+        return 1.0f
     }
 
     private fun isBesideNothing(heightMap: Matrix<Float>, x: Int, y: Int, nothing: Float): Boolean {

@@ -3,14 +3,17 @@ package com.grimfox.gec.model.geometry
 import java.lang.Math.*
 import java.util.*
 
-class SpatialPointSet2F() {
+class SpatialPointSet2F(levels: Int = 7) {
+
+    val levels = min(maxLevels, max(minLevels, levels))
 
     companion object {
-        private val levels = 7
+        private val minLevels = 3
+        private val maxLevels = 12
         private val baseCenters = centersForLayer(4)
-        private val widths = IntArray(levels) {i -> round(pow(2.0, i.toDouble())).toInt() * 4 }
-        private val offsets = FloatArray(levels) { i -> offsetForLayer(widths[i]) }
-        private val diagonals = FloatArray(levels) { i -> diagonalForLayer(widths[i]) }
+        private val widths = IntArray(maxLevels) {i -> round(pow(2.0, i.toDouble())).toInt() * 4 }
+        private val offsets = FloatArray(maxLevels) { i -> offsetForLayer(widths[i]) }
+        private val diagonals = FloatArray(maxLevels) { i -> diagonalForLayer(widths[i]) }
 
         private fun centersForLayer(width: Int): Array<Point2F> {
             val centers = Array(width * width) { Point2F(0.0f, 0.0f)}
