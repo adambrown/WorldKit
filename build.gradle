@@ -1,5 +1,19 @@
 description 'Game Environment Creator'
 
+import org.gradle.internal.os.OperatingSystem
+
+switch (OperatingSystem.current()) {
+    case OperatingSystem.WINDOWS:
+        project.ext.lwjgl_natives = "natives-windows"
+        break
+    case OperatingSystem.LINUX:
+        project.ext.lwjgl_natives = "natives-linux"
+        break
+    case OperatingSystem.MAC_OS:
+        project.ext.lwjgl_natives = "natives-macos"
+        break
+}
+
 apply plugin: 'kotlin'
 apply plugin: 'application'
 
@@ -43,6 +57,47 @@ dependencies {
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: jackson_version
 
     compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
+
+    // LWJGL dependencies START
+    compile group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-bgfx', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-egl', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-jawt', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-nuklear', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-openal', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-opencl', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-opengl', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-opengles', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-ovr', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-vulkan', version: lwjgl_version
+    compile group: 'org.lwjgl', name: 'lwjgl-xxhash', version: lwjgl_version
+
+    // LWJGL natives
+    runtime group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-bgfx', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-nuklear', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-openal', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-ovr', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-xxhash', version: lwjgl_version, classifier: lwjgl_natives
+    // LWJGL dependencies END
 
     runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }

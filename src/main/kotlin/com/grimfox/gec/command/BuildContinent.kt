@@ -106,11 +106,9 @@ class BuildContinent() : Runnable {
             var (graph, regionMask) = buildRegions(parameterSet)
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
-                val localLastGraph = graph
-                val localGraph: Graph
                 val points = generatePoints(parameters.stride, virtualWidth, random)
-                localGraph = buildGraph(virtualWidth, points, parameters.stride)
-                regionMask = applyMask(localGraph, localLastGraph, regionMask)
+                val localGraph = buildGraph(virtualWidth, points, parameters.stride)
+                regionMask = applyMask(localGraph, graph, regionMask)
                 refineCoastline(localGraph, random, regionMask, parameters)
                 graph = localGraph
             }
