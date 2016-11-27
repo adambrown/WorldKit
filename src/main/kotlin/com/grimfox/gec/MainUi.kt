@@ -13,16 +13,21 @@ object MainUi {
     @JvmStatic fun main(vararg args: String) {
         val mainFont = NkUserFont.create()
         val glyphFont = NkUserFont.create()
+        val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }
+        val glyphClose = glyphIndex[0]
+        val glyphMinimize = glyphIndex[1]
+        val glyphRestore = glyphIndex[2]
+        val glyphMaximize = glyphIndex[3]
         val mainStyle = style {
             createFont("fonts/FiraSans.ttf", 22.0f, 32, 95, 512, 512, mainFont)
-            createFont("fonts/WorldKitUi.ttf", 22.0f, 32, 3, 512, 512, glyphFont)
+            createFont("fonts/WorldKitUi.ttf", 22.0f, 32, 4, 512, 512, glyphFont)
 
             background.set(45, 45, 48)
 
             dragAreaLeftMargin = 0
-            dragAreaRightMargin = 100
+            dragAreaRightMargin = 146
             dragAreaTopMargin = 0
-            dragAreaHeight = 24
+            dragAreaHeight = 32
 
             init { context ->
                 twr(stackPush()) { stack ->
@@ -79,56 +84,57 @@ object MainUi {
                                 nk_style_pop_font(context)
                             }
                             col(48) {
-                                if (nk_button_label(context, "!")) {
-                                    setShouldClose(true)
+                                if (nk_button_label(context, glyphMinimize)) {
+                                    minimizeWindow()
                                 }
                             }
                             col(48) {
-                                if (nk_button_label(context, "\"")) {
-                                    setShouldClose(true)
+                                val glyph = if (isMaximized) glyphRestore else glyphMaximize
+                                if (nk_button_label(context, glyph)) {
+                                    toggleMaximized()
                                 }
                             }
                             col(48) {
-                                if (nk_button_label(context, " ")) {
-                                    setShouldClose(true)
+                                if (nk_button_label(context, glyphClose)) {
+                                    closeWindow()
                                 }
                             }
                         }
                         nk_style_pop_font(context)
 
-                        nk_layout_row_static(context, 30f, 400, 1)
-                        nk_text(context, "mouse x: $mouseX, y: $mouseY", NK_TEXT_ALIGN_LEFT)
-                        nk_text(context, "window w: $width, h: $height", NK_TEXT_ALIGN_LEFT)
-
-
-                        nk_layout_row_dynamic(context, 30.0f, 1)
-                        if (nk_button_label(context, "button with really long name")) {
-                            println("button clicked")
-                        }
-                        nk_layout_row_dynamic(context, 30f, 2)
-                        if (nk_option_label(context, "easy", op == EASY)) {
-                            op = EASY
-                        }
-                        if (nk_option_label(context, "hard", op == HARD)) {
-                            op = HARD
-                        }
-
-                        nk_layout_row_dynamic(context, 25f, 1)
-                        nk_property_int(context, "Compression:", 0, compression, 100, 10, 1.0f)
-
-                        nk_layout_row_dynamic(context, 20f, 1)
-                        nk_label(context, "background:", NK_TEXT_LEFT)
-                        nk_layout_row_dynamic(context, 25f, 1)
-                        if (nk_combo_begin_color(context, style.background, NkVec2.mallocStack(stack).set(nk_widget_width(context), 400f))) {
-                            nk_layout_row_dynamic(context, 120f, 1)
-                            nk_color_picker(context, style.background, NK_RGBA)
-                            nk_layout_row_dynamic(context, 25f, 1)
-                            style.background.rInt = nk_propertyi(context, "#R:", 0, style.background.rInt, 255, 1, 1.0f)
-                            style.background.gInt = nk_propertyi(context, "#G:", 0, style.background.gInt, 255, 1, 1.0f)
-                            style.background.bInt = nk_propertyi(context, "#B:", 0, style.background.bInt, 255, 1, 1.0f)
-                            style.background.aInt = nk_propertyi(context, "#A:", 0, style.background.aInt, 255, 1, 1.0f)
-                            nk_combo_end(context)
-                        }
+//                        nk_layout_row_static(context, 30f, 400, 1)
+//                        nk_text(context, "mouse x: $mouseX, y: $mouseY", NK_TEXT_ALIGN_LEFT)
+//                        nk_text(context, "window w: $width, h: $height", NK_TEXT_ALIGN_LEFT)
+//
+//
+//                        nk_layout_row_dynamic(context, 30.0f, 1)
+//                        if (nk_button_label(context, "button with really long name")) {
+//                            println("button clicked")
+//                        }
+//                        nk_layout_row_dynamic(context, 30f, 2)
+//                        if (nk_option_label(context, "easy", op == EASY)) {
+//                            op = EASY
+//                        }
+//                        if (nk_option_label(context, "hard", op == HARD)) {
+//                            op = HARD
+//                        }
+//
+//                        nk_layout_row_dynamic(context, 25f, 1)
+//                        nk_property_int(context, "Compression:", 0, compression, 100, 10, 1.0f)
+//
+//                        nk_layout_row_dynamic(context, 20f, 1)
+//                        nk_label(context, "background:", NK_TEXT_LEFT)
+//                        nk_layout_row_dynamic(context, 25f, 1)
+//                        if (nk_combo_begin_color(context, style.background, NkVec2.mallocStack(stack).set(nk_widget_width(context), 400f))) {
+//                            nk_layout_row_dynamic(context, 120f, 1)
+//                            nk_color_picker(context, style.background, NK_RGBA)
+//                            nk_layout_row_dynamic(context, 25f, 1)
+//                            style.background.rInt = nk_propertyi(context, "#R:", 0, style.background.rInt, 255, 1, 1.0f)
+//                            style.background.gInt = nk_propertyi(context, "#G:", 0, style.background.gInt, 255, 1, 1.0f)
+//                            style.background.bInt = nk_propertyi(context, "#B:", 0, style.background.bInt, 255, 1, 1.0f)
+//                            style.background.aInt = nk_propertyi(context, "#A:", 0, style.background.aInt, 255, 1, 1.0f)
+//                            nk_combo_end(context)
+//                        }
                     }
                     nk_end(context)
                 }

@@ -43,6 +43,7 @@ fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, uiBlock: UserInt
         ui.show()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
+            ui.handleDragAndResize()
             ui.uiBlock(ui.nkContext)
             ui.clearViewport()
             ui.drawFrame()
@@ -80,12 +81,21 @@ interface UserInterface {
     val height: Int
     val mouseX: Int
     val mouseY: Int
+    val isMaximized: Boolean
 
     fun show()
 
     fun hide()
 
-    fun setShouldClose(shouldClose: Boolean)
+    fun closeWindow()
+
+    fun minimizeWindow()
+
+    fun toggleMaximized()
+
+    fun maximizeWindow()
+
+    fun restoreWindow()
 }
 
 var NkColor.r: Byte
@@ -145,6 +155,7 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     internal val window = context.window
     internal val nkContext = context.context
 
+    override val isMaximized: Boolean get() = window.isMaximized
     override val style: UiStyle get() = context.style
     override val width: Int get() = window.currentWidth
     override val height: Int get() = window.currentHeight
@@ -159,8 +170,28 @@ private class UserInterfaceInternal internal constructor(internal val context: N
         glfwHideWindow(window.id)
     }
 
-    override fun setShouldClose(shouldClose: Boolean) {
-        glfwSetWindowShouldClose(window.id, shouldClose)
+    override fun closeWindow() {
+        glfwSetWindowShouldClose(window.id, true)
+    }
+
+    override fun minimizeWindow() {
+        glfwIconifyWindow(window.id)
+    }
+
+    override fun maximizeWindow() {
+        window.maximize()
+    }
+
+    override fun restoreWindow() {
+        window.restore()
+    }
+
+    override fun toggleMaximized() {
+        if (isMaximized) {
+            restoreWindow()
+        } else {
+            maximizeWindow()
+        }
     }
 
     internal fun close() {
@@ -169,6 +200,10 @@ private class UserInterfaceInternal internal constructor(internal val context: N
 
     internal fun handleFrameInput() {
         window.handleFrameInput(context.context)
+    }
+
+    internal fun handleDragAndResize() {
+        window.handleDragAndResize()
     }
 
     internal fun shouldClose(): Boolean {
@@ -292,6 +327,7 @@ private data class ScreenSpec(
 private class WindowContext(
         var id: Long = 0,
 
+        var isMaximized: Boolean = false,
         var isResizing: Boolean = false,
         var isDragging: Boolean = false,
         var hasMoved: Boolean = false,
@@ -320,6 +356,11 @@ private class WindowContext(
         var resizeMouseStartX: Int = 0,
         var resizeMouseStartY: Int = 0,
 
+        var resizeWindowStartX: Int = 0,
+        var resizeWindowStartY: Int = 0,
+
+        var resizeMove: Boolean = false,
+
         var resizeWindowStartWidth: Int = 0,
         var resizeWindowStartHeight: Int = 0,
 
@@ -328,6 +369,9 @@ private class WindowContext(
 
         var currentPixelWidth: Int = width,
         var currentPixelHeight: Int = height,
+
+        var restoreX: Int = 0,
+        var restoreY: Int = 0,
 
         var monitors: List<MonitorSpec> = emptyList(),
         var warpLines: List<WarpLine> = emptyList(),
@@ -369,8 +413,6 @@ private class WindowContext(
             }
             relativeMouseX = mouseX.toDouble() - x
             relativeMouseY = mouseY.toDouble() - y
-            handleDragging()
-            handleResizing()
         }
         nk_input_begin(context)
         glfwPollEvents()
@@ -388,24 +430,40 @@ private class WindowContext(
         nk_input_end(context)
     }
 
+    internal fun handleDragAndResize() {
+        handleDragging()
+        handleResizing()
+    }
+
     private fun handleResizing() {
         if (isResizing) {
-            val deltaMouseX = mouseX - resizeMouseStartX
+            isMaximized = false
+            val deltaMouseX = if (resizeMove) resizeMouseStartX - mouseX else mouseX - resizeMouseStartX
             val deltaMouseY = mouseY - resizeMouseStartY
             val deltaWindowX = width - resizeWindowStartWidth
             val deltaWindowY = height - resizeWindowStartHeight
-            val resizeX = deltaMouseX - deltaWindowX
+            var resizeX = deltaMouseX - deltaWindowX
             val resizeY = deltaMouseY - deltaWindowY
             if (Math.abs(resizeX) > 0.5 || Math.abs(resizeY) > 0.5) {
                 var newWidth = width + resizeX
                 var newHeight = height + resizeY
-                val newWindowX2 = x + newWidth
-                val newWindowY2 = y + newHeight
-                if (newWindowX2 > currentMonitor.maximizedX2) {
-                    newWidth = currentMonitor.maximizedX2 - x
-                } else if (newWidth < 640) {
-                    newWidth = 640
+                if (resizeMove) {
+                    val newWindowX1 = x - resizeX
+                    if (newWindowX1 < currentMonitor.maximizedX1) {
+                        newWidth = (x + width) - currentMonitor.maximizedX1
+                    } else if (newWidth < 640) {
+                        newWidth = 640
+                    }
+                    resizeX = newWidth - width
+                } else {
+                    val newWindowX2 = x + newWidth
+                    if (newWindowX2 > currentMonitor.maximizedX2) {
+                        newWidth = currentMonitor.maximizedX2 - x
+                    } else if (newWidth < 640) {
+                        newWidth = 640
+                    }
                 }
+                val newWindowY2 = y + newHeight
                 if (newWindowY2 > currentMonitor.maximizedY2) {
                     newHeight = currentMonitor.maximizedY2 - y
                 } else if (newHeight < 480) {
@@ -416,12 +474,20 @@ private class WindowContext(
                 currentWidth = newWidth
                 currentHeight = newHeight
                 glfwSetWindowSize(id, currentWidth, currentHeight)
+                if (resizeMove) {
+                    x -= resizeX
+                    restoreX = x
+                    glfwSetWindowPos(id, x, y)
+                }
             }
         }
     }
 
     private fun handleDragging() {
         if (isDragging) {
+            if (hasMoved) {
+                isMaximized = false
+            }
             val deltaMouseX = mouseX - dragMouseStartX
             val deltaMouseY = mouseY - dragMouseStartY
             val deltaWindowX = x - dragWindowStartX
@@ -433,18 +499,12 @@ private class WindowContext(
                 var newWindowY = Math.round(y + moveY.toDouble()).toInt()
                 if (newWindowY < 0) {
                     if (hasMoved && (newWindowY <= -15 || mouseY < 0.1)) {
-                        glfwSetWindowPos(id, currentMonitor.maximizedX1, currentMonitor.maximizedY1)
-                        glfwSetWindowSize(id, currentMonitor.maximizedWidth, currentMonitor.maximizedHeight)
+                        maximize()
                         hasMoved = false
                     }
                 } else {
                     if (!hasMoved && (Math.abs(dragWindowStartX - newWindowX) > 10 || Math.abs(dragWindowStartY - newWindowY) > 10)) {
-                        if (currentWidth != width || currentWidth != height) {
-                            newWindowX = Math.round(mouseX - (relativeMouseX / currentWidth.toDouble()) * width).toInt()
-                            dragWindowStartX = newWindowX
-                            dragMouseStartX = mouseX
-                            glfwSetWindowSize(id, width, height)
-                        }
+                        newWindowX = restore(newWindowX)
                         hasMoved = true
                     }
                     if (hasMoved) {
@@ -477,9 +537,41 @@ private class WindowContext(
                         glfwSetWindowPos(id, newWindowX, newWindowY)
                         x = newWindowX
                         y = newWindowY
+                        restoreX = x
+                        restoreY = y
                     }
                 }
             }
+        }
+    }
+
+    internal fun restore(windowX: Int = x): Int {
+        if (isMaximized && (currentWidth != width || currentWidth != height)) {
+            val newWindowX = if (isDragging) {
+                val newWindowX = Math.round(mouseX - (relativeMouseX / currentWidth.toDouble()) * width).toInt()
+                dragWindowStartX = newWindowX
+                dragMouseStartX = mouseX
+                newWindowX
+            } else {
+                x = restoreX
+                y = restoreY
+                glfwSetWindowPos(id, x, y)
+                restoreX
+            }
+            glfwSetWindowSize(id, width, height)
+            isMaximized = false
+            return newWindowX
+        }
+        return windowX
+    }
+
+    internal fun maximize() {
+        if (!isMaximized) {
+            restoreX = x
+            restoreY = y
+            glfwSetWindowPos(id, currentMonitor.maximizedX1, currentMonitor.maximizedY1)
+            glfwSetWindowSize(id, currentMonitor.maximizedWidth, currentMonitor.maximizedHeight)
+            isMaximized = true
         }
     }
 
@@ -848,12 +940,10 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
                 startDrag(stack, window)
-            } else if ((x >= window.currentWidth - window.resizeAreaWidth
-                    && x <= window.currentWidth
-                    && y >= window.currentHeight - window.resizeAreaHeight
-                    && y <= window.currentHeight)
-                    && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                startResize(stack, window)
+            } else if ((y >= window.currentHeight - window.resizeAreaHeight && y <= window.currentHeight)
+                    && ((x >= window.currentWidth - window.resizeAreaWidth && x <= window.currentWidth) || (x >= 0 && x <= window.resizeAreaWidth))
+                    && (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)) {
+                startResize(stack, window, x <= window.resizeAreaWidth)
             } else {
                 handleStandardMouseAction(context, window, action, button, x, y)
             }
@@ -887,6 +977,8 @@ private fun startDrag(stack: MemoryStack, window: WindowContext) {
     glfwGetWindowPos(window.id, w, h)
     window.x = w[0]
     window.y = h[0]
+    window.restoreX = window.x
+    window.restoreY = window.y
     window.isDragging = true
     window.hasMoved = false
     val pointerLocation = MouseInfo.getPointerInfo()?.location
@@ -898,7 +990,7 @@ private fun startDrag(stack: MemoryStack, window: WindowContext) {
     window.dragWindowStartY = window.y
 }
 
-private fun startResize(stack: MemoryStack, window: WindowContext) {
+private fun startResize(stack: MemoryStack, window: WindowContext, moveWithResize: Boolean) {
     val w = stack.mallocInt(1)
     val h = stack.mallocInt(1)
     glfwGetWindowSize(window.id, w, h)
@@ -912,6 +1004,9 @@ private fun startResize(stack: MemoryStack, window: WindowContext) {
     window.mouseY = pointerLocation?.y ?: window.mouseY
     window.resizeMouseStartX = window.mouseX
     window.resizeMouseStartY = window.mouseY
+    window.resizeWindowStartX = window.x
+    window.resizeWindowStartY = window.y
+    window.resizeMove = moveWithResize
     window.resizeWindowStartWidth = window.width
     window.resizeWindowStartHeight = window.height
 }
@@ -929,6 +1024,8 @@ private fun initializeWindowState(window: WindowContext) {
         glfwGetWindowPos(window.id, x, y)
         window.x = x[0]
         window.y = y[0]
+        window.restoreX = window.x
+        window.restoreY - window.y
         window.relativeMouseX = window.mouseX.toDouble() - window.x
         window.relativeMouseY = window.mouseY.toDouble() - window.y
         glfwGetWindowSize(window.id, x, y)
