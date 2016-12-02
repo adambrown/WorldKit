@@ -1,6 +1,7 @@
 package com.grimfox.gec.ui
 
 import com.grimfox.gec.extensions.twr
+import com.grimfox.gec.learning.LessonEightRenderer
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
@@ -26,6 +27,7 @@ import java.awt.MouseInfo
 import java.awt.Rectangle
 import java.awt.Toolkit
 import java.nio.ByteBuffer
+import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
@@ -34,18 +36,21 @@ import java.util.*
 
 fun style(block: UiStyle.() -> Unit) = block
 
-fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, uiBlock: UserInterface.(NkContext) -> Unit) {
+fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, shininess: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
     val style = UiStyleInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, style))
     try {
         style.styleBlock()
         style.init(ui.nkContext)
         ui.show()
+        val lesson8: LessonEightRenderer = LessonEightRenderer(shininess)
+        lesson8.onSurfaceCreated()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.uiBlock(ui.nkContext)
             ui.clearViewport()
+            lesson8.onDrawFrame(ui.pixelWidth, ui.pixelHeight, ui.mouseX, ui.mouseY)
             ui.drawFrame()
             ui.swapBuffers()
         }
@@ -79,6 +84,8 @@ interface UserInterface {
 
     val width: Int
     val height: Int
+    val pixelWidth: Int
+    val pixelHeight: Int
     val mouseX: Int
     val mouseY: Int
     val isMaximized: Boolean
@@ -159,6 +166,8 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     override val style: UiStyle get() = context.style
     override val width: Int get() = window.currentWidth
     override val height: Int get() = window.currentHeight
+    override val pixelWidth: Int get() = window.currentPixelWidth
+    override val pixelHeight: Int get() = window.currentPixelHeight
     override val mouseX: Int get() = window.mouseX
     override val mouseY: Int get() = window.mouseY
 
@@ -211,9 +220,9 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 
     internal fun clearViewport() {
-        glViewport(0, -32, window.width, window.height + 32)
+        glViewport(0, -32, window.currentPixelWidth, window.currentPixelHeight + 32)
         glClearColor(style.background.rFloat, style.background.gFloat, style.background.bFloat, style.background.aFloat)
-        glClear(GL_COLOR_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
     internal fun drawFrame() {

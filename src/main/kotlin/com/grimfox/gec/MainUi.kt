@@ -60,24 +60,25 @@ object MainUi {
             }
         }
 
-        val EASY = 0
-        val HARD = 1
-
-        var op = EASY
-
-        val compression = BufferUtils.createIntBuffer(1).put(0, 20)
+//        val EASY = 0
+//        val HARD = 1
+//
+//        var op = EASY
+//
+//        val compression = BufferUtils.createIntBuffer(1).put(0, 20)
 
         twr(stackPush()) { stack ->
-            val windowBounds = nk_rect(0.0f, 0.0f, 10.0f, 10.0f, NkRect.mallocStack(stack))
+            val shininess = stack.mallocFloat(1)
+            val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
 
-            ui(mainStyle, 640, 480) { context ->
+            ui(mainStyle, 640, 480, shininess) { context ->
                 twr(stackPush()) { stack ->
 
                     if (nk_begin(context, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
                         nk_window_set_bounds(context, nk_rect(0.0f, 0.0f, width.toFloat(), height.toFloat(), windowBounds))
 
                         nk_style_push_font(context, glyphFont)
-                        context.staticRow(32, width - 1) {
+                        context.staticRow(32, width) {
                             col {
                                 nk_style_push_font(context, mainFont)
                                 nk_text(context, "WorldKit", NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
@@ -101,6 +102,15 @@ object MainUi {
                             }
                         }
                         nk_style_pop_font(context)
+
+                        context.staticRow(32, width) {
+                            col(400) {
+                                nk_slider_float(context, 0.0f, shininess, 100.0f, 0.3f)
+                            }
+                            col {
+
+                            }
+                        }
 
 //                        nk_layout_row_static(context, 30f, 400, 1)
 //                        nk_text(context, "mouse x: $mouseX, y: $mouseY", NK_TEXT_ALIGN_LEFT)
