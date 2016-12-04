@@ -68,10 +68,10 @@ object MainUi {
 //        val compression = BufferUtils.createIntBuffer(1).put(0, 20)
 
         twr(stackPush()) { stack ->
-            val shininess = stack.mallocFloat(1)
+            val heightMapScaleFactor = stack.mallocFloat(1)
             val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
 
-            ui(mainStyle, 640, 480, shininess) { context ->
+            ui(mainStyle, 640, 480, heightMapScaleFactor) { context ->
                 twr(stackPush()) { stack ->
 
                     if (nk_begin(context, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
@@ -105,7 +105,7 @@ object MainUi {
 
                         context.staticRow(32, width) {
                             col(400) {
-                                nk_slider_float(context, 0.0f, shininess, 100.0f, 0.3f)
+                                nk_slider_float(context, 0.0f, heightMapScaleFactor, 25.0f, 0.01f)
                             }
                             col {
 

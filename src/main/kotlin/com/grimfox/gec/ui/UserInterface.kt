@@ -36,14 +36,14 @@ import java.util.*
 
 fun style(block: UiStyle.() -> Unit) = block
 
-fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, shininess: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
+fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
     val style = UiStyleInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, style))
     try {
         style.styleBlock()
         style.init(ui.nkContext)
         ui.show()
-        val lesson8: LessonEightRenderer = LessonEightRenderer(shininess)
+        val lesson8: LessonEightRenderer = LessonEightRenderer(heightMapScaleFactor)
         lesson8.onSurfaceCreated()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
