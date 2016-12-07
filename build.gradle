@@ -55,6 +55,7 @@ dependencies {
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: jackson_version
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: jackson_version
     compile group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: jackson_version
+    compile group: 'org.joml', name: 'joml', version: joml_version
 
     compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 

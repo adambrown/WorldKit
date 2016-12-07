@@ -69,9 +69,10 @@ object MainUi {
 
         twr(stackPush()) { stack ->
             val heightMapScaleFactor = stack.mallocFloat(1)
+            heightMapScaleFactor.put(0, 10.0f)
             val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
 
-            ui(mainStyle, 640, 480, heightMapScaleFactor) { context ->
+            ui(mainStyle, 800, 600, heightMapScaleFactor) { context ->
                 twr(stackPush()) { stack ->
 
                     if (nk_begin(context, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
@@ -104,8 +105,13 @@ object MainUi {
                         nk_style_pop_font(context)
 
                         context.staticRow(32, width) {
-                            col(400) {
-                                nk_slider_float(context, 0.0f, heightMapScaleFactor, 25.0f, 0.01f)
+                            context.staticRow(32, width) {
+                                col {
+
+                                }
+                            }
+                            col(396) {
+                                nk_slider_float(context, 0.0f, heightMapScaleFactor, 20.0f, 0.01f)
                             }
                             col {
 
