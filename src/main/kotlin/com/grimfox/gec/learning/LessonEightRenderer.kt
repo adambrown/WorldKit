@@ -3,13 +3,13 @@ package com.grimfox.gec.learning
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
+import com.grimfox.gec.util.geometry.min
 import org.joml.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.nuklear.NkColor
 import org.lwjgl.nuklear.Nuklear.nk_rgb
 import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL13.GL_TEXTURE0
-import org.lwjgl.opengl.GL13.glActiveTexture
+import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
@@ -21,6 +21,8 @@ import java.lang.Math.round
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.nio.IntBuffer
+import java.text.FieldPosition
 import javax.imageio.ImageIO
 
 /**
@@ -28,7 +30,7 @@ import javax.imageio.ImageIO
  * passed in is unused for OpenGL ES 2.0 renderers -- the static class GLES20 is
  * used instead.
  */
-class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
+class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor: FloatBuffer) {
 
     companion object {
         private val BYTES_PER_FLOAT = 4
@@ -41,13 +43,29 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
     private val normalMatrix = Matrix3f()
 
     /** Additional matrices.  */
-    private val accumulatedRotation = Matrix4f()
-    private val rotation = Quaternionf().rotate(0.0f, 0.0f, 0.0f)
+    private val defaultRotation = Quaternionf().rotate(0.0f, 0.0f, 0.0f)
+    private val rotation = Quaternionf(defaultRotation)
     private val deltaRotation = Quaternionf()
 
     private val floatBuffer = BufferUtils.createFloatBuffer(16)
 
-    private val translation = Vector3f(0.0f, 0.0f, -102.0f)
+    private val modelScale = 512.0f
+
+    private val minZoom = 0.005f
+    private val maxZoom = 100.0f
+    private val defaultZoom = 0.6187f
+    private val zoomIncrement = 0.1f
+    private var zoom = defaultZoom
+
+    private val modelScaleAdjustment = (((-1.0 / modelScale) * 0.0666666) + 1.06604).toFloat()
+
+    private val defaultTranslation = Vector3f(0.0f, 0.0f, -7.6f).mul(modelScale * modelScaleAdjustment)
+    private val translation = Vector3f(defaultTranslation)
+
+    private var lastScroll = 0.0f
+    private var scroll = 0.0f
+
+    private val perspectiveToOrtho = 8.10102f
 
     /** OpenGL handles to our program uniforms.  */
     private val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
@@ -72,7 +90,7 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
 
     private val background = nk_rgb(30, 30, 30, NkColor.create())
 
-    private val lightDirection = Vector3f(1.0f, 1.0f, 1.0f)
+    private val lightDirection = Vector3f(1.0f, 1.0f, 2.0f)
 
     /** This is a handle to our cube shading program.  */
     private var program: Int = 0
@@ -85,6 +103,12 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
     var lastMouseX = 0.0f
     var lastMouseY = 0.0f
     var mouseSpeed = 0.0035f
+    var lastMouse1Down = false
+    var lastMouse2Down = false
+    var isRollOn = false
+    var isRotateOn = false
+    var isTranslateOn = false
+    var isResetOn = false
 
     val axisRotation = AxisAngle4f(0.0f, 0.0f, 0.0f, 0.0f)
 
@@ -121,7 +145,7 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
                 listOf(positionAttribute, uvAttribute),
                 listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, colorUniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform))
 
-        heightMap = HexGrid(150.0f, 256)
+        heightMap = HexGrid(10.0f * modelScale, 2048)
 
         twr(MemoryStack.stackPush()) { stack ->
             val bufferedImage = ImageIO.read(File(getPathForResource("/textures/height-map.png")))
@@ -138,16 +162,92 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
         }
 
         lightDirection.normalize()
-
-        accumulatedRotation.identity()
     }
 
-    fun onDrawFrame(width: Int, height: Int, mouseX: Int, mouseY: Int) {
+    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, mouseX: Int, mouseY: Int, mouseWheel: Float, isMouse1Down: Boolean, isMouse2Down: Boolean) {
 
         if (width <= 0 || height <= 0) {
             return
         }
 
+        lastScroll = scroll
+        scroll = mouseWheel
+        val deltaScroll = scroll - lastScroll
+
+        val isMouseOver = mouseX > xPosition && mouseX < width && mouseY > yPosition && mouseY < height
+
+        val adjustedMouseX = mouseX - xPosition
+        val adjustedMouseY = mouseY - yPosition
+        val adjustedWidth = width - xPosition
+        val adjustedHeight = height - yPosition
+
+        val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+        val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+
+        val mouseDistanceMultiplier = (heightMap!!.width / (height - yPosition))
+
+        if (isMouseOver) {
+            val isMouseOverMargin = isMouseOver && (adjustedMouseX <= marginWidth || adjustedMouseX > marginWidth + hotZoneWidth || adjustedMouseY <= marginHeight || adjustedMouseY > marginHeight + hotZoneHeight)
+            if (isMouseOverMargin) {
+                if (isMouse1Down) {
+                    if (!lastMouse1Down && !isMouse2Down && !isRotateOn && !isTranslateOn) {
+                        lastMouse1Down = true
+                        isRollOn = true
+                    }
+                }
+            } else {
+                if (isMouse1Down) {
+                    if (!lastMouse1Down && !isMouse2Down && !isRotateOn && !isTranslateOn) {
+                        lastMouse1Down = true
+                        isRotateOn = true
+                    }
+                }
+            }
+            if (isMouse2Down) {
+                if (!lastMouse2Down && !isMouse1Down && !isRotateOn && !isTranslateOn) {
+                    lastMouse2Down = true
+                    isTranslateOn = true
+                }
+                zoom -= deltaScroll * (zoomIncrement * zoom)
+                zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
+            } else {
+                translation.z += deltaScroll * 0.3f * modelScale
+            }
+            if (isMouse1Down && isMouse2Down) {
+                if (isRotateOn || isTranslateOn || (!lastMouse1Down && !lastMouse2Down)) {
+                    isRotateOn = false
+                    isTranslateOn = false
+                    isResetOn = true
+                }
+            }
+        }
+        if (isMouse1Down) {
+            lastMouse1Down = true
+        }
+        if (isMouse2Down) {
+            lastMouse2Down = true
+        }
+        if (!isMouse1Down) {
+            isRollOn = false
+            isRotateOn = false
+            isResetOn = false
+            lastMouse1Down = false
+        }
+        if (!isMouse2Down) {
+            isTranslateOn = false
+            isResetOn = false
+            lastMouse2Down = false
+        }
+
+        if (isResetOn) {
+            translation.set(defaultTranslation)
+            rotation.set(defaultRotation)
+            zoom = defaultZoom
+        }
+
+        val perspectiveOn = perspectiveOn[0] > 0
         deltaX = mouseX - lastMouseX
         deltaY = mouseY - lastMouseY
 
@@ -159,37 +259,51 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
         glDisable(GL_CULL_FACE)
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_SCISSOR_TEST)
+        glEnable(GL_MULTISAMPLE)
 
         glClearColor(background.rFloat, background.gFloat, background.bFloat, background.aFloat)
-        glScissor(400, 0, width - 400, height - 42)
+        glScissor(xPosition, 0, width - xPosition, height - yPosition)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-        glViewport(400, 0, width - 400, height - 42)
+        glViewport(xPosition, 0, width - xPosition, height - yPosition)
 
         // Create a new perspective projection matrix. The height will stay the
         // same while the width will vary as per aspect ratio.
-        val ratio = (width - 400.0f) / (height - 42.0f)
-        val left = -ratio
-        val right = ratio
-        val bottom = -1.0f
-        val top = 1.0f
-        val near = 1.0f
-        val far = 1000.0f
-
-        projectionMatrix.setFrustum(left, right, bottom, top, near, far)
+        val premulRatio = ((width - xPosition.toFloat()) / (height - yPosition))
+        val ratio = premulRatio * zoom
+        if (perspectiveOn) {
+            projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 1.0f, 10000.0f)
+        } else {
+            val orthoZoom = zoom * perspectiveToOrtho * modelScale
+            projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 1.0f, 10000.0f)
+        }
 
         glUseProgram(program)
-
+        if (isTranslateOn) {
+            translation.x += deltaX * mouseDistanceMultiplier
+            translation.y += deltaY * -mouseDistanceMultiplier
+        }
         modelMatrix.translation(translation)
 
-
-//        deltaX = 0.0f
-//        deltaY = 0.0f
-        deltaRotation.identity().rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
+        deltaRotation.identity()
+        if (isRotateOn) {
+            deltaRotation.rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
+        } else if (isRollOn) {
+            var deltaRoll = 0.0f
+            if (adjustedMouseX <= adjustedWidth / 2) {
+                deltaRoll += deltaY
+            } else {
+                deltaRoll -= deltaY
+            }
+            if (adjustedMouseY <= adjustedHeight / 2) {
+                deltaRoll -= deltaX
+            } else {
+                deltaRoll += deltaX
+            }
+            deltaRotation.rotate(0.0f, 0.0f, deltaRoll * mouseSpeed * 0.5f)
+        }
 
         rotation.premul(deltaRotation)
-        deltaX = 0.0f
-        deltaY = 0.0f
 
         modelMatrix.rotate(rotation)
 
@@ -225,9 +339,9 @@ class LessonEightRenderer(val heightMapScaleFactor: FloatBuffer) {
 
         glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
 
-        glUniform1f(shininessUniform.location, 2.0f)
+        glUniform1f(shininessUniform.location, 1.7f)
 
-        glUniform1f(heightScaleUniform.location, heightMapScaleFactor[0])
+        glUniform1f(heightScaleUniform.location, heightMapScaleFactor[0] * modelScale)
 
         glUniform1f(uvScaleUniform.location, heightMap!!.width / textureResolution)
 

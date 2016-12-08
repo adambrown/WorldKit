@@ -2,7 +2,7 @@ package com.grimfox.gec.ui
 
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.learning.LessonEightRenderer
-import org.lwjgl.BufferUtils
+import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
@@ -26,31 +26,29 @@ import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.awt.Rectangle
 import java.awt.Toolkit
+import java.lang.Math.round
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
-import java.nio.channels.Channels
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.*
 
 fun style(block: UiStyle.() -> Unit) = block
 
-fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
+fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, perspectiveOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
     val style = UiStyleInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, style))
     try {
         style.styleBlock()
         style.init(ui.nkContext)
         ui.show()
-        val lesson8: LessonEightRenderer = LessonEightRenderer(heightMapScaleFactor)
+        val lesson8: LessonEightRenderer = LessonEightRenderer(perspectiveOn, heightMapScaleFactor)
         lesson8.onSurfaceCreated()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.uiBlock(ui.nkContext)
             ui.clearViewport()
-            lesson8.onDrawFrame(ui.pixelWidth, ui.pixelHeight, ui.mouseX, ui.mouseY)
+            lesson8.onDrawFrame(534, 42, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
             ui.drawFrame()
             ui.swapBuffers()
         }
@@ -88,7 +86,13 @@ interface UserInterface {
     val pixelHeight: Int
     val mouseX: Int
     val mouseY: Int
+    val relativeMouseX: Int
+    val relativeMouseY: Int
+    val scrollX: Float
+    val scrollY: Float
     val isMaximized: Boolean
+    val isMouse1Down: Boolean
+    val isMouse2Down: Boolean
 
     fun show()
 
@@ -170,6 +174,12 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     override val pixelHeight: Int get() = window.currentPixelHeight
     override val mouseX: Int get() = window.mouseX
     override val mouseY: Int get() = window.mouseY
+    override val relativeMouseX: Int get() = round(window.relativeMouseX.toFloat())
+    override val relativeMouseY: Int get() = round(window.relativeMouseY.toFloat())
+    override val scrollX: Float get() = window.scrollX
+    override val scrollY: Float get() = window.scrollY
+    override val isMouse1Down: Boolean get() = window.isMouse1Down
+    override val isMouse2Down: Boolean get() = window.isMouse2Down
 
     override fun show() {
         glfwShowWindow(window.id)
@@ -358,6 +368,12 @@ private class WindowContext(
 
         var dragWindowStartX: Int = 0,
         var dragWindowStartY: Int = 0,
+
+        var isMouse1Down: Boolean = false,
+        var isMouse2Down: Boolean = false,
+
+        var scrollX: Float = 0.0f,
+        var scrollY: Float = 0.0f,
 
         var width: Int = 800,
         var height: Int = 600,
@@ -759,6 +775,7 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+        glfwWindowHint(GLFW_SAMPLES, 4)
         if (Platform.get() === Platform.MACOSX) {
             glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
         }
@@ -884,6 +901,8 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
     nk_buffer_init(cmds, allocator, 4096L)
     val context = NkContext.create()
     glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
+        window.scrollX += xOffset.toFloat()
+        window.scrollY += yOffset.toFloat()
         Nuklear.nk_input_scroll(context, yOffset.toFloat())
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
@@ -970,6 +989,19 @@ private fun handleStandardMouseAction(context: NkContext, window: WindowContext,
         window.isDragging = false
         window.hasMoved = false
         window.isResizing = false
+    }
+    if (button == GLFW_MOUSE_BUTTON_1) {
+        if (action == GLFW_PRESS) {
+            window.isMouse1Down = true
+        } else if (action == GLFW_RELEASE) {
+            window.isMouse1Down = false
+        }
+    } else if (button == GLFW_MOUSE_BUTTON_2) {
+        if (action == GLFW_PRESS) {
+            window.isMouse2Down = true
+        } else if (action == GLFW_RELEASE) {
+            window.isMouse2Down = false
+        }
     }
     val nkButton: Int
     when (button) {
@@ -1070,44 +1102,6 @@ private fun setCopyHandler(context: NkContext, windowId: Long) {
             }
         }
     }
-}
-
-private fun loadResource(resource: String, bufferSize: Int): ByteBuffer {
-    var buffer: ByteBuffer? = null
-
-    val path = Paths.get(resource)
-    if (Files.isReadable(path)) {
-        Files.newByteChannel(path).use({ fc ->
-            buffer = BufferUtils.createByteBuffer(fc.size().toInt() + 1)
-            var read = 0
-            while (read != -1) {
-                read = fc.read(buffer)
-            }
-        })
-    } else {
-        UserInterface::class.java.classLoader.getResourceAsStream(resource).use { source ->
-            Channels.newChannel(source).use { rbc ->
-                buffer = BufferUtils.createByteBuffer(bufferSize)
-
-                while (true) {
-                    val bytes = rbc.read(buffer)
-                    if (bytes == -1)
-                        break
-                    if (buffer!!.remaining() === 0)
-                        buffer = resizeBuffer(buffer!!, buffer!!.capacity() * 2)
-                }
-            }
-        }
-    }
-    buffer!!.flip()
-    return buffer!!
-}
-
-private fun resizeBuffer(buffer: ByteBuffer, newCapacity: Int): ByteBuffer {
-    val newBuffer = BufferUtils.createByteBuffer(newCapacity)
-    buffer.flip()
-    newBuffer.put(buffer)
-    return newBuffer
 }
 
 private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {

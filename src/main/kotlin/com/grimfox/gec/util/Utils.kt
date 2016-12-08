@@ -4,13 +4,16 @@ import com.grimfox.gec.Main
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Graph.CellEdge
 import com.grimfox.gec.model.Matrix
+import org.lwjgl.BufferUtils
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.Channels
 import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.*
 
 inline fun <reified T> printList(list: Collection<T>): String {
@@ -31,6 +34,44 @@ fun <E> Collection<E>.containsAny(other: Collection<E>): Boolean {
         }
     }
     return false
+}
+
+fun loadResource(resource: String, bufferSize: Int): ByteBuffer {
+    var buffer: ByteBuffer? = null
+
+    val path = Paths.get(resource)
+    if (Files.isReadable(path)) {
+        Files.newByteChannel(path).use({ fc ->
+            buffer = BufferUtils.createByteBuffer(fc.size().toInt() + 1)
+            var read = 0
+            while (read != -1) {
+                read = fc.read(buffer)
+            }
+        })
+    } else {
+        Utils::class.java.classLoader.getResourceAsStream(resource).use { source ->
+            Channels.newChannel(source).use { rbc ->
+                buffer = BufferUtils.createByteBuffer(bufferSize)
+
+                while (true) {
+                    val bytes = rbc.read(buffer)
+                    if (bytes == -1)
+                        break
+                    if (buffer!!.remaining() === 0)
+                        buffer = resizeBuffer(buffer!!, buffer!!.capacity() * 2)
+                }
+            }
+        }
+    }
+    buffer!!.flip()
+    return buffer!!
+}
+
+private fun resizeBuffer(buffer: ByteBuffer, newCapacity: Int): ByteBuffer {
+    val newBuffer = BufferUtils.createByteBuffer(newCapacity)
+    buffer.flip()
+    newBuffer.put(buffer)
+    return newBuffer
 }
 
 object Utils {

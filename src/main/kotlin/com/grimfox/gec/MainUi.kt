@@ -2,7 +2,6 @@ package com.grimfox.gec
 
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.ui.*
-import org.lwjgl.BufferUtils
 import org.lwjgl.nuklear.*
 import org.lwjgl.nuklear.Nuklear.*
 import org.lwjgl.system.MemoryStack.stackPush
@@ -56,6 +55,17 @@ object MainUi {
                     button.hover(nk_style_item_color(nk_rgb(63, 63, 65, NkColor.create()), NkStyleItem.create()))
                     button.normal(nk_style_item_color(background, NkStyleItem.create()))
                     context.style().button().set(button)
+
+                    val slider = context.style().slider()
+                    slider.border(0.0f)
+                    slider.border_color().set(background)
+                    slider.rounding(0.0f)
+                    slider.padding().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
+                    slider.spacing().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
+                    slider.bar_height(100.0f)
+                    slider.show_buttons(0)
+                    slider.cursor_size().set(nk_vec2(20.0f, 100.0f, NkVec2.mallocStack(stack)))
+                    context.style().slider().set(slider)
                 }
             }
         }
@@ -69,10 +79,16 @@ object MainUi {
 
         twr(stackPush()) { stack ->
             val heightMapScaleFactor = stack.mallocFloat(1)
-            heightMapScaleFactor.put(0, 10.0f)
+            heightMapScaleFactor.put(0, 0.5f)
+            val perspectiveOn = stack.mallocInt(1)
+            perspectiveOn.put(0, 1)
             val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
+            val editBoxBuffer = stack.malloc(200)
+            val editBoxLength = stack.mallocInt(1)
+            editBoxBuffer.putChar('f').putChar('o').putChar('o')
+            editBoxLength.put(0, 3)
 
-            ui(mainStyle, 800, 600, heightMapScaleFactor) { context ->
+            ui(mainStyle, 1280, 720, perspectiveOn, heightMapScaleFactor) { context ->
                 twr(stackPush()) { stack ->
 
                     if (nk_begin(context, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
@@ -104,17 +120,69 @@ object MainUi {
                         }
                         nk_style_pop_font(context)
 
-                        context.staticRow(32, width) {
-                            context.staticRow(32, width) {
-                                col {
-
-                                }
+                        context.staticRow(48, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
                             }
-                            col(396) {
-                                nk_slider_float(context, 0.0f, heightMapScaleFactor, 20.0f, 0.01f)
+                        }
+                        context.staticRow(48, width) {
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(140) {
+                                nk_label(context, "Perspective On:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(280) {
+                                nk_checkbox_label(context, "", perspectiveOn)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
                             }
                             col {
-
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                        }
+                        context.staticRow(48, width) {
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(140) {
+                                nk_label(context, "Height Scale:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(320) {
+                                nk_slider_float(context, 0.0f, heightMapScaleFactor, 1.0f, 0.0001f)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                        }
+                        context.staticRow(48, width) {
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(140) {
+                                nk_label(context, "Input text:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col(320) {
+                                nk_edit_string(context, NK_EDIT_ACTIVE or NK_EDIT_ACTIVATED or NK_EDIT_BOX, editBoxBuffer, editBoxLength, 50) { l, i -> i }
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
                             }
                         }
 

@@ -66,7 +66,7 @@ void main() {
     vec3 normal = normalize(normalMatrix * modelNormal);
     float diffuse;
     if (gl_FrontFacing) {
-        diffuse = max(dot(normal, lightDirection), 0.0) + 0.02;
+        diffuse = max(dot(normal, lightDirection), 0.0) + 0.06;
     } else {
         diffuse = 0.0;
     }
