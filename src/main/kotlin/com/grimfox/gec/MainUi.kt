@@ -2,9 +2,11 @@ package com.grimfox.gec
 
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.ui.*
+import org.lwjgl.BufferUtils
 import org.lwjgl.nuklear.*
 import org.lwjgl.nuklear.Nuklear.*
 import org.lwjgl.system.MemoryStack.stackPush
+import java.nio.charset.Charset
 import java.util.*
 
 object MainUi {
@@ -31,6 +33,7 @@ object MainUi {
             init { context ->
                 twr(stackPush()) { stack ->
                     nk_style_set_font(context, mainFont)
+
                     val window = NkStyleWindow.create()
                     window.background().set(background)
                     window.background(background)
@@ -52,7 +55,7 @@ object MainUi {
                     button.text_normal().set(buttonGlyphColor)
                     button.text_hover().set(buttonGlyphColor)
                     button.active(nk_style_item_color(nk_rgb(0, 122, 204, NkColor.create()), NkStyleItem.create()))
-                    button.hover(nk_style_item_color(nk_rgb(63, 63, 65, NkColor.create()), NkStyleItem.create()))
+                    button.hover(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
                     button.normal(nk_style_item_color(background, NkStyleItem.create()))
                     context.style().button().set(button)
 
@@ -62,10 +65,36 @@ object MainUi {
                     slider.rounding(0.0f)
                     slider.padding().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
                     slider.spacing().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
-                    slider.bar_height(100.0f)
+                    slider.bar_height(1.0f)
                     slider.show_buttons(0)
-                    slider.cursor_size().set(nk_vec2(20.0f, 100.0f, NkVec2.mallocStack(stack)))
+                    slider.cursor_size().set(nk_vec2(22.0f, 22.0f, NkVec2.mallocStack(stack)))
+                    slider.active(nk_style_item_color(background, NkStyleItem.create()))
+                    slider.hover(nk_style_item_color(background, NkStyleItem.create()))
+                    slider.normal(nk_style_item_color(background, NkStyleItem.create()))
+                    slider.bar_active(nk_rgb(62, 62, 64, NkColor.create()))
+                    slider.bar_hover(nk_rgb(62, 62, 64, NkColor.create()))
+                    slider.bar_normal(nk_rgb(62, 62, 64, NkColor.create()))
+                    slider.bar_filled(nk_rgb(100, 101, 103, NkColor.create()))
+                    slider.cursor_active(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
+                    slider.cursor_hover(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
+                    slider.cursor_normal(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
                     context.style().slider().set(slider)
+
+                    val text = context.style().text()
+                    text.color(nk_rgb(153, 153, 153, NkColor.create()))
+                    text.padding().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
+
+                    val checkBox = context.style().checkbox()
+                    checkBox.border(0.0f)
+                    checkBox.border_color().set(background)
+                    checkBox.padding().set(nk_vec2(0.0f, 0.0f, NkVec2.mallocStack(stack)))
+                    checkBox.spacing(0.0f)
+                    checkBox.active(nk_style_item_color(nk_rgb(0, 122, 204, NkColor.create()), NkStyleItem.create()))
+                    checkBox.normal(nk_style_item_color(nk_rgb(62, 62, 64, NkColor.create()), NkStyleItem.create()))
+                    checkBox.hover(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
+                    checkBox.cursor_hover(nk_style_item_color(nk_rgb(100, 101, 103, NkColor.create()), NkStyleItem.create()))
+                    checkBox.cursor_normal(nk_style_item_color(nk_rgb(0, 122, 204, NkColor.create()), NkStyleItem.create()))
+                    context.style().checkbox().set(checkBox)
                 }
             }
         }
@@ -80,15 +109,21 @@ object MainUi {
         twr(stackPush()) { stack ->
             val heightMapScaleFactor = stack.mallocFloat(1)
             heightMapScaleFactor.put(0, 0.5f)
+            val waterPlaneOn = stack.mallocInt(1)
+            waterPlaneOn.put(0, 1)
             val perspectiveOn = stack.mallocInt(1)
             perspectiveOn.put(0, 1)
+            val rotateAroundCamera = stack.mallocInt(1)
+            rotateAroundCamera.put(0, 0)
+            val resetView = stack.mallocInt(1)
+            resetView.put(0, 0)
             val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
-            val editBoxBuffer = stack.malloc(200)
-            val editBoxLength = stack.mallocInt(1)
-            editBoxBuffer.putChar('f').putChar('o').putChar('o')
-            editBoxLength.put(0, 3)
 
-            ui(mainStyle, 1280, 720, perspectiveOn, heightMapScaleFactor) { context ->
+            val editData = stack.malloc(100)
+            val editDataLength = stack.mallocInt(1)
+            editDataLength.put(0, 0)
+
+            ui(mainStyle, 1280, 720, resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor) { context ->
                 twr(stackPush()) { stack ->
 
                     if (nk_begin(context, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
@@ -122,67 +157,167 @@ object MainUi {
 
                         context.staticRow(48, width) {
                             col {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                         }
                         context.staticRow(48, width) {
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(140) {
+                                nk_label(context, "Water On:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(280) {
+                                nk_checkbox_label(context, "", waterPlaneOn)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(48, width) {
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(140) {
                                 nk_label(context, "Perspective On:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(280) {
                                 nk_checkbox_label(context, "", perspectiveOn)
                             }
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                         }
                         context.staticRow(48, width) {
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(140) {
+                                nk_label(context, "Rotate Camera:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(280) {
+                                nk_checkbox_label(context, "", rotateAroundCamera)
+                            }
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(48, width) {
+                            col(24) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(140) {
                                 nk_label(context, "Height Scale:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(320) {
                                 nk_slider_float(context, 0.0f, heightMapScaleFactor, 1.0f, 0.0001f)
                             }
                             col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                         }
-                        context.staticRow(48, width) {
-                            col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(40, width) {
+                            col(196) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col(140) {
-                                nk_label(context, "Input text:", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                                if (nk_button_label(context, "Reset View")) {
+                                    resetView.put(0, 1)
+                                } else {
+                                    resetView.put(0, 0)
+                                }
                             }
-                            col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
-                            }
-                            col(320) {
-                                nk_edit_string(context, NK_EDIT_ACTIVE or NK_EDIT_ACTIVATED or NK_EDIT_BOX, editBoxBuffer, editBoxLength, 50) { l, i -> i }
-                            }
-                            col(24) {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                            col(196) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                             col {
-                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_CENTERED)
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(40, width) {
+                            col(96) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(340) {
+                                nk_edit_string(context, NK_EDIT_FIELD, editData, editDataLength, 100, ::nnk_filter_ascii)
+                            }
+                            col(96) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(40, width) {
+                            col(96) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(340) {
+                                val bytes = ByteArray(editDataLength[0])
+                                for (i in 0..bytes.size - 1) {
+                                    bytes[i] = editData[i]
+                                }
+                                nk_label(context, String(bytes, Charsets.US_ASCII), NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col(96) {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+                            }
+                        }
+                        context.staticRow(4, width) {
+                            col {
+                                nk_label(context, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                         }
 

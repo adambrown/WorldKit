@@ -4,7 +4,12 @@ uniform mat4 modelViewProjectionMatrix;
 uniform mat4 modelViewMatrix;
 uniform mat3 normalMatrix;
 uniform vec3 lightDirection;
-uniform vec4 color;
+uniform vec4 color1;
+uniform vec4 color2;
+uniform vec4 color3;
+uniform vec4 color4;
+uniform vec4 color5;
+uniform vec4 color6;
 uniform vec4 ambientColor;
 uniform vec4 diffuseColor;
 uniform vec4 specularColor;
@@ -42,8 +47,13 @@ vec4 toGamma(vec4 v) {
 }
 
 void main() {
+    if (!gl_FrontFacing) {
+        colorOut = vec4(0.076f, 0.082f, 0.212f, 1.0f);
+        return;
+    }
     vec2 size = vec2(uvScale * 2, 0.0);
-    float height = texture(heightMapTexture, VertexIn.uv).r * heightScale;
+    float unscaledHeight = texture(heightMapTexture, VertexIn.uv).r;
+    float height = unscaledHeight * heightScale;
     float westPixel = textureOffset(heightMapTexture, VertexIn.uv, off.xy).r * heightScale;
     float eastPixel = textureOffset(heightMapTexture, VertexIn.uv, off.zy).r * heightScale;
     float northPixel = textureOffset(heightMapTexture, VertexIn.uv, off.yx).r * heightScale;
@@ -60,17 +70,58 @@ void main() {
     crossNormal = normalize(vec3(crossNormal.x, -crossNormal.y, crossNormal.z));
     vec3 xNormal = cross(vd, vc);
     xNormal = normalize(vec3(xNormal.y, -xNormal.x, xNormal.z));
-
-
     vec3 modelNormal = normalize(xNormal + crossNormal);
     vec3 normal = normalize(normalMatrix * modelNormal);
-    float diffuse;
-    if (gl_FrontFacing) {
-        diffuse = max(dot(normal, lightDirection), 0.0) + 0.06;
+    float diffuse = max(dot(normal, lightDirection), 0.0) + 0.06;
+    vec4 lowColor;
+    vec4 highColor;
+    float interpolation;
+    if (unscaledHeight <= 0.05) {
+        lowColor = color1;
+        highColor = color1;
+        interpolation = 0.5;
+    } else if (unscaledHeight <= 0.19) {
+        lowColor = color1;
+        highColor = color2;
+        interpolation = (unscaledHeight - 0.05) * 7.1426;
+    } else if (unscaledHeight <= 0.24) {
+        lowColor = color2;
+        highColor = color2;
+        interpolation = 0.5;
+    } else if (unscaledHeight <= 0.38) {
+        lowColor = color2;
+        highColor = color3;
+        interpolation = (unscaledHeight - 0.24) * 7.1426;
+    } else if (unscaledHeight <= 0.43) {
+        lowColor = color3;
+        highColor = color3;
+        interpolation = 0.5;
+    } else if (unscaledHeight <= 0.57) {
+        lowColor = color3;
+        highColor = color4;
+        interpolation = (unscaledHeight - 0.43) * 7.1426;
+    } else if (unscaledHeight <= 0.62) {
+        lowColor = color4;
+        highColor = color4;
+        interpolation = 0.5;
+    } else if (unscaledHeight <= 0.76) {
+        lowColor = color4;
+        highColor = color5;
+        interpolation = (unscaledHeight - 0.62) * 7.1426;
+    } else if (unscaledHeight <= 0.81) {
+        lowColor = color5;
+        highColor = color5;
+        interpolation = 0.5;
+    } else if (unscaledHeight <= 0.95) {
+        lowColor = color5;
+        highColor = color6;
+        interpolation = (unscaledHeight - 0.81) * 7.1426;
     } else {
-        diffuse = 0.0;
+        lowColor = color6;
+        highColor = color6;
+        interpolation = 0.5;
     }
-    vec4 baseColor = toLinear(color);
+    vec4 baseColor = mix(toLinear(lowColor), toLinear(highColor), interpolation);
     vec4 lightColor = toLinear(vec4(1.0));
     vec4 diffuseColor = vec4(baseColor.rgb * lightColor.rgb * diffuse, 1.0);
     vec4 spec = vec4(0.0);

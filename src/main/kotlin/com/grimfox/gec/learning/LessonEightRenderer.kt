@@ -3,7 +3,6 @@ package com.grimfox.gec.learning
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.util.geometry.min
 import org.joml.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.nuklear.NkColor
@@ -22,57 +21,53 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
-import java.text.FieldPosition
 import javax.imageio.ImageIO
 
-/**
- * This class implements our custom renderer. Note that the GL10 parameter
- * passed in is unused for OpenGL ES 2.0 renderers -- the static class GLES20 is
- * used instead.
- */
-class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor: FloatBuffer) {
-
-    companion object {
-        private val BYTES_PER_FLOAT = 4
-    }
+class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntBuffer, val perspectiveOn: IntBuffer, val waterPlaneOn: IntBuffer, val heightMapScaleFactor: FloatBuffer) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
     private val projectionMatrix = Matrix4f()
+    private val mvMatrix = Matrix4f()
     private val mvpMatrix = Matrix4f()
     private val normalMatrix = Matrix3f()
+    private val tempMatrix = Matrix4f()
 
-    /** Additional matrices.  */
     private val defaultRotation = Quaternionf().rotate(0.0f, 0.0f, 0.0f)
     private val rotation = Quaternionf(defaultRotation)
     private val deltaRotation = Quaternionf()
 
     private val floatBuffer = BufferUtils.createFloatBuffer(16)
 
-    private val modelScale = 512.0f
+    private val modelScale = 256.0f
 
     private val minZoom = 0.005f
-    private val maxZoom = 100.0f
-    private val defaultZoom = 0.6187f
-    private val zoomIncrement = 0.1f
+    private val maxZoom = 20.0f
+    private val defaultZoom = 4.53f
+
+    private val zoomIncrement = 0.05f
     private var zoom = defaultZoom
 
-    private val modelScaleAdjustment = (((-1.0 / modelScale) * 0.0666666) + 1.06604).toFloat()
-
-    private val defaultTranslation = Vector3f(0.0f, 0.0f, -7.6f).mul(modelScale * modelScaleAdjustment)
+    private val defaultTranslation = Vector3f(0.0f, 0.0f, -2073.58f)
     private val translation = Vector3f(defaultTranslation)
+    private val deltaTranslation = Vector3f()
+    private val pivot = Vector3f(0.0f, 0.0f, 0.0f)
 
     private var lastScroll = 0.0f
     private var scroll = 0.0f
 
-    private val perspectiveToOrtho = 8.10102f
+    private val perspectiveToOrtho = 1.325f
 
-    /** OpenGL handles to our program uniforms.  */
     private val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
     private val mvMatrixUniform = ShaderUniform("modelViewMatrix")
     private val nMatrixUniform = ShaderUniform("normalMatrix")
     private val lightDirectionUniform = ShaderUniform("lightDirection")
-    private val colorUniform = ShaderUniform("color")
+    private val color1Uniform = ShaderUniform("color1")
+    private val color2Uniform = ShaderUniform("color2")
+    private val color3Uniform = ShaderUniform("color3")
+    private val color4Uniform = ShaderUniform("color4")
+    private val color5Uniform = ShaderUniform("color5")
+    private val color6Uniform = ShaderUniform("color6")
     private val ambientUniform = ShaderUniform("ambientColor")
     private val diffuseUniform = ShaderUniform("diffuseColor")
     private val specularUniform = ShaderUniform("specularColor")
@@ -81,9 +76,22 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
     private val uvScaleUniform = ShaderUniform("uvScale")
     private val heightMapTextureUniform = ShaderUniform("heightMapTexture")
 
-    /** OpenGL handles to our program attributes.  */
+    private val mvpMatrixUniformWater = ShaderUniform("modelViewProjectionMatrix")
+    private val mvMatrixUniformWater = ShaderUniform("modelViewMatrix")
+    private val nMatrixUniformWater = ShaderUniform("normalMatrix")
+    private val lightDirectionUniformWater = ShaderUniform("lightDirection")
+    private val colorUniformWater = ShaderUniform("color")
+    private val ambientUniformWater = ShaderUniform("ambientColor")
+    private val diffuseUniformWater = ShaderUniform("diffuseColor")
+    private val specularUniformWater = ShaderUniform("specularColor")
+    private val shininessUniformWater = ShaderUniform("shininess")
+    private val heightScaleUniformWater = ShaderUniform("heightScale")
+
     private val positionAttribute = ShaderAttribute("position", 0)
     private val uvAttribute = ShaderAttribute("uv", 1)
+
+    private val positionAttributeWater = ShaderAttribute("position", 0)
+    private val uvAttributeWater = ShaderAttribute("uv", 1)
 
     private var textureId = -1
     private var textureResolution = 0
@@ -92,14 +100,11 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
 
     private val lightDirection = Vector3f(1.0f, 1.0f, 2.0f)
 
-    /** This is a handle to our cube shading program.  */
-    private var program: Int = 0
+    private var heightMapProgram: Int = 0
+    private var waterPlaneProgram: Int = 0
 
-    /** Retain the most recent delta for touch events.  */
-    // These still work without volatile, but refreshes are not guaranteed to
-    // happen.
-    @Volatile var deltaX: Float = 0.0f
-    @Volatile var deltaY: Float = 0.0f
+    var deltaX: Float = 0.0f
+    var deltaY: Float = 0.0f
     var lastMouseX = 0.0f
     var lastMouseY = 0.0f
     var mouseSpeed = 0.0035f
@@ -110,10 +115,9 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
     var isTranslateOn = false
     var isResetOn = false
 
-    val axisRotation = AxisAngle4f(0.0f, 0.0f, 0.0f, 0.0f)
+    private lateinit var heightMap: HexGrid
 
-    /** The current heightmap object.  */
-    private var heightMap: HexGrid? = null
+    private lateinit var waterPlane: HexGrid
 
     fun onSurfaceCreated() {
 
@@ -137,15 +141,25 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
         // matrices separately if we choose.
         viewMatrix.setLookAt(eye, eyeCenter, eyeUp)
 
-        val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/test.vert"))
-        val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/test.frag"))
+        val heightMapVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/height-map.vert"))
+        val heightMapFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/height-map.frag"))
 
-        program = createAndLinkProgram(
-                listOf(vertexShader, fragmentShader),
+        val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
+        val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
+
+        heightMapProgram = createAndLinkProgram(
+                listOf(heightMapVertexShader, heightMapFragmentShader),
                 listOf(positionAttribute, uvAttribute),
-                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, colorUniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform))
+                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, color1Uniform, color2Uniform, color3Uniform, color4Uniform, color5Uniform, color6Uniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform))
 
-        heightMap = HexGrid(10.0f * modelScale, 2048)
+        waterPlaneProgram = createAndLinkProgram(
+                listOf(waterVertexShader, waterFragmentShader),
+                listOf(positionAttributeWater, uvAttributeWater),
+                listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
+
+        heightMap = HexGrid(10.0f * modelScale, 512)
+
+        waterPlane = HexGrid(12.0f * modelScale, 16)
 
         twr(MemoryStack.stackPush()) { stack ->
             val bufferedImage = ImageIO.read(File(getPathForResource("/textures/height-map.png")))
@@ -162,12 +176,28 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
         }
 
         lightDirection.normalize()
+
+        modelMatrix.translate(translation)
     }
 
     fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, mouseX: Int, mouseY: Int, mouseWheel: Float, isMouse1Down: Boolean, isMouse2Down: Boolean) {
 
         if (width <= 0 || height <= 0) {
             return
+        }
+
+        val waterOn = waterPlaneOn[0] > 0
+        val resetView = resetView[0] > 0
+        val perspectiveOn = perspectiveOn[0] > 0
+        val rotateAroundCamera = rotateAroundCamera[0] > 0
+
+        val premulRatio = ((width - xPosition.toFloat()) / (height - yPosition))
+        val ratio = premulRatio * zoom
+        if (perspectiveOn) {
+            projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
+        } else {
+            val orthoZoom = zoom * perspectiveToOrtho * modelScale
+            projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
         }
 
         lastScroll = scroll
@@ -186,7 +216,7 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
         val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
         val hotZoneHeight = adjustedHeight - (2 * marginHeight)
 
-        val mouseDistanceMultiplier = (heightMap!!.width / (height - yPosition))
+        val mouseDistanceMultiplier = (heightMap.width / (height - yPosition))
 
         if (isMouseOver) {
             val isMouseOverMargin = isMouseOver && (adjustedMouseX <= marginWidth || adjustedMouseX > marginWidth + hotZoneWidth || adjustedMouseY <= marginHeight || adjustedMouseY > marginHeight + hotZoneHeight)
@@ -202,6 +232,7 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
                     if (!lastMouse1Down && !isMouse2Down && !isRotateOn && !isTranslateOn) {
                         lastMouse1Down = true
                         isRotateOn = true
+                        modelMatrix.getTranslation(pivot)
                     }
                 }
             }
@@ -214,6 +245,8 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
                 zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
             } else {
                 translation.z += deltaScroll * 0.3f * modelScale
+                tempMatrix.translation(0.0f, 0.0f, deltaScroll * 0.3f * modelScale)
+                tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (isMouse1Down && isMouse2Down) {
                 if (isRotateOn || isTranslateOn || (!lastMouse1Down && !lastMouse2Down)) {
@@ -241,53 +274,36 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
             lastMouse2Down = false
         }
 
-        if (isResetOn) {
+        if (resetView) {
             translation.set(defaultTranslation)
             rotation.set(defaultRotation)
             zoom = defaultZoom
+            modelMatrix.translation(translation).rotate(rotation)
         }
 
-        val perspectiveOn = perspectiveOn[0] > 0
         deltaX = mouseX - lastMouseX
         deltaY = mouseY - lastMouseY
 
         lastMouseX = mouseX.toFloat()
         lastMouseY = mouseY.toFloat()
 
-        // setup global state
-        glDisable(GL_BLEND)
-        glDisable(GL_CULL_FACE)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_SCISSOR_TEST)
-        glEnable(GL_MULTISAMPLE)
 
-        glClearColor(background.rFloat, background.gFloat, background.bFloat, background.aFloat)
-        glScissor(xPosition, 0, width - xPosition, height - yPosition)
-        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-        glViewport(xPosition, 0, width - xPosition, height - yPosition)
-
-        // Create a new perspective projection matrix. The height will stay the
-        // same while the width will vary as per aspect ratio.
-        val premulRatio = ((width - xPosition.toFloat()) / (height - yPosition))
-        val ratio = premulRatio * zoom
-        if (perspectiveOn) {
-            projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 1.0f, 10000.0f)
-        } else {
-            val orthoZoom = zoom * perspectiveToOrtho * modelScale
-            projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 1.0f, 10000.0f)
-        }
-
-        glUseProgram(program)
         if (isTranslateOn) {
             translation.x += deltaX * mouseDistanceMultiplier
             translation.y += deltaY * -mouseDistanceMultiplier
+            tempMatrix.translation(deltaX * mouseDistanceMultiplier, deltaY * -mouseDistanceMultiplier, 0.0f)
+            tempMatrix.mul(modelMatrix, modelMatrix)
         }
-        modelMatrix.translation(translation)
 
         deltaRotation.identity()
         if (isRotateOn) {
             deltaRotation.rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
+            if (rotateAroundCamera) {
+                modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.5f)
+            } else {
+                modelMatrix.getTranslation(deltaTranslation)
+                modelMatrix.rotateAroundLocal(deltaRotation, deltaTranslation.x, deltaTranslation.y, deltaTranslation.z)
+            }
         } else if (isRollOn) {
             var deltaRoll = 0.0f
             if (adjustedMouseX <= adjustedWidth / 2) {
@@ -301,59 +317,71 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
                 deltaRoll += deltaX
             }
             deltaRotation.rotate(0.0f, 0.0f, deltaRoll * mouseSpeed * 0.5f)
+            modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
         }
 
-        rotation.premul(deltaRotation)
+        viewMatrix.mul(modelMatrix, mvMatrix)
+        normalMatrix.set(mvMatrix).invert().transpose()
+        projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-        modelMatrix.rotate(rotation)
+        glDisable(GL_BLEND)
+        glDisable(GL_CULL_FACE)
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_SCISSOR_TEST)
+        glEnable(GL_MULTISAMPLE)
 
-        // This multiplies the view matrix by the model matrix, and stores
-        // the result in the MVP matrix
-        // (which currently contains model * view).
-        viewMatrix.mul(modelMatrix, mvpMatrix)
+        glClearColor(background.rFloat, background.gFloat, background.bFloat, background.aFloat)
+        glScissor(xPosition, 0, width - xPosition, height - yPosition)
+        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-        // Pass in the modelview matrix.
-        glUniformMatrix4fv(mvMatrixUniform.location, false, mvpMatrix.get(0, floatBuffer))
+        glViewport(xPosition, 0, width - xPosition, height - yPosition)
 
-        normalMatrix.set(mvpMatrix).invert().transpose()
+        if (waterOn) {
+            drawWaterPlane()
+        }
+        drawHeightMap()
 
-        glUniformMatrix3fv(nMatrixUniform.location, false, normalMatrix.get(0, floatBuffer))
-
-        // This multiplies the modelview matrix by the projection matrix,
-        // and stores the result in the MVP matrix
-        // (which now contains model * view * projection).
-        projectionMatrix.mul(mvpMatrix, mvpMatrix)
-
-        // Pass in the combined matrix.
-        glUniformMatrix4fv(mvpMatrixUniform.location, false, mvpMatrix.get(0, floatBuffer))
-
-        // Pass in the light position in eye space.
-
-        glUniform3f(lightDirectionUniform.location, lightDirection.x, lightDirection.y, lightDirection.z)
-
-        glUniform4f(colorUniform.location, 0.4f, 0.6f, 0.39f, 1.0f)
-
-        glUniform4f(ambientUniform.location, 0.1f, 0.1f, 0.1f, 1.0f)
-
-        glUniform4f(diffuseUniform.location, 0.6f, 0.6f, 0.6f, 1.0f)
-
-        glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
-
-        glUniform1f(shininessUniform.location, 1.7f)
-
-        glUniform1f(heightScaleUniform.location, heightMapScaleFactor[0] * modelScale)
-
-        glUniform1f(uvScaleUniform.location, heightMap!!.width / textureResolution)
-
-        glUniform1i(heightMapTextureUniform.location, 0)
-
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, textureId)
-
-        // Render the heightmap.
-        heightMap!!.render()
         glScissor(0, 0, width, height)
         glDisable(GL_SCISSOR_TEST)
+    }
+
+    private fun drawHeightMap() {
+        glUseProgram(heightMapProgram)
+        glUniformMatrix4fv(mvMatrixUniform.location, false, mvMatrix.get(0, floatBuffer))
+        glUniformMatrix3fv(nMatrixUniform.location, false, normalMatrix.get(0, floatBuffer))
+        glUniformMatrix4fv(mvpMatrixUniform.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform3f(lightDirectionUniform.location, lightDirection.x, lightDirection.y, lightDirection.z)
+        glUniform4f(color1Uniform.location, 0.157f, 0.165f, 0.424f, 1.0f)
+        glUniform4f(color2Uniform.location, 0.459f, 0.761f, 0.859f, 1.0f)
+        glUniform4f(color3Uniform.location, 0.353f, 0.706f, 0.275f, 1.0f)
+        glUniform4f(color4Uniform.location, 0.922f, 0.922f, 0.157f, 1.0f)
+        glUniform4f(color5Uniform.location, 0.835f, 0.176f, 0.165f, 1.0f)
+        glUniform4f(color6Uniform.location, 0.955f, 0.955f, 0.955f, 1.0f)
+        glUniform4f(ambientUniform.location, 0.1f, 0.1f, 0.1f, 1.0f)
+        glUniform4f(diffuseUniform.location, 0.6f, 0.6f, 0.6f, 1.0f)
+        glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
+        glUniform1f(shininessUniform.location, 1.7f)
+        glUniform1f(heightScaleUniform.location, heightMapScaleFactor[0] * modelScale)
+        glUniform1f(uvScaleUniform.location, heightMap.width / textureResolution)
+        glUniform1i(heightMapTextureUniform.location, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, textureId)
+        heightMap.render()
+    }
+
+    private fun drawWaterPlane() {
+        glUseProgram(waterPlaneProgram)
+        glUniformMatrix4fv(mvMatrixUniformWater.location, false, mvMatrix.get(0, floatBuffer))
+        glUniformMatrix3fv(nMatrixUniformWater.location, false, normalMatrix.get(0, floatBuffer))
+        glUniformMatrix4fv(mvpMatrixUniformWater.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform3f(lightDirectionUniformWater.location, lightDirection.x, lightDirection.y, lightDirection.z)
+        glUniform4f(colorUniformWater.location, 0.1f, 0.2f, 0.4f, 1.0f)
+        glUniform4f(ambientUniformWater.location, 0.4f, 0.4f, 0.4f, 1.0f)
+        glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
+        glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
+        glUniform1f(shininessUniformWater.location, 5.0f)
+        glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor[0] * modelScale)
+        waterPlane.render()
     }
 
     internal inner class HexGrid(val width: Float, xResolution: Int) {
@@ -451,7 +479,7 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
 
                 if (vao > 0) {
 
-                    val stride = floatsPerVertex * BYTES_PER_FLOAT
+                    val stride = floatsPerVertex * 4
                     glBindVertexArray(vao)
                     val vbo = glGenBuffers()
                     val ibo = glGenBuffers()
@@ -465,7 +493,7 @@ class LessonEightRenderer(val perspectiveOn: IntBuffer, val heightMapScaleFactor
                         glVertexAttribPointer(positionAttribute.location, 2, GL_FLOAT, false, stride, 0)
 
                         glEnableVertexAttribArray(uvAttribute.location)
-                        glVertexAttribPointer(uvAttribute.location, 2, GL_FLOAT, false, stride, (2 * BYTES_PER_FLOAT).toLong())
+                        glVertexAttribPointer(uvAttribute.location, 2, GL_FLOAT, false, stride, 8)
 
                         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)
 
