@@ -35,16 +35,16 @@ import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.util.*
 
-fun style(block: UiStyle.(NkContext, Long) -> Unit) = block
+fun style(block: UiStyle.(UserInterface, NkContext, Long) -> Unit) = block
 
 fun mouseClickHandler(mouseClickHandler: (Int, Int, Int, Boolean) -> Unit) = mouseClickHandler
 
-fun ui(styleBlock: UiStyle.(NkContext, Long) -> Unit, mouseClickHandler: (Int, Int, Int, Boolean) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
+fun ui(styleBlock: UiStyle.(UserInterface, NkContext, Long) -> Unit, mouseClickHandler: (Int, Int, Int, Boolean) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
     val style = UiStyleInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, style))
     ui.mouseClickHandler = mouseClickHandler
     try {
-        style.styleBlock(ui.nk, ui.nvg)
+        style.styleBlock(ui, ui.nk, ui.nvg)
         ui.show()
         val lesson8: LessonEightRenderer = LessonEightRenderer(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
         lesson8.onSurfaceCreated()
@@ -73,10 +73,7 @@ interface UiStyle {
 
     val background: NkColor
 
-    var dragAreaLeftMargin: Int
-    var dragAreaRightMargin: Int
-    var dragAreaTopMargin: Int
-    var dragAreaHeight: Int
+    var dragArea: Block
 
     fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): Int
 
@@ -119,6 +116,10 @@ interface UserInterface {
     fun maximizeWindow()
 
     fun restoreWindow()
+
+    operator fun invoke(block: UserInterface.() -> Unit) {
+        this.block()
+    }
 }
 
 var NkColor.r: Byte
@@ -267,10 +268,8 @@ private class UiStyleInternal internal constructor() : UiStyle {
     internal val fonts: ArrayList<Pair<Any, ByteBuffer>> = ArrayList()
 
     override val background: NkColor = NkColor.create()
-    override var dragAreaLeftMargin: Int = 0
-    override var dragAreaRightMargin: Int = 0
-    override var dragAreaTopMargin: Int = 0
-    override var dragAreaHeight: Int = 32
+
+    override lateinit var dragArea: Block
 
     override fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont): Int {
         val fontId = fonts.size
@@ -1001,10 +1000,11 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
             glfwGetCursorPos(windowId, cx, cy)
             val x = cx.get(0)
             val y = cy.get(0)
-            if (y >= style.dragAreaTopMargin
-                    && y < style.dragAreaTopMargin + style.dragAreaHeight
-                    && x >= style.dragAreaLeftMargin
-                    && x < window.currentWidth - style.dragAreaRightMargin
+            val dragAreaY1 = style.dragArea.y
+            val dragAreaY2 = dragAreaY1 + style.dragArea.height
+            val dragAreaX1 = style.dragArea.x
+            val dragAreaX2 = dragAreaX1 + style.dragArea.width
+            if (y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
                 startDrag(stack, window)

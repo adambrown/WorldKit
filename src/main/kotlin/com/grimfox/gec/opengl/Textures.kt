@@ -1,133 +1,67 @@
 package com.grimfox.gec.opengl
 
-import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.getResourceStream
-import com.grimfox.gec.util.getResourceUrl
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL30.*
 import org.lwjgl.opengl.GL31.*
+import java.awt.Transparency
+import java.awt.color.ColorSpace
 import java.awt.image.*
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
 
-fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {
+fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {
     val bufferedImage = getResourceStream(baseImage).use { ImageIO.read(it) }
     val width = bufferedImage.width
     val height = bufferedImage.height
-    val dataBuffer = bufferedImage.raster.dataBuffer
-    val dataBufferClass: Class<*>
+    val components = bufferedImage.colorModel.numComponents
+    val componentBytes = bufferedImage.colorModel.componentSize.max()!! / 8
     val type: Int
-    val data: ByteBuffer = when (dataBuffer.dataType) {
-        DataBuffer.TYPE_BYTE -> {
-            if (dataBuffer is DataBufferByte) {
-                dataBufferClass = DataBufferByte::class.java
-                val textureData = ByteBuffer.allocateDirect(dataBuffer.size).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.put(dataBuffer.data)
-                textureData.flip()
-                if (dataType == GL_UNSIGNED_BYTE || dataType == GL_BYTE) {
-                    type = dataType
-                } else {
-                    throw IllegalStateException("unable to load texture with data type not matching requested data type")
-                }
-                textureData
-            } else {
-                throw IllegalStateException("unable to load texture with invalid data type")
-            }
-        }
-        DataBuffer.TYPE_USHORT -> {
-            if (dataBuffer is DataBufferUShort) {
-                dataBufferClass = DataBufferUShort::class.java
-                val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                val typedData = textureData.asShortBuffer()
-                typedData.put(dataBuffer.data)
-                if (dataType == GL_UNSIGNED_SHORT || dataType == GL_SHORT) {
-                    type = dataType
-                } else {
-                    throw IllegalStateException("unable to load texture with data type not matching requested data type")
-                }
-                textureData
-            } else {
-                throw IllegalStateException("unable to load texture with invalid data type")
-            }
-        }
-        DataBuffer.TYPE_SHORT -> {
-            if (dataBuffer is DataBufferShort) {
-                dataBufferClass = DataBufferShort::class.java
-                val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                val typedData = textureData.asShortBuffer()
-                typedData.put(dataBuffer.data)
-                if (dataType == GL_UNSIGNED_SHORT || dataType == GL_SHORT) {
-                    type = dataType
-                } else {
-                    throw IllegalStateException("unable to load texture with data type not matching requested data type")
-                }
-                textureData
-            } else {
-                throw IllegalStateException("unable to load texture with invalid data type")
-            }
-        }
-        DataBuffer.TYPE_INT -> {
-            if (dataBuffer is DataBufferInt) {
-                dataBufferClass = DataBufferInt::class.java
-                val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-                val typedData = textureData.asIntBuffer()
-                typedData.put(dataBuffer.data)
-                if (dataType == GL_UNSIGNED_INT || dataType == GL_INT) {
-                    type = dataType
-                } else {
-                    throw IllegalStateException("unable to load texture with data type not matching requested data type")
-                }
-                textureData
-            } else {
-                throw IllegalStateException("unable to load texture with invalid data type")
-            }
-        }
-        DataBuffer.TYPE_FLOAT -> {
-            if (dataBuffer is DataBufferFloat) {
-                dataBufferClass = DataBufferFloat::class.java
-                val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-                val typedData = textureData.asFloatBuffer()
-                typedData.put(dataBuffer.data)
-                if (dataType == GL_FLOAT) {
-                    type = dataType
-                } else {
-                    throw IllegalStateException("unable to load texture with data type not matching requested data type")
-                }
-                textureData
-            } else {
-                throw IllegalStateException("unable to load texture with invalid data type")
-            }
-        }
-        else -> {
-            throw IllegalStateException("unable to load texture with invalid data type")
-        }
+    val bufferType: Int
+    val usableImage: BufferedImage
+    if (componentBytes == 1) {
+        bufferType = DataBuffer.TYPE_BYTE
+        val colorModel = ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_LINEAR_RGB), components == 4, false, Transparency.TRANSLUCENT, bufferType)
+        val raster = colorModel.createCompatibleWritableRaster(width, height)
+        usableImage = BufferedImage(colorModel, raster, false, null)
+        val converter = ColorConvertOp(null)
+        converter.filter(bufferedImage, usableImage)
+        type = GL_UNSIGNED_BYTE
+    } else if (componentBytes == 2) {
+        bufferType = DataBuffer.TYPE_USHORT
+        val colorModel = ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_LINEAR_RGB), components == 4, false, Transparency.TRANSLUCENT, bufferType)
+        val raster = colorModel.createCompatibleWritableRaster(width, height)
+        usableImage = BufferedImage(colorModel, raster, false, null)
+        val converter = ColorConvertOp(null)
+        converter.filter(bufferedImage, usableImage)
+        type = GL_UNSIGNED_SHORT
+    } else {
+        bufferType = DataBuffer.TYPE_FLOAT
+        val colorModel = ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_LINEAR_RGB), components == 4, false, Transparency.TRANSLUCENT, bufferType)
+        val raster = colorModel.createCompatibleWritableRaster(width, height)
+        usableImage = BufferedImage(colorModel, raster, false, null)
+        val converter = ColorConvertOp(null)
+        converter.filter(bufferedImage, usableImage)
+        type = GL_FLOAT
     }
+    val data: ByteBuffer = readImageData(usableImage, components, bufferType)
+    val unpackAlignment: Int
     val internalFormat: Int
-    val format = when (bufferedImage.colorModel.numComponents) {
+    val format = when (components) {
         1 -> {
-            internalFormat = when (dataType) {
-                GL_UNSIGNED_BYTE -> {
+            internalFormat = when (bufferType) {
+                DataBuffer.TYPE_BYTE -> {
+                    unpackAlignment = 1
                     GL_R8
                 }
-                GL_BYTE -> {
-                    GL_R8_SNORM
-                }
-                GL_UNSIGNED_SHORT -> {
+                DataBuffer.TYPE_USHORT -> {
+                    unpackAlignment = 2
                     GL_R16
                 }
-                GL_SHORT -> {
-                    GL_R16_SNORM
-                }
-                GL_UNSIGNED_INT -> {
-                    GL_R32UI
-                }
-                GL_INT -> {
-                    GL_R32I
-                }
-                GL_FLOAT -> {
+                DataBuffer.TYPE_FLOAT -> {
+                    unpackAlignment = 4
                     GL_R32F
                 }
                 else -> {
@@ -137,26 +71,17 @@ fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: Stri
             GL_RED
         }
         2 -> {
-            internalFormat = when (dataType) {
-                GL_UNSIGNED_BYTE -> {
+            internalFormat = when (bufferType) {
+                DataBuffer.TYPE_BYTE -> {
+                    unpackAlignment = 2
                     GL_RG8
                 }
-                GL_BYTE -> {
-                    GL_RG8_SNORM
-                }
-                GL_UNSIGNED_SHORT -> {
+                DataBuffer.TYPE_USHORT -> {
+                    unpackAlignment = 4
                     GL_RG16
                 }
-                GL_SHORT -> {
-                    GL_RG16_SNORM
-                }
-                GL_UNSIGNED_INT -> {
-                    GL_RG32UI
-                }
-                GL_INT -> {
-                    GL_RG32I
-                }
-                GL_FLOAT -> {
+                DataBuffer.TYPE_FLOAT -> {
+                    unpackAlignment = 8
                     GL_RG32F
                 }
                 else -> {
@@ -166,26 +91,17 @@ fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: Stri
             GL_RG
         }
         3 -> {
-            internalFormat = when (dataType) {
-                GL_UNSIGNED_BYTE -> {
+            internalFormat = when (bufferType) {
+                DataBuffer.TYPE_BYTE -> {
+                    unpackAlignment = 1
                     GL_RGB8
                 }
-                GL_BYTE -> {
-                    GL_RGB8_SNORM
-                }
-                GL_UNSIGNED_SHORT -> {
+                DataBuffer.TYPE_USHORT -> {
+                    unpackAlignment = 2
                     GL_RGB16
                 }
-                GL_SHORT -> {
-                    GL_RGB16_SNORM
-                }
-                GL_UNSIGNED_INT -> {
-                    GL_RGB32UI
-                }
-                GL_INT -> {
-                    GL_RGB32I
-                }
-                GL_FLOAT -> {
+                DataBuffer.TYPE_FLOAT -> {
+                    unpackAlignment = 4
                     GL_RGB32F
                 }
                 else -> {
@@ -195,26 +111,17 @@ fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: Stri
             GL_RGB
         }
         4 -> {
-            internalFormat = when (dataType) {
-                GL_UNSIGNED_BYTE -> {
+            internalFormat = when (bufferType) {
+                DataBuffer.TYPE_BYTE -> {
+                    unpackAlignment = 4
                     GL_RGBA8
                 }
-                GL_BYTE -> {
-                    GL_RGBA8_SNORM
-                }
-                GL_UNSIGNED_SHORT -> {
+                DataBuffer.TYPE_USHORT -> {
+                    unpackAlignment = 8
                     GL_RGBA16
                 }
-                GL_SHORT -> {
-                    GL_RGBA16_SNORM
-                }
-                GL_UNSIGNED_INT -> {
-                    GL_RGBA32UI
-                }
-                GL_INT -> {
-                    GL_RGBA32I
-                }
-                GL_FLOAT -> {
+                DataBuffer.TYPE_FLOAT -> {
+                    unpackAlignment = 8
                     GL_RGBA32F
                 }
                 else -> {
@@ -229,39 +136,15 @@ fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: Stri
     }
     val textureId = GL11.glGenTextures()
     glBindTexture(GL_TEXTURE_2D, textureId)
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 2)
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, bufferedImage.width, bufferedImage.height, 0, format, type, data)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment)
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, usableImage.width, usableImage.height, 0, format, type, data)
     if (generateMipMaps) {
         glGenerateMipmap(GL_TEXTURE_2D)
     }
     mipMaps.forEachIndexed { i, path ->
         val mipMapImage = getResourceStream(path).use { ImageIO.read(it) }
-        val mipMapBuffer = mipMapImage.raster.dataBuffer
         try {
-            val mipMapData: ByteBuffer = if (dataBufferClass == DataBufferByte::class.java) {
-                val textureData = ByteBuffer.allocateDirect(mipMapBuffer.size).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.put((mipMapBuffer as DataBufferByte).data)
-                textureData.flip()
-                textureData
-            } else if (dataBufferClass == DataBufferUShort::class.java) {
-                val textureData = ByteBuffer.allocateDirect(mipMapBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.asShortBuffer().put((mipMapBuffer as DataBufferUShort).data)
-                textureData
-            } else if (dataBufferClass == DataBufferShort::class.java) {
-                val textureData = ByteBuffer.allocateDirect(mipMapBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.asShortBuffer().put((mipMapBuffer as DataBufferShort).data)
-                textureData
-            } else if (dataBufferClass == DataBufferInt::class.java) {
-                val textureData = ByteBuffer.allocateDirect(mipMapBuffer.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.asIntBuffer().put((mipMapBuffer as DataBufferInt).data)
-                textureData
-            } else if (dataBufferClass == DataBufferFloat::class.java) {
-                val textureData = ByteBuffer.allocateDirect(mipMapBuffer.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-                textureData.asFloatBuffer().put((mipMapBuffer as DataBufferFloat).data)
-                textureData
-            } else {
-                throw IllegalStateException("unable to load mip map data with format not matching base image")
-            }
+            val mipMapData = readImageData(mipMapImage, components, bufferType)
             glTexImage2D(GL_TEXTURE_2D, i + 1, internalFormat, mipMapImage.width, mipMapImage.height, 0, format, type, mipMapData)
         } catch (e: Exception) {
             throw IllegalStateException("unable to load mip map data with format not matching base image", e)
@@ -271,4 +154,56 @@ fun loadTexture2D(dataType: Int, minFilter: Int, magFilter: Int, baseImage: Stri
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
     glBindTexture(GL_TEXTURE_2D, 0)
     return Triple(textureId, width, height)
+}
+
+private fun readImageData(image: BufferedImage, components: Int, bufferType: Int): ByteBuffer {
+    val sampleModel = image.sampleModel
+    val dataBuffer = image.raster.dataBuffer
+    val width = image.width
+    val height = image.height
+    val bands = intArrayOf(0, 1, 2, 3)
+    val data: ByteBuffer = when (bufferType) {
+        DataBuffer.TYPE_BYTE -> {
+            val textureData = ByteBuffer.allocateDirect(width * height * components)
+            var offset = 0
+            for (y in 0..height - 1) {
+                for (x in 0..width - 1) {
+                    for (band in 0..components - 1) {
+                        textureData.put(offset++, sampleModel.getSample(x, y, bands[band], dataBuffer).toByte())
+                    }
+                }
+            }
+            textureData
+        }
+        DataBuffer.TYPE_USHORT -> {
+            val bytes = ByteBuffer.allocateDirect(width * height * components * 2).order(ByteOrder.nativeOrder())
+            val textureData = bytes.asShortBuffer()
+            var offset = 0
+            for (y in 0..height - 1) {
+                for (x in 0..width - 1) {
+                    for (band in 0..components - 1) {
+                        textureData.put(offset++, sampleModel.getSample(x, y, bands[band], dataBuffer).toShort())
+                    }
+                }
+            }
+            bytes
+        }
+        DataBuffer.TYPE_FLOAT -> {
+            val bytes = ByteBuffer.allocateDirect(width * height * components * 4).order(ByteOrder.nativeOrder())
+            val textureData = bytes.asFloatBuffer()
+            var offset = 0
+            for (y in 0..height - 1) {
+                for (x in 0..width - 1) {
+                    for (band in 0..components - 1) {
+                        textureData.put(offset++, sampleModel.getSampleFloat(x, y, bands[band], dataBuffer))
+                    }
+                }
+            }
+            bytes
+        }
+        else -> {
+            throw IllegalStateException("unable to load texture with invalid data type")
+        }
+    }
+    return data
 }

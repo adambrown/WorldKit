@@ -7,6 +7,7 @@ import com.grimfox.gec.ui.Sizing.*
 import com.grimfox.gec.ui.VerticalAlignment.*
 import org.joml.Vector4f
 import org.lwjgl.nanovg.NVGColor
+import org.lwjgl.nanovg.NVGPaint
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
@@ -81,19 +82,41 @@ class ScissorStack(val nvg: Long) {
 
 interface Fill {
 
-    fun doFill(nvg: Long)
+    fun draw(nvg: Long, block: Block)
 }
 
 private class FillNone() : Fill {
 
-    override fun doFill(nvg: Long) {
+    override fun draw(nvg: Long, block: Block) {
     }
 }
 
 class FillColor(val color: NVGColor) : Fill {
 
-    override fun doFill(nvg: Long) {
+    override fun draw(nvg: Long, block: Block) {
         nvgFillColor(nvg, color)
+        nvgFill(nvg)
+    }
+}
+
+class FillImageDynamic(val image: Int) : Fill {
+
+    private val paint = NVGPaint.create()
+
+    override fun draw(nvg: Long, block: Block) {
+        nvgImagePattern(nvg, block.x.toFloat(), block.y.toFloat(), block.width.toFloat(), block.height.toFloat(), 0.0f, image, 1.0f, paint)
+        nvgFillPaint(nvg, paint)
+        nvgFill(nvg)
+    }
+}
+
+class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
+
+    private val paint = NVGPaint.create()
+
+    override fun draw(nvg: Long, block: Block) {
+        nvgImagePattern(nvg, 0.0f, 0.0f, width.toFloat(), height.toFloat(), 0.0f, image, 1.0f, paint)
+        nvgFillPaint(nvg, paint)
         nvgFill(nvg)
     }
 }
@@ -102,20 +125,26 @@ interface Stroke {
 
     val size: Float
 
-    fun doStroke(nvg: Long)
+    fun draw(nvg: Long, block: Block)
 }
 
 private class StrokeNone() : Stroke {
 
     override val size = 0.0f
 
-    override fun doStroke(nvg: Long) {
+    override fun draw(nvg: Long, block: Block) {
+    }
+}
+
+class StrokeInvisible(override val size: Float) : Stroke {
+
+    override fun draw(nvg: Long, block: Block) {
     }
 }
 
 class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
 
-    override fun doStroke(nvg: Long) {
+    override fun draw(nvg: Long, block: Block) {
         nvgStrokeColor(nvg, color)
         nvgStrokeWidth(nvg, size)
         nvgStroke(nvg)
@@ -153,37 +182,8 @@ class StaticTextUtf8(string: String, var size: Float, var font: Int, var color: 
     override fun draw(nvg: Long, block: Block) {
         nvgFontFaceId(nvg, font)
         nvgFontSize(nvg, size)
-        val x: Float
-        val hAlignMask = when (block.hAlign) {
-            LEFT -> {
-                x = block.x.toFloat()
-                NVG_ALIGN_LEFT
-            }
-            RIGHT -> {
-                x = block.x.toFloat() + block.width
-                NVG_ALIGN_RIGHT
-            }
-            CENTER -> {
-                x = block.x + block.width / 2.0f
-                NVG_ALIGN_CENTER
-            }
-        }
-        val y: Float
-        val vAlignMask = when (block.vAlign) {
-            TOP -> {
-                y = block.y.toFloat()
-                NVG_ALIGN_TOP
-            }
-            BOTTOM -> {
-                y = block.y.toFloat() + block.height
-                NVG_ALIGN_BOTTOM
-            }
-            MIDDLE -> {
-                y = block.y + block.height / 2.0f
-                NVG_ALIGN_MIDDLE
-            }
-        }
-        nvgTextAlign(nvg, hAlignMask or vAlignMask)
+        val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, color)
         nvgText(nvg, x, y, data, NULL)
     }
@@ -197,6 +197,65 @@ class StaticTextUtf8(string: String, var size: Float, var font: Int, var color: 
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
     }
+}
+
+class DynamicTextUtf8(override val data: ByteBuffer, var size: Float, var font: Int, var color: NVGColor) : Text {
+
+    override val length: Int get() = data.limit()
+
+    override fun draw(nvg: Long, block: Block) {
+        nvgFontFaceId(nvg, font)
+        nvgFontSize(nvg, size)
+        val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgTextAlign(nvg, alignMask)
+        nvgFillColor(nvg, color)
+        nvgText(nvg, x, y, data, NULL)
+    }
+
+    override fun dimensions(nvg: Long): Pair<Float, Float> {
+        twr(stackPush()) { stack ->
+            val bounds = stack.mallocFloat(4)
+            nvgFontFaceId(nvg, font)
+            nvgFontSize(nvg, size)
+            nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
+            return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
+        }
+    }
+}
+
+private fun calculatePositionAndAlignmentForText(block: Block): Triple<Float, Float, Int> {
+    val x: Float
+    val hAlignMask = when (block.hAlign) {
+        LEFT -> {
+            x = block.x.toFloat()
+            NVG_ALIGN_LEFT
+        }
+        RIGHT -> {
+            x = block.x.toFloat() + block.width
+            NVG_ALIGN_RIGHT
+        }
+        CENTER -> {
+            x = block.x + block.width / 2.0f
+            NVG_ALIGN_CENTER
+        }
+    }
+    val y: Float
+    val vAlignMask = when (block.vAlign) {
+        TOP -> {
+            y = block.y.toFloat()
+            NVG_ALIGN_TOP
+        }
+        BOTTOM -> {
+            y = block.y.toFloat() + block.height
+            NVG_ALIGN_BOTTOM
+        }
+        MIDDLE -> {
+            y = block.y + block.height / 2.0f
+            NVG_ALIGN_MIDDLE
+        }
+    }
+    val alignMask = hAlignMask or vAlignMask
+    return Triple(x, y, alignMask)
 }
 
 interface Shape {
@@ -231,8 +290,8 @@ class ShapeRectangle(override val fill: Fill, override val stroke: Stroke) : Sha
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
         nvgRect(nvg, block.x.toFloat() + halfStroke, block.y.toFloat() + halfStroke, block.width.toFloat() - stroke.size, block.height.toFloat() - stroke.size)
-        fill.doFill(nvg)
-        stroke.doStroke(nvg)
+        fill.draw(nvg, block)
+        stroke.draw(nvg, block)
     }
 }
 
@@ -242,8 +301,8 @@ class ShapeCircle(override val fill: Fill, override val stroke: Stroke) : Shape 
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
         nvgCircle(nvg, (block.x + block.width) / 2.0f, (block.y + block.height) / 2.0f, Math.min(block.width, block.height) / 2.0f - halfStroke)
-        fill.doFill(nvg)
-        stroke.doStroke(nvg)
+        fill.draw(nvg, block)
+        stroke.draw(nvg, block)
     }
 }
 
@@ -253,8 +312,8 @@ class ShapeEllipse(override val fill: Fill, override val stroke: Stroke) : Shape
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
         nvgEllipse(nvg, (block.x.toFloat() + block.width.toFloat()) / 2.0f, (block.y.toFloat() + block.height.toFloat()) / 2.0f, block.width / 2.0f - halfStroke, block.height / 2.0f - halfStroke)
-        fill.doFill(nvg)
-        stroke.doStroke(nvg)
+        fill.draw(nvg, block)
+        stroke.draw(nvg, block)
     }
 }
 
@@ -264,8 +323,8 @@ class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
         nvgRoundedRect(nvg, block.x.toFloat() + halfStroke, block.y.toFloat() + halfStroke, block.width.toFloat() - stroke.size, block.height.toFloat() - stroke.size, Math.min(cornerRadius, Math.min(block.width, block.height) / 2.0f))
-        fill.doFill(nvg)
-        stroke.doStroke(nvg)
+        fill.draw(nvg, block)
+        stroke.draw(nvg, block)
     }
 
 }

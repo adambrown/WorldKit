@@ -9,22 +9,27 @@ import com.grimfox.gec.ui.HorizontalAlignment.*
 import com.grimfox.gec.ui.Layout.*
 import com.grimfox.gec.ui.Sizing.*
 import com.grimfox.gec.ui.VerticalAlignment.*
+import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NanoVG
-import org.lwjgl.nanovg.NanoVG.nvgRGBA
+import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nuklear.*
 import org.lwjgl.nuklear.Nuklear.*
 import org.lwjgl.opengl.GL11.*
+import org.lwjgl.system.CallbackI
 import org.lwjgl.system.MemoryStack.stackPush
+import org.lwjgl.system.MemoryUtil
+import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.util.*
 
 object MainUi {
 
-    class UiData(var font: Int = -1) {
+    class UiData(var textFont: Int = -1,
+                 var glyphFont: Int = -1) {
         lateinit var root: Block
     }
 
@@ -32,11 +37,22 @@ object MainUi {
         val uiData = UiData()
         val mainFont = NkUserFont.create()
         val glyphFont = NkUserFont.create()
+
         val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }
         val glyphClose = glyphIndex[0]
         val glyphMinimize = glyphIndex[1]
         val glyphRestore = glyphIndex[2]
         val glyphMaximize = glyphIndex[3]
+
+        val maxRestoreGlyph = MemoryUtil.memUTF8(glyphRestore, true)
+
+        fun setRestore() {
+            MemoryUtil.memUTF8(glyphRestore, true, maxRestoreGlyph, 0)
+        }
+
+        fun setMaximize() {
+            MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
+        }
 
         val WHITE = nvgRGBA(200.toByte(), 200.toByte(), 200.toByte(), 255.toByte(), NVGColor.create())
         val BLUE = nvgRGBA(40.toByte(), 40.toByte(), 200.toByte(), 255.toByte(), NVGColor.create())
@@ -45,242 +61,451 @@ object MainUi {
         val MAGENTA = nvgRGBA(180.toByte(), 40.toByte(), 180.toByte(), 255.toByte(), NVGColor.create())
         val ORANGE = nvgRGBA(180.toByte(), 160.toByte(), 40.toByte(), 255.toByte(), NVGColor.create())
 
+        val COLOR_NORMAL_TEXT = nvgRGBA(153.toByte(), 153.toByte(), 153.toByte(), 255.toByte(), NVGColor.create())
+
+        val COLOR_BUTTON_TEXT = nvgRGBA(243.toByte(), 243.toByte(), 243.toByte(), 255.toByte(), NVGColor.create())
+        val COLOR_BUTTON_MOUSE_OVER = nvgRGBA(64.toByte(), 62.toByte(), 64.toByte(), 255.toByte(), NVGColor.create())
+        val COLOR_BUTTON_MOUSE_DOWN = nvgRGBA(0.toByte(), 122.toByte(), 204.toByte(), 255.toByte(), NVGColor.create())
+
+
+        val FILL_BUTTON_MOUSE_OVER = FillColor(COLOR_BUTTON_MOUSE_OVER)
+        val FILL_BUTTON_MOUSE_DOWN = FillColor(COLOR_BUTTON_MOUSE_DOWN)
+
         val FILL_BLUE = FillColor(BLUE)
         val FILL_MAGENTA = FillColor(MAGENTA)
         val STROKE_GREEN_THICK = StrokeColor(GREEN, 2.0f)
         val STROKE_ORANGE_THICK = StrokeColor(ORANGE, 2.0f)
-        val STROKE_RED_THIN = StrokeColor(RED, 1.0f)
-        val ROUNDED_RECT = ShapeRoundedRectangle(FILL_BLUE, STROKE_GREEN_THICK, 6.0f)
+        val STROKE_RED_THIN = NO_STROKE
+//        val STROKE_RED_THIN = StrokeColor(RED, 1.0f)
+        val BUTTON_NORMAL = ShapeRectangle(NO_FILL, NO_STROKE)
+//        val ROUNDED_RECT = ShapeRoundedRectangle(FILL_BLUE, STROKE_GREEN_THICK, 6.0f)
         val RECT = ShapeRectangle(NO_FILL, STROKE_RED_THIN)
 
-        val MOUSE_OVER = ShapeRoundedRectangle(FILL_MAGENTA, STROKE_ORANGE_THICK, 6.0f)
+        val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+        val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
-        val mainStyle = style { nk, nvg ->
-            val wkIcon = loadTexture2D(GL_UNSIGNED_BYTE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, "/textures/wk-icon-1024.png", true,
-                    "/textures/wk-icon-512.png",
-                    "/textures/wk-icon-256.png",
-                    "/textures/wk-icon-128.png",
-                    "/textures/wk-icon-64.png",
-                    "/textures/wk-icon-32.png",
-                    "/textures/wk-icon-16.png")
+        val mainStyle = style { ui, nk, nvg ->
+            ui {
+                val iconNvg = nvgCreateImage(nvg, getPathForResource("/textures/wk-icon-128.png"), NVG_IMAGE_GENERATE_MIPMAPS)
 
-            createNkFont("/fonts/FiraSans.ttf", 22.0f, 32, 95, 512, 512, mainFont)
-            createNkFont("/fonts/WorldKitUi.ttf", 22.0f, 32, 4, 512, 512, glyphFont)
+                val ICON_SHAPE = ShapeRectangle(FillImageDynamic(iconNvg), NO_STROKE)
 
-            fun text(value: String): Text {
-                return StaticTextUtf8(value, 24.0f, uiData.font, WHITE)
-            }
+                createNkFont("/fonts/FiraSans.ttf", 22.0f, 32, 95, 512, 512, mainFont)
+                createNkFont("/fonts/WorldKitUi.ttf", 22.0f, 32, 4, 512, 512, glyphFont)
 
-            background.set(45, 45, 48)
-
-            dragAreaLeftMargin = 0
-            dragAreaRightMargin = 146
-            dragAreaTopMargin = 0
-            dragAreaHeight = 32
-
-            uiData.font = getNvgFont(createNvgFont("/fonts/FiraSans.ttf", "FiraSans", nvg))
-            uiData.root = uiRoot(0, 0, 0, 0) {
-                block {
-                    vSizing = STATIC
-                    height = 40
-                    layout = VERTICAL
+                fun text(value: String, color: NVGColor = COLOR_NORMAL_TEXT): Text {
+                    return StaticTextUtf8(value, 22.0f, uiData.textFont, color)
                 }
-                block {
-                    vSizing = STATIC
-                    height = 40
-                    layout = VERTICAL
+
+                fun glyph(value: String, color: NVGColor = COLOR_NORMAL_TEXT): Text {
+                    return StaticTextUtf8(value, 22.0f, uiData.glyphFont, color)
+                }
+
+                fun text(value: ByteBuffer, color: NVGColor = COLOR_NORMAL_TEXT): Text {
+                    return DynamicTextUtf8(value, 22.0f, uiData.textFont, color)
+                }
+
+                fun glyph(value: ByteBuffer, color: NVGColor = COLOR_NORMAL_TEXT): Text {
+                    return DynamicTextUtf8(value, 22.0f, uiData.glyphFont, color)
+                }
+
+                background.set(45, 45, 48)
+
+                uiData.textFont = getNvgFont(createNvgFont("/fonts/FiraSans.ttf", "FiraSans", nvg))
+                uiData.glyphFont = getNvgFont(createNvgFont("/fonts/WorldKitUi.ttf", "Glyphs", nvg))
+                uiData.root = uiRoot(0, 0, 0, 0) {
                     block {
-                        hSizing = SHRINK
-                        layout = HORIZONTAL
+                        vSizing = STATIC
+                        height = 40
+                        layout = VERTICAL
                         block {
-                            hAlign = CENTER
-                            vAlign = MIDDLE
+                            hSizing = STATIC
+                            vSizing = STATIC
+                            width = 40
+                            height = 40
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = CENTER
+                                vAlign = MIDDLE
+                                hSizing = STATIC
+                                vSizing = STATIC
+                                height = 32
+                                width = 32
+                                shape = ICON_SHAPE
+                                isMouseAware = false
+                            }
+                            isMouseAware = false
+                        }
+                        block {
+                            hSizing = STATIC
+                            vSizing = STATIC
+                            width = 10
+                            height = 40
+                            layout = HORIZONTAL
+                            isMouseAware = false
+                        }
+                        block {
                             hSizing = SHRINK
                             vSizing = STATIC
+                            height = 32
+                            vAlign = BOTTOM
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = CENTER
+                                vAlign = MIDDLE
+                                hSizing = SHRINK
+                                vSizing = SHRINK
+                                padLeft = 10
+                                padRight = 10
+                                text = text("File", COLOR_BUTTON_TEXT)
+                                shape = RECT
+                                isMouseAware = false
+                            }
+                            shape = BUTTON_NORMAL
+                            var mouseDownOver = false
+                            var mouseOver = false
+                            onMouseOver {
+                                mouseOver = true
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_MOUSE_OVER
+                                }
+                            }
+                            onMouseOut {
+                                mouseOver = false
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_NORMAL
+                                }
+                            }
+                            onMouseDown { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    mouseDownOver = true
+                                    shape = BUTTON_MOUSE_DOWN
+                                }
+                            }
+                            onMouseRelease { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                    mouseDownOver = false
+                                    shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                }
+                            }
+                            onMouseClick { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    println("mouse click File")
+                                }
+                            }
+                        }
+                        block {
+                            hSizing = SHRINK
+                            vSizing = STATIC
+                            height = 32
+                            vAlign = BOTTOM
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = CENTER
+                                vAlign = MIDDLE
+                                hSizing = SHRINK
+                                vSizing = SHRINK
+                                padLeft = 10
+                                padRight = 10
+                                text = text("Settings", COLOR_BUTTON_TEXT)
+                                shape = RECT
+                                isMouseAware = false
+                            }
+                            shape = BUTTON_NORMAL
+                            var mouseDownOver = false
+                            var mouseOver = false
+                            onMouseOver {
+                                mouseOver = true
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_MOUSE_OVER
+                                }
+                            }
+                            onMouseOut {
+                                mouseOver = false
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_NORMAL
+                                }
+                            }
+                            onMouseDown { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    mouseDownOver = true
+                                    shape = BUTTON_MOUSE_DOWN
+                                }
+                            }
+                            onMouseRelease { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                    mouseDownOver = false
+                                    shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                }
+                            }
+                            onMouseClick { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    println("mouse click Settings")
+                                }
+                            }
+                        }
+                        block {
+                            hSizing = SHRINK
+                            vSizing = STATIC
+                            height = 32
+                            vAlign = BOTTOM
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = CENTER
+                                vAlign = MIDDLE
+                                hSizing = SHRINK
+                                vSizing = SHRINK
+                                padLeft = 10
+                                padRight = 10
+                                text = text("About", COLOR_BUTTON_TEXT)
+                                shape = RECT
+                                isMouseAware = false
+                            }
+                            shape = BUTTON_NORMAL
+                            var mouseDownOver = false
+                            var mouseOver = false
+                            onMouseOver {
+                                mouseOver = true
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_MOUSE_OVER
+                                }
+                            }
+                            onMouseOut {
+                                mouseOver = false
+                                if (!mouseDownOver) {
+                                    shape = BUTTON_NORMAL
+                                }
+                            }
+                            onMouseDown { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    mouseDownOver = true
+                                    shape = BUTTON_MOUSE_DOWN
+                                }
+                            }
+                            onMouseRelease { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                    mouseDownOver = false
+                                    shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                }
+                            }
+                            onMouseClick { button, x, y ->
+                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                    println("mouse click About")
+                                }
+                            }
+                        }
+                        block {
+                            hSizing = STATIC
+                            vSizing = STATIC
+                            width = 32
                             height = 40
-                            padLeft = 10
-                            padRight = 10
-                            text = text("this is 1")
-                            shape = RECT
-                            isMouseAware = false
-                        }
-                        shape = ROUNDED_RECT
-                        onMouseOver {
-                            shape = MOUSE_OVER
-                        }
-                        onMouseOut {
-                            shape = ROUNDED_RECT
-                        }
-                        onMouseDown { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse down 1")
-                            }
-                        }
-                        onMouseUp { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse up 1")
-                            }
-                        }
-                        onMouseRelease { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse release 1")
-                            }
-                        }
-                        onMouseClick { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse click 1")
-                            }
-                        }
-                    }
-                    block {
-                        hSizing = SHRINK
-                        layout = HORIZONTAL
-                        block {
-                            hAlign = CENTER
-                            vAlign = MIDDLE
-                            hSizing = SHRINK
-                            vSizing = SHRINK
-                            padLeft = 10
-                            padRight = 10
-                            text = text("this is 2")
-                            shape = RECT
-                            isMouseAware = false
-                        }
-                        shape = ROUNDED_RECT
-                        onMouseOver {
-                            shape = MOUSE_OVER
-                        }
-                        onMouseOut {
-                            shape = ROUNDED_RECT
-                        }
-                        onMouseDown { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse down 2")
-                            }
-                        }
-                        onMouseUp { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse up 2")
-                            }
-                        }
-                        onMouseRelease { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse release 2")
-                            }
-                        }
-                        onMouseClick { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse click 2")
-                            }
-                        }
-                    }
-                    block {
-                        hSizing = SHRINK
-                        layout = HORIZONTAL
-                        block {
-                            hAlign = CENTER
-                            vAlign = MIDDLE
-                            hSizing = SHRINK
-                            vSizing = SHRINK
-                            padLeft = 10
-                            padRight = 10
-                            text = text("this is 3")
-                            shape = RECT
-                            isMouseAware = false
-                        }
-                        shape = ROUNDED_RECT
-                        onMouseOver {
-                            shape = MOUSE_OVER
-                        }
-                        onMouseOut {
-                            shape = ROUNDED_RECT
-                        }
-                        onMouseDown { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse down 3")
-                            }
-                        }
-                        onMouseUp { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse up 3")
-                            }
-                        }
-                        onMouseRelease { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse release 3")
-                            }
-                        }
-                        onMouseClick { button, x, y ->
-                            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                println("mouse click 3")
-                            }
-                        }
-                    }
-                    block {
-                        hSizing = GROW
-                        layout = HORIZONTAL
-                        shape = ROUNDED_RECT
-                        block {
-                            hAlign = CENTER
-                            vAlign = MIDDLE
-                            hSizing = SHRINK
-                            vSizing = SHRINK
-                            text = text("this is centered")
-                            shape = RECT
-                            isMouseAware = false
-                        }
-                    }
-                    block {
-                        hSizing = STATIC
-                        width = 120
-                        layout = HORIZONTAL
-                        block {
-                            hSizing = STATIC
-                            width = 40
-                            hAlign = LEFT
-                            vAlign = TOP
                             layout = HORIZONTAL
-                            shape = ROUNDED_RECT
+                            isMouseAware = false
+                        }
+                        dragArea = block {
+                            hSizing = GROW
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = CENTER
+                                vAlign = TOP
+                                hSizing = SHRINK
+                                vSizing = STATIC
+                                height = 32
+                                layout = HORIZONTAL
+                                block {
+                                    hAlign = LEFT
+                                    vAlign = MIDDLE
+                                    hSizing = SHRINK
+                                    vSizing = SHRINK
+                                    text = text("WorldKit - Edit Mode")
+                                    shape = RECT
+                                    isMouseAware = false
+                                }
+                                isMouseAware = false
+                            }
+                            isMouseAware = false
                         }
                         block {
                             hSizing = STATIC
-                            width = 40
-                            hAlign = LEFT
-                            vAlign = TOP
+                            width = 10
                             layout = HORIZONTAL
-                            shape = ROUNDED_RECT
+                            isMouseAware = false
                         }
                         block {
                             hSizing = STATIC
-                            width = 40
-                            hAlign = LEFT
-                            vAlign = TOP
+                            width = 144
                             layout = HORIZONTAL
-                            shape = ROUNDED_RECT
+                            block {
+                                hSizing = STATIC
+                                vSizing = STATIC
+                                width = 48
+                                height = 32
+                                hAlign = LEFT
+                                vAlign = TOP
+                                layout = HORIZONTAL
+                                shape = BUTTON_NORMAL
+                                block {
+                                    hAlign = CENTER
+                                    vAlign = MIDDLE
+                                    hSizing = SHRINK
+                                    vSizing = SHRINK
+                                    text = glyph(glyphMinimize, COLOR_BUTTON_TEXT)
+                                    isMouseAware = false
+                                }
+                                var mouseDownOver = false
+                                var mouseOver = false
+                                onMouseOver {
+                                    mouseOver = true
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_MOUSE_OVER
+                                    }
+                                }
+                                onMouseOut {
+                                    mouseOver = false
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseDown { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        mouseDownOver = true
+                                        shape = BUTTON_MOUSE_DOWN
+                                    }
+                                }
+                                onMouseRelease { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                        mouseDownOver = false
+                                        shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseClick { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        minimizeWindow()
+                                    }
+                                }
+                            }
+                            block {
+                                hSizing = STATIC
+                                vSizing = STATIC
+                                width = 48
+                                height = 32
+                                hAlign = LEFT
+                                vAlign = TOP
+                                layout = HORIZONTAL
+                                shape = BUTTON_NORMAL
+                                block {
+                                    hAlign = CENTER
+                                    vAlign = MIDDLE
+                                    hSizing = SHRINK
+                                    vSizing = SHRINK
+                                    text = glyph(maxRestoreGlyph, COLOR_BUTTON_TEXT)
+                                    isMouseAware = false
+                                }
+                                var mouseDownOver = false
+                                var mouseOver = false
+                                onMouseOver {
+                                    mouseOver = true
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_MOUSE_OVER
+                                    }
+                                }
+                                onMouseOut {
+                                    mouseOver = false
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseDown { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        mouseDownOver = true
+                                        shape = BUTTON_MOUSE_DOWN
+                                    }
+                                }
+                                onMouseRelease { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                        mouseDownOver = false
+                                        shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseClick { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        toggleMaximized()
+                                    }
+                                }
+                            }
+                            block {
+                                hSizing = STATIC
+                                vSizing = STATIC
+                                width = 48
+                                height = 32
+                                hAlign = LEFT
+                                vAlign = TOP
+                                layout = HORIZONTAL
+                                shape = BUTTON_NORMAL
+                                block {
+                                    hAlign = CENTER
+                                    vAlign = MIDDLE
+                                    hSizing = SHRINK
+                                    vSizing = SHRINK
+                                    text = glyph(glyphClose, COLOR_BUTTON_TEXT)
+                                    isMouseAware = false
+                                }
+                                var mouseDownOver = false
+                                var mouseOver = false
+                                onMouseOver {
+                                    mouseOver = true
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_MOUSE_OVER
+                                    }
+                                }
+                                onMouseOut {
+                                    mouseOver = false
+                                    if (!mouseDownOver) {
+                                        shape = BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseDown { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        mouseDownOver = true
+                                        shape = BUTTON_MOUSE_DOWN
+                                    }
+                                }
+                                onMouseRelease { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                        mouseDownOver = false
+                                        shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                    }
+                                }
+                                onMouseClick { button, x, y ->
+                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                        closeWindow()
+                                    }
+                                }
+                            }
                         }
                     }
+//                block {
+//                    vSizing = GROW
+//                    layout = VERTICAL
+//                    hAlign = LEFT
+//                    vAlign = TOP
+//                    shape = ROUNDED_RECT
+//                }
+//                block {
+//                    vSizing = GROW
+//                    layout = VERTICAL
+//                    hAlign = LEFT
+//                    vAlign = TOP
+//                    shape = ROUNDED_RECT
+//                }
+//                block {
+//                    vSizing = GROW
+//                    layout = VERTICAL
+//                    hAlign = LEFT
+//                    vAlign = TOP
+//                    shape = ROUNDED_RECT
+//                }
                 }
-//                block {
-//                    vSizing = GROW
-//                    layout = VERTICAL
-//                    hAlign = LEFT
-//                    vAlign = TOP
-//                    shape = ROUNDED_RECT
-//                }
-//                block {
-//                    vSizing = GROW
-//                    layout = VERTICAL
-//                    hAlign = LEFT
-//                    vAlign = TOP
-//                    shape = ROUNDED_RECT
-//                }
-//                block {
-//                    vSizing = GROW
-//                    layout = VERTICAL
-//                    hAlign = LEFT
-//                    vAlign = TOP
-//                    shape = ROUNDED_RECT
-//                }
             }
             twr(stackPush()) { stack ->
                 nk_style_set_font(nk, mainFont)
@@ -377,45 +602,51 @@ object MainUi {
             val editDataLength = stack.mallocInt(1)
             editDataLength.put(0, 0)
 
-            val nvgButtonColor = NVGColor.create()
-            rgba(180, 50, 40, 255, nvgButtonColor)
+            var lastMaximized = true
 
             ui(mainStyle, mouseClickHandler, 1280, 720, resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor) { nk, nvg ->
                 twr(stackPush()) { stack ->
-                    drawButton(nvg, "Click Me!", 200f, 200f, 200f, 32f, nvgButtonColor, uiData.font)
                     uiData.root.width = width
                     uiData.root.height = height
                     uiData.root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
                     uiData.root.draw(nvg)
 
+                    if (isMaximized && !lastMaximized) {
+                        setRestore()
+                    } else if (!isMaximized && lastMaximized) {
+                        setMaximize()
+                    }
+                    lastMaximized = isMaximized
+
+
                     if (nk_begin(nk, "0", windowBounds, NK_WINDOW_BACKGROUND)) {
                         nk_window_set_bounds(nk, nk_rect(0.0f, 0.0f, width.toFloat(), height.toFloat(), windowBounds))
 
-                        nk_style_push_font(nk, glyphFont)
-                        nk.staticRow(32, width) {
-                            col {
-                                nk_style_push_font(nk, mainFont)
-                                nk_text(nk, "WorldKit", NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
-                                nk_style_pop_font(nk)
-                            }
-                            col(48) {
-                                if (nk_button_label(nk, glyphMinimize)) {
-                                    minimizeWindow()
-                                }
-                            }
-                            col(48) {
-                                val glyph = if (isMaximized) glyphRestore else glyphMaximize
-                                if (nk_button_label(nk, glyph)) {
-                                    toggleMaximized()
-                                }
-                            }
-                            col(48) {
-                                if (nk_button_label(nk, glyphClose)) {
-                                    closeWindow()
-                                }
-                            }
-                        }
-                        nk_style_pop_font(nk)
+//                        nk_style_push_font(nk, glyphFont)
+//                        nk.staticRow(32, width) {
+//                            col {
+//                                nk_style_push_font(nk, mainFont)
+//                                nk_text(nk, "", NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
+//                                nk_style_pop_font(nk)
+//                            }
+//                            col(48) {
+//                                if (nk_button_label(nk, glyphMinimize)) {
+//                                    minimizeWindow()
+//                                }
+//                            }
+//                            col(48) {
+//                                val glyph = if (isMaximized) glyphRestore else glyphMaximize
+//                                if (nk_button_label(nk, glyph)) {
+//                                    toggleMaximized()
+//                                }
+//                            }
+//                            col(48) {
+//                                if (nk_button_label(nk, glyphClose)) {
+//                                    closeWindow()
+//                                }
+//                            }
+//                        }
+//                        nk_style_pop_font(nk)
 
                         nk.staticRow(48, width) {
                             col {
@@ -530,58 +761,58 @@ object MainUi {
                                 nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
                             }
                         }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(40, width) {
-                            col(96) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(340) {
-                                nk_edit_string(nk, NK_EDIT_FIELD, editData, editDataLength, 100, ::nnk_filter_ascii)
-                            }
-                            col(96) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(40, width) {
-                            col(96) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(340) {
-                                val bytes = ByteArray(editDataLength[0])
-                                for (i in 0..bytes.size - 1) {
-                                    bytes[i] = editData[i]
-                                }
-                                nk_label(nk, String(bytes, Charsets.US_ASCII), NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(96) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(40, width) {
+//                            col(96) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(340) {
+//                                nk_edit_string(nk, NK_EDIT_FIELD, editData, editDataLength, 100, ::nnk_filter_ascii)
+//                            }
+//                            col(96) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(40, width) {
+//                            col(96) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(340) {
+//                                val bytes = ByteArray(editDataLength[0])
+//                                for (i in 0..bytes.size - 1) {
+//                                    bytes[i] = editData[i]
+//                                }
+//                                nk_label(nk, String(bytes, Charsets.US_ASCII), NK_TEXT_ALIGN_CENTERED or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(96) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
 
 //                        nk_layout_row_static(context, 30f, 400, 1)
 //                        nk_text(context, "mouse x: $mouseX, y: $mouseY", NK_TEXT_ALIGN_LEFT)
