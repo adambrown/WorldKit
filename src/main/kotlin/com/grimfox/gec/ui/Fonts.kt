@@ -21,7 +21,7 @@ import org.lwjgl.nuklear.Nuklear.NK_UTF_INVALID
 import org.lwjgl.stb.STBTTAlignedQuad
 import org.lwjgl.system.MemoryUtil.memAllocInt
 
-fun createFont(fontData: ByteBuffer, fontHeight: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): NkUserFont {
+fun createNkFont(fontData: ByteBuffer, fontHeight: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): NkUserFont {
     val fontTexID = glGenTextures()
 
     val fontInfo = STBTTFontinfo.create()

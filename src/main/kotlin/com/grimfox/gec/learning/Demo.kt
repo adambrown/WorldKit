@@ -63,10 +63,7 @@ val paintC = NVGPaint.create()
 private val rows = NVGTextRow.create(3)
 private val glyphs = NVGGlyphPosition.create(100)
 private val paragraph = memUTF8(
-        "This is longer chunk of text.\n  \n  Would have used lorem ipsum but she    was busy jumping over the lazy dog with the fox and all the men who " +
-                "came" +
-                " " +
-                "to the aid of the party."
+        "This is longer chunk of text.\n\nWould have used lorem ipsum but she was busy jumping over the lazy dog with the fox and all the men who came to the aid of the party."
 )
 
 private val lineh = BufferUtils.createFloatBuffer(1)
@@ -102,12 +99,7 @@ private fun cpToUTF8(cp: Int): ByteBuffer {
 }
 
 fun rgba(r: Int, g: Int, b: Int, a: Int, color: NVGColor): NVGColor {
-    color.r(r / 255.0f)
-    color.g(g / 255.0f)
-    color.b(b / 255.0f)
-    color.a(a / 255.0f)
-
-    return color
+    return nvgRGBA(r.toByte(), g.toByte(), b.toByte(), a.toByte(), color)
 }
 
 private fun drawWindow(vg: Long, title: String, x: Float, y: Float, w: Float, h: Float) {
@@ -362,6 +354,40 @@ private fun drawButton(vg: Long, preicon: ByteBuffer?, text: String, x: Float, y
         nvgText(vg, x + w * 0.5f - tw * 0.5f + iw * 0.25f, y + h * 0.5f, textEncoded, NULL)
     }
 }
+
+fun drawButton(vg: Long, text: String, x: Float, y: Float, unused: Float, h: Float, color: NVGColor, font: Int) {
+    twr(stackPush()) { stack ->
+        val bg = paintA
+        val cornerRadius = 4.0f
+        nvgFontSize(vg, 20.0f)
+        nvgFontFaceId(vg, font)
+        val textEncoded = stack.UTF8(text)
+        val w = nvgTextBounds(vg, 0f, 0f, textEncoded, NULL, null as FloatBuffer?) + 20
+
+        nvgLinearGradient(vg, x, y, x, y + h, rgba(255, 255, 255, if (isBlack(color)) 16 else 32, colorB), rgba(0, 0, 0, if (isBlack(color)) 16 else 32, colorC), bg)
+        nvgBeginPath(vg)
+        nvgRoundedRect(vg, x + 1, y + 1, w - 2, h - 2, cornerRadius - 1)
+        if (!isBlack(color)) {
+            nvgFillColor(vg, color)
+            nvgFill(vg)
+        }
+        nvgFillPaint(vg, bg)
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRoundedRect(vg, x + 0.5f, y + 0.5f, w - 1, h - 1, cornerRadius - 0.5f)
+        nvgStrokeColor(vg, rgba(0, 0, 0, 48, colorA))
+        nvgStroke(vg)
+
+        nvgTextAlign(vg, NVG_ALIGN_CENTER or NVG_ALIGN_MIDDLE)
+        nvgFillColor(vg, rgba(0, 0, 0, 160, colorA))
+        nvgText(vg, x + w * 0.5f, y + h * 0.5f - 1, textEncoded, NULL)
+        nvgFillColor(vg, rgba(255, 255, 255, 160, colorA))
+        nvgText(vg, x + w * 0.5f, y + h * 0.5f, textEncoded, NULL)
+    }
+}
+
+
 
 private fun drawSlider(vg: Long, pos: Float, x: Float, y: Float, w: Float, h: Float) {
     val bg = paintA

@@ -7,7 +7,11 @@ import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
 import org.lwjgl.BufferUtils
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.InputStream
 import java.math.BigInteger
+import java.net.URI
+import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.Channels
@@ -36,6 +40,22 @@ fun <E> Collection<E>.containsAny(other: Collection<E>): Boolean {
     return false
 }
 
+fun getResourceUrl(resource: String): URL {
+    return Utils::class.java.getResource(resource)
+}
+
+fun getResourceUri(resource: String): URI {
+    return Utils::class.java.getResource(resource).toURI()
+}
+
+fun getResourceStream(resource: String): InputStream {
+    return Utils::class.java.getResourceAsStream(resource)
+}
+
+fun getPathForResource(resource: String): String {
+    return File(Utils::class.java.getResource(resource).toURI()).canonicalPath
+}
+
 fun loadResource(resource: String, bufferSize: Int): ByteBuffer {
     var buffer: ByteBuffer? = null
 
@@ -49,7 +69,7 @@ fun loadResource(resource: String, bufferSize: Int): ByteBuffer {
             }
         })
     } else {
-        Utils::class.java.classLoader.getResourceAsStream(resource).use { source ->
+        Utils::class.java.getResourceAsStream(resource).use { source ->
             Channels.newChannel(source).use { rbc ->
                 buffer = BufferUtils.createByteBuffer(bufferSize)
 

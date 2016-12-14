@@ -161,19 +161,10 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
 
         waterPlane = HexGrid(12.0f * modelScale, 16)
 
-        twr(MemoryStack.stackPush()) { stack ->
-            val bufferedImage = ImageIO.read(File(getPathForResource("/textures/height-map.png")))
-            textureResolution = bufferedImage.width
-            val dataBuffer = (bufferedImage.raster.dataBuffer as DataBufferUShort).data
-            val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-            textureData.put(dataBuffer)
-            textureData.flip()
-            textureId = glGenTextures()
-            glBindTexture(GL_TEXTURE_2D, textureId)
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 2)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, bufferedImage.width, bufferedImage.height, 0, GL_RED, GL_UNSIGNED_SHORT, textureData)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        }
+        val (texId, texWidth) = loadTexture2D(GL_UNSIGNED_SHORT, GL_NEAREST, GL_NEAREST, "/textures/height-map.png", false)
+
+        textureId = texId
+        textureResolution = texWidth
 
         lightDirection.normalize()
 

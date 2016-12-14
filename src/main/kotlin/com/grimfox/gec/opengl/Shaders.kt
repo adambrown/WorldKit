@@ -1,5 +1,6 @@
 package com.grimfox.gec.opengl
 
+import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11.GL_FALSE
 import org.lwjgl.opengl.GL20.*
 
@@ -14,7 +15,7 @@ data class ShaderUniform(val name: String) {
 }
 
 fun loadShaderSource(sourcePath: String): String {
-    return Shaders::class.java.getResourceAsStream(sourcePath).bufferedReader().use { it.readText() }
+    return getResourceStream(sourcePath).bufferedReader().use { it.readText() }
 }
 
 fun compileShader(shaderType: Int, shaderSource: String): Int {

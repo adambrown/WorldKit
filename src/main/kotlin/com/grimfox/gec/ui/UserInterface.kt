@@ -6,6 +6,9 @@ import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
+import org.lwjgl.nanovg.NanoVG
+import org.lwjgl.nanovg.NanoVG.*
+import org.lwjgl.nanovg.NanoVGGL3.*
 import org.lwjgl.nuklear.*
 import org.lwjgl.nuklear.Nuklear.*
 import org.lwjgl.opengl.*
@@ -32,24 +35,30 @@ import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.util.*
 
-fun style(block: UiStyle.() -> Unit) = block
+fun style(block: UiStyle.(NkContext, Long) -> Unit) = block
 
-fun ui(styleBlock: UiStyle.() -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext) -> Unit) {
+fun mouseClickHandler(mouseClickHandler: (Int, Int, Int, Boolean) -> Unit) = mouseClickHandler
+
+fun ui(styleBlock: UiStyle.(NkContext, Long) -> Unit, mouseClickHandler: (Int, Int, Int, Boolean) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
     val style = UiStyleInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, style))
+    ui.mouseClickHandler = mouseClickHandler
     try {
-        style.styleBlock()
-        style.init(ui.nkContext)
+        style.styleBlock(ui.nk, ui.nvg)
         ui.show()
         val lesson8: LessonEightRenderer = LessonEightRenderer(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
         lesson8.onSurfaceCreated()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
-            ui.uiBlock(ui.nkContext)
             ui.clearViewport()
             lesson8.onDrawFrame(534, 42, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
+            nvgSave(ui.nvg)
+            nvgBeginFrame(ui.nvg, ui.width, ui.height, ui.pixelWidth / ui.width.toFloat())
+            ui.uiBlock(ui.nk, ui.nvg)
             ui.drawFrame()
+            nvgEndFrame(ui.nvg)
+            nvgRestore(ui.nvg)
             ui.swapBuffers()
         }
     } catch (e: Throwable) {
@@ -69,11 +78,13 @@ interface UiStyle {
     var dragAreaTopMargin: Int
     var dragAreaHeight: Int
 
-    fun createFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): Int
+    fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): Int
 
-    fun getFont(id: Int): NkUserFont
+    fun getNkFont(id: Int): NkUserFont
 
-    fun init(block: (NkContext) -> Unit)
+    fun createNvgFont(resource: String, name: String, nvg: Long): Int
+
+    fun getNvgFont(id: Int): Int
 }
 
 interface UserInterface {
@@ -93,6 +104,7 @@ interface UserInterface {
     val isMaximized: Boolean
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
+    var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean) -> Unit
 
     fun show()
 
@@ -164,7 +176,8 @@ private fun colorFloatToByte(f: Float) = colorIntToByte(Math.round(f * 255))
 private class UserInterfaceInternal internal constructor(internal val context: NuklearContext) : UserInterface {
 
     internal val window = context.window
-    internal val nkContext = context.context
+    internal val nk = context.nk
+    internal val nvg: Long = context.nvg
 
     override val isMaximized: Boolean get() = window.isMaximized
     override val style: UiStyle get() = context.style
@@ -180,6 +193,11 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     override val scrollY: Float get() = window.scrollY
     override val isMouse1Down: Boolean get() = window.isMouse1Down
     override val isMouse2Down: Boolean get() = window.isMouse2Down
+    override var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit
+        get() = window.mouseClickHandler
+        set(value) {
+            window.mouseClickHandler = value
+        }
 
     override fun show() {
         glfwShowWindow(window.id)
@@ -218,7 +236,7 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 
     internal fun handleFrameInput() {
-        window.handleFrameInput(context.context)
+        window.handleFrameInput(context.nk)
     }
 
     internal fun handleDragAndResize() {
@@ -246,8 +264,7 @@ private class UserInterfaceInternal internal constructor(internal val context: N
 
 private class UiStyleInternal internal constructor() : UiStyle {
 
-    internal val fonts: ArrayList<Pair<NkUserFont, ByteBuffer>> = ArrayList()
-    internal var init: (NkContext) -> Unit = {}
+    internal val fonts: ArrayList<Pair<Any, ByteBuffer>> = ArrayList()
 
     override val background: NkColor = NkColor.create()
     override var dragAreaLeftMargin: Int = 0
@@ -255,27 +272,41 @@ private class UiStyleInternal internal constructor() : UiStyle {
     override var dragAreaTopMargin: Int = 0
     override var dragAreaHeight: Int = 32
 
-    override fun createFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont): Int {
+    override fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont): Int {
         val fontId = fonts.size
         val fontData = loadResource(resource, 160 * 1024)
-        createFont(fontData, height, codePointOffset, codePointCount, textureWidth, textureHeight, font)
+        createNkFont(fontData, height, codePointOffset, codePointCount, textureWidth, textureHeight, font)
         fonts.add(Pair(font, fontData))
         return fontId
     }
 
-    override fun getFont(id: Int): NkUserFont {
-        return fonts[id].first
+    override fun createNvgFont(resource: String, name: String, nvg: Long): Int {
+        val fontId = fonts.size
+        val fontData = loadResource(resource, 160 * 1024)
+        val fontPointer = nvgCreateFontMem(nvg, name, fontData, 0)
+        fonts.add(Pair(fontPointer, fontData))
+        return fontId
     }
 
-    override fun init(block: (NkContext) -> Unit) {
-        init = block
+    override fun getNkFont(id: Int): NkUserFont {
+        return fonts[id].first as NkUserFont
+    }
+
+    override fun getNvgFont(id: Int): Int {
+        return fonts[id].first as Int
     }
 
     internal fun close() {
         fonts.forEach {
             try {
-                glDeleteTextures(it.first.texture().id())
-                it.first.query().free()
+                if (it.first is NkUserFont) {
+                    val font = it.first as NkUserFont
+                    glDeleteTextures(font.texture().id())
+                    font.query().free()
+                } else if (it.first is Int) {
+                    val fontPointer = it.first as Int
+
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -401,7 +432,9 @@ private class WindowContext(
         var monitors: List<MonitorSpec> = emptyList(),
         var warpLines: List<WarpLine> = emptyList(),
 
-        var currentMonitor: MonitorSpec = NO_MONITOR
+        var currentMonitor: MonitorSpec = NO_MONITOR,
+        var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> }
+
 ) {
 
     internal fun handleFrameInput(context: NkContext) {
@@ -631,18 +664,19 @@ private class NuklearContext internal constructor(
         var uniform_tex: Int,
         var uniform_proj: Int,
         val allocator: NkAllocator,
-        val context: NkContext,
+        val nk: NkContext,
         val style: UiStyleInternal,
-        val window: WindowContext) {
+        val window: WindowContext,
+        val nvg: Long) {
 
     internal fun close() {
         try {
             style.close()
         } finally {
-            context.clip().copy().free()
-            context.clip().paste().free()
+            nk.clip().copy().free()
+            nk.clip().paste().free()
             nk_buffer_free(cmds)
-            nk_free(context)
+            nk_free(nk)
             allocator.alloc().free()
             allocator.mfree().free()
             glDetachShader(prog, vertexShader)
@@ -716,7 +750,7 @@ private class NuklearContext internal constructor(
 
             nk_buffer_init_fixed(vBuffer, vertices/*, max_vertex_buffer*/)
             nk_buffer_init_fixed(eBuffer, elements/*, max_element_buffer*/)
-            nk_convert(context, cmds, vBuffer, eBuffer, config)
+            nk_convert(nk, cmds, vBuffer, eBuffer, config)
         }
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER)
         glUnmapBuffer(GL_ARRAY_BUFFER)
@@ -726,10 +760,10 @@ private class NuklearContext internal constructor(
         val fb_scale_y = window.currentPixelHeight.toFloat() / window.currentHeight.toFloat()
 
         var offset = NULL
-        var cmd: NkDrawCommand? = nk__draw_begin(context, cmds)
+        var cmd: NkDrawCommand? = nk__draw_begin(nk, cmds)
         while (cmd != null) {
             if (cmd.elem_count() == 0) {
-                cmd = nk__draw_next(cmd, cmds, context)
+                cmd = nk__draw_next(cmd, cmds, nk)
                 continue
             }
             glBindTexture(GL_TEXTURE_2D, cmd.texture().id())
@@ -741,9 +775,9 @@ private class NuklearContext internal constructor(
             )
             glDrawElements(GL_TRIANGLES, cmd.elem_count(), GL_UNSIGNED_SHORT, offset)
             offset += (cmd.elem_count() * 2).toLong()
-            cmd = nk__draw_next(cmd, cmds, context)
+            cmd = nk__draw_next(cmd, cmds, nk)
         }
-        nk_clear(context)
+        nk_clear(nk)
 
         // default OpenGL state
         glUseProgram(0)
@@ -800,7 +834,12 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
     } else if (caps.GL_ARB_debug_output) {
         ARBDebugOutput.glDebugMessageControlARB(ARBDebugOutput.GL_DEBUG_SOURCE_API_ARB, ARBDebugOutput.GL_DEBUG_TYPE_OTHER_ARB, ARBDebugOutput.GL_DEBUG_SEVERITY_LOW_ARB, null as IntBuffer?, false)
     }
-    val nkShaderVersion = if (Platform.get() === Platform.MACOSX) "#version 150\n" else "#version 300 es\n"
+    val nvg = nvgCreate(NVG_ANTIALIAS or NVG_STENCIL_STROKES or NVG_DEBUG)
+    if (nvg == NULL) {
+        throw RuntimeException("Could not init nanovg.")
+    }
+    glfwSwapInterval(1)
+    val nkShaderVersion = "#version 330\n"
     val vertex_shader = nkShaderVersion +
             "uniform mat4 ProjMtx;\n" +
             "in vec2 Position;\n" +
@@ -910,14 +949,15 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
     }
     glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
         val press = action == GLFW_PRESS
+        val repeat = action == GLFW_REPEAT
         when (key) {
             GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
-            GLFW_KEY_DELETE -> nk_input_key(context, NK_KEY_DEL, press)
-            GLFW_KEY_ENTER -> nk_input_key(context, NK_KEY_ENTER, press)
-            GLFW_KEY_TAB -> nk_input_key(context, NK_KEY_TAB, press)
-            GLFW_KEY_BACKSPACE -> nk_input_key(context, NK_KEY_BACKSPACE, press)
-            GLFW_KEY_UP -> nk_input_key(context, NK_KEY_UP, press)
-            GLFW_KEY_DOWN -> nk_input_key(context, NK_KEY_DOWN, press)
+            GLFW_KEY_DELETE -> nk_input_key(context, NK_KEY_DEL, press || repeat)
+            GLFW_KEY_ENTER -> nk_input_key(context, NK_KEY_ENTER, press || repeat)
+            GLFW_KEY_TAB -> nk_input_key(context, NK_KEY_TAB, press || repeat)
+            GLFW_KEY_BACKSPACE -> nk_input_key(context, NK_KEY_BACKSPACE, press || repeat)
+            GLFW_KEY_UP -> nk_input_key(context, NK_KEY_UP, press || repeat)
+            GLFW_KEY_DOWN -> nk_input_key(context, NK_KEY_DOWN, press || repeat)
             GLFW_KEY_HOME -> {
                 nk_input_key(context, NK_KEY_TEXT_START, press)
                 nk_input_key(context, NK_KEY_SCROLL_START, press)
@@ -968,10 +1008,12 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
                 startDrag(stack, window)
+                handleStandardMouseAction(context, window, action, button, x, y)
             } else if ((y >= window.currentHeight - window.resizeAreaHeight && y <= window.currentHeight)
                     && ((x >= window.currentWidth - window.resizeAreaWidth && x <= window.currentWidth) || (x >= 0 && x <= window.resizeAreaWidth))
                     && (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)) {
                 startResize(stack, window, x <= window.resizeAreaWidth)
+                handleStandardMouseAction(context, window, action, button, x, y)
             } else {
                 handleStandardMouseAction(context, window, action, button, x, y)
             }
@@ -981,7 +1023,7 @@ private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): Nu
     setCopyHandler(context, window.id)
     setPastHandler(context, window.id)
     initializeWindowState(window)
-    return NuklearContext(debugProc, nullTexture, vertexLayout, cmds, vbo, vao, ebo, prog, vertexShader, fragmentShader, uniformTex, uniformProj, allocator, context, style, window)
+    return NuklearContext(debugProc, nullTexture, vertexLayout, cmds, vbo, vao, ebo, prog, vertexShader, fragmentShader, uniformTex, uniformProj, allocator, context, style, window, nvg)
 }
 
 private fun handleStandardMouseAction(context: NkContext, window: WindowContext, action: Int, button: Int, x: Double, y: Double) {
@@ -1003,6 +1045,7 @@ private fun handleStandardMouseAction(context: NkContext, window: WindowContext,
             window.isMouse2Down = false
         }
     }
+    window.mouseClickHandler(button, Math.round(x).toInt(), Math.round(y).toInt(), action == GLFW_PRESS)
     val nkButton: Int
     when (button) {
         GLFW_MOUSE_BUTTON_RIGHT -> nkButton = NK_BUTTON_RIGHT
