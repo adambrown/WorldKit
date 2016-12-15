@@ -6,7 +6,6 @@ import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
-import org.lwjgl.nanovg.NanoVG
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
 import org.lwjgl.nuklear.*
@@ -35,28 +34,31 @@ import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.util.*
 
-fun style(block: UiStyle.(UserInterface, NkContext, Long) -> Unit) = block
+fun layout(block: UiLayout.(UserInterface, NkContext, Long) -> Unit) = block
 
-fun mouseClickHandler(mouseClickHandler: (Int, Int, Int, Boolean) -> Unit) = mouseClickHandler
-
-fun ui(styleBlock: UiStyle.(UserInterface, NkContext, Long) -> Unit, mouseClickHandler: (Int, Int, Int, Boolean) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
-    val style = UiStyleInternal()
-    val ui = UserInterfaceInternal(createNkContext(width, height, style))
-    ui.mouseClickHandler = mouseClickHandler
+fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
+    val layout = UiLayoutInternal()
+    val ui = UserInterfaceInternal(createNkContext(width, height, layout))
     try {
-        style.styleBlock(ui, ui.nk, ui.nvg)
+        layout.layoutBlock(ui, ui.nk, ui.nvg)
+        ui.mouseClickHandler = { button, x, y, isDown ->
+            layout.root.handleMouseAction(button, x, y, isDown)
+        }
         ui.show()
         val lesson8: LessonEightRenderer = LessonEightRenderer(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
-        lesson8.onSurfaceCreated()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.clearViewport()
             lesson8.onDrawFrame(534, 42, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
             nvgSave(ui.nvg)
+            layout.root.width = ui.width
+            layout.root.height = ui.height
+            layout.root.handleNewMousePosition(ui.nvg, ui.relativeMouseX, ui.relativeMouseY)
             nvgBeginFrame(ui.nvg, ui.width, ui.height, ui.pixelWidth / ui.width.toFloat())
             ui.uiBlock(ui.nk, ui.nvg)
             ui.drawFrame()
+            layout.root.draw(ui.nvg)
             nvgEndFrame(ui.nvg)
             nvgRestore(ui.nvg)
             ui.swapBuffers()
@@ -69,9 +71,11 @@ fun ui(styleBlock: UiStyle.(UserInterface, NkContext, Long) -> Unit, mouseClickH
     }
 }
 
-interface UiStyle {
+interface UiLayout {
 
     val background: NkColor
+
+    var root: Block
 
     var dragArea: Block
 
@@ -82,11 +86,15 @@ interface UiStyle {
     fun createNvgFont(resource: String, name: String, nvg: Long): Int
 
     fun getNvgFont(id: Int): Int
+
+    fun root(builder: Block.() -> Unit) {
+        root = uiRoot(0, 0, 0, 0, builder)
+    }
 }
 
 interface UserInterface {
 
-    val style: UiStyle
+    val layout: UiLayout
 
     val width: Int
     val height: Int
@@ -181,7 +189,7 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     internal val nvg: Long = context.nvg
 
     override val isMaximized: Boolean get() = window.isMaximized
-    override val style: UiStyle get() = context.style
+    override val layout: UiLayout get() = context.style
     override val width: Int get() = window.currentWidth
     override val height: Int get() = window.currentHeight
     override val pixelWidth: Int get() = window.currentPixelWidth
@@ -250,7 +258,7 @@ private class UserInterfaceInternal internal constructor(internal val context: N
 
     internal fun clearViewport() {
         glViewport(0, -32, window.currentPixelWidth, window.currentPixelHeight + 32)
-        glClearColor(style.background.rFloat, style.background.gFloat, style.background.bFloat, style.background.aFloat)
+        glClearColor(layout.background.rFloat, layout.background.gFloat, layout.background.bFloat, layout.background.aFloat)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
@@ -263,12 +271,13 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 }
 
-private class UiStyleInternal internal constructor() : UiStyle {
+private class UiLayoutInternal internal constructor() : UiLayout {
 
     internal val fonts: ArrayList<Pair<Any, ByteBuffer>> = ArrayList()
 
     override val background: NkColor = NkColor.create()
 
+    override lateinit var root: Block
     override lateinit var dragArea: Block
 
     override fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont): Int {
@@ -664,7 +673,7 @@ private class NuklearContext internal constructor(
         var uniform_proj: Int,
         val allocator: NkAllocator,
         val nk: NkContext,
-        val style: UiStyleInternal,
+        val style: UiLayoutInternal,
         val window: WindowContext,
         val nvg: Long) {
 
@@ -788,7 +797,7 @@ private class NuklearContext internal constructor(
     }
 }
 
-private fun createNkContext(width: Int, height: Int, style: UiStyleInternal): NuklearContext {
+private fun createNkContext(width: Int, height: Int, style: UiLayoutInternal): NuklearContext {
     GLFWErrorCallback.createPrint().set()
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
     val (screens, warpLines) = getScreensAndWarpLines()

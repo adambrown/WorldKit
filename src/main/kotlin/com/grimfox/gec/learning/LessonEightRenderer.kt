@@ -120,26 +120,14 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
 
     private lateinit var waterPlane: HexGrid
 
-    fun onSurfaceCreated() {
+    init {
 
-        // Enable depth testing
         glEnable(GL_DEPTH_TEST)
 
-        // Position the eye in front of the origin.
         val eye = Vector3f(0.0f, 0.0f, 0.5f)
-
-        // We are looking toward the distance
         val eyeCenter = Vector3f(0.0f, 0.0f, -5.0f)
-
-        // Set our up vector. This is where our head would be pointing were we
-        // holding the camera.
         val eyeUp = Vector3f(0.0f, 1.0f, 0.0f)
 
-        // Set the view matrix. This matrix can be said to represent the camera
-        // position.
-        // NOTE: In OpenGL 1, a ModelView matrix is used, which is a combination
-        // of a model and view matrix. In OpenGL 2, we can keep track of these
-        // matrices separately if we choose.
         viewMatrix.setLookAt(eye, eyeCenter, eyeUp)
 
         val heightMapVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/height-map.vert"))
@@ -166,20 +154,6 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
         textureId = texId
         textureResolution = texWidth
 
-//        twr(MemoryStack.stackPush()) { stack ->
-//            val bufferedImage = ImageIO.read(File(getPathForResource("/textures/height-map.png")))
-//            textureResolution = bufferedImage.width
-//            val dataBuffer = (bufferedImage.raster.dataBuffer as DataBufferUShort).data
-//            val textureData = ByteBuffer.allocateDirect(dataBuffer.size * 2).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-//            textureData.put(dataBuffer)
-//            textureData.flip()
-//            textureId = glGenTextures()
-//            glBindTexture(GL_TEXTURE_2D, textureId)
-//            glPixelStorei(GL_UNPACK_ALIGNMENT, 2)
-//            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, bufferedImage.width, bufferedImage.height, 0, GL_RED, GL_UNSIGNED_SHORT, textureData)
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-//        }
-
         lightDirection.normalize()
 
         modelMatrix.translate(translation)
@@ -192,7 +166,10 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
         }
 
         val waterOn = waterPlaneOn[0] > 0
-        val resetView = resetView[0] > 0
+        val doReset = resetView[0] > 0
+        if (doReset) {
+            resetView.put(0, 0)
+        }
         val perspectiveOn = perspectiveOn[0] > 0
         val rotateAroundCamera = rotateAroundCamera[0] > 0
 
@@ -279,7 +256,7 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
             lastMouse2Down = false
         }
 
-        if (resetView) {
+        if (doReset) {
             translation.set(defaultTranslation)
             rotation.set(defaultRotation)
             zoom = defaultZoom

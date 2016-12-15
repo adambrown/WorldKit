@@ -883,7 +883,7 @@ private class DefaultBlock(
                 return getXRelativeTo(parent.x, parent.width)
             }
             if (layout == HORIZONTAL) {
-                return getXRelativeTo(lastBlock!!.x + lastBlock!!.width, parent.width)
+                return getXRelativeTo(lastBlock!!.x + lastBlock!!.width + lastBlock!!.padRight + padLeft, parent.width)
             }
             return getXRelativeTo(parent.x, parent.width)
         }
@@ -898,7 +898,7 @@ private class DefaultBlock(
             if (layout == HORIZONTAL) {
                 return getYRelativeTo(parent.y, parent.height)
             }
-            return getYRelativeTo(lastBlock!!.y + lastBlock!!.height, parent.height)
+            return getYRelativeTo(lastBlock!!.y + lastBlock!!.height + lastBlock!!.padBottom + padLeft, parent.height)
 
         }
         set(value) {
