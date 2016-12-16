@@ -1,6 +1,11 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.Reference
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
+import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
+import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
 class ToggleStyle(
@@ -24,39 +29,40 @@ class ToggleStyle(
 fun Block.toggle(toggleValue: Reference<Boolean>, width: Int, height: Int, textOn: Text, textOff: Text, style: ToggleStyle): Block {
     textOn.style = style.textNormalOn
     textOff.style = style.textNormalOff
+    val switchSize = height - (2 * style.switchInset)
     return block {
         val toggle = this
         var mouseDownOver = false
         var mouseOver = false
-        vAlign = VerticalAlignment.MIDDLE
-        hSizing = Sizing.STATIC
-        vSizing = Sizing.STATIC
+        vAlign = MIDDLE
+        hSizing = STATIC
+        vSizing = STATIC
         this.width = width
         this.height = height
         shape = style.backgroundNormal
         val onBlock = block {
             isVisible = toggleValue.value
             block {
-                hSizing = Sizing.GROW
-                layout = Layout.HORIZONTAL
+                hSizing = GROW
+                layout = HORIZONTAL
                 block {
-                    hAlign = HorizontalAlignment.CENTER
-                    vAlign = VerticalAlignment.MIDDLE
-                    hSizing = Sizing.SHRINK
-                    vSizing = Sizing.SHRINK
+                    hAlign = CENTER
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
                     text = textOn
                     isMouseAware = false
                 }
                 isMouseAware = false
             }
             block {
-                hAlign = HorizontalAlignment.LEFT
-                vAlign = VerticalAlignment.MIDDLE
-                hSizing = Sizing.STATIC
-                vSizing = Sizing.STATIC
-                layout = Layout.HORIZONTAL
-                this.width = height - (2 * style.switchInset)
-                this.height = height - (2 * style.switchInset)
+                hAlign = LEFT
+                vAlign = MIDDLE
+                hSizing = STATIC
+                vSizing = STATIC
+                layout = HORIZONTAL
+                this.width = switchSize
+                this.height = switchSize
                 padRight = style.switchInset
                 shape = style.switchNormalOn
                 isMouseAware = false
@@ -66,25 +72,25 @@ fun Block.toggle(toggleValue: Reference<Boolean>, width: Int, height: Int, textO
         val offBlock = block {
             isVisible = !toggleValue.value
             block {
-                hAlign = HorizontalAlignment.LEFT
-                vAlign = VerticalAlignment.MIDDLE
-                hSizing = Sizing.STATIC
-                vSizing = Sizing.STATIC
-                layout = Layout.HORIZONTAL
-                this.width = height - (2 * style.switchInset)
-                this.height = height - (2 * style.switchInset)
+                hAlign = LEFT
+                vAlign = MIDDLE
+                hSizing = STATIC
+                vSizing = STATIC
+                layout = HORIZONTAL
+                this.width = switchSize
+                this.height = switchSize
                 padLeft = style.switchInset
                 shape = style.switchNormalOff
                 isMouseAware = false
             }
             block {
-                hSizing = Sizing.GROW
-                layout = Layout.HORIZONTAL
+                hSizing = GROW
+                layout = HORIZONTAL
                 block {
-                    hAlign = HorizontalAlignment.CENTER
-                    vAlign = VerticalAlignment.MIDDLE
-                    hSizing = Sizing.SHRINK
-                    vSizing = Sizing.SHRINK
+                    hAlign = CENTER
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
                     text = textOff
                     isMouseAware = false
                 }

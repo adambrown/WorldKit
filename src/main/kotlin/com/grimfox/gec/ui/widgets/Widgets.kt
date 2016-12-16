@@ -341,6 +341,22 @@ fun uiRoot(x: Int, y: Int, width: Int, height: Int, builder: Block.() -> Unit): 
     return root
 }
 
+class BlockTemplate(
+        val isVisible: Boolean = true,
+        val hAlign: HorizontalAlignment = LEFT,
+        val vAlign: VerticalAlignment = TOP,
+        val layout: Layout = HORIZONTAL,
+        val xOffset: Int = 0,
+        val yOffset: Int = 0,
+        val hSizing: Sizing = RELATIVE,
+        val width: Int = 100,
+        val vSizing: Sizing = RELATIVE,
+        val height: Int = 100,
+        val padLeft: Int = 0,
+        val padRight: Int = 0,
+        val padTop: Int = 0,
+        val padBottom: Int = 0)
+
 abstract class Block {
     abstract val root: Block
     abstract val parent: Block
