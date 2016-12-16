@@ -64,43 +64,29 @@ dependencies {
 
     // LWJGL dependencies START
     compile group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-bgfx', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-egl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-jawt', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-nuklear', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-openal', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-opencl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-opengl', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-opengles', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-ovr', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-vulkan', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-xxhash', version: lwjgl_version
 
     // LWJGL natives
     runtime group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-bgfx', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-nuklear', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-openal', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-ovr', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-xxhash', version: lwjgl_version, classifier: lwjgl_natives
     // LWJGL dependencies END
 
     runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version

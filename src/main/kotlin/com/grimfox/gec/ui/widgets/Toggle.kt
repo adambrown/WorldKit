@@ -1,11 +1,11 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.ui.Reference
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
+import com.grimfox.gec.util.MutableReference
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
 class ToggleStyle(
@@ -26,7 +26,7 @@ class ToggleStyle(
         val textMouseDownOn: TextStyle,
         val textMouseDownOff: TextStyle)
 
-fun Block.toggle(toggleValue: Reference<Boolean>, width: Int, height: Int, textOn: Text, textOff: Text, style: ToggleStyle): Block {
+fun Block.toggle(toggleValue: MutableReference<Boolean>, width: Int, height: Int, textOn: Text, textOff: Text, style: ToggleStyle): Block {
     textOn.style = style.textNormalOn
     textOff.style = style.textNormalOff
     val switchSize = height - (2 * style.switchInset)

@@ -1,30 +1,21 @@
 package com.grimfox.gec.learning
 
-import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.util.getPathForResource
+import com.grimfox.gec.util.MutableReference
+import com.grimfox.gec.util.Reference
 import org.joml.*
 import org.lwjgl.BufferUtils
-import org.lwjgl.nuklear.NkColor
-import org.lwjgl.nuklear.Nuklear.nk_rgb
+import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
-import org.lwjgl.system.MemoryStack
-import java.awt.image.DataBufferUShort
-import java.io.File
-import java.lang.Math.sqrt
 import java.lang.Math.round
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.FloatBuffer
-import java.nio.IntBuffer
-import javax.imageio.ImageIO
+import java.lang.Math.sqrt
 
-class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCamera: Reference<Boolean>, val perspectiveOn: Reference<Boolean>, val waterPlaneOn: Reference<Boolean>, val heightMapScaleFactor: Reference<Float>) {
+class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAroundCamera: Reference<Boolean>, val perspectiveOn: Reference<Boolean>, val waterPlaneOn: Reference<Boolean>, val heightMapScaleFactor: Reference<Float>) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -40,11 +31,9 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
 
     private val floatBuffer = BufferUtils.createFloatBuffer(16)
 
-    private val modelScale = 256.0f
-
-    private val minZoom = 0.005f
-    private val maxZoom = 20.0f
-    private val defaultZoom = 4.53f
+    private val minZoom = 0.02f
+    private val maxZoom = 100.0f
+    private val defaultZoom = 3.836f
 
     private val zoomIncrement = 0.05f
     private var zoom = defaultZoom
@@ -57,7 +46,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
     private var lastScroll = 0.0f
     private var scroll = 0.0f
 
-    private val perspectiveToOrtho = 1.325f
+    private val perspectiveToOrtho = 340.0f
 
     private val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
     private val mvMatrixUniform = ShaderUniform("modelViewMatrix")
@@ -97,7 +86,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
     private var textureId = -1
     private var textureResolution = 0
 
-    private val background = nk_rgb(30, 30, 30, NkColor.create())
+    private val background = NVGColor.create().set(30, 30, 30)
 
     private val lightDirection = Vector3f(1.0f, 1.0f, 2.0f)
 
@@ -116,9 +105,9 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
     var isTranslateOn = false
     var isResetOn = false
 
-    private lateinit var heightMap: HexGrid
+    private var heightMap: HexGrid
 
-    private lateinit var waterPlane: HexGrid
+    private var waterPlane: HexGrid
 
     init {
 
@@ -146,9 +135,9 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
                 listOf(positionAttributeWater, uvAttributeWater),
                 listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
 
-        heightMap = HexGrid(10.0f * modelScale, 512)
+        heightMap = HexGrid(2560.0f, 512)
 
-        waterPlane = HexGrid(12.0f * modelScale, 16)
+        waterPlane = HexGrid(2600.0f, 16)
 
         val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false)
         textureId = texId
@@ -178,7 +167,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
         if (perspectiveOn) {
             projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
         } else {
-            val orthoZoom = zoom * perspectiveToOrtho * modelScale
+            val orthoZoom = zoom * perspectiveToOrtho
             projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
         }
 
@@ -226,8 +215,9 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
                 zoom -= deltaScroll * (zoomIncrement * zoom)
                 zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
             } else {
-                translation.z += deltaScroll * 0.3f * modelScale
-                tempMatrix.translation(0.0f, 0.0f, deltaScroll * 0.3f * modelScale)
+                val scaledScroll = deltaScroll * 76.0f
+                translation.z += scaledScroll
+                tempMatrix.translation(0.0f, 0.0f, scaledScroll)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (isMouse1Down && isMouse2Down) {
@@ -312,7 +302,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
         glEnable(GL_SCISSOR_TEST)
         glEnable(GL_MULTISAMPLE)
 
-        glClearColor(background.rFloat, background.gFloat, background.bFloat, background.aFloat)
+        glClearColor(background.r, background.g, background.b, background.a)
         glScissor(xPosition, 0, width - xPosition, height - yPosition)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
@@ -343,7 +333,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
         glUniform4f(diffuseUniform.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
         glUniform1f(shininessUniform.location, 1.7f)
-        glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value * modelScale)
+        glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value)
         glUniform1f(uvScaleUniform.location, heightMap.width / textureResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
@@ -362,7 +352,7 @@ class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCam
         glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
         glUniform1f(shininessUniformWater.location, 5.0f)
-        glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor.value * modelScale)
+        glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor.value)
         waterPlane.render()
     }
 

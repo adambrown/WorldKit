@@ -5,7 +5,7 @@ import com.grimfox.gec.ui.widgets.Sizing.SHRINK
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
-class ButtonStyle(
+data class ButtonStyle(
         val normal: Shape,
         val textNormal: TextStyle,
         val mouseOver: Shape,
@@ -20,7 +20,12 @@ class ButtonStyle(
                 hAlign = CENTER,
                 vAlign = MIDDLE,
                 hSizing = SHRINK,
-                vSizing = SHRINK))
+                vSizing = SHRINK)) {
+
+    operator inline fun invoke(builder: ButtonStyle.() -> ButtonStyle): ButtonStyle {
+        return this.builder()
+    }
+}
 
 
 fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Block {

@@ -4,26 +4,25 @@ import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.learning.LessonEightRenderer
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.uiRoot
+import com.grimfox.gec.util.MutableReference
+import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
+import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
-import org.lwjgl.nuklear.*
-import org.lwjgl.nuklear.Nuklear.*
-import org.lwjgl.opengl.*
+import org.lwjgl.opengl.ARBDebugOutput
 import org.lwjgl.opengl.GL.createCapabilities
 import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_8_8_8_8_REV
-import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.*
-import org.lwjgl.opengl.GL30.glBindVertexArray
+import org.lwjgl.opengl.GL43
 import org.lwjgl.opengl.GLUtil.setupDebugMessageCallback
+import org.lwjgl.opengl.KHRDebug
 import org.lwjgl.system.Callback
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
-import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
 import java.awt.GraphicsEnvironment
@@ -32,21 +31,17 @@ import java.awt.Rectangle
 import java.awt.Toolkit
 import java.lang.Math.round
 import java.nio.ByteBuffer
-import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.util.*
 
-class Reference<T>(var value: T)
+fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun layout(block: UiLayout.(UserInterface, NkContext, Long) -> Unit) = block
-
-fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: Int, height: Int, resetView: Reference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
-    val layout = UiLayoutInternal()
-    val ui = UserInterfaceInternal(createNkContext(width, height, layout))
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, resetView: MutableReference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, uiBlock: UserInterface.() -> Unit) {
+    val ui = UserInterfaceInternal(createWindow(width, height))
     try {
-        layout.layoutBlock(ui, ui.nk, ui.nvg)
+        ui.layout.layoutBlock(ui)
         ui.mouseClickHandler = { button, x, y, isDown ->
-            layout.root.handleMouseAction(button, x, y, isDown)
+            ui.root.handleMouseAction(button, x, y, isDown)
         }
         ui.show()
         val lesson8: LessonEightRenderer = LessonEightRenderer(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
@@ -54,17 +49,9 @@ fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: In
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.clearViewport()
-            lesson8.onDrawFrame(534, 42, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
-            nvgSave(ui.nvg)
-            layout.root.width = ui.width
-            layout.root.height = ui.height
-            layout.root.handleNewMousePosition(ui.nvg, ui.relativeMouseX, ui.relativeMouseY)
-            nvgBeginFrame(ui.nvg, ui.width, ui.height, ui.pixelWidth / ui.width.toFloat())
-            ui.uiBlock(ui.nk, ui.nvg)
+            ui.uiBlock()
+            lesson8.onDrawFrame(534, 40, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
             ui.drawFrame()
-            layout.root.draw(ui.nvg)
-            nvgEndFrame(ui.nvg)
-            nvgRestore(ui.nvg)
             ui.swapBuffers()
         }
     } catch (e: Throwable) {
@@ -77,19 +64,15 @@ fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: In
 
 interface UiLayout {
 
-    val background: NkColor
+    val background: NVGColor
 
     var root: Block
 
     var dragArea: Block
 
-    fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont = NkUserFont.create()): Int
+    fun createFont(resource: String, name: String): Int
 
-    fun getNkFont(id: Int): NkUserFont
-
-    fun createNvgFont(resource: String, name: String, nvg: Long): Int
-
-    fun getNvgFont(id: Int): Int
+    fun createImage(resource: String, options: Int): Int
 
     fun root(builder: Block.() -> Unit) {
         root = uiRoot(0, 0, 0, 0, builder)
@@ -134,66 +117,13 @@ interface UserInterface {
     }
 }
 
-var NkColor.r: Byte
-    get() = r()
-    set(value) { r(value) }
-var NkColor.g: Byte
-    get() = g()
-    set(value) { g(value) }
-var NkColor.b: Byte
-    get() = b()
-    set(value) { b(value) }
-var NkColor.a: Byte
-    get() = a()
-    set(value) { a(value) }
+private class UserInterfaceInternal internal constructor(internal val window: WindowContext) : UserInterface {
 
-var NkColor.rFloat: Float
-    get() = colorByteToFloat(r)
-    set(value) { r = colorFloatToByte(value) }
-var NkColor.gFloat: Float
-    get() = colorByteToFloat(g)
-    set(value) { g = colorFloatToByte(value) }
-var NkColor.bFloat: Float
-    get() = colorByteToFloat(b)
-    set(value) { b = colorFloatToByte(value) }
-var NkColor.aFloat: Float
-    get() = colorByteToFloat(a)
-    set(value) { a = colorFloatToByte(value) }
-
-var NkColor.rInt: Int
-    get() = colorByteToInt(r)
-    set(value) { r = colorIntToByte(value) }
-var NkColor.gInt: Int
-    get() = colorByteToInt(g)
-    set(value) { g = colorIntToByte(value) }
-var NkColor.bInt: Int
-    get() = colorByteToInt(b)
-    set(value) { b = colorIntToByte(value) }
-var NkColor.aInt: Int
-    get() = colorByteToInt(a)
-    set(value) { a = colorIntToByte(value) }
-
-fun NkColor.set(r: Int, g: Int, b: Int, a: Int) {
-    nk_rgba(r, g, b, a, this)
-}
-
-fun NkColor.set(r: Int, g: Int, b: Int) {
-    nk_rgb(r, g, b, this)
-}
-
-private fun colorByteToInt(b: Byte) = (b.toInt() and 0xFF)
-private fun colorByteToFloat(b: Byte) = colorByteToInt(b) / 255.0f
-private fun colorIntToByte(i: Int) = i.toByte()
-private fun colorFloatToByte(f: Float) = colorIntToByte(Math.round(f * 255))
-
-private class UserInterfaceInternal internal constructor(internal val context: NuklearContext) : UserInterface {
-
-    internal val window = context.window
-    internal val nk = context.nk
-    internal val nvg: Long = context.nvg
+    internal val nvg: Long by lazy { window.nvg }
+    internal val root: Block by lazy { layout.root }
 
     override val isMaximized: Boolean get() = window.isMaximized
-    override val layout: UiLayout get() = context.style
+    override val layout: UiLayout get() = window.layout
     override val width: Int get() = window.currentWidth
     override val height: Int get() = window.currentHeight
     override val pixelWidth: Int get() = window.currentPixelWidth
@@ -245,11 +175,11 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 
     internal fun close() {
-        context.close()
+        window.close()
     }
 
     internal fun handleFrameInput() {
-        window.handleFrameInput(context.nk)
+        window.handleFrameInput()
     }
 
     internal fun handleDragAndResize() {
@@ -261,13 +191,21 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 
     internal fun clearViewport() {
-        glViewport(0, -32, window.currentPixelWidth, window.currentPixelHeight + 32)
-        glClearColor(layout.background.rFloat, layout.background.gFloat, layout.background.bFloat, layout.background.aFloat)
+        glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+        glClearColor(layout.background.r, layout.background.g, layout.background.b, layout.background.a)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
     internal fun drawFrame() {
-        context.drawFrame()
+        glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+        nvgSave(nvg)
+        root.width = width
+        root.height = height
+        root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
+        nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
+        root.draw(nvg)
+        nvgEndFrame(nvg)
+        nvgRestore(nvg)
     }
 
     internal fun swapBuffers() {
@@ -275,86 +213,60 @@ private class UserInterfaceInternal internal constructor(internal val context: N
     }
 }
 
-private class UiLayoutInternal internal constructor() : UiLayout {
+private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
-    internal val fonts: ArrayList<Pair<Any, ByteBuffer>> = ArrayList()
+    internal val fonts: ArrayList<ByteBuffer> = ArrayList()
 
-    override val background: NkColor = NkColor.create()
+    override val background: NVGColor = NO_COLOR
 
     override lateinit var root: Block
     override lateinit var dragArea: Block
 
-    override fun createNkFont(resource: String, height: Float, codePointOffset: Int, codePointCount: Int, textureWidth: Int, textureHeight: Int, font: NkUserFont): Int {
-        val fontId = fonts.size
+    override fun createFont(resource: String, name: String): Int {
         val fontData = loadResource(resource, 160 * 1024)
-        createNkFont(fontData, height, codePointOffset, codePointCount, textureWidth, textureHeight, font)
-        fonts.add(Pair(font, fontData))
-        return fontId
+        fonts.add(fontData)
+        return nvgCreateFontMem(nvg, name, fontData, 0)
     }
 
-    override fun createNvgFont(resource: String, name: String, nvg: Long): Int {
-        val fontId = fonts.size
-        val fontData = loadResource(resource, 160 * 1024)
-        val fontPointer = nvgCreateFontMem(nvg, name, fontData, 0)
-        fonts.add(Pair(fontPointer, fontData))
-        return fontId
-    }
-
-    override fun getNkFont(id: Int): NkUserFont {
-        return fonts[id].first as NkUserFont
-    }
-
-    override fun getNvgFont(id: Int): Int {
-        return fonts[id].first as Int
+    override fun createImage(resource: String, options: Int): Int {
+        return nvgCreateImage(nvg, getPathForResource(resource), options)
     }
 
     internal fun close() {
-        fonts.forEach {
-            try {
-                if (it.first is NkUserFont) {
-                    val font = it.first as NkUserFont
-                    glDeleteTextures(font.texture().id())
-                    font.query().free()
-                } else if (it.first is Int) {
-                    val fontPointer = it.first as Int
-
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        fonts.clear()
     }
 }
 
-private data class MonitorSpec(val id: Long,
-                                val dpiX: Double,
-                                val dpiY: Double,
-                                val physicalWidth: Int,
-                                val physicalHeight: Int,
-                                val virtualWidth: Int,
-                                val virtualHeight: Int,
-                                val x1: Int,
-                                val y1: Int,
-                                val x2: Int,
-                                val y2: Int,
-                                val mouseSpaceX1: Int,
-                                val mouseSpaceY1: Int,
-                                val mouseSpaceX2: Int,
-                                val mouseSpaceY2: Int,
-                                val mouseSpaceWidth: Int,
-                                val mouseSpaceHeight: Int,
-                                val centerX: Int,
-                                val centerY: Int,
-                                val maximizedWidth: Int,
-                                val maximizedHeight: Int,
-                                var maximizedX1: Int,
-                                val maximizedY1: Int,
-                                val maximizedX2: Int,
-                                val maximizedY2: Int,
-                                val redBits: Int,
-                                val greenBits: Int,
-                                val blueBits: Int,
-                                val refreshRate: Int)
+private data class MonitorSpec(
+        val id: Long,
+        val dpiX: Double,
+        val dpiY: Double,
+        val physicalWidth: Int,
+        val physicalHeight: Int,
+        val virtualWidth: Int,
+        val virtualHeight: Int,
+        val x1: Int,
+        val y1: Int,
+        val x2: Int,
+        val y2: Int,
+        val mouseSpaceX1: Int,
+        val mouseSpaceY1: Int,
+        val mouseSpaceX2: Int,
+        val mouseSpaceY2: Int,
+        val mouseSpaceWidth: Int,
+        val mouseSpaceHeight: Int,
+        val centerX: Int,
+        val centerY: Int,
+        val maximizedWidth: Int,
+        val maximizedHeight: Int,
+        var maximizedX1: Int,
+        val maximizedY1: Int,
+        val maximizedX2: Int,
+        val maximizedY2: Int,
+        val redBits: Int,
+        val greenBits: Int,
+        val blueBits: Int,
+        val refreshRate: Int)
 
 private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
@@ -388,6 +300,10 @@ private data class ScreenSpec(
 
 private class WindowContext(
         var id: Long = 0,
+
+        val debugProc: Callback,
+        val nvg: Long,
+        val layout: UiLayoutInternal = UiLayoutInternal(nvg),
 
         var isMaximized: Boolean = false,
         var isResizing: Boolean = false,
@@ -449,7 +365,7 @@ private class WindowContext(
 
 ) {
 
-    internal fun handleFrameInput(context: NkContext) {
+    internal fun handleFrameInput() {
         twr(stackPush()) { stack ->
             val w = stack.mallocInt(1)
             val h = stack.mallocInt(1)
@@ -484,20 +400,7 @@ private class WindowContext(
             relativeMouseX = mouseX.toDouble() - x
             relativeMouseY = mouseY.toDouble() - y
         }
-        nk_input_begin(context)
         glfwPollEvents()
-        val mouse = context.input().mouse()
-        if (mouse.grab())
-            glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_HIDDEN)
-        else if (mouse.grabbed()) {
-            val prevX = mouse.prev().x()
-            val prevY = mouse.prev().y()
-            glfwSetCursorPos(id, prevX.toDouble(), prevY.toDouble())
-            mouse.pos().x(prevX)
-            mouse.pos().y(prevY)
-        } else if (mouse.ungrab())
-            glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
-        nk_input_end(context)
     }
 
     internal fun handleDragAndResize() {
@@ -660,148 +563,20 @@ private class WindowContext(
         }
         return Pair(x, y)
     }
-}
-
-private class NuklearContext internal constructor(
-        val debugProc: Callback,
-        var nullTexture: NkDrawNullTexture,
-        val vertexLayout: NkDrawVertexLayoutElement.Buffer,
-        val cmds: NkBuffer,
-        var vbo: Int,
-        var vao: Int,
-        var ebo: Int,
-        var prog: Int,
-        var vertexShader: Int,
-        var fragmentShader: Int,
-        var uniform_tex: Int,
-        var uniform_proj: Int,
-        val allocator: NkAllocator,
-        val nk: NkContext,
-        val style: UiLayoutInternal,
-        val window: WindowContext,
-        val nvg: Long) {
 
     internal fun close() {
         try {
-            style.close()
+            layout.close()
         } finally {
-            nk.clip().copy().free()
-            nk.clip().paste().free()
-            nk_buffer_free(cmds)
-            nk_free(nk)
-            allocator.alloc().free()
-            allocator.mfree().free()
-            glDetachShader(prog, vertexShader)
-            glDetachShader(prog, fragmentShader)
-            glDeleteShader(vertexShader)
-            glDeleteShader(fragmentShader)
-            glDeleteProgram(prog)
-            glDeleteTextures(nullTexture.texture().id())
-            glDeleteBuffers(vbo)
-            glDeleteBuffers(ebo)
-            Callbacks.glfwFreeCallbacks(window.id)
+            Callbacks.glfwFreeCallbacks(id)
             debugProc.free()
             glfwTerminate()
             glfwSetErrorCallback(null).free()
         }
     }
-
-    internal fun drawFrame(antiAliasing: Int = NK_ANTI_ALIASING_ON, maxVertexBuffer: Int = 524288, maxElementBuffer: Int = 131072) {
-        twr(stackPush()) { stack ->
-            // setup global state
-            glEnable(GL_BLEND)
-            GL14.glBlendEquation(GL14.GL_FUNC_ADD)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glDisable(GL_CULL_FACE)
-            glDisable(GL_DEPTH_TEST)
-            glEnable(GL_SCISSOR_TEST)
-            GL13.glActiveTexture(GL13.GL_TEXTURE0)
-
-            // setup program
-            glUseProgram(prog)
-            glUniform1i(uniform_tex, 0)
-            glUniformMatrix4fv(uniform_proj, false, stack.floats(
-                    2.0f / window.currentWidth, 0.0f, 0.0f, 0.0f,
-                    0.0f, -2.0f / window.currentHeight, 0.0f, 0.0f,
-                    0.0f, 0.0f, -1.0f, 0.0f,
-                    -1.0f, 1.0f, 0.0f, 1.0f
-            ))
-            glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
-        }
-
-        // convert from command queue into draw list and draw to screen
-
-        // allocate vertex and element buffer
-        glBindVertexArray(vao)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
-
-        glBufferData(GL_ARRAY_BUFFER, maxVertexBuffer.toLong(), GL_STREAM_DRAW)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxElementBuffer.toLong(), GL_STREAM_DRAW)
-
-        // load draw vertices & elements directly into vertex + element buffer
-        val vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY, maxVertexBuffer.toLong(), null)
-        val elements = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY, maxElementBuffer.toLong(), null)
-        twr(stackPush()) { stack ->
-            // fill convert configuration
-            val config = NkConvertConfig.callocStack(stack)
-                    .vertex_layout(vertexLayout)
-                    .vertex_size(20)
-                    .vertex_alignment(4)
-                    .null_texture(nullTexture)
-                    .circle_segment_count(22)
-                    .curve_segment_count(22)
-                    .arc_segment_count(22)
-                    .global_alpha(1.0f)
-                    .shape_AA(antiAliasing)
-                    .line_AA(antiAliasing)
-
-            // setup buffers to load vertices and elements
-            val vBuffer = NkBuffer.mallocStack(stack)
-            val eBuffer = NkBuffer.mallocStack(stack)
-
-            nk_buffer_init_fixed(vBuffer, vertices/*, max_vertex_buffer*/)
-            nk_buffer_init_fixed(eBuffer, elements/*, max_element_buffer*/)
-            nk_convert(nk, cmds, vBuffer, eBuffer, config)
-        }
-        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER)
-        glUnmapBuffer(GL_ARRAY_BUFFER)
-
-        // iterate over and execute each draw command
-        val fb_scale_x = window.currentPixelWidth.toFloat() / window.currentWidth.toFloat()
-        val fb_scale_y = window.currentPixelHeight.toFloat() / window.currentHeight.toFloat()
-
-        var offset = NULL
-        var cmd: NkDrawCommand? = nk__draw_begin(nk, cmds)
-        while (cmd != null) {
-            if (cmd.elem_count() == 0) {
-                cmd = nk__draw_next(cmd, cmds, nk)
-                continue
-            }
-            glBindTexture(GL_TEXTURE_2D, cmd.texture().id())
-            glScissor(
-                    (cmd.clip_rect().x() * fb_scale_x).toInt(),
-                    ((window.currentHeight - (cmd.clip_rect().y() + cmd.clip_rect().h()).toInt()) * fb_scale_y).toInt(),
-                    (cmd.clip_rect().w() * fb_scale_x).toInt(),
-                    (cmd.clip_rect().h() * fb_scale_y).toInt()
-            )
-            glDrawElements(GL_TRIANGLES, cmd.elem_count(), GL_UNSIGNED_SHORT, offset)
-            offset += (cmd.elem_count() * 2).toLong()
-            cmd = nk__draw_next(cmd, cmds, nk)
-        }
-        nk_clear(nk)
-
-        // default OpenGL state
-        glUseProgram(0)
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-        glDisable(GL_BLEND)
-        glDisable(GL_SCISSOR_TEST)
-    }
 }
 
-private fun createNkContext(width: Int, height: Int, style: UiLayoutInternal): NuklearContext {
+private fun createWindow(width: Int, height: Int): WindowContext {
     GLFWErrorCallback.createPrint().set()
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
     val (screens, warpLines) = getScreensAndWarpLines()
@@ -851,159 +626,17 @@ private fun createNkContext(width: Int, height: Int, style: UiLayoutInternal): N
         throw RuntimeException("Could not init nanovg.")
     }
     glfwSwapInterval(1)
-    val nkShaderVersion = "#version 330\n"
-    val vertex_shader = nkShaderVersion +
-            "uniform mat4 ProjMtx;\n" +
-            "in vec2 Position;\n" +
-            "in vec2 TexCoord;\n" +
-            "in vec4 Color;\n" +
-            "out vec2 Frag_UV;\n" +
-            "out vec4 Frag_Color;\n" +
-            "void main() {\n" +
-            "   Frag_UV = TexCoord;\n" +
-            "   Frag_Color = Color;\n" +
-            "   gl_Position = ProjMtx * vec4(Position.xy, 0, 1);\n" +
-            "}\n"
-    val fragment_shader = nkShaderVersion +
-            "precision mediump float;\n" +
-            "uniform sampler2D Texture;\n" +
-            "in vec2 Frag_UV;\n" +
-            "in vec4 Frag_Color;\n" +
-            "out vec4 Out_Color;\n" +
-            "void main(){\n" +
-            "   Out_Color = Frag_Color * texture(Texture, Frag_UV.st);\n" +
-            "}\n"
-    val prog = glCreateProgram()
-    val vertexShader = glCreateShader(GL_VERTEX_SHADER)
-    val fragmentShader = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(vertexShader, vertex_shader)
-    glShaderSource(fragmentShader, fragment_shader)
-    glCompileShader(vertexShader)
-    glCompileShader(fragmentShader)
-    if (glGetShaderi(vertexShader, GL_COMPILE_STATUS) !== GL_TRUE) {
-        throw IllegalStateException()
-    }
-    if (glGetShaderi(fragmentShader, GL_COMPILE_STATUS) !== GL_TRUE) {
-        throw IllegalStateException()
-    }
-    glAttachShader(prog, vertexShader)
-    glAttachShader(prog, fragmentShader)
-    glLinkProgram(prog)
-    if (glGetProgrami(prog, GL_LINK_STATUS) !== GL_TRUE) {
-        throw IllegalStateException()
-    }
-
-    val uniformTex = glGetUniformLocation(prog, "Texture")
-    val uniformProj = glGetUniformLocation(prog, "ProjMtx")
-    val attribPos = glGetAttribLocation(prog, "Position")
-    val attribUv = glGetAttribLocation(prog, "TexCoord")
-    val attribCol = glGetAttribLocation(prog, "Color")
-
-    val vbo = glGenBuffers()
-    val ebo = glGenBuffers()
-    val vao = GL30.glGenVertexArrays()
-
-    glBindVertexArray(vao)
-    glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
-
-    glEnableVertexAttribArray(attribPos)
-    glEnableVertexAttribArray(attribUv)
-    glEnableVertexAttribArray(attribCol)
-
-    glVertexAttribPointer(attribPos, 2, GL11.GL_FLOAT, false, 20, 0)
-    glVertexAttribPointer(attribUv, 2, GL11.GL_FLOAT, false, 20, 8)
-    glVertexAttribPointer(attribCol, 4, GL11.GL_UNSIGNED_BYTE, true, 20, 16)
-
-    val nullTexID = GL11.glGenTextures()
-
-    val nullTexture = NkDrawNullTexture.create()
-    nullTexture.texture().id(nullTexID)
-    nullTexture.uv().set(0.5f, 0.5f)
-
-    glBindTexture(GL11.GL_TEXTURE_2D, nullTexID)
-    twr(stackPush()) { stack ->
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, stack.ints(0xFFFFFFFF.toInt()))
-    }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-
-    glBindTexture(GL11.GL_TEXTURE_2D, 0)
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-    glBindVertexArray(0)
-    val window = WindowContext(id = windowId, monitors = monitors, warpLines = warpLines, width = width, height = height)
-    val vertexLayout = NkDrawVertexLayoutElement.create(4)
-            .position(0).attribute(NK_VERTEX_POSITION).format(NK_FORMAT_FLOAT).offset(0)
-            .position(1).attribute(NK_VERTEX_TEXCOORD).format(NK_FORMAT_FLOAT).offset(8)
-            .position(2).attribute(NK_VERTEX_COLOR).format(NK_FORMAT_R8G8B8A8).offset(16)
-            .position(3).attribute(NK_VERTEX_ATTRIBUTE_COUNT).format(NK_FORMAT_COUNT).offset(0)
-            .flip()
-    val allocator = NkAllocator.create()
-    allocator.alloc { handle, old, size ->
-        val mem = MemoryUtil.nmemAlloc(size)
-        if (mem == NULL) {
-            throw OutOfMemoryError()
-        }
-        mem
-    }
-    allocator.mfree { handle, ptr -> MemoryUtil.nmemFree(ptr) }
-    val cmds = NkBuffer.create()
-    nk_buffer_init(cmds, allocator, 4096L)
-    val context = NkContext.create()
+    val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, warpLines = warpLines, width = width, height = height)
     glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
         window.scrollX += xOffset.toFloat()
         window.scrollY += yOffset.toFloat()
-        Nuklear.nk_input_scroll(context, yOffset.toFloat())
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
-        Nuklear.nk_input_unicode(context, codePoint)
+
     }
     glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
-        val press = action == GLFW_PRESS
-        val repeat = action == GLFW_REPEAT
         when (key) {
             GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
-            GLFW_KEY_DELETE -> nk_input_key(context, NK_KEY_DEL, press || repeat)
-            GLFW_KEY_ENTER -> nk_input_key(context, NK_KEY_ENTER, press || repeat)
-            GLFW_KEY_TAB -> nk_input_key(context, NK_KEY_TAB, press || repeat)
-            GLFW_KEY_BACKSPACE -> nk_input_key(context, NK_KEY_BACKSPACE, press || repeat)
-            GLFW_KEY_UP -> nk_input_key(context, NK_KEY_UP, press || repeat)
-            GLFW_KEY_DOWN -> nk_input_key(context, NK_KEY_DOWN, press || repeat)
-            GLFW_KEY_HOME -> {
-                nk_input_key(context, NK_KEY_TEXT_START, press)
-                nk_input_key(context, NK_KEY_SCROLL_START, press)
-            }
-            GLFW_KEY_END -> {
-                nk_input_key(context, NK_KEY_TEXT_END, press)
-                nk_input_key(context, NK_KEY_SCROLL_END, press)
-            }
-            GLFW_KEY_PAGE_DOWN -> nk_input_key(context, NK_KEY_SCROLL_DOWN, press)
-            GLFW_KEY_PAGE_UP -> nk_input_key(context, NK_KEY_SCROLL_UP, press)
-            GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT -> nk_input_key(context, NK_KEY_SHIFT, press)
-            GLFW_KEY_LEFT_CONTROL, GLFW_KEY_RIGHT_CONTROL -> if (press) {
-                nk_input_key(context, NK_KEY_COPY, glfwGetKey(windowId, GLFW_KEY_C) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_PASTE, glfwGetKey(windowId, GLFW_KEY_P) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_CUT, glfwGetKey(windowId, GLFW_KEY_X) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_UNDO, glfwGetKey(windowId, GLFW_KEY_Z) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_REDO, glfwGetKey(windowId, GLFW_KEY_R) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_WORD_LEFT, glfwGetKey(windowId, GLFW_KEY_LEFT) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_WORD_RIGHT, glfwGetKey(windowId, GLFW_KEY_RIGHT) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_LINE_START, glfwGetKey(windowId, GLFW_KEY_B) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_TEXT_LINE_END, glfwGetKey(windowId, GLFW_KEY_E) == GLFW_PRESS)
-            } else {
-                nk_input_key(context, NK_KEY_LEFT, glfwGetKey(windowId, GLFW_KEY_LEFT) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_RIGHT, glfwGetKey(windowId, GLFW_KEY_RIGHT) == GLFW_PRESS)
-                nk_input_key(context, NK_KEY_COPY, false)
-                nk_input_key(context, NK_KEY_PASTE, false)
-                nk_input_key(context, NK_KEY_CUT, false)
-                nk_input_key(context, NK_KEY_SHIFT, false)
-            }
-        }
-    }
-    glfwSetCursorPosCallback(window.id) { windowId, x, y ->
-        if (!window.isDragging && !window.isResizing) {
-            Nuklear.nk_input_motion(context, x.toInt(), y.toInt())
         }
     }
     glfwSetMouseButtonCallback(window.id) { windowId, button, action, mods ->
@@ -1013,33 +646,30 @@ private fun createNkContext(width: Int, height: Int, style: UiLayoutInternal): N
             glfwGetCursorPos(windowId, cx, cy)
             val x = cx.get(0)
             val y = cy.get(0)
-            val dragAreaY1 = style.dragArea.y
-            val dragAreaY2 = dragAreaY1 + style.dragArea.height
-            val dragAreaX1 = style.dragArea.x
-            val dragAreaX2 = dragAreaX1 + style.dragArea.width
+            val dragAreaY1 = window.layout.dragArea.y
+            val dragAreaY2 = dragAreaY1 + window.layout.dragArea.height
+            val dragAreaX1 = window.layout.dragArea.x
+            val dragAreaX2 = dragAreaX1 + window.layout.dragArea.width
             if (y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
                 startDrag(stack, window)
-                handleStandardMouseAction(context, window, action, button, x, y)
+                handleStandardMouseAction(window, action, button, x, y)
             } else if ((y >= window.currentHeight - window.resizeAreaHeight && y <= window.currentHeight)
                     && ((x >= window.currentWidth - window.resizeAreaWidth && x <= window.currentWidth) || (x >= 0 && x <= window.resizeAreaWidth))
                     && (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)) {
                 startResize(stack, window, x <= window.resizeAreaWidth)
-                handleStandardMouseAction(context, window, action, button, x, y)
+                handleStandardMouseAction(window, action, button, x, y)
             } else {
-                handleStandardMouseAction(context, window, action, button, x, y)
+                handleStandardMouseAction(window, action, button, x, y)
             }
         }
     }
-    nk_init(context, allocator, null)
-    setCopyHandler(context, window.id)
-    setPastHandler(context, window.id)
     initializeWindowState(window)
-    return NuklearContext(debugProc, nullTexture, vertexLayout, cmds, vbo, vao, ebo, prog, vertexShader, fragmentShader, uniformTex, uniformProj, allocator, context, style, window, nvg)
+    return window
 }
 
-private fun handleStandardMouseAction(context: NkContext, window: WindowContext, action: Int, button: Int, x: Double, y: Double) {
+private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double) {
     if (action == GLFW_RELEASE) {
         window.isDragging = false
         window.hasMoved = false
@@ -1059,13 +689,6 @@ private fun handleStandardMouseAction(context: NkContext, window: WindowContext,
         }
     }
     window.mouseClickHandler(button, Math.round(x).toInt(), Math.round(y).toInt(), action == GLFW_PRESS)
-    val nkButton: Int
-    when (button) {
-        GLFW_MOUSE_BUTTON_RIGHT -> nkButton = NK_BUTTON_RIGHT
-        GLFW_MOUSE_BUTTON_MIDDLE -> nkButton = NK_BUTTON_MIDDLE
-        else -> nkButton = NK_BUTTON_LEFT
-    }
-    nk_input_button(context, nkButton, Math.round(x).toInt(), Math.round(y).toInt(), action == GLFW_PRESS)
 }
 
 private fun startDrag(stack: MemoryStack, window: WindowContext) {
@@ -1133,28 +756,6 @@ private fun initializeWindowState(window: WindowContext) {
         window.monitors.forEachIndexed { i, monitorSpec ->
             if (window.mouseX >= monitorSpec.mouseSpaceX1 && window.mouseX <= monitorSpec.mouseSpaceX2 && window.mouseY >= monitorSpec.mouseSpaceY1 && window.mouseY <= monitorSpec.mouseSpaceY2) {
                 window.currentMonitor = monitorSpec
-            }
-        }
-    }
-}
-
-private fun setPastHandler(context: NkContext, windowId: Long) {
-    context.clip().paste { handle, edit ->
-        val string = nglfwGetClipboardString(windowId)
-        if (string != NULL) {
-            nnk_textedit_paste(edit, string, nnk_strlen(string))
-        }
-    }
-}
-
-private fun setCopyHandler(context: NkContext, windowId: Long) {
-    context.clip().copy { handle, text, length ->
-        if (length > 0) {
-            twr(stackPush()) { stack ->
-                val string = stack.malloc(length + 1)
-                MemoryUtil.memCopy(text, MemoryUtil.memAddress(string), length)
-                string.put(length, 0.toByte())
-                glfwSetClipboardString(windowId, string)
             }
         }
     }

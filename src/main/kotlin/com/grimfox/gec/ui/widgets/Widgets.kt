@@ -1,10 +1,13 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.extensions.twr
+import com.grimfox.gec.ui.NO_COLOR
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
+import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.cRef
 import org.joml.Vector4f
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NVGPaint
@@ -14,8 +17,6 @@ import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
 import java.nio.ByteBuffer
 import java.util.*
-
-private val NO_COLOR = nvgRGBA(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), NVGColor.create())
 
 enum class HorizontalAlignment {
     LEFT,
@@ -153,7 +154,7 @@ class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
     }
 }
 
-open class TextStyle(open val size: Float, open val font: Int, open val color: NVGColor)
+open class TextStyle(open val size: Reference<Float>, open val font: Reference<Int>, open val color: Reference<NVGColor>)
 
 interface Text {
 
@@ -168,7 +169,7 @@ interface Text {
 
 private class TextNone() : Text {
 
-    override var style: TextStyle = TextStyle(0.0f, -1, NO_COLOR)
+    override var style: TextStyle = TextStyle(cRef(0.0f), cRef(-1), cRef(NO_COLOR))
     override val data: ByteBuffer = ByteBuffer.wrap(ByteArray(0))
     override val length: Int = 0
 
@@ -186,19 +187,19 @@ class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
     override val length: Int = data.limit()
 
     override fun draw(nvg: Long, block: Block) {
-        nvgFontFaceId(nvg, style.font)
-        nvgFontSize(nvg, style.size)
+        nvgFontFaceId(nvg, style.font.value)
+        nvgFontSize(nvg, style.size.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
         nvgTextAlign(nvg, alignMask)
-        nvgFillColor(nvg, style.color)
+        nvgFillColor(nvg, style.color.value)
         nvgText(nvg, x, y, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
         twr(stackPush()) { stack ->
             val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, style.font)
-            nvgFontSize(nvg, style.size)
+            nvgFontFaceId(nvg, style.font.value)
+            nvgFontSize(nvg, style.size.value)
             nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
@@ -210,19 +211,19 @@ class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextSty
     override val length: Int get() = data.limit()
 
     override fun draw(nvg: Long, block: Block) {
-        nvgFontFaceId(nvg, style.font)
-        nvgFontSize(nvg, style.size)
+        nvgFontFaceId(nvg, style.font.value)
+        nvgFontSize(nvg, style.size.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
         nvgTextAlign(nvg, alignMask)
-        nvgFillColor(nvg, style.color)
+        nvgFillColor(nvg, style.color.value)
         nvgText(nvg, x, y, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
         twr(stackPush()) { stack ->
             val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, style.font)
-            nvgFontSize(nvg, style.size)
+            nvgFontFaceId(nvg, style.font.value)
+            nvgFontSize(nvg, style.size.value)
             nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
@@ -341,7 +342,7 @@ fun uiRoot(x: Int, y: Int, width: Int, height: Int, builder: Block.() -> Unit): 
     return root
 }
 
-class BlockTemplate(
+data class BlockTemplate(
         val isVisible: Boolean = true,
         val hAlign: HorizontalAlignment = LEFT,
         val vAlign: VerticalAlignment = TOP,
@@ -532,9 +533,18 @@ abstract class Block {
     fun onMouseClick(onMouseClick: Block.(Int, Int, Int) -> Unit) {
         this.onMouseClick = onMouseClick
     }
+
+    operator fun invoke(builder: Block.() -> Unit): Block {
+        this.builder()
+        return this
+    }
+
+    fun with(builder: Block.() -> Unit): Block {
+        return invoke(builder)
+    }
 }
 
-private class RootBlock(override var x: Int, override var y: Int, override var width: Int, override var height: Int) : Block() {
+private open class RootBlock(override var x: Int, override var y: Int, override var width: Int, override var height: Int) : Block() {
     override val root = this
     override val parent = this
     override val children = ArrayList<Block>()
@@ -630,6 +640,13 @@ private class RootBlock(override var x: Int, override var y: Int, override var w
     override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
+}
+
+val NO_BLOCK: Block = object : RootBlock(-1, -1, -1, -1) {
+    override var isVisible: Boolean
+        get() = false
+        set(value) {
+        }
 }
 
 private class DefaultBlock(

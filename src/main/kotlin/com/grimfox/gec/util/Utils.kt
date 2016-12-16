@@ -20,6 +20,28 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 
+interface Reference<out T> {
+
+    val value: T
+}
+
+interface MutableReference<T> : Reference<T> {
+
+    override var value: T
+}
+
+private class CRef<out T>(override val value: T) : Reference<T>
+
+private class Ref<T>(override var value: T) : MutableReference<T>
+
+fun <T> cRef(value: T): Reference<T> {
+    return CRef(value)
+}
+
+fun <T> ref(value: T): MutableReference<T> {
+    return Ref(value)
+}
+
 inline fun <reified T> printList(list: Collection<T>): String {
     return printList(list, { it.toString() })
 }
