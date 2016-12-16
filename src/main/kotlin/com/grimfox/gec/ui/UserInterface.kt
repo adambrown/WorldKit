@@ -2,6 +2,8 @@ package com.grimfox.gec.ui
 
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.learning.LessonEightRenderer
+import com.grimfox.gec.ui.widgets.Block
+import com.grimfox.gec.ui.widgets.uiRoot
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
@@ -34,9 +36,11 @@ import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import java.util.*
 
+class Reference<T>(var value: T)
+
 fun layout(block: UiLayout.(UserInterface, NkContext, Long) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: Int, height: Int, resetView: IntBuffer, rotateAroundCamera: IntBuffer, perspectiveOn: IntBuffer, waterPlaneOn: IntBuffer, heightMapScaleFactor: FloatBuffer, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
+fun ui(layoutBlock: UiLayout.(UserInterface, NkContext, Long) -> Unit, width: Int, height: Int, resetView: Reference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, uiBlock: UserInterface.(NkContext, Long) -> Unit) {
     val layout = UiLayoutInternal()
     val ui = UserInterfaceInternal(createNkContext(width, height, layout))
     try {

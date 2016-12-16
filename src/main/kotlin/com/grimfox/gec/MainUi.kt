@@ -2,10 +2,11 @@ package com.grimfox.gec
 
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.ui.HorizontalAlignment.*
-import com.grimfox.gec.ui.Layout.*
-import com.grimfox.gec.ui.Sizing.*
-import com.grimfox.gec.ui.VerticalAlignment.*
+import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
+import com.grimfox.gec.ui.widgets.Layout.*
+import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.getPathForResource
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 import org.lwjgl.nanovg.NVGColor
@@ -40,46 +41,68 @@ object MainUi {
                 MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
             }
 
-            val WHITE = nvgRGBA(200.toByte(), 200.toByte(), 200.toByte(), 255.toByte(), NVGColor.create())
-            val BLUE = nvgRGBA(40.toByte(), 40.toByte(), 200.toByte(), 255.toByte(), NVGColor.create())
             val GREEN = nvgRGBA(40.toByte(), 200.toByte(), 40.toByte(), 255.toByte(), NVGColor.create())
-            val RED = nvgRGBA(200.toByte(), 40.toByte(), 40.toByte(), 255.toByte(), NVGColor.create())
-            val MAGENTA = nvgRGBA(180.toByte(), 40.toByte(), 180.toByte(), 255.toByte(), NVGColor.create())
-            val ORANGE = nvgRGBA(180.toByte(), 160.toByte(), 40.toByte(), 255.toByte(), NVGColor.create())
+            val STROKE_GREEN_THICK = StrokeColor(GREEN, 2.0f)
+
+            val COLOR_BEVELS = nvgRGBA(34.toByte(), 34.toByte(), 35.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_BEVELS_LIGHTER = nvgRGBA(38.toByte(), 38.toByte(), 39.toByte(), 255.toByte(), NVGColor.create())
+
+            val COLOR_CLICK_ITEMS_DARKER = nvgRGBA(62.toByte(), 62.toByte(), 64.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_CLICK_ITEMS = nvgRGBA(82.toByte(), 82.toByte(), 84.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_CLICK_ITEMS_LIGHTER = nvgRGBA(102.toByte(), 102.toByte(), 104.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_CLICK_ITEMS_HOVER = nvgRGBA(122.toByte(), 122.toByte(), 124.toByte(), 255.toByte(), NVGColor.create())
+
+            val COLOR_ACTIVE_HIGHLIGHT_DARK = nvgRGBA(11.toByte(), 50.toByte(), 77.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_ACTIVE_HIGHLIGHT = nvgRGBA(0.toByte(), 122.toByte(), 204.toByte(), 255.toByte(), NVGColor.create())
+            val COLOR_ACTIVE_HIGHLIGHT_BRIGHT = nvgRGBA(133.toByte(), 199.toByte(), 242.toByte(), 255.toByte(), NVGColor.create())
 
             val COLOR_NORMAL_TEXT = nvgRGBA(153.toByte(), 153.toByte(), 153.toByte(), 255.toByte(), NVGColor.create())
 
             val COLOR_BUTTON_TEXT = nvgRGBA(243.toByte(), 243.toByte(), 243.toByte(), 255.toByte(), NVGColor.create())
             val COLOR_BUTTON_MOUSE_OVER = nvgRGBA(64.toByte(), 62.toByte(), 64.toByte(), 255.toByte(), NVGColor.create())
-            val COLOR_BUTTON_MOUSE_DOWN = nvgRGBA(0.toByte(), 122.toByte(), 204.toByte(), 255.toByte(), NVGColor.create())
-
 
             val FILL_BUTTON_MOUSE_OVER = FillColor(COLOR_BUTTON_MOUSE_OVER)
-            val FILL_BUTTON_MOUSE_DOWN = FillColor(COLOR_BUTTON_MOUSE_DOWN)
+            val FILL_BUTTON_MOUSE_DOWN = FillColor(COLOR_ACTIVE_HIGHLIGHT)
 
-            val FILL_BLUE = FillColor(BLUE)
-            val FILL_MAGENTA = FillColor(MAGENTA)
-            val STROKE_GREEN_THICK = StrokeColor(GREEN, 2.0f)
-            val STROKE_ORANGE_THICK = StrokeColor(ORANGE, 2.0f)
-            val STROKE_RED_THIN = NO_STROKE
-//        val STROKE_RED_THIN = StrokeColor(RED, 1.0f)
-            val BUTTON_NORMAL = ShapeRectangle(NO_FILL, NO_STROKE)
-//        val ROUNDED_RECT = ShapeRoundedRectangle(FILL_BLUE, STROKE_GREEN_THICK, 6.0f)
-            val RECT = ShapeRectangle(NO_FILL, STROKE_RED_THIN)
-
+            val BUTTON_NORMAL = NO_SHAPE
             val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
             val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
-            val heightMapScaleFactor = stack.mallocFloat(1)
-            heightMapScaleFactor.put(0, 0.5f)
-            val waterPlaneOn = stack.mallocInt(1)
-            waterPlaneOn.put(0, 1)
-            val perspectiveOn = stack.mallocInt(1)
-            perspectiveOn.put(0, 1)
-            val rotateAroundCamera = stack.mallocInt(1)
-            rotateAroundCamera.put(0, 0)
-            val resetView = stack.mallocInt(1)
-            resetView.put(0, 0)
+            val FILL_TOGGLE_BACKGROUND_NORMAL = FillColor(COLOR_BEVELS)
+            val FILL_TOGGLE_BACKGROUND_MOUSE_OVER = FillColor(COLOR_BEVELS_LIGHTER)
+            val FILL_TOGGLE_BACKGROUND_MOUSE_DOWN = FillColor(COLOR_ACTIVE_HIGHLIGHT_DARK)
+
+            val FILL_TOGGLE_SWITCH_NORMAL_OFF = FillColor(COLOR_CLICK_ITEMS_DARKER)
+            val FILL_TOGGLE_SWITCH_MOUSE_OVER_OFF = FillColor(COLOR_CLICK_ITEMS)
+            val FILL_TOGGLE_SWITCH_MOUSE_DOWN_OFF = FillColor(COLOR_ACTIVE_HIGHLIGHT)
+
+            val FILL_TOGGLE_SWITCH_NORMAL_ON = FillColor(COLOR_CLICK_ITEMS_LIGHTER)
+            val FILL_TOGGLE_SWITCH_MOUSE_OVER_ON = FillColor(COLOR_CLICK_ITEMS_HOVER)
+            val FILL_TOGGLE_SWITCH_MOUSE_DOWN_ON = FillColor(COLOR_ACTIVE_HIGHLIGHT)
+
+            val TOGGLE_WIDTH = 76
+            val TOGGLE_HEIGHT = 32
+            val TOGGLE_CORNER_RADIUS = TOGGLE_HEIGHT / 2.0f
+
+            val TOGGLE_BACKGROUND_NORMAL = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_NORMAL, NO_STROKE, TOGGLE_CORNER_RADIUS)
+            val TOGGLE_BACKGROUND_MOUSE_OVER = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_MOUSE_OVER, NO_STROKE, TOGGLE_CORNER_RADIUS)
+            val TOGGLE_BACKGROUND_MOUSE_DOWN = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_MOUSE_DOWN, NO_STROKE, TOGGLE_CORNER_RADIUS)
+
+            val TOGGLE_SWITCH_NORMAL_OFF = ShapeCircle(FILL_TOGGLE_SWITCH_NORMAL_OFF, NO_STROKE)
+            val TOGGLE_SWITCH_MOUSE_OVER_OFF = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_OVER_OFF, NO_STROKE)
+            val TOGGLE_SWITCH_MOUSE_DOWN_OFF = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_DOWN_OFF, NO_STROKE)
+
+            val TOGGLE_SWITCH_NORMAL_ON = ShapeCircle(FILL_TOGGLE_SWITCH_NORMAL_ON, NO_STROKE)
+            val TOGGLE_SWITCH_MOUSE_OVER_ON = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_OVER_ON, NO_STROKE)
+            val TOGGLE_SWITCH_MOUSE_DOWN_ON = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_DOWN_ON, NO_STROKE)
+
+            val DEFAULT_HEIGHT_SCALE = 0.5f
+            val heightMapScaleFactor = Reference(DEFAULT_HEIGHT_SCALE)
+            val waterPlaneOn = Reference(true)
+            val perspectiveOn = Reference(true)
+            val rotateAroundCamera = Reference(false)
+            val resetView = Reference(false)
+
             val windowBounds = nk_rect(0.0f, 0.0f, 100.0f, 100.0f, NkRect.mallocStack(stack))
 
             val mainStyle = layout { ui, nk, nvg ->
@@ -94,20 +117,72 @@ object MainUi {
                     val textFont = getNvgFont(createNvgFont("/fonts/FiraSans.ttf", "FiraSans", nvg))
                     val glyphFont = getNvgFont(createNvgFont("/fonts/WorldKitUi.ttf", "Glyphs", nvg))
 
-                    fun text(value: String, color: NVGColor = COLOR_NORMAL_TEXT): Text {
-                        return StaticTextUtf8(value, 22.0f, textFont, color)
+                    val TEXT_STYLE_NORMAL = TextStyle(22.0f, textFont, COLOR_NORMAL_TEXT)
+                    val TEXT_STYLE_BUTTON = TextStyle(22.0f, textFont, COLOR_BUTTON_TEXT)
+                    val TEXT_STYLE_GLYPH = TextStyle(22.0f, glyphFont, COLOR_BUTTON_TEXT)
+
+                    val TOGGLE_STYLE = ToggleStyle(4,
+                            TOGGLE_BACKGROUND_NORMAL,
+                            TOGGLE_SWITCH_NORMAL_ON,
+                            TOGGLE_SWITCH_NORMAL_OFF,
+                            TEXT_STYLE_NORMAL,
+                            TEXT_STYLE_NORMAL,
+                            TOGGLE_BACKGROUND_MOUSE_OVER,
+                            TOGGLE_SWITCH_MOUSE_OVER_ON,
+                            TOGGLE_SWITCH_MOUSE_OVER_OFF,
+                            TEXT_STYLE_NORMAL,
+                            TEXT_STYLE_NORMAL,
+                            TOGGLE_BACKGROUND_MOUSE_DOWN,
+                            TOGGLE_SWITCH_MOUSE_DOWN_ON,
+                            TOGGLE_SWITCH_MOUSE_DOWN_OFF,
+                            TEXT_STYLE_NORMAL,
+                            TEXT_STYLE_NORMAL)
+
+                    fun text(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
+                        return StaticTextUtf8(value, style)
                     }
 
-                    fun glyph(value: String, color: NVGColor = COLOR_NORMAL_TEXT): Text {
-                        return StaticTextUtf8(value, 22.0f, glyphFont, color)
+                    fun glyph(value: String, style: TextStyle = TEXT_STYLE_GLYPH): Text {
+                        return StaticTextUtf8(value, style)
                     }
 
-                    fun text(value: ByteBuffer, color: NVGColor = COLOR_NORMAL_TEXT): Text {
-                        return DynamicTextUtf8(value, 22.0f, textFont, color)
+                    fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text {
+                        return DynamicTextUtf8(value, style)
                     }
 
-                    fun glyph(value: ByteBuffer, color: NVGColor = COLOR_NORMAL_TEXT): Text {
-                        return DynamicTextUtf8(value, 22.0f, glyphFont, color)
+                    val TEXT_ON = text("On")
+                    val TEXT_OFF = text("Off")
+
+                    fun Block.label(text: Text, width: Int): Block {
+                        return block {
+                            hSizing = STATIC
+                            this.width = width
+                            layout = HORIZONTAL
+                            block {
+                                hAlign = RIGHT
+                                vAlign = MIDDLE
+                                hSizing = SHRINK
+                                vSizing = SHRINK
+                                this.text = text
+                                isMouseAware = false
+                            }
+                            isMouseAware = false
+                        }
+                    }
+
+                    fun Block.toggle(value: Reference<Boolean>): Block {
+                        return toggle(value, TOGGLE_WIDTH, TOGGLE_HEIGHT, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
+                    }
+
+                    fun Block.supplantEvents(other: Block): Block {
+                        other.isMouseAware = false
+                        onMouseOver = other.onMouseOver
+                        onMouseOut = other.onMouseOut
+                        onMouseDown = other.onMouseDown
+                        onMouseUp = other.onMouseUp
+                        onMouseRelease = other.onMouseRelease
+                        onMouseClick = other.onMouseClick
+                        return this
                     }
 
                     fun Block.hSpacer(space: Int) {
@@ -125,6 +200,24 @@ object MainUi {
                             height = space
                             layout = VERTICAL
                             isMouseAware = false
+                        }
+                    }
+
+                    fun Block.toggleRow(value: Reference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
+                        return block {
+                            val row = this
+                            vSizing = STATIC
+                            this.height = height
+                            layout = VERTICAL
+                            label(label, labelWidth)
+                            hSpacer(gap)
+                            block {
+                                hSizing = GROW
+                                layout = HORIZONTAL
+                                val toggle = toggle(value)
+                                row.supplantEvents(toggle)
+                                isMouseAware = false
+                            }
                         }
                     }
 
@@ -167,8 +260,7 @@ object MainUi {
                                     vSizing = SHRINK
                                     padLeft = 10
                                     padRight = 10
-                                    text = text("File", COLOR_BUTTON_TEXT)
-                                    shape = RECT
+                                    text = text("File", TEXT_STYLE_BUTTON)
                                     isMouseAware = false
                                 }
                                 shape = BUTTON_NORMAL
@@ -217,8 +309,7 @@ object MainUi {
                                     vSizing = SHRINK
                                     padLeft = 10
                                     padRight = 10
-                                    text = text("Settings", COLOR_BUTTON_TEXT)
-                                    shape = RECT
+                                    text = text("Settings", TEXT_STYLE_BUTTON)
                                     isMouseAware = false
                                 }
                                 shape = BUTTON_NORMAL
@@ -267,8 +358,7 @@ object MainUi {
                                     vSizing = SHRINK
                                     padLeft = 10
                                     padRight = 10
-                                    text = text("About", COLOR_BUTTON_TEXT)
-                                    shape = RECT
+                                    text = text("Help", TEXT_STYLE_BUTTON)
                                     isMouseAware = false
                                 }
                                 shape = BUTTON_NORMAL
@@ -300,7 +390,7 @@ object MainUi {
                                 }
                                 onMouseClick { button, x, y ->
                                     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                        println("mouse click About")
+                                        println("mouse click Help")
                                     }
                                 }
                             }
@@ -321,7 +411,6 @@ object MainUi {
                                         hSizing = SHRINK
                                         vSizing = SHRINK
                                         text = text("WorldKit - Edit Mode")
-                                        shape = RECT
                                         isMouseAware = false
                                     }
                                     isMouseAware = false
@@ -347,7 +436,7 @@ object MainUi {
                                         vAlign = MIDDLE
                                         hSizing = SHRINK
                                         vSizing = SHRINK
-                                        text = glyph(glyphMinimize, COLOR_BUTTON_TEXT)
+                                        text = glyph(glyphMinimize)
                                         isMouseAware = false
                                     }
                                     var mouseDownOver = false
@@ -396,7 +485,7 @@ object MainUi {
                                         vAlign = MIDDLE
                                         hSizing = SHRINK
                                         vSizing = SHRINK
-                                        text = glyph(maxRestoreGlyph, COLOR_BUTTON_TEXT)
+                                        text = glyph(maxRestoreGlyph)
                                         isMouseAware = false
                                     }
                                     var mouseDownOver = false
@@ -445,7 +534,7 @@ object MainUi {
                                         vAlign = MIDDLE
                                         hSizing = SHRINK
                                         vSizing = SHRINK
-                                        text = glyph(glyphClose, COLOR_BUTTON_TEXT)
+                                        text = glyph(glyphClose)
                                         isMouseAware = false
                                     }
                                     var mouseDownOver = false
@@ -501,75 +590,9 @@ object MainUi {
                                     hSizing = GROW
                                     layout = HORIZONTAL
                                     vSpacer(padding)
-                                    block {
-                                        vSizing = STATIC
-                                        height = rowHeight
-                                        layout = VERTICAL
-                                        block {
-                                            hSizing = STATIC
-                                            width = labelWidth
-                                            layout = HORIZONTAL
-                                            block {
-                                                hAlign = RIGHT
-                                                vAlign = MIDDLE
-                                                hSizing = SHRINK
-                                                vSizing = SHRINK
-                                                text = text("Water:")
-                                                isMouseAware = false
-                                            }
-                                        }
-                                        hSpacer(padding)
-                                        block {
-                                            hSizing = GROW
-                                            layout = HORIZONTAL
-                                        }
-                                    }
-                                    block {
-                                        vSizing = STATIC
-                                        height = rowHeight
-                                        layout = VERTICAL
-                                        block {
-                                            hSizing = STATIC
-                                            width = labelWidth
-                                            layout = HORIZONTAL
-                                            block {
-                                                hAlign = RIGHT
-                                                vAlign = MIDDLE
-                                                hSizing = SHRINK
-                                                vSizing = SHRINK
-                                                text = text("Perspective:")
-                                                isMouseAware = false
-                                            }
-                                        }
-                                        hSpacer(padding)
-                                        block {
-                                            hSizing = GROW
-                                            layout = HORIZONTAL
-                                        }
-                                    }
-                                    block {
-                                        vSizing = STATIC
-                                        height = rowHeight
-                                        layout = VERTICAL
-                                        block {
-                                            hSizing = STATIC
-                                            width = labelWidth
-                                            layout = HORIZONTAL
-                                            block {
-                                                hAlign = RIGHT
-                                                vAlign = MIDDLE
-                                                hSizing = SHRINK
-                                                vSizing = SHRINK
-                                                text = text("Rotate camera:")
-                                                isMouseAware = false
-                                            }
-                                        }
-                                        hSpacer(padding)
-                                        block {
-                                            hSizing = GROW
-                                            layout = HORIZONTAL
-                                        }
-                                    }
+                                    toggleRow(waterPlaneOn, rowHeight, text("Water:"), labelWidth, padding)
+                                    toggleRow(perspectiveOn, rowHeight, text("Perspective:"), labelWidth, padding)
+                                    toggleRow(rotateAroundCamera, rowHeight, text("Rotate camera:"), labelWidth, padding)
                                     block {
                                         vSizing = STATIC
                                         height = rowHeight
@@ -615,8 +638,7 @@ object MainUi {
                                                     vSizing = SHRINK
                                                     padLeft = 10
                                                     padRight = 10
-                                                    text = text("Reset view", COLOR_BUTTON_TEXT)
-                                                    shape = RECT
+                                                    text = text("Reset view", TEXT_STYLE_BUTTON)
                                                     isMouseAware = false
                                                 }
                                                 shape = BUTTON_NORMAL
@@ -648,7 +670,56 @@ object MainUi {
                                                 }
                                                 onMouseClick { button, x, y ->
                                                     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                                                        resetView.put(0, 1)
+                                                        resetView.value = true
+                                                    }
+                                                }
+                                            }
+                                            block {
+                                                hSizing = SHRINK
+                                                vSizing = STATIC
+                                                height = 32
+                                                vAlign = BOTTOM
+                                                layout = HORIZONTAL
+                                                block {
+                                                    hAlign = CENTER
+                                                    vAlign = MIDDLE
+                                                    hSizing = SHRINK
+                                                    vSizing = SHRINK
+                                                    padLeft = 10
+                                                    padRight = 10
+                                                    text = text("Reset height", TEXT_STYLE_BUTTON)
+                                                    isMouseAware = false
+                                                }
+                                                shape = BUTTON_NORMAL
+                                                var mouseDownOver = false
+                                                var mouseOver = false
+                                                onMouseOver {
+                                                    mouseOver = true
+                                                    if (!mouseDownOver) {
+                                                        shape = BUTTON_MOUSE_OVER
+                                                    }
+                                                }
+                                                onMouseOut {
+                                                    mouseOver = false
+                                                    if (!mouseDownOver) {
+                                                        shape = BUTTON_NORMAL
+                                                    }
+                                                }
+                                                onMouseDown { button, x, y ->
+                                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                                        mouseDownOver = true
+                                                        shape = BUTTON_MOUSE_DOWN
+                                                    }
+                                                }
+                                                onMouseRelease { button, x, y ->
+                                                    if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                                                        mouseDownOver = false
+                                                        shape = if (mouseOver) BUTTON_MOUSE_OVER else BUTTON_NORMAL
+                                                    }
+                                                }
+                                                onMouseClick { button, x, y ->
+                                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                                        heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE
                                                     }
                                                 }
                                             }
@@ -780,115 +851,115 @@ object MainUi {
 //                        }
 //                        nk_style_pop_font(nk)
 
-                        nk.staticRow(48, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(48, width) {
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(140) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(280) {
-                                nk_checkbox_label(nk, "", waterPlaneOn)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(48, width) {
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(140) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(280) {
-                                nk_checkbox_label(nk, "", perspectiveOn)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(48, width) {
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(140) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(280) {
-                                nk_checkbox_label(nk, "", rotateAroundCamera)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(48, width) {
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(140) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(320) {
-                                nk_slider_float(nk, 0.0f, heightMapScaleFactor, 1.0f, 0.0001f)
-                            }
-                            col(24) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(40, width) {
-                            col(196) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(140) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col(196) {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
-                        nk.staticRow(4, width) {
-                            col {
-                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
-                            }
-                        }
+//                        nk.staticRow(48, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(48, width) {
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(140) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(280) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(48, width) {
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(140) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(280) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(48, width) {
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(140) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(280) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(48, width) {
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(140) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(320) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(24) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(40, width) {
+//                            col(196) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(140) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col(196) {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
+//                        nk.staticRow(4, width) {
+//                            col {
+//                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
+//                            }
+//                        }
 //                        nk.staticRow(4, width) {
 //                            col {
 //                                nk_label(nk, "", NK_TEXT_ALIGN_LEFT or NK_TEXT_ALIGN_MIDDLE)
@@ -983,34 +1054,34 @@ object MainUi {
     }
 }
 
-data class StaticRow(var remainder: Int, var greedyCount: Int = 0, val columns: MutableList<Pair<Int, () -> Unit>> = ArrayList()) {
-
-    fun col(width: Int, layout: () -> Unit = {}) {
-        columns.add(Pair(width, layout))
-        remainder -= width
-    }
-
-    fun col(layout: () -> Unit = {}) {
-        columns.add(Pair(-1, layout))
-        greedyCount++
-    }
-}
-
-fun NkContext.staticRow(height: Int, width: Int, columns: StaticRow.() -> Unit) {
-    val row = StaticRow(width)
-    row.columns()
-    nk_layout_row_begin(this, NK_STATIC, height.toFloat(), row.columns.size)
-    row.columns.forEach { pair ->
-        if (pair.first < 0) {
-            val localWidth = row.remainder / row.greedyCount
-            row.remainder -= localWidth
-            row.greedyCount--
-            nk_layout_row_push(this, localWidth.toFloat())
-            pair.second()
-        } else {
-            nk_layout_row_push(this, pair.first.toFloat())
-            pair.second()
-        }
-    }
-    nk_layout_row_end(this)
-}
+//data class StaticRow(var remainder: Int, var greedyCount: Int = 0, val columns: MutableList<Pair<Int, () -> Unit>> = ArrayList()) {
+//
+//    fun col(width: Int, layout: () -> Unit = {}) {
+//        columns.add(Pair(width, layout))
+//        remainder -= width
+//    }
+//
+//    fun col(layout: () -> Unit = {}) {
+//        columns.add(Pair(-1, layout))
+//        greedyCount++
+//    }
+//}
+//
+//fun NkContext.staticRow(height: Int, width: Int, columns: StaticRow.() -> Unit) {
+//    val row = StaticRow(width)
+//    row.columns()
+//    nk_layout_row_begin(this, NK_STATIC, height.toFloat(), row.columns.size)
+//    row.columns.forEach { pair ->
+//        if (pair.first < 0) {
+//            val localWidth = row.remainder / row.greedyCount
+//            row.remainder -= localWidth
+//            row.greedyCount--
+//            nk_layout_row_push(this, localWidth.toFloat())
+//            pair.second()
+//        } else {
+//            nk_layout_row_push(this, pair.first.toFloat())
+//            pair.second()
+//        }
+//    }
+//    nk_layout_row_end(this)
+//}

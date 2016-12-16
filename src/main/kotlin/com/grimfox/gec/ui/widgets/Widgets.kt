@@ -1,10 +1,10 @@
-package com.grimfox.gec.ui
+package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.extensions.twr
-import com.grimfox.gec.ui.HorizontalAlignment.*
-import com.grimfox.gec.ui.Layout.*
-import com.grimfox.gec.ui.Sizing.*
-import com.grimfox.gec.ui.VerticalAlignment.*
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
+import com.grimfox.gec.ui.widgets.Layout.*
+import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import org.joml.Vector4f
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NVGPaint
@@ -14,6 +14,8 @@ import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
 import java.nio.ByteBuffer
 import java.util.*
+
+private val NO_COLOR = nvgRGBA(0.toByte(), 0.toByte(), 0.toByte(), 0.toByte(), NVGColor.create())
 
 enum class HorizontalAlignment {
     LEFT,
@@ -151,8 +153,11 @@ class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
     }
 }
 
+open class TextStyle(open val size: Float, open val font: Int, open val color: NVGColor)
+
 interface Text {
 
+    var style: TextStyle
     val data: ByteBuffer
     val length: Int
 
@@ -163,6 +168,7 @@ interface Text {
 
 private class TextNone() : Text {
 
+    override var style: TextStyle = TextStyle(0.0f, -1, NO_COLOR)
     override val data: ByteBuffer = ByteBuffer.wrap(ByteArray(0))
     override val length: Int = 0
 
@@ -174,49 +180,49 @@ private class TextNone() : Text {
     }
 }
 
-class StaticTextUtf8(string: String, var size: Float, var font: Int, var color: NVGColor) : Text {
+class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
 
     override val data: ByteBuffer = MemoryUtil.memUTF8(string, true)
     override val length: Int = data.limit()
 
     override fun draw(nvg: Long, block: Block) {
-        nvgFontFaceId(nvg, font)
-        nvgFontSize(nvg, size)
+        nvgFontFaceId(nvg, style.font)
+        nvgFontSize(nvg, style.size)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
         nvgTextAlign(nvg, alignMask)
-        nvgFillColor(nvg, color)
+        nvgFillColor(nvg, style.color)
         nvgText(nvg, x, y, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
         twr(stackPush()) { stack ->
             val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, font)
-            nvgFontSize(nvg, size)
+            nvgFontFaceId(nvg, style.font)
+            nvgFontSize(nvg, style.size)
             nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
     }
 }
 
-class DynamicTextUtf8(override val data: ByteBuffer, var size: Float, var font: Int, var color: NVGColor) : Text {
+class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextStyle) : Text {
 
     override val length: Int get() = data.limit()
 
     override fun draw(nvg: Long, block: Block) {
-        nvgFontFaceId(nvg, font)
-        nvgFontSize(nvg, size)
+        nvgFontFaceId(nvg, style.font)
+        nvgFontSize(nvg, style.size)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
         nvgTextAlign(nvg, alignMask)
-        nvgFillColor(nvg, color)
+        nvgFillColor(nvg, style.color)
         nvgText(nvg, x, y, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
         twr(stackPush()) { stack ->
             val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, font)
-            nvgFontSize(nvg, size)
+            nvgFontFaceId(nvg, style.font)
+            nvgFontSize(nvg, style.size)
             nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
@@ -300,7 +306,7 @@ class ShapeCircle(override val fill: Fill, override val stroke: Stroke) : Shape 
     override fun draw(nvg: Long, block: Block) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgCircle(nvg, (block.x + block.width) / 2.0f, (block.y + block.height) / 2.0f, Math.min(block.width, block.height) / 2.0f - halfStroke)
+        nvgCircle(nvg, block.x + (block.width / 2.0f), block.y + (block.height / 2.0f), Math.min(block.width, block.height) / 2.0f - halfStroke)
         fill.draw(nvg, block)
         stroke.draw(nvg, block)
     }
@@ -340,6 +346,7 @@ abstract class Block {
     abstract val parent: Block
     abstract var nvg: Long
     abstract val children: MutableList<Block>
+    abstract var isVisible: Boolean
     abstract var hAlign: HorizontalAlignment
     abstract var vAlign: VerticalAlignment
     abstract var layout: Layout
@@ -427,25 +434,33 @@ abstract class Block {
     }
 
     private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Block? {
-        this.nvg = nvg
-        prepareForIteration()
-        return getMouseOverBlock(mouseX, mouseY)
+        if (isVisible) {
+            this.nvg = nvg
+            prepareForIteration()
+            return getMouseOverBlock(mouseX, mouseY)
+        }
+        return null
     }
 
     private fun getMouseOverBlock(mouseX: Int, mouseY: Int): Block? {
-        if (!isMouseAware || mouseX < x || mouseX > x + width || mouseY < y || mouseY > y + height) {
-            return null
+        if (isVisible) {
+            if (!isMouseAware || mouseX < x || mouseX > x + width || mouseY < y || mouseY > y + height) {
+                return null
+            }
+            (children.size - 1 downTo 0)
+                    .mapNotNull { children[it].getMouseOverBlock(mouseX, mouseY) }
+                    .forEach { return it }
+            return this
         }
-        (children.size - 1 downTo 0)
-                .mapNotNull { children[it].getMouseOverBlock(mouseX, mouseY) }
-                .forEach { return it }
-        return this
+        return null
     }
 
     fun draw(nvg: Long) {
-        this.nvg = nvg
-        prepareForIteration()
-        draw(ScissorStack(nvg))
+        if (isVisible) {
+            this.nvg = nvg
+            prepareForIteration()
+            draw(ScissorStack(nvg))
+        }
     }
 
     private fun prepareForIteration() {
@@ -459,14 +474,16 @@ abstract class Block {
     }
 
     private fun draw(scissorStack: ScissorStack) {
-        shape.draw(nvg, this)
-        val strokeSize = shape.stroke.size
-        scissorStack.push(Vector4f(x.toFloat() + strokeSize, y.toFloat() + strokeSize, x.toFloat() + width - strokeSize, y.toFloat() + height - strokeSize))
-        text.draw(nvg, this)
-        children.forEach {
-            it.draw(scissorStack)
+        if (isVisible) {
+            shape.draw(nvg, this)
+            val strokeSize = shape.stroke.size
+            scissorStack.push(Vector4f(x.toFloat() + strokeSize, y.toFloat() + strokeSize, x.toFloat() + width - strokeSize, y.toFloat() + height - strokeSize))
+            text.draw(nvg, this)
+            children.forEach {
+                it.draw(scissorStack)
+            }
+            scissorStack.pop()
         }
-        scissorStack.pop()
     }
 
     fun block(builder: Block.() -> Unit): Block {
@@ -506,6 +523,10 @@ private class RootBlock(override var x: Int, override var y: Int, override var w
     override val parent = this
     override val children = ArrayList<Block>()
     override var nvg: Long = -1
+    override var isVisible: Boolean
+        get() = true
+        set(value) {
+        }
     override var hAlign: HorizontalAlignment
         get() = LEFT
         set(value) {
@@ -600,6 +621,7 @@ private class DefaultBlock(
         override val parent: Block,
         override var nvg: Long = -1,
         override val children: MutableList<Block> = ArrayList(),
+        override var isVisible: Boolean = true,
         override var hAlign: HorizontalAlignment = LEFT,
         override var vAlign: VerticalAlignment = TOP,
         override var layout: Layout = ABSOLUTE,
@@ -643,6 +665,9 @@ private class DefaultBlock(
 
     override var width: Int
         get() {
+            if (!isVisible) {
+                return 0
+            }
             when (hSizing) {
                 STATIC -> {
                     return Math.max(0, _width)
@@ -761,6 +786,9 @@ private class DefaultBlock(
 
     override var height: Int
         get() {
+            if (!isVisible) {
+                return 0
+            }
             when (vSizing) {
                 STATIC -> {
                     return Math.max(0, _height)

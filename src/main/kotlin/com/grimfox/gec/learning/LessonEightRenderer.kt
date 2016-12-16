@@ -24,7 +24,7 @@ import java.nio.FloatBuffer
 import java.nio.IntBuffer
 import javax.imageio.ImageIO
 
-class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntBuffer, val perspectiveOn: IntBuffer, val waterPlaneOn: IntBuffer, val heightMapScaleFactor: FloatBuffer) {
+class LessonEightRenderer(val resetView: Reference<Boolean>, val rotateAroundCamera: Reference<Boolean>, val perspectiveOn: Reference<Boolean>, val waterPlaneOn: Reference<Boolean>, val heightMapScaleFactor: Reference<Float>) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -165,13 +165,13 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
             return
         }
 
-        val waterOn = waterPlaneOn[0] > 0
-        val doReset = resetView[0] > 0
+        val waterOn = waterPlaneOn.value
+        val doReset = resetView.value
         if (doReset) {
-            resetView.put(0, 0)
+            resetView.value = false
         }
-        val perspectiveOn = perspectiveOn[0] > 0
-        val rotateAroundCamera = rotateAroundCamera[0] > 0
+        val perspectiveOn = perspectiveOn.value
+        val rotateAroundCamera = rotateAroundCamera.value
 
         val premulRatio = ((width - xPosition.toFloat()) / (height - yPosition))
         val ratio = premulRatio * zoom
@@ -343,7 +343,7 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
         glUniform4f(diffuseUniform.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
         glUniform1f(shininessUniform.location, 1.7f)
-        glUniform1f(heightScaleUniform.location, heightMapScaleFactor[0] * modelScale)
+        glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value * modelScale)
         glUniform1f(uvScaleUniform.location, heightMap.width / textureResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
@@ -362,7 +362,7 @@ class LessonEightRenderer(val resetView: IntBuffer, val rotateAroundCamera: IntB
         glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
         glUniform1f(shininessUniformWater.location, 5.0f)
-        glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor[0] * modelScale)
+        glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor.value * modelScale)
         waterPlane.render()
     }
 
