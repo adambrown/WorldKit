@@ -30,15 +30,48 @@ interface MutableReference<T> : Reference<T> {
     override var value: T
 }
 
+interface MonitoredReference<T> : MutableReference<T> {
+
+    val listeners: MutableList<(oldValue: T, newValue: T) -> Unit>
+
+    override var value: T
+
+    fun listener(listener: (oldValue: T, newValue: T) -> Unit)
+}
+
 private class CRef<out T>(override val value: T) : Reference<T>
 
-private class Ref<T>(override var value: T) : MutableReference<T>
+private class MRef<T>(override var value: T) : MutableReference<T>
+
+private class Ref<T>(value: T) : MonitoredReference<T> {
+
+    override val listeners: MutableList<(oldValue: T, newValue: T) -> Unit> = ArrayList()
+
+    private var _value: T = value
+    override var value: T
+        get() = _value
+        set(value) {
+            val old = _value
+            _value = value
+            if (old != value) {
+                listeners.forEach { it(old, value) }
+            }
+        }
+
+    override fun listener(listener: (oldValue: T, newValue: T) -> Unit) {
+        listeners.add(listener)
+    }
+}
 
 fun <T> cRef(value: T): Reference<T> {
     return CRef(value)
 }
 
-fun <T> ref(value: T): MutableReference<T> {
+fun <T> mRef(value: T): MutableReference<T> {
+    return MRef(value)
+}
+
+fun <T> ref(value: T): MonitoredReference<T> {
     return Ref(value)
 }
 
@@ -114,6 +147,26 @@ private fun resizeBuffer(buffer: ByteBuffer, newCapacity: Int): ByteBuffer {
     buffer.flip()
     newBuffer.put(buffer)
     return newBuffer
+}
+
+fun clamp(value: Int, min: Int, max: Int): Int {
+    if (value < min) {
+        return min
+    }
+    if (value > max) {
+        return max
+    }
+    return value
+}
+
+fun clamp(value: Float, min: Float, max: Float): Float {
+    if (value < min) {
+        return min
+    }
+    if (value > max) {
+        return max
+    }
+    return value
 }
 
 object Utils {

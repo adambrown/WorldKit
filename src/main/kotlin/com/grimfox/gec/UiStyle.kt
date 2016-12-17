@@ -8,7 +8,7 @@ import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.ui.widgets.toggle
-import com.grimfox.gec.util.MutableReference
+import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
 import java.nio.ByteBuffer
@@ -31,13 +31,14 @@ val COLOR_CLICK_ITEMS = color(82, 82, 84)
 val COLOR_CLICK_ITEMS_LIGHTER = color(102, 102, 104)
 val COLOR_CLICK_ITEMS_HOVER = color(122, 122, 124)
 
-val COLOR_ACTIVE_HIGHLIGHT_DARK = color(11, 50, 77)
+//val COLOR_ACTIVE_HIGHLIGHT_DARK = color(11, 50, 77)
 val COLOR_ACTIVE_HIGHLIGHT = color(0, 122, 204)
-val COLOR_ACTIVE_HIGHLIGHT_BRIGHT = color(133, 199, 242)
+//val COLOR_ACTIVE_HIGHLIGHT_BRIGHT = color(133, 199, 242)
 
 val COLOR_NORMAL_TEXT = color(153, 153, 153)
-
 val COLOR_BUTTON_TEXT = color(243, 243, 243)
+
+
 val COLOR_BUTTON_MOUSE_OVER = color(64, 62, 64)
 
 val FILL_BUTTON_MOUSE_OVER = FillColor(COLOR_BUTTON_MOUSE_OVER)
@@ -47,9 +48,15 @@ val BUTTON_NORMAL = NO_SHAPE
 val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
 val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
+val SWITCH_HEIGHT = 20
+val ELEMENT_INSET = 4
+
+val TOGGLE_WIDTH = 76
+val TOGGLE_HEIGHT = SWITCH_HEIGHT + (ELEMENT_INSET * 2)
+val TOGGLE_CORNER_RADIUS = TOGGLE_HEIGHT / 2.0f
+
 val FILL_TOGGLE_BACKGROUND_NORMAL = FillColor(COLOR_BEVELS)
 val FILL_TOGGLE_BACKGROUND_MOUSE_OVER = FillColor(COLOR_BEVELS_LIGHTER)
-val FILL_TOGGLE_BACKGROUND_MOUSE_DOWN = FillColor(COLOR_ACTIVE_HIGHLIGHT_DARK)
 
 val FILL_TOGGLE_SWITCH_NORMAL_OFF = FillColor(COLOR_CLICK_ITEMS_DARKER)
 val FILL_TOGGLE_SWITCH_MOUSE_OVER_OFF = FillColor(COLOR_CLICK_ITEMS)
@@ -59,13 +66,8 @@ val FILL_TOGGLE_SWITCH_NORMAL_ON = FillColor(COLOR_CLICK_ITEMS_LIGHTER)
 val FILL_TOGGLE_SWITCH_MOUSE_OVER_ON = FillColor(COLOR_CLICK_ITEMS_HOVER)
 val FILL_TOGGLE_SWITCH_MOUSE_DOWN_ON = FillColor(COLOR_ACTIVE_HIGHLIGHT)
 
-val TOGGLE_WIDTH = 76
-val TOGGLE_HEIGHT = 32
-val TOGGLE_CORNER_RADIUS = TOGGLE_HEIGHT / 2.0f
-
 val TOGGLE_BACKGROUND_NORMAL = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_NORMAL, NO_STROKE, TOGGLE_CORNER_RADIUS)
 val TOGGLE_BACKGROUND_MOUSE_OVER = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_MOUSE_OVER, NO_STROKE, TOGGLE_CORNER_RADIUS)
-val TOGGLE_BACKGROUND_MOUSE_DOWN = ShapeRoundedRectangle(FILL_TOGGLE_BACKGROUND_MOUSE_DOWN, NO_STROKE, TOGGLE_CORNER_RADIUS)
 
 val TOGGLE_SWITCH_NORMAL_OFF = ShapeCircle(FILL_TOGGLE_SWITCH_NORMAL_OFF, NO_STROKE)
 val TOGGLE_SWITCH_MOUSE_OVER_OFF = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_OVER_OFF, NO_STROKE)
@@ -75,35 +77,79 @@ val TOGGLE_SWITCH_NORMAL_ON = ShapeCircle(FILL_TOGGLE_SWITCH_NORMAL_ON, NO_STROK
 val TOGGLE_SWITCH_MOUSE_OVER_ON = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_OVER_ON, NO_STROKE)
 val TOGGLE_SWITCH_MOUSE_DOWN_ON = ShapeCircle(FILL_TOGGLE_SWITCH_MOUSE_DOWN_ON, NO_STROKE)
 
+
+val SLIDER_BAR_UNFILLED_NORMAL = ShapeRoundedRectangle(FillColor(COLOR_BEVELS), NO_STROKE, 3.0f)
+val SLIDER_BAR_FILLED_NORMAL = ShapeRoundedRectangle(FillColor(COLOR_CLICK_ITEMS), NO_STROKE, 4.0f)
+val SLIDER_SWITCH_NORMAL = ShapeCircle(FillColor(COLOR_CLICK_ITEMS), NO_STROKE)
+
+val SLIDER_BAR_UNFILLED_MOUSE_OVER = ShapeRoundedRectangle(FillColor(COLOR_BEVELS_LIGHTER), NO_STROKE, 3.0f)
+val SLIDER_BAR_FILLED_MOUSE_OVER = ShapeRoundedRectangle(FillColor(COLOR_CLICK_ITEMS_LIGHTER), NO_STROKE, 4.0f)
+val SLIDER_SWITCH_MOUSE_OVER = ShapeCircle(FillColor(COLOR_CLICK_ITEMS_LIGHTER), NO_STROKE)
+
+val SLIDER_BAR_FILLED_MOUSE_DOWN = ShapeRoundedRectangle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE, 4.0f)
+val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE)
+
+
 val TEXT_STYLE_NORMAL = TextStyle(cRef(22.0f), textFont, cRef(COLOR_NORMAL_TEXT))
 val TEXT_STYLE_BUTTON = TextStyle(cRef(22.0f), textFont, cRef(COLOR_BUTTON_TEXT))
 val TEXT_STYLE_GLYPH = TextStyle(cRef(22.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
 
+
 val TOGGLE_STYLE = ToggleStyle(
-        4,
-        TOGGLE_BACKGROUND_NORMAL,
-        TOGGLE_SWITCH_NORMAL_ON,
-        TOGGLE_SWITCH_NORMAL_OFF,
-        TEXT_STYLE_NORMAL,
-        TEXT_STYLE_NORMAL,
-        TOGGLE_BACKGROUND_MOUSE_OVER,
-        TOGGLE_SWITCH_MOUSE_OVER_ON,
-        TOGGLE_SWITCH_MOUSE_OVER_OFF,
-        TEXT_STYLE_NORMAL,
-        TEXT_STYLE_NORMAL,
-        TOGGLE_BACKGROUND_MOUSE_DOWN,
-        TOGGLE_SWITCH_MOUSE_DOWN_ON,
-        TOGGLE_SWITCH_MOUSE_DOWN_OFF,
-        TEXT_STYLE_NORMAL,
-        TEXT_STYLE_NORMAL)
+        backgroundNormal = TOGGLE_BACKGROUND_NORMAL,
+        switchNormalOn = TOGGLE_SWITCH_NORMAL_ON,
+        switchNormalOff = TOGGLE_SWITCH_NORMAL_OFF,
+        textNormalOn = TEXT_STYLE_NORMAL,
+        textNormalOff = TEXT_STYLE_NORMAL,
+        backgroundMouseOver = TOGGLE_BACKGROUND_MOUSE_OVER,
+        switchMouseOverOn = TOGGLE_SWITCH_MOUSE_OVER_ON,
+        switchMouseOverOff = TOGGLE_SWITCH_MOUSE_OVER_OFF,
+        textMouseOverOn = TEXT_STYLE_NORMAL,
+        textMouseOverOff = TEXT_STYLE_NORMAL,
+        backgroundMouseDown = TOGGLE_BACKGROUND_MOUSE_OVER,
+        switchMouseDownOn = TOGGLE_SWITCH_MOUSE_DOWN_ON,
+        switchMouseDownOff = TOGGLE_SWITCH_MOUSE_DOWN_OFF,
+        textMouseDownOn = TEXT_STYLE_NORMAL,
+        textMouseDownOff = TEXT_STYLE_NORMAL,
+        inset = ELEMENT_INSET,
+        template = BlockTemplate(
+                vAlign = MIDDLE,
+                hSizing = STATIC,
+                vSizing = STATIC,
+                width = TOGGLE_WIDTH,
+                height = TOGGLE_HEIGHT))
+
+val SLIDER_STYLE = SliderStyle(
+        barUnfilledNormal = SLIDER_BAR_UNFILLED_NORMAL,
+        barFilledNormal = SLIDER_BAR_FILLED_NORMAL,
+        switchNormal = SLIDER_SWITCH_NORMAL,
+        barUnfilledMouseOver = SLIDER_BAR_UNFILLED_MOUSE_OVER,
+        barFilledMouseOver = SLIDER_BAR_FILLED_MOUSE_OVER,
+        switchMouseOver = SLIDER_SWITCH_MOUSE_OVER,
+        barUnfilledMouseDown = SLIDER_BAR_UNFILLED_MOUSE_OVER,
+        barFilledMouseDown = SLIDER_BAR_FILLED_MOUSE_DOWN,
+        switchMouseDown = SLIDER_SWITCH_MOUSE_DOWN,
+        template = BlockTemplate(
+                hSizing = GROW,
+                layout = HORIZONTAL),
+        sliderTemplate = BlockTemplate(
+                padLeft = 12,
+                padRight = 12),
+        switchTemplate = BlockTemplate(
+                vAlign = MIDDLE,
+                hSizing = STATIC,
+                vSizing = STATIC,
+                width = SWITCH_HEIGHT,
+                height = SWITCH_HEIGHT,
+                layout = HORIZONTAL))
 
 val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
-        BUTTON_NORMAL,
-        TEXT_STYLE_GLYPH,
-        BUTTON_MOUSE_OVER,
-        TEXT_STYLE_GLYPH,
-        BUTTON_MOUSE_DOWN,
-        TEXT_STYLE_GLYPH,
+        normal = BUTTON_NORMAL,
+        textNormal = TEXT_STYLE_GLYPH,
+        mouseOver = BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_GLYPH,
+        mouseDown = BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_GLYPH,
         template = BlockTemplate(
                 hSizing = STATIC,
                 vSizing = STATIC,
@@ -114,12 +160,12 @@ val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
                 layout = HORIZONTAL))
 
 val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
-        BUTTON_NORMAL,
-        TEXT_STYLE_BUTTON,
-        BUTTON_MOUSE_OVER,
-        TEXT_STYLE_BUTTON,
-        BUTTON_MOUSE_DOWN,
-        TEXT_STYLE_BUTTON,
+        normal = BUTTON_NORMAL,
+        textNormal = TEXT_STYLE_BUTTON,
+        mouseOver = BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_BUTTON,
+        mouseDown = BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_BUTTON,
         template = BlockTemplate(
                 hSizing = SHRINK,
                 vSizing = STATIC,
@@ -188,18 +234,49 @@ fun Block.dragArea(title: Text): Block {
     }
 }
 
-fun Block.toggle(value: MutableReference<Boolean>): Block {
-    return toggle(value, TOGGLE_WIDTH, TOGGLE_HEIGHT, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
+fun Block.toggle(value: MonitoredReference<Boolean>): Block {
+    return toggle(value, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
+}
+
+fun <T> Block.slider(value: MonitoredReference<T>, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+    return slider(value, SLIDER_STYLE, function, inverseFunction)
+}
+
+fun combineFunctions(f1: (Block.() -> Unit)?, f2: (Block.() -> Unit)?): (Block.() -> Unit)? {
+    if (f1 == null && f2 == null) {
+        return null
+    }
+    if (f1 == null) {
+        return f2
+    }
+    if (f2 == null) {
+        return f1
+    }
+    return { f1(); f2() }
+}
+
+fun combineFunctions(f1: (Block.(Int, Int, Int) -> Unit)?, f2: (Block.(Int, Int, Int) -> Unit)?): (Block.(Int, Int, Int) -> Unit)? {
+    if (f1 == null && f2 == null) {
+        return null
+    }
+    if (f1 == null) {
+        return f2
+    }
+    if (f2 == null) {
+        return f1
+    }
+    return { button, x, y -> f1(button, x, y); f2(button, x, y) }
 }
 
 fun Block.supplantEvents(other: Block): Block {
     other.isMouseAware = false
-    onMouseOver = other.onMouseOver
-    onMouseOut = other.onMouseOut
-    onMouseDown = other.onMouseDown
-    onMouseUp = other.onMouseUp
-    onMouseRelease = other.onMouseRelease
-    onMouseClick = other.onMouseClick
+    onMouseOver = combineFunctions(onMouseOver, other.onMouseOver)
+    onMouseOut = combineFunctions(onMouseOut, other.onMouseOut)
+    onMouseDown = combineFunctions(onMouseDown, other.onMouseDown)
+    onMouseUp = combineFunctions(onMouseUp, other.onMouseUp)
+    onMouseRelease = combineFunctions(onMouseRelease, other.onMouseRelease)
+    onMouseClick = combineFunctions(onMouseClick, other.onMouseClick)
+    onMouseDrag = combineFunctions(onMouseDrag, other.onMouseDrag)
     return this
 }
 
@@ -221,7 +298,7 @@ fun Block.vSpacer(space: Int) {
     }
 }
 
-fun Block.toggleRow(value: MutableReference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
+fun Block.toggleRow(value: MonitoredReference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -233,6 +310,24 @@ fun Block.toggleRow(value: MutableReference<Boolean>, height: Int, label: Text, 
             hSizing = GROW
             layout = HORIZONTAL
             val toggle = toggle(value)
+            row.supplantEvents(toggle)
+            isMouseAware = false
+        }
+    }
+}
+
+fun <T> Block.sliderRow(value: MonitoredReference<T>, height: Int, label: Text, labelWidth: Int, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, labelWidth)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val toggle = slider(value, function, inverseFunction)
             row.supplantEvents(toggle)
             isMouseAware = false
         }

@@ -36,7 +36,7 @@ import java.util.*
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, resetView: MutableReference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, uiBlock: UserInterface.() -> Unit) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, resetView: MutableReference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, tick: UserInterface.() -> Unit) {
     val ui = UserInterfaceInternal(createWindow(width, height))
     try {
         ui.layout.layoutBlock(ui)
@@ -49,7 +49,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, r
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.clearViewport()
-            ui.uiBlock()
+            ui.tick()
             lesson8.onDrawFrame(534, 40, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
             ui.drawFrame()
             ui.swapBuffers()
@@ -94,9 +94,13 @@ interface UserInterface {
     val scrollX: Float
     val scrollY: Float
     val isMaximized: Boolean
+    val isMinimized: Boolean
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
     var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean) -> Unit
+    var maximizeHandler: () -> Unit
+    var minimizeHandler: () -> Unit
+    var restoreHandler: () -> Unit
 
     fun show()
 
@@ -123,6 +127,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     internal val root: Block by lazy { layout.root }
 
     override val isMaximized: Boolean get() = window.isMaximized
+    override val isMinimized: Boolean get() = window.isMinimized
     override val layout: UiLayout get() = window.layout
     override val width: Int get() = window.currentWidth
     override val height: Int get() = window.currentHeight
@@ -141,6 +146,22 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         set(value) {
             window.mouseClickHandler = value
         }
+    override var maximizeHandler: () -> Unit
+        get() = window.maximizeHandler
+        set(value) {
+            window.maximizeHandler = value
+        }
+    override var minimizeHandler: () -> Unit
+        get() = window.minimizeHandler
+        set(value) {
+            window.minimizeHandler = value
+        }
+    override var restoreHandler: () -> Unit
+        get() = window.restoreHandler
+        set(value) {
+            window.restoreHandler = value
+        }
+
 
     override fun show() {
         glfwShowWindow(window.id)
@@ -306,6 +327,7 @@ private class WindowContext(
         val layout: UiLayoutInternal = UiLayoutInternal(nvg),
 
         var isMaximized: Boolean = false,
+        var isMinimized: Boolean = false,
         var isResizing: Boolean = false,
         var isDragging: Boolean = false,
         var hasMoved: Boolean = false,
@@ -361,7 +383,10 @@ private class WindowContext(
         var warpLines: List<WarpLine> = emptyList(),
 
         var currentMonitor: MonitorSpec = NO_MONITOR,
-        var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> }
+        var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> },
+        var maximizeHandler: () -> Unit = {},
+        var minimizeHandler: () -> Unit = {},
+        var restoreHandler: () -> Unit = {}
 
 ) {
 
@@ -377,6 +402,12 @@ private class WindowContext(
             glfwGetFramebufferSize(id, w, h)
             currentPixelWidth = w.get(0)
             currentPixelHeight = h.get(0)
+
+            if (currentPixelWidth < 0 || currentPixelHeight < 0) {
+                isMinimized = true
+            } else {
+                isMinimized = false
+            }
 
             val lastMouseX = mouseX
             val lastMouseY = mouseY
@@ -411,6 +442,7 @@ private class WindowContext(
     private fun handleResizing() {
         if (isResizing) {
             isMaximized = false
+            restoreHandler()
             val deltaMouseX = if (resizeMove) resizeMouseStartX - mouseX else mouseX - resizeMouseStartX
             val deltaMouseY = mouseY - resizeMouseStartY
             val deltaWindowX = width - resizeWindowStartWidth
@@ -460,6 +492,7 @@ private class WindowContext(
         if (isDragging) {
             if (hasMoved) {
                 isMaximized = false
+                restoreHandler()
             }
             val deltaMouseX = mouseX - dragMouseStartX
             val deltaMouseY = mouseY - dragMouseStartY
@@ -533,6 +566,7 @@ private class WindowContext(
             }
             glfwSetWindowSize(id, width, height)
             isMaximized = false
+            restoreHandler()
             return newWindowX
         }
         return windowX
@@ -545,6 +579,7 @@ private class WindowContext(
             glfwSetWindowPos(id, currentMonitor.maximizedX1, currentMonitor.maximizedY1)
             glfwSetWindowSize(id, currentMonitor.maximizedWidth, currentMonitor.maximizedHeight)
             isMaximized = true
+            maximizeHandler()
         }
     }
 

@@ -6,7 +6,7 @@ import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
-import com.grimfox.gec.util.MutableReference
+import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryUtil
@@ -14,28 +14,29 @@ import org.lwjgl.system.MemoryUtil
 object MainUi {
 
     @JvmStatic fun main(vararg args: String) {
-
-        val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }
-        val glyphClose = glyphIndex[0]
-        val glyphMinimize = glyphIndex[1]
-        val glyphRestore = glyphIndex[2]
-        val glyphMaximize = glyphIndex[3]
-
-        val maxRestoreGlyph = MemoryUtil.memUTF8(glyphRestore, true)
-        fun setRestore() {
-            MemoryUtil.memUTF8(glyphRestore, true, maxRestoreGlyph, 0)
-        }
-
-        fun setMaximize() {
-            MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
-        }
-
         val DEFAULT_HEIGHT_SCALE = 130.0f
-        val heightMapScaleFactor: MutableReference<Float> = ref(DEFAULT_HEIGHT_SCALE)
-        val waterPlaneOn: MutableReference<Boolean> = ref(true)
-        val perspectiveOn: MutableReference<Boolean> = ref(true)
-        val rotateAroundCamera: MutableReference<Boolean> = ref(false)
-        val resetView: MutableReference<Boolean> = ref(false)
+        val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
+        val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
+        val heightScaleFunction = { scale: Float ->
+            Math.min(MAX_HEIGHT_SCALE, Math.max(MIN_HEIGHT_SCALE, if (scale <= 0.5f) {
+                scale * 260
+            } else {
+                (125.937 + (4160.29 * Math.pow(scale - 0.46874918, 2.0))).toFloat()
+            }))
+        }
+        val heightScaleFunctionInverse = { value: Float ->
+            Math.min(1.0f, Math.max(0.0f, if (value <= 130) {
+                value / 260
+            } else {
+                (Math.sqrt((value - 125.937) / 4160.29) + 0.46874918).toFloat()
+            }))
+        }
+        val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
+
+        val waterPlaneOn = ref(true)
+        val perspectiveOn = ref(true)
+        val rotateAroundCamera = ref(false)
+        val resetView = mRef(false)
 
         val uiLayout = layout { ui ->
             ui {
@@ -43,6 +44,20 @@ object MainUi {
 
                 textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
                 glyphFont.value = createFont("/fonts/WorldKitUi.ttf", "Glyphs")
+
+                val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }
+                val glyphClose = glyphIndex[0]
+                val glyphMinimize = glyphIndex[1]
+                val glyphRestore = glyphIndex[2]
+                val glyphMaximize = glyphIndex[3]
+
+                val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) glyphRestore else glyphMaximize, true)
+                ui.maximizeHandler = {
+                    MemoryUtil.memUTF8(glyphRestore, true, maxRestoreGlyph, 0)
+                }
+                ui.restoreHandler = {
+                    MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
+                }
 
                 val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
 
@@ -88,32 +103,7 @@ object MainUi {
                                 toggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
                                 toggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
                                 toggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                block {
-                                    vSizing = STATIC
-                                    height = LARGE_ROW_HEIGHT
-                                    layout = VERTICAL
-                                    block {
-                                        hSizing = STATIC
-                                        width = labelWidth
-                                        layout = HORIZONTAL
-                                        block {
-                                            hAlign = RIGHT
-                                            vAlign = MIDDLE
-                                            hSizing = SHRINK
-                                            vSizing = SHRINK
-                                            text = text("Height scale:")
-                                            isMouseAware = false
-                                        }
-                                    }
-                                    hSpacer(MEDIUM_SPACER_SIZE)
-                                    block {
-                                        hSizing = GROW
-                                        layout = HORIZONTAL
-
-                                        //@TODO need to add slider here
-
-                                    }
-                                }
+                                sliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
                                 buttonRow(LARGE_ROW_HEIGHT) {
                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
@@ -132,15 +122,8 @@ object MainUi {
             }
         }
 
-        var lastMaximized = true
-
         ui(uiLayout, 1280, 720, resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor) {
-            if (isMaximized && !lastMaximized) {
-                setRestore()
-            } else if (!isMaximized && lastMaximized) {
-                setMaximize()
-            }
-            lastMaximized = isMaximized
+
         }
     }
 }

@@ -68,16 +68,40 @@ class ScissorStack(val nvg: Long) {
         return clip
     }
 
+    inline fun suspendIf(condition: Boolean, block: () -> Unit) {
+        if (condition) {
+            suspendWhile(block)
+        } else {
+            block()
+        }
+    }
+
+    inline fun suspendWhile(block: () -> Unit) {
+        suspend()
+        block()
+        resume()
+    }
+
+    fun suspend() {
+        nvgResetScissor(nvg)
+    }
+
+    fun resume() {
+        if (!stack.isEmpty()) {
+            val current = stack.last()
+            nvgScissor(nvg, current.x, current.y, current.z - current.x, current.w - current.y)
+        }
+    }
+
     fun pop(): Vector4f? {
         if (stack.isEmpty()) {
             return null
         }
         val top = stack.removeAt(stack.size - 1)
         if (stack.isEmpty()) {
-            nvgResetScissor(nvg)
+            suspend()
         } else {
-            val current = stack.last()
-            nvgScissor(nvg, current.x, current.y, current.z - current.x, current.w - current.y)
+            resume()
         }
         return top
     }
@@ -346,7 +370,7 @@ data class BlockTemplate(
         val isVisible: Boolean = true,
         val hAlign: HorizontalAlignment = LEFT,
         val vAlign: VerticalAlignment = TOP,
-        val layout: Layout = HORIZONTAL,
+        val layout: Layout = ABSOLUTE,
         val xOffset: Int = 0,
         val yOffset: Int = 0,
         val hSizing: Sizing = RELATIVE,
@@ -383,12 +407,14 @@ abstract class Block {
     abstract var text: Text
     abstract var lastBlock: Block?
     abstract var isMouseAware: Boolean
+    abstract var canOverflow: Boolean
     abstract var onMouseOver: (Block.() -> Unit)?
     abstract var onMouseOut: (Block.() -> Unit)?
     abstract var onMouseDown: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseUp: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseRelease: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int) -> Unit)?
+    abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
@@ -445,6 +471,12 @@ abstract class Block {
                     mouseOver?.mouseOverFun()
                 }
             }
+            awaitingRelease.forEach {
+                val mouseDragFun = it.second.onMouseDrag
+                if (mouseDragFun != null) {
+                    it.second.mouseDragFun(it.first, mouseX, mouseY)
+                }
+            }
         } else {
             root.handleNewMousePosition(nvg, mouseX, mouseY)
         }
@@ -492,10 +524,14 @@ abstract class Block {
 
     private fun draw(scissorStack: ScissorStack) {
         if (isVisible) {
-            shape.draw(nvg, this)
+            scissorStack.suspendIf(canOverflow) {
+                shape.draw(nvg, this)
+            }
             val strokeSize = shape.stroke.size
             scissorStack.push(Vector4f(x.toFloat() + strokeSize, y.toFloat() + strokeSize, x.toFloat() + width - strokeSize, y.toFloat() + height - strokeSize))
-            text.draw(nvg, this)
+            scissorStack.suspendIf(canOverflow) {
+                text.draw(nvg, this)
+            }
             children.forEach {
                 it.draw(scissorStack)
             }
@@ -613,6 +649,10 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         get() = true
         set(value) {
         }
+    override var canOverflow: Boolean
+        get() = false
+        set(value) {
+        }
     override var onMouseOver: (Block.() -> Unit)?
         get() = null
         set(value) {
@@ -634,6 +674,10 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         set(value) {
         }
     override var onMouseClick: (Block.(Int, Int, Int) -> Unit)?
+        get() = null
+        set(value) {
+        }
+    override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
@@ -670,6 +714,7 @@ private class DefaultBlock(
         override var padBottom: Int = 0,
         override var shape: Shape = NO_SHAPE,
         override var text: Text = NO_TEXT,
+        override var canOverflow: Boolean = false,
         override var lastBlock: Block? = null,
         override var isMouseAware: Boolean = parent.isMouseAware,
         override var onMouseOver: (Block.() -> Unit)? = null,
@@ -677,7 +722,8 @@ private class DefaultBlock(
         override var onMouseDown: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseUp: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null) : Block() {
+        override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null,
+        override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null) : Block() {
 
     override var awaitingRelease: MutableList<Pair<Int, Block>>
         get() = ArrayList()

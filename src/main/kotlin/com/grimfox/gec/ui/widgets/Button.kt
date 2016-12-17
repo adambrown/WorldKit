@@ -1,6 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
+import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.SHRINK
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
@@ -8,14 +9,15 @@ import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 data class ButtonStyle(
         val normal: Shape,
         val textNormal: TextStyle,
+        val textShapeNormal: Shape = NO_SHAPE,
         val mouseOver: Shape,
         val textMouseOver: TextStyle,
+        val textShapeMouseOver: Shape = NO_SHAPE,
         val mouseDown: Shape,
         val textMouseDown: TextStyle,
-        val template: BlockTemplate = BlockTemplate(),
-        val textShapeNormal: Shape = NO_SHAPE,
-        val textShapeMouseOver: Shape = NO_SHAPE,
         val textShapeMouseDown: Shape = NO_SHAPE,
+        val template: BlockTemplate = BlockTemplate(
+                layout = HORIZONTAL),
         val textShapeTemplate: BlockTemplate = BlockTemplate(
                 hAlign = CENTER,
                 vAlign = MIDDLE,
