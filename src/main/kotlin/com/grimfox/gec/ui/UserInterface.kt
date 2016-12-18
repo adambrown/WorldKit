@@ -1,11 +1,8 @@
 package com.grimfox.gec.ui
 
 import com.grimfox.gec.extensions.twr
-import com.grimfox.gec.learning.LessonEightRenderer
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.uiRoot
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.Reference
 import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
@@ -36,7 +33,7 @@ import java.util.*
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, resetView: MutableReference<Boolean>, rotateAroundCamera: Reference<Boolean>, perspectiveOn: Reference<Boolean>, waterPlaneOn: Reference<Boolean>, heightMapScaleFactor: Reference<Float>, tick: UserInterface.() -> Unit) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, tick: UserInterface.() -> Unit) {
     val ui = UserInterfaceInternal(createWindow(width, height))
     try {
         ui.layout.layoutBlock(ui)
@@ -44,13 +41,12 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, r
             ui.root.handleMouseAction(button, x, y, isDown)
         }
         ui.show()
-        val lesson8: LessonEightRenderer = LessonEightRenderer(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
             ui.clearViewport()
             ui.tick()
-            lesson8.onDrawFrame(534, 40, ui.pixelWidth, ui.pixelHeight, ui.relativeMouseX, ui.relativeMouseY, ui.scrollY, ui.isMouse1Down, ui.isMouse2Down)
+            ui.setupViewport()
             ui.drawFrame()
             ui.swapBuffers()
         }
@@ -176,6 +172,8 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     }
 
     override fun minimizeWindow() {
+        window.isMinimized = true
+        minimizeHandler()
         glfwIconifyWindow(window.id)
     }
 
@@ -212,19 +210,31 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     }
 
     internal fun clearViewport() {
-        glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+        setupViewport()
         glClearColor(layout.background.r, layout.background.g, layout.background.b, layout.background.a)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
-    internal fun drawFrame() {
+    internal fun setupViewport() {
         glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+    }
+
+    internal fun drawFrame() {
+        if (window.currentPixelWidth < 0 || window.currentPixelHeight < 0 && !isMinimized) {
+            window.isMinimized = true
+            minimizeHandler()
+        }
+        if (isMinimized) {
+            return
+        }
+        setupViewport()
         nvgSave(nvg)
         root.width = width
         root.height = height
         root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
         nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
         root.draw(nvg)
+        setupViewport()
         nvgEndFrame(nvg)
         nvgRestore(nvg)
     }
@@ -403,9 +413,10 @@ private class WindowContext(
             currentPixelWidth = w.get(0)
             currentPixelHeight = h.get(0)
 
-            if (currentPixelWidth < 0 || currentPixelHeight < 0) {
+            if (currentPixelWidth <= 0 || currentPixelHeight <= 0 && !isMinimized) {
                 isMinimized = true
-            } else {
+                minimizeHandler()
+            } else if (currentPixelWidth > 0 && currentPixelHeight > 0 && isMinimized) {
                 isMinimized = false
             }
 

@@ -23,6 +23,10 @@ val SMALL_ROW_HEIGHT = 32
 val MEDIUM_ROW_HEIGHT = 40
 val LARGE_ROW_HEIGHT = 48
 
+val COLOR_BACKGROUND = color(45, 45, 48)
+val FILL_BACKGROUND = FillColor(COLOR_BACKGROUND)
+val BACKGROUND_RECT = ShapeRectangle(FILL_BACKGROUND, NO_STROKE)
+
 val COLOR_BEVELS = color(34, 34, 35)
 val COLOR_BEVELS_LIGHTER = color(38, 38, 39)
 
@@ -93,6 +97,11 @@ val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO
 val TEXT_STYLE_NORMAL = TextStyle(cRef(22.0f), textFont, cRef(COLOR_NORMAL_TEXT))
 val TEXT_STYLE_BUTTON = TextStyle(cRef(22.0f), textFont, cRef(COLOR_BUTTON_TEXT))
 val TEXT_STYLE_GLYPH = TextStyle(cRef(22.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_LARGE = TextStyle(cRef(32.0f), textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(32.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+
+val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
+val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)
 
 
 val TOGGLE_STYLE = ToggleStyle(
@@ -170,6 +179,27 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 hSizing = SHRINK,
                 vSizing = STATIC,
                 height = SMALL_ROW_HEIGHT,
+                vAlign = MIDDLE,
+                layout = HORIZONTAL),
+        textShapeTemplate = BlockTemplate(
+                hAlign = CENTER,
+                vAlign = MIDDLE,
+                hSizing = SHRINK,
+                vSizing = SHRINK,
+                padLeft = SMALL_SPACER_SIZE,
+                padRight = SMALL_SPACER_SIZE))
+
+val LARGE_TEXT_BUTTON_STYLE = ButtonStyle(
+        normal = BUTTON_NORMAL,
+        textNormal = TEXT_STYLE_BUTTON_LARGE,
+        mouseOver = BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_BUTTON_LARGE,
+        mouseDown = BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_BUTTON_LARGE,
+        template = BlockTemplate(
+                hSizing = SHRINK,
+                vSizing = STATIC,
+                height = MEDIUM_ROW_HEIGHT,
                 vAlign = MIDDLE,
                 layout = HORIZONTAL),
         textShapeTemplate = BlockTemplate(
@@ -298,7 +328,30 @@ fun Block.vSpacer(space: Int) {
     }
 }
 
-fun Block.toggleRow(value: MonitoredReference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
+fun Block.hDivider() {
+    block {
+        hSizing = STATIC
+        width = 6
+        height = -12
+        yOffset = 6
+        layout = HORIZONTAL
+        isMouseAware = false
+        block {
+            hSizing = STATIC
+            width = 2
+            shape = DIVIDER_DARK
+            layout = HORIZONTAL
+        }
+        block {
+            hSizing = STATIC
+            width = 2
+            shape = DIVIDER_LIGHT
+            layout = HORIZONTAL
+        }
+    }
+}
+
+fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -316,7 +369,24 @@ fun Block.toggleRow(value: MonitoredReference<Boolean>, height: Int, label: Text
     }
 }
 
-fun <T> Block.sliderRow(value: MonitoredReference<T>, height: Int, label: Text, labelWidth: Int, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Int): Block {
+    return block {
+        val row = this
+        hSizing = SHRINK
+        layout = HORIZONTAL
+        label(label)
+        hSpacer(gap)
+        block {
+            hSizing = SHRINK
+            layout = HORIZONTAL
+            val toggle = toggle(value)
+            row.supplantEvents(toggle)
+            isMouseAware = false
+        }
+    }
+}
+
+fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Int, label: Text, labelWidth: Int, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -334,11 +404,43 @@ fun <T> Block.sliderRow(value: MonitoredReference<T>, height: Int, label: Text, 
     }
 }
 
-fun Block.buttonRow(height: Int, buttons: Block.() -> Unit): Block {
+fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Int, label: Text, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+    return block {
+        val row = this
+        hSizing = SHRINK
+        layout = HORIZONTAL
+        label(label)
+        hSpacer(gap)
+        block {
+            hSizing = STATIC
+            this.width = width
+            layout = HORIZONTAL
+            val toggle = slider(value, function, inverseFunction)
+            row.supplantEvents(toggle)
+            isMouseAware = false
+        }
+    }
+}
+
+fun Block.vButtonRow(height: Int, buttons: Block.() -> Unit): Block {
     return block {
         vSizing = STATIC
         this.height = height
         layout = VERTICAL
+        block {
+            hSizing = SHRINK
+            vSizing = SHRINK
+            hAlign = CENTER
+            vAlign = MIDDLE
+            buttons()
+        }
+    }
+}
+
+fun Block.hButtonRow(buttons: Block.() -> Unit): Block {
+    return block {
+        hSizing = SHRINK
+        layout = HORIZONTAL
         block {
             hSizing = SHRINK
             vSizing = SHRINK

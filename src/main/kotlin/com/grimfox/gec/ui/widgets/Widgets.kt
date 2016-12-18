@@ -357,6 +357,19 @@ class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke
         fill.draw(nvg, block)
         stroke.draw(nvg, block)
     }
+}
+
+class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
+
+    override val fill = NO_FILL
+    override val stroke = NO_STROKE
+
+    override fun draw(nvg: Long, block: Block) {
+        nvgSave(nvg)
+        nvgReset(nvg)
+        viewport.onDrawFrame(block.x, block.y, block.width, block.height, block.root.height)
+        nvgRestore(nvg)
+    }
 
 }
 
@@ -753,7 +766,7 @@ private class DefaultBlock(
                 }
                 RELATIVE -> {
                     if (_width < 0) {
-                        return (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight).toInt() - _width
+                        return (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight).toInt() + _width
                     } else {
                         return ((Math.min(100, _width) / 100.0f) * (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight)).toInt()
                     }
@@ -874,7 +887,7 @@ private class DefaultBlock(
                 }
                 RELATIVE -> {
                     if (_height < 0) {
-                        return (parent.height - (parent.shape.stroke.size * 2)).toInt() - _height
+                        return (parent.height - (parent.shape.stroke.size * 2)).toInt() + _height
                     } else {
                         return ((Math.min(100, _height) / 100.0f) * (parent.height - (parent.shape.stroke.size * 2))).toInt()
                     }
@@ -1005,7 +1018,7 @@ private class DefaultBlock(
             if (layout == HORIZONTAL) {
                 return getYRelativeTo(parent.y, parent.height)
             }
-            return getYRelativeTo(lastBlock!!.y + lastBlock!!.height + lastBlock!!.padBottom + padLeft, parent.height)
+            return getYRelativeTo(lastBlock!!.y + lastBlock!!.height + lastBlock!!.padBottom + padTop, parent.height)
 
         }
         set(value) {

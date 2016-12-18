@@ -1,4 +1,4 @@
-package com.grimfox.gec.learning
+package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
@@ -15,7 +15,12 @@ import org.lwjgl.opengl.GL30.*
 import java.lang.Math.round
 import java.lang.Math.sqrt
 
-class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAroundCamera: Reference<Boolean>, val perspectiveOn: Reference<Boolean>, val waterPlaneOn: Reference<Boolean>, val heightMapScaleFactor: Reference<Float>) {
+class MeshViewport3D(
+        val resetView: MutableReference<Boolean>,
+        val rotateAroundCamera: Reference<Boolean>,
+        val perspectiveOn: Reference<Boolean>,
+        val waterPlaneOn: Reference<Boolean>,
+        val heightMapScaleFactor: Reference<Float>) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -105,11 +110,11 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
     var isTranslateOn = false
     var isResetOn = false
 
-    private var heightMap: HexGrid
+    private lateinit var heightMap: HexGrid
 
-    private var waterPlane: HexGrid
+    private lateinit var waterPlane: HexGrid
 
-    init {
+    fun init() {
 
         glEnable(GL_DEPTH_TEST)
 
@@ -148,11 +153,23 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
         modelMatrix.translate(translation)
     }
 
-    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, mouseX: Int, mouseY: Int, mouseWheel: Float, isMouse1Down: Boolean, isMouse2Down: Boolean) {
+    var mouseX = 0
+    var mouseY = 0
+    var mouseWheel = 0.0f
+    var isMouse1Down = false
+    var isMouse2Down = false
 
-        if (width <= 0 || height <= 0) {
-            return
-        }
+    fun doInput(mouseX: Int, mouseY: Int, mouseWheel: Float, isMouse1Down: Boolean, isMouse2Down: Boolean) {
+        this.mouseX = mouseX
+        this.mouseY = mouseY
+        this.mouseWheel = mouseWheel
+        this.isMouse1Down = isMouse1Down
+        this.isMouse2Down = isMouse2Down
+    }
+
+    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int) {
+
+        val flippedY = rootHeight - (yPosition + height)
 
         val waterOn = waterPlaneOn.value
         val doReset = resetView.value
@@ -162,7 +179,7 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
         val perspectiveOn = perspectiveOn.value
         val rotateAroundCamera = rotateAroundCamera.value
 
-        val premulRatio = ((width - xPosition.toFloat()) / (height - yPosition))
+        val premulRatio = width / height.toFloat()
         val ratio = premulRatio * zoom
         if (perspectiveOn) {
             projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
@@ -175,19 +192,17 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
         scroll = mouseWheel
         val deltaScroll = scroll - lastScroll
 
-        val isMouseOver = mouseX > xPosition && mouseX < width && mouseY > yPosition && mouseY < height
+        val isMouseOver = mouseX > xPosition && mouseX < xPosition + width && mouseY > yPosition && mouseY < yPosition + height
 
         val adjustedMouseX = mouseX - xPosition
         val adjustedMouseY = mouseY - yPosition
-        val adjustedWidth = width - xPosition
-        val adjustedHeight = height - yPosition
 
-        val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneWidth = adjustedWidth - (2 * marginWidth)
-        val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+        val marginWidth = Math.min(220, ((width * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneWidth = width - (2 * marginWidth)
+        val marginHeight = Math.min(220, ((height * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneHeight = height - (2 * marginHeight)
 
-        val mouseDistanceMultiplier = (heightMap.width / (height - yPosition))
+        val mouseDistanceMultiplier = (heightMap.width / (height))
 
         if (isMouseOver) {
             val isMouseOverMargin = isMouseOver && (adjustedMouseX <= marginWidth || adjustedMouseX > marginWidth + hotZoneWidth || adjustedMouseY <= marginHeight || adjustedMouseY > marginHeight + hotZoneHeight)
@@ -237,12 +252,10 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
         if (!isMouse1Down) {
             isRollOn = false
             isRotateOn = false
-            isResetOn = false
             lastMouse1Down = false
         }
         if (!isMouse2Down) {
             isTranslateOn = false
-            isResetOn = false
             lastMouse2Down = false
         }
 
@@ -278,12 +291,12 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
             }
         } else if (isRollOn) {
             var deltaRoll = 0.0f
-            if (adjustedMouseX <= adjustedWidth / 2) {
+            if (adjustedMouseX <= width / 2) {
                 deltaRoll += deltaY
             } else {
                 deltaRoll -= deltaY
             }
-            if (adjustedMouseY <= adjustedHeight / 2) {
+            if (adjustedMouseY <= height / 2) {
                 deltaRoll -= deltaX
             } else {
                 deltaRoll += deltaX
@@ -303,17 +316,16 @@ class LessonEightRenderer(val resetView: MutableReference<Boolean>, val rotateAr
         glEnable(GL_MULTISAMPLE)
 
         glClearColor(background.r, background.g, background.b, background.a)
-        glScissor(xPosition, 0, width - xPosition, height - yPosition)
+        glScissor(xPosition, flippedY, width, height)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-        glViewport(xPosition, 0, width - xPosition, height - yPosition)
+        glViewport(xPosition, flippedY, width, height)
 
         if (waterOn) {
             drawWaterPlane()
         }
         drawHeightMap()
 
-        glScissor(0, 0, width, height)
         glDisable(GL_SCISSOR_TEST)
     }
 

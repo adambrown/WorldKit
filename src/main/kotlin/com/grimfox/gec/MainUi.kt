@@ -32,11 +32,12 @@ object MainUi {
             }))
         }
         val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
-
         val waterPlaneOn = ref(true)
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
+
+        val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
         val uiLayout = layout { ui ->
             ui {
@@ -60,6 +61,8 @@ object MainUi {
                 }
 
                 val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
+
+                meshViewport.init()
 
                 var topBar = NO_BLOCK
                 var contentPanel = NO_BLOCK
@@ -100,11 +103,11 @@ object MainUi {
                                 hSizing = GROW
                                 layout = HORIZONTAL
                                 vSpacer(MEDIUM_SPACER_SIZE)
-                                toggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                toggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                toggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                sliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-                                buttonRow(LARGE_ROW_HEIGHT) {
+                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                vButtonRow(LARGE_ROW_HEIGHT) {
                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
                                 }
@@ -116,14 +119,105 @@ object MainUi {
                             layout = HORIZONTAL
                             hAlign = LEFT
                             vAlign = TOP
+                            block {
+                                xOffset = 6
+                                yOffset = 6
+                                width = -12
+                                height = -12
+                                block {
+                                    hSizing = STATIC
+                                    width = 2
+                                    hAlign = LEFT
+                                    layout = HORIZONTAL
+                                    shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                }
+                                block {
+                                    hSizing = GROW
+                                    layout = HORIZONTAL
+                                    block {
+                                        vSizing = STATIC
+                                        height = 2
+                                        vAlign = TOP
+                                        layout = VERTICAL
+                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    }
+                                    block {
+                                        vSizing = GROW
+                                        layout = VERTICAL
+                                        block {
+                                            layout = ABSOLUTE
+                                            shape = ShapeMeshViewport3D(meshViewport)
+                                        }
+                                        block {
+                                            val toolbar = this
+                                            vSizing = STATIC
+                                            height = MEDIUM_ROW_HEIGHT
+                                            var tools = NO_BLOCK
+                                            var expandToolbarButton = NO_BLOCK
+                                            var collapseToolbarButton = NO_BLOCK
+                                            hButtonRow {
+                                                expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) { tools.isVisible = true; collapseToolbarButton.isVisible = true; expandToolbarButton.isVisible = false; toolbar.shape = BACKGROUND_RECT }
+                                                collapseToolbarButton = button(text("-"), LARGE_TEXT_BUTTON_STYLE) { tools.isVisible = false; collapseToolbarButton.isVisible = false; expandToolbarButton.isVisible = true; toolbar.shape = NO_SHAPE }
+                                                collapseToolbarButton.isVisible = false
+                                            }
+                                            tools = block {
+                                                isVisible = false
+                                                hSizing = GROW
+                                                layout = HORIZONTAL
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hDivider()
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hDivider()
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hDivider()
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hSliderRow(heightMapScaleFactor, 350, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hDivider()
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hButtonRow {
+                                                    button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
+                                                }
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hDivider()
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                                hButtonRow {
+                                                    button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                                }
+                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                            }
+                                        }
+                                    }
+                                    block {
+                                        vSizing = STATIC
+                                        height = 2
+                                        vAlign = TOP
+                                        layout = VERTICAL
+                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    }
+                                }
+                                block {
+                                    hSizing = STATIC
+                                    width = 2
+                                    hAlign = LEFT
+                                    layout = HORIZONTAL
+                                    shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        ui(uiLayout, 1280, 720, resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor) {
-
+        ui(uiLayout, 1280, 720) {
+            meshViewport.doInput(relativeMouseX, relativeMouseY, scrollY, isMouse1Down, isMouse2Down)
         }
     }
 }
