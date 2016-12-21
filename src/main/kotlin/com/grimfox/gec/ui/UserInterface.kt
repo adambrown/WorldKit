@@ -294,12 +294,14 @@ private data class MonitorSpec(
         val maximizedY1: Int,
         val maximizedX2: Int,
         val maximizedY2: Int,
+        val scaleFactor: Double,
+        val overRender: Double,
         val redBits: Int,
         val greenBits: Int,
         val blueBits: Int,
         val refreshRate: Int)
 
-private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0, 0, 0, 0)
 
 private data class ScreenIdentity(
         val x: Int,
@@ -322,12 +324,16 @@ private data class ScreenSpec(
         val y2: Int,
         val width: Int,
         val height: Int,
+        val pixelWidth: Int,
+        val pixelHeight: Int,
         val maximizedX1: Int,
         val maximizedY1: Int,
         val maximizedX2: Int,
         val maximizedY2: Int,
         val maximizedWidth: Int,
-        val maximizedHeight: Int)
+        val maximizedHeight: Int,
+        var scaleFactor: Double,
+        var overRender: Double)
 
 private class WindowContext(
         var id: Long = 0,
@@ -818,7 +824,9 @@ private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenS
         totalBounds = totalBounds.union(device.defaultConfiguration.bounds)
     }
     var lastX = 0
+    var lastIdentity: ScreenIdentity?
     for (device in devices) {
+        val currentMode = device.displayMode
         val graphicsConfiguration = device.defaultConfiguration
         val bounds = graphicsConfiguration.bounds
         val toolkit = Toolkit.getDefaultToolkit()
@@ -835,18 +843,33 @@ private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenS
         val maximizedHeight = height - insets.top - insets.bottom
         val maximizedX2 = maximizedX1 + maximizedWidth
         val maximizedY2 = maximizedY1 + maximizedHeight
-        if (x1 > lastX) {
-            val scaleFactor = lastX / x1.toDouble()
-            val iX1 = lastX
-            val iY1 = Math.round(y1 * scaleFactor).toInt()
-            val iWidth = Math.round(width * scaleFactor).toInt()
-            val iHeight = Math.round(height * scaleFactor).toInt()
-            screens.put(ScreenIdentity(iX1, iY1, iWidth, iHeight), ScreenSpec(x1, y1, x2, y2, width, height, maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight))
-            warpLines.add(WarpLine(iX1, y1, x1, y1 + height, Math.abs(x1 - lastX), 0))
-            lastX = iX1 + iWidth
+        if (x1 > lastX || currentMode.width != width) {
+            val scaleFactor = currentMode.width / width.toDouble()
+            lastIdentity = ScreenIdentity(lastX, Math.round(y1 * scaleFactor).toInt(), currentMode.width, currentMode.height)
+            screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, width, height, currentMode.width, currentMode.height,
+                    maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, scaleFactor, width.toDouble() / currentMode.width))
+            if (x1 > lastX) {
+                warpLines.add(WarpLine(lastX, y1, x1, y1 + height, Math.abs(x1 - lastX), 0))
+            }
+            lastX += currentMode.width
         } else {
-            screens.put(ScreenIdentity(x1, y1, width, height), ScreenSpec(x1, y1, x2, y2, width, height, maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight))
+            lastIdentity = ScreenIdentity(x1, y1, currentMode.width, currentMode.height)
+            screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, currentMode.width, currentMode.height, currentMode.width, currentMode.height,
+                    maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, 1.0, 1.0))
             lastX = x2
+        }
+    }
+    var minScaleFactor = 1.0
+    screens.forEach { screenIdentity, screenSpec ->
+        if (screenSpec.scaleFactor < minScaleFactor) {
+            minScaleFactor = screenSpec.scaleFactor
+        }
+    }
+    if (minScaleFactor < 1.0) {
+        val correctionFactor = 1.0 / minScaleFactor
+        screens.forEach { screenIdentity, screenSpec ->
+            screenSpec.scaleFactor *= correctionFactor
+            screenSpec.scaleFactor = Math.max(1.0, Math.min(2.5, Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0))
         }
     }
     return Pair(screens, warpLines)
@@ -859,6 +882,8 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
         val intPointer1 = stack.mallocInt(1)
         val intPointer2 = stack.mallocInt(1)
         val monitorIds = glfwGetMonitors()
+        var primaryScaleCorrection = 1.0
+        var isPrimary = true
         while (monitorIds.hasRemaining()) {
             val monitorId = monitorIds.get()
             glfwGetMonitorPhysicalSize(monitorId, intPointer1, intPointer2)
@@ -881,6 +906,13 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             var screen = screens[ScreenIdentity(virtualX, virtualY, virtualWidth, virtualHeight)]
             if (screen == null) {
                 screen = screens.entries.first().value
+            }
+            if (isPrimary) {
+                val avgDpi = (dpiX + dpiY) / 2.0
+                primaryScaleCorrection = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
+            }
+            if (primaryScaleCorrection != 1.0) {
+                screen.scaleFactor = Math.max(1.0, Math.min(2.5, Math.round((Math.round(screen.scaleFactor * primaryScaleCorrection * 4.0) / 4.0) * 100.0) / 100.0))
             }
             monitors.add(MonitorSpec(
                     id = monitorId,
@@ -908,11 +940,13 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                     maximizedY1 = screen.maximizedY1,
                     maximizedX2 = screen.maximizedX2,
                     maximizedY2 = screen.maximizedY2,
+                    scaleFactor = screen.scaleFactor,
+                    overRender = screen.overRender,
                     redBits = redBits,
                     greenBits = greenBits,
                     blueBits = blueBits,
-                    refreshRate = refreshRate
-            ))
+                    refreshRate = refreshRate))
+            isPrimary = false
         }
         val pointerLocation = MouseInfo.getPointerInfo()?.location
         val mouseX = pointerLocation?.x ?: 0

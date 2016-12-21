@@ -16,12 +16,12 @@ import java.nio.ByteBuffer
 val textFont = ref(-1)
 val glyphFont = ref(-1)
 
-val SMALL_SPACER_SIZE = 10
-val MEDIUM_SPACER_SIZE = 24
+val SMALL_SPACER_SIZE = 6
+val MEDIUM_SPACER_SIZE = 12
 
-val SMALL_ROW_HEIGHT = 32
-val MEDIUM_ROW_HEIGHT = 40
-val LARGE_ROW_HEIGHT = 48
+val SMALL_ROW_HEIGHT = 20
+val MEDIUM_ROW_HEIGHT = 26
+val LARGE_ROW_HEIGHT = 32
 
 val COLOR_BACKGROUND = color(45, 45, 48)
 val FILL_BACKGROUND = FillColor(COLOR_BACKGROUND)
@@ -52,10 +52,10 @@ val BUTTON_NORMAL = NO_SHAPE
 val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
 val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
-val SWITCH_HEIGHT = 20
-val ELEMENT_INSET = 4
+val SWITCH_HEIGHT = 12
+val ELEMENT_INSET = 3
 
-val TOGGLE_WIDTH = 76
+val TOGGLE_WIDTH = 52
 val TOGGLE_HEIGHT = SWITCH_HEIGHT + (ELEMENT_INSET * 2)
 val TOGGLE_CORNER_RADIUS = TOGGLE_HEIGHT / 2.0f
 
@@ -94,11 +94,11 @@ val SLIDER_BAR_FILLED_MOUSE_DOWN = ShapeRoundedRectangle(FillColor(COLOR_ACTIVE_
 val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE)
 
 
-val TEXT_STYLE_NORMAL = TextStyle(cRef(22.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON = TextStyle(cRef(22.0f), textFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_GLYPH = TextStyle(cRef(22.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_LARGE = TextStyle(cRef(32.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(32.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_NORMAL = TextStyle(cRef(14.0f), textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON = TextStyle(cRef(14.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_GLYPH = TextStyle(cRef(14.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_LARGE = TextStyle(cRef(20.0f), textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(20.0f), textFont, cRef(COLOR_BUTTON_TEXT))
 
 val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
 val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)
@@ -142,15 +142,25 @@ val SLIDER_STYLE = SliderStyle(
                 hSizing = GROW,
                 layout = HORIZONTAL),
         sliderTemplate = BlockTemplate(
-                padLeft = 12,
-                padRight = 12),
+                padLeft = Math.round(SWITCH_HEIGHT / 2.0f),
+                padRight = Math.round(SWITCH_HEIGHT / 2.0f)),
         switchTemplate = BlockTemplate(
                 vAlign = MIDDLE,
                 hSizing = STATIC,
                 vSizing = STATIC,
                 width = SWITCH_HEIGHT,
                 height = SWITCH_HEIGHT,
-                layout = HORIZONTAL))
+                layout = HORIZONTAL),
+        barUnfilledTemplate = BlockTemplate(
+                vAlign = MIDDLE,
+                vSizing = STATIC,
+                height = Math.round(SWITCH_HEIGHT / 3.0f) - 2),
+        barFilledTemplate = BlockTemplate(
+                hAlign = LEFT,
+                hSizing = RELATIVE,
+                vAlign = MIDDLE,
+                vSizing = STATIC,
+                height = Math.round(SWITCH_HEIGHT / 3.0f)))
 
 val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
         normal = BUTTON_NORMAL,
@@ -331,20 +341,20 @@ fun Block.vSpacer(space: Int) {
 fun Block.hDivider() {
     block {
         hSizing = STATIC
-        width = 6
-        height = -12
-        yOffset = 6
+        width = SMALL_SPACER_SIZE
+        height = -2 * SMALL_SPACER_SIZE
+        yOffset = SMALL_SPACER_SIZE
         layout = HORIZONTAL
         isMouseAware = false
         block {
             hSizing = STATIC
-            width = 2
+            width = 1
             shape = DIVIDER_DARK
             layout = HORIZONTAL
         }
         block {
             hSizing = STATIC
-            width = 2
+            width = 1
             shape = DIVIDER_LIGHT
             layout = HORIZONTAL
         }

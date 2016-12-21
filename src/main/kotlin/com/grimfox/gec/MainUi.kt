@@ -10,6 +10,7 @@ import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryUtil
+import java.nio.ByteBuffer
 
 object MainUi {
 
@@ -36,6 +37,7 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
+        val dynamicTextRef = ref("some dynamic text")
 
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
@@ -58,6 +60,16 @@ object MainUi {
                 }
                 ui.restoreHandler = {
                     MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
+                }
+
+                val dynamicTextBuffer = ByteBuffer.allocateDirect(250)
+
+                val dynamicTextBytes = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
+                dynamicTextBuffer.limit(dynamicTextBytes + 1)
+                val dynamicText = DynamicTextUtf8(dynamicTextBuffer, TEXT_STYLE_NORMAL)
+                dynamicTextRef.listener { old, new ->
+                    val byteCount = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
+                    dynamicTextBuffer.limit(byteCount + 1)
                 }
 
                 val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
@@ -92,9 +104,9 @@ object MainUi {
                         hAlign = LEFT
                         vAlign = TOP
                         leftPanel = block {
-                            val labelWidth = 130
+                            val labelWidth = 80
                             hSizing = STATIC
-                            width = 534
+                            width = 280
                             layout = HORIZONTAL
                             hAlign = LEFT
                             vAlign = TOP
@@ -111,6 +123,11 @@ object MainUi {
                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
                                 }
+                                val dynamicLabel = label(dynamicText)
+                                dynamicLabel.layout = VERTICAL
+                                dynamicLabel.vAlign = TOP
+                                dynamicLabel.vSizing = STATIC
+                                dynamicLabel.height = LARGE_ROW_HEIGHT
                             }
                             hSpacer(MEDIUM_SPACER_SIZE)
                         }
@@ -120,13 +137,13 @@ object MainUi {
                             hAlign = LEFT
                             vAlign = TOP
                             block {
-                                xOffset = 6
-                                yOffset = 6
-                                width = -12
-                                height = -12
+                                xOffset = SMALL_SPACER_SIZE
+                                yOffset = SMALL_SPACER_SIZE
+                                width = -2 * SMALL_SPACER_SIZE
+                                height = -2 * SMALL_SPACER_SIZE
                                 block {
                                     hSizing = STATIC
-                                    width = 2
+                                    width = 1
                                     hAlign = LEFT
                                     layout = HORIZONTAL
                                     shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
@@ -136,7 +153,7 @@ object MainUi {
                                     layout = HORIZONTAL
                                     block {
                                         vSizing = STATIC
-                                        height = 2
+                                        height = 1
                                         vAlign = TOP
                                         layout = VERTICAL
                                         shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
@@ -177,7 +194,7 @@ object MainUi {
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
-                                                hSliderRow(heightMapScaleFactor, 350, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                hSliderRow(heightMapScaleFactor, 170, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
@@ -218,6 +235,7 @@ object MainUi {
 
         ui(uiLayout, 1280, 720) {
             meshViewport.doInput(relativeMouseX, relativeMouseY, scrollY, isMouse1Down, isMouse2Down)
+            dynamicTextRef.value = "$width x $height / $pixelWidth x $pixelHeight / $mouseX : $mouseY"
         }
     }
 }
