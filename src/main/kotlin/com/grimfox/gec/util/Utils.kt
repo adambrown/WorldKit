@@ -169,6 +169,16 @@ fun clamp(value: Float, min: Float, max: Float): Float {
     return value
 }
 
+fun clamp(value: Double, min: Double, max: Double): Double {
+    if (value < min) {
+        return min
+    }
+    if (value > max) {
+        return max
+    }
+    return value
+}
+
 object Utils {
 
     val LOG = LoggerFactory.getLogger(Main::class.java)

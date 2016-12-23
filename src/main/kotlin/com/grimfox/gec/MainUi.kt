@@ -1,5 +1,6 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.opengl.loadTexture2D
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
@@ -9,6 +10,8 @@ import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.nanovg.NanoVG.*
+import org.lwjgl.nanovg.NanoVGGL3.nvglCreateImageFromHandle
+import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
 
@@ -73,6 +76,15 @@ object MainUi {
                 }
 
                 val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
+//                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_LINEAR, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true,
+//                        "/textures/wk-icon-512.png",
+//                        "/textures/wk-icon-256.png",
+//                        "/textures/wk-icon-128.png",
+//                        "/textures/wk-icon-64.png",
+//                        "/textures/wk-icon-32.png",
+//                        "/textures/wk-icon-16.png")
+//
+//                val icon = createImage(texId, texWidth, texHeight, 0)
 
                 meshViewport.init()
 
@@ -104,9 +116,9 @@ object MainUi {
                         hAlign = LEFT
                         vAlign = TOP
                         leftPanel = block {
-                            val labelWidth = 80
+                            val labelWidth = 92
                             hSizing = STATIC
-                            width = 280
+                            width = 268
                             layout = HORIZONTAL
                             hAlign = LEFT
                             vAlign = TOP
@@ -194,7 +206,7 @@ object MainUi {
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
-                                                hSliderRow(heightMapScaleFactor, 170, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                hSliderRow(heightMapScaleFactor, 144, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
@@ -213,7 +225,7 @@ object MainUi {
                                     }
                                     block {
                                         vSizing = STATIC
-                                        height = 2
+                                        height = 1
                                         vAlign = TOP
                                         layout = VERTICAL
                                         shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
@@ -221,7 +233,7 @@ object MainUi {
                                 }
                                 block {
                                     hSizing = STATIC
-                                    width = 2
+                                    width = 1
                                     hAlign = LEFT
                                     layout = HORIZONTAL
                                     shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)

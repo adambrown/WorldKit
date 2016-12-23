@@ -94,11 +94,11 @@ val SLIDER_BAR_FILLED_MOUSE_DOWN = ShapeRoundedRectangle(FillColor(COLOR_ACTIVE_
 val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE)
 
 
-val TEXT_STYLE_NORMAL = TextStyle(cRef(14.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON = TextStyle(cRef(14.0f), textFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_GLYPH = TextStyle(cRef(14.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_LARGE = TextStyle(cRef(20.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(20.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_NORMAL = TextStyle(cRef(16.0f), textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON = TextStyle(cRef(16.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_GLYPH = TextStyle(cRef(16.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_LARGE = TextStyle(cRef(22.0f), textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(22.0f), textFont, cRef(COLOR_BUTTON_TEXT))
 
 val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
 val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)

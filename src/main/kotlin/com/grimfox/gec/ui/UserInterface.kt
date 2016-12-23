@@ -3,6 +3,7 @@ package com.grimfox.gec.ui
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.uiRoot
+import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.glfw.Callbacks
@@ -44,10 +45,11 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, t
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
             ui.handleDragAndResize()
-            ui.clearViewport()
+            val frameWidth = ui.width
+            val frameHeight = ui.height
+            ui.clearViewport(frameWidth, frameHeight)
             ui.tick()
-            ui.setupViewport()
-            ui.drawFrame()
+            ui.drawFrame(frameWidth, frameHeight)
             ui.swapBuffers()
         }
     } catch (e: Throwable) {
@@ -69,6 +71,8 @@ interface UiLayout {
     fun createFont(resource: String, name: String): Int
 
     fun createImage(resource: String, options: Int): Int
+
+    fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int
 
     fun root(builder: Block.() -> Unit) {
         root = uiRoot(0, 0, 0, 0, builder)
@@ -209,17 +213,13 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         return glfwWindowShouldClose(window.id)
     }
 
-    internal fun clearViewport() {
-        setupViewport()
+    internal fun clearViewport(width: Int, height: Int) {
+        glViewport(0, 0, width, height)
         glClearColor(layout.background.r, layout.background.g, layout.background.b, layout.background.a)
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
-    internal fun setupViewport() {
-        glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
-    }
-
-    internal fun drawFrame() {
+    internal fun drawFrame(width: Int, height: Int) {
         if (window.currentPixelWidth < 0 || window.currentPixelHeight < 0 && !isMinimized) {
             window.isMinimized = true
             minimizeHandler()
@@ -227,14 +227,15 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         if (isMinimized) {
             return
         }
-        setupViewport()
+        glViewport(0, 0, width, height)
         nvgSave(nvg)
-        root.width = width
-        root.height = height
-        root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
+        val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+        root.width = (width / scale).toInt()
+        root.height = (height / scale).toInt()
+        root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
         nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
-        root.draw(nvg)
-        setupViewport()
+        root.draw(nvg, scale)
+        glViewport(0, 0, width, height)
         nvgEndFrame(nvg)
         nvgRestore(nvg)
     }
@@ -261,6 +262,10 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
     override fun createImage(resource: String, options: Int): Int {
         return nvgCreateImage(nvg, getPathForResource(resource), options)
+    }
+
+    override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int {
+        return nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
     }
 
     internal fun close() {
@@ -301,7 +306,7 @@ private data class MonitorSpec(
         val blueBits: Int,
         val refreshRate: Int)
 
-private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0, 0, 0, 0)
+private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 1.0, 0, 0, 0, 0)
 
 private data class ScreenIdentity(
         val x: Int,
@@ -533,7 +538,7 @@ private class WindowContext(
                     if (hasMoved) {
                         monitors.forEachIndexed { i, monitorSpec ->
                             if (mouseX >= monitorSpec.mouseSpaceX1 && mouseX <= monitorSpec.mouseSpaceX2 && mouseY >= monitorSpec.mouseSpaceY1 && mouseY <= monitorSpec.mouseSpaceY2) {
-                                currentMonitor = monitorSpec
+                                adjustForCurrentMonitor(monitorSpec, this)
                             }
                         }
                         val roomToGrowX = currentMonitor.maximizedWidth - currentWidth
@@ -648,7 +653,7 @@ private fun createWindow(width: Int, height: Int): WindowContext {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
-        glfwWindowHint(GLFW_SAMPLES, 4)
+        glfwWindowHint(GLFW_SAMPLES, 8)
         if (Platform.get() === Platform.MACOSX) {
             glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
         }
@@ -807,9 +812,22 @@ private fun initializeWindowState(window: WindowContext) {
         window.height = window.currentHeight
         window.monitors.forEachIndexed { i, monitorSpec ->
             if (window.mouseX >= monitorSpec.mouseSpaceX1 && window.mouseX <= monitorSpec.mouseSpaceX2 && window.mouseY >= monitorSpec.mouseSpaceY1 && window.mouseY <= monitorSpec.mouseSpaceY2) {
-                window.currentMonitor = monitorSpec
+                adjustForCurrentMonitor(monitorSpec, window)
             }
         }
+    }
+}
+
+private fun adjustForCurrentMonitor(monitorSpec: MonitorSpec, window: WindowContext) {
+    val lastMonitor = window.currentMonitor
+    window.currentMonitor = monitorSpec
+    if (lastMonitor != window.currentMonitor && lastMonitor.scaleFactor != window.currentMonitor.scaleFactor) {
+        val sizeAdjustment = ((window.currentMonitor.scaleFactor / lastMonitor.scaleFactor) / lastMonitor.overRender) * window.currentMonitor.overRender
+        window.width = round(window.width * sizeAdjustment).toInt()
+        window.height = round(window.height * sizeAdjustment).toInt()
+        window.currentWidth = round(window.currentWidth * sizeAdjustment).toInt()
+        window.currentHeight = round(window.currentHeight * sizeAdjustment).toInt()
+        glfwSetWindowSize(window.id, window.currentWidth, window.currentHeight)
     }
 }
 
@@ -869,7 +887,7 @@ private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenS
         val correctionFactor = 1.0 / minScaleFactor
         screens.forEach { screenIdentity, screenSpec ->
             screenSpec.scaleFactor *= correctionFactor
-            screenSpec.scaleFactor = Math.max(1.0, Math.min(2.5, Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0))
+            screenSpec.scaleFactor = clamp(Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
         }
     }
     return Pair(screens, warpLines)
@@ -882,8 +900,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
         val intPointer1 = stack.mallocInt(1)
         val intPointer2 = stack.mallocInt(1)
         val monitorIds = glfwGetMonitors()
-        var primaryScaleCorrection = 1.0
-        var isPrimary = true
         while (monitorIds.hasRemaining()) {
             val monitorId = monitorIds.get()
             glfwGetMonitorPhysicalSize(monitorId, intPointer1, intPointer2)
@@ -907,13 +923,15 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             if (screen == null) {
                 screen = screens.entries.first().value
             }
-            if (isPrimary) {
-                val avgDpi = (dpiX + dpiY) / 2.0
-                primaryScaleCorrection = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
-            }
-            if (primaryScaleCorrection != 1.0) {
-                screen.scaleFactor = Math.max(1.0, Math.min(2.5, Math.round((Math.round(screen.scaleFactor * primaryScaleCorrection * 4.0) / 4.0) * 100.0) / 100.0))
-            }
+            val avgDpi = (dpiX + dpiY) / 2.0
+            screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
+//            if (isPrimary) {
+//                val avgDpi = (dpiX + dpiY) / 2.0
+//                primaryScaleCorrection = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
+//            }
+//            if (primaryScaleCorrection != 1.0) {
+//                screen.scaleFactor = clamp(Math.round((Math.round(screen.scaleFactor * primaryScaleCorrection * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
+//            }
             monitors.add(MonitorSpec(
                     id = monitorId,
                     dpiX = dpiX,
@@ -946,7 +964,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                     greenBits = greenBits,
                     blueBits = blueBits,
                     refreshRate = refreshRate))
-            isPrimary = false
         }
         val pointerLocation = MouseInfo.getPointerInfo()?.location
         val mouseX = pointerLocation?.x ?: 0

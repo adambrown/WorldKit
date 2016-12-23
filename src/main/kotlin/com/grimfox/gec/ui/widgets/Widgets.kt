@@ -109,18 +109,18 @@ class ScissorStack(val nvg: Long) {
 
 interface Fill {
 
-    fun draw(nvg: Long, block: Block)
+    fun draw(nvg: Long, block: Block, scale: Float)
 }
 
 private class FillNone() : Fill {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 }
 
 class FillColor(val color: NVGColor) : Fill {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgFillColor(nvg, color)
         nvgFill(nvg)
     }
@@ -130,8 +130,8 @@ class FillImageDynamic(val image: Int) : Fill {
 
     private val paint = NVGPaint.create()
 
-    override fun draw(nvg: Long, block: Block) {
-        nvgImagePattern(nvg, block.x.toFloat(), block.y.toFloat(), block.width.toFloat(), block.height.toFloat(), 0.0f, image, 1.0f, paint)
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        nvgImagePattern(nvg, block.x.toFloat() * scale, block.y.toFloat() * scale, block.width.toFloat() * scale, block.height.toFloat() * scale, 0.0f, image, 1.0f, paint)
         nvgFillPaint(nvg, paint)
         nvgFill(nvg)
     }
@@ -141,8 +141,8 @@ class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
 
     private val paint = NVGPaint.create()
 
-    override fun draw(nvg: Long, block: Block) {
-        nvgImagePattern(nvg, 0.0f, 0.0f, width.toFloat(), height.toFloat(), 0.0f, image, 1.0f, paint)
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        nvgImagePattern(nvg,  block.x.toFloat() * scale, block.y.toFloat() * scale, width.toFloat() * scale, height.toFloat() * scale, 0.0f, image, 1.0f, paint)
         nvgFillPaint(nvg, paint)
         nvgFill(nvg)
     }
@@ -152,28 +152,28 @@ interface Stroke {
 
     val size: Float
 
-    fun draw(nvg: Long, block: Block)
+    fun draw(nvg: Long, block: Block, scale: Float)
 }
 
 private class StrokeNone() : Stroke {
 
     override val size = 0.0f
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 }
 
 class StrokeInvisible(override val size: Float) : Stroke {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 }
 
 class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgStrokeColor(nvg, color)
-        nvgStrokeWidth(nvg, size)
+        nvgStrokeWidth(nvg, size * scale)
         nvgStroke(nvg)
     }
 }
@@ -186,7 +186,7 @@ interface Text {
     val data: ByteBuffer
     val length: Int
 
-    fun draw(nvg: Long, block: Block)
+    fun draw(nvg: Long, block: Block, scale: Float)
 
     fun dimensions(nvg: Long): Pair<Float, Float>
 }
@@ -197,7 +197,7 @@ private class TextNone() : Text {
     override val data: ByteBuffer = ByteBuffer.wrap(ByteArray(0))
     override val length: Int = 0
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -210,13 +210,13 @@ class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
     override val data: ByteBuffer = MemoryUtil.memUTF8(string, true)
     override val length: Int = data.limit()
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgFontFaceId(nvg, style.font.value)
-        nvgFontSize(nvg, style.size.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x, y, data, NULL)
+        nvgText(nvg, x * scale, y * scale, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -234,13 +234,13 @@ class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextSty
 
     override val length: Int get() = data.limit()
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgFontFaceId(nvg, style.font.value)
-        nvgFontSize(nvg, style.size.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x, y, data, NULL)
+        nvgText(nvg, x * scale, y * scale, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -294,7 +294,7 @@ interface Shape {
     val fill: Fill
     val stroke: Stroke
 
-    fun draw(nvg: Long, block: Block)
+    fun draw(nvg: Long, block: Block, scale: Float)
 }
 
 private class ShapeNone() : Shape {
@@ -302,7 +302,7 @@ private class ShapeNone() : Shape {
     override val fill: Fill = NO_FILL
     override val stroke: Stroke = NO_STROKE
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 }
 
@@ -317,45 +317,45 @@ val NO_TEXT: Text = TextNone()
 
 class ShapeRectangle(override val fill: Fill, override val stroke: Stroke) : Shape {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgRect(nvg, block.x.toFloat() + halfStroke, block.y.toFloat() + halfStroke, block.width.toFloat() - stroke.size, block.height.toFloat() - stroke.size)
-        fill.draw(nvg, block)
-        stroke.draw(nvg, block)
+        nvgRect(nvg, (block.x.toFloat() + halfStroke) * scale, (block.y.toFloat() + halfStroke) * scale, (block.width.toFloat() - stroke.size) * scale, (block.height.toFloat() - stroke.size) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
     }
 }
 
 class ShapeCircle(override val fill: Fill, override val stroke: Stroke) : Shape {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgCircle(nvg, block.x + (block.width / 2.0f), block.y + (block.height / 2.0f), Math.min(block.width, block.height) / 2.0f - halfStroke)
-        fill.draw(nvg, block)
-        stroke.draw(nvg, block)
+        nvgCircle(nvg, (block.x + (block.width / 2.0f)) * scale, (block.y + (block.height / 2.0f)) * scale, (Math.min(block.width, block.height) / 2.0f - halfStroke) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
     }
 }
 
 class ShapeEllipse(override val fill: Fill, override val stroke: Stroke) : Shape {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgEllipse(nvg, (block.x.toFloat() + block.width.toFloat()) / 2.0f, (block.y.toFloat() + block.height.toFloat()) / 2.0f, block.width / 2.0f - halfStroke, block.height / 2.0f - halfStroke)
-        fill.draw(nvg, block)
-        stroke.draw(nvg, block)
+        nvgEllipse(nvg, ((block.x.toFloat() + block.width.toFloat()) / 2.0f) * scale, ((block.y.toFloat() + block.height.toFloat()) / 2.0f) * scale, (block.width / 2.0f - halfStroke) * scale, (block.height / 2.0f - halfStroke) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
     }
 }
 
 class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke, val cornerRadius: Float) : Shape {
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgRoundedRect(nvg, block.x.toFloat() + halfStroke, block.y.toFloat() + halfStroke, block.width.toFloat() - stroke.size, block.height.toFloat() - stroke.size, Math.min(cornerRadius, Math.min(block.width, block.height) / 2.0f))
-        fill.draw(nvg, block)
-        stroke.draw(nvg, block)
+        nvgRoundedRect(nvg, (block.x.toFloat() + halfStroke) * scale, (block.y.toFloat() + halfStroke) * scale, (block.width.toFloat() - stroke.size) * scale, (block.height.toFloat() - stroke.size) * scale, (Math.min(cornerRadius, Math.min(block.width, block.height) / 2.0f)) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
     }
 }
 
@@ -364,10 +364,10 @@ class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
     override val fill = NO_FILL
     override val stroke = NO_STROKE
 
-    override fun draw(nvg: Long, block: Block) {
+    override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgSave(nvg)
         nvgReset(nvg)
-        viewport.onDrawFrame(block.x, block.y, block.width, block.height, block.root.height)
+        viewport.onDrawFrame(Math.round(block.x * scale), Math.round(block.y * scale), Math.round(block.width * scale), Math.round(block.height * scale), Math.round(block.root.height * scale))
         nvgRestore(nvg)
     }
 
@@ -517,11 +517,11 @@ abstract class Block {
         return null
     }
 
-    fun draw(nvg: Long) {
+    fun draw(nvg: Long, scale: Float) {
         if (isVisible) {
             this.nvg = nvg
             prepareForIteration()
-            draw(ScissorStack(nvg))
+            draw(ScissorStack(nvg), scale)
         }
     }
 
@@ -535,18 +535,18 @@ abstract class Block {
         }
     }
 
-    private fun draw(scissorStack: ScissorStack) {
+    private fun draw(scissorStack: ScissorStack, scale: Float) {
         if (isVisible) {
             scissorStack.suspendIf(canOverflow) {
-                shape.draw(nvg, this)
+                shape.draw(nvg, this, scale)
             }
             val strokeSize = shape.stroke.size
-            scissorStack.push(Vector4f(x.toFloat() + strokeSize, y.toFloat() + strokeSize, x.toFloat() + width - strokeSize, y.toFloat() + height - strokeSize))
+            scissorStack.push(Vector4f((x.toFloat() + strokeSize) * scale, (y.toFloat() + strokeSize) * scale, (x.toFloat() + width - strokeSize) * scale, (y.toFloat() + height - strokeSize) * scale))
             scissorStack.suspendIf(canOverflow) {
-                text.draw(nvg, this)
+                text.draw(nvg, this, scale)
             }
             children.forEach {
-                it.draw(scissorStack)
+                it.draw(scissorStack, scale)
             }
             scissorStack.pop()
         }
