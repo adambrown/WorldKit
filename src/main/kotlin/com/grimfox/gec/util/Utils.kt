@@ -95,20 +95,8 @@ fun <E> Collection<E>.containsAny(other: Collection<E>): Boolean {
     return false
 }
 
-fun getResourceUrl(resource: String): URL {
-    return Utils::class.java.getResource(resource)
-}
-
-fun getResourceUri(resource: String): URI {
-    return Utils::class.java.getResource(resource).toURI()
-}
-
 fun getResourceStream(resource: String): InputStream {
     return Utils::class.java.getResourceAsStream(resource)
-}
-
-fun getPathForResource(resource: String): String {
-    return File(Utils::class.java.getResource(resource).toURI()).canonicalPath
 }
 
 fun loadResource(resource: String, bufferSize: Int): ByteBuffer {

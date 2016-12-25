@@ -131,7 +131,7 @@ class FillImageDynamic(val image: Int) : Fill {
     private val paint = NVGPaint.create()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
-        nvgImagePattern(nvg, block.x.toFloat() * scale, block.y.toFloat() * scale, block.width.toFloat() * scale, block.height.toFloat() * scale, 0.0f, image, 1.0f, paint)
+        nvgImagePattern(nvg, Math.round(block.x * scale).toFloat(), Math.round(block.y * scale).toFloat(), Math.round(block.width * scale).toFloat(), Math.round(block.height * scale).toFloat(), 0.0f, image, 1.0f, paint)
         nvgFillPaint(nvg, paint)
         nvgFill(nvg)
     }
@@ -142,7 +142,7 @@ class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
     private val paint = NVGPaint.create()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
-        nvgImagePattern(nvg,  block.x.toFloat() * scale, block.y.toFloat() * scale, width.toFloat() * scale, height.toFloat() * scale, 0.0f, image, 1.0f, paint)
+        nvgImagePattern(nvg, Math.round(block.x * scale).toFloat(), Math.round(block.y * scale).toFloat(), Math.round(block.width * scale).toFloat(), Math.round(block.height * scale).toFloat(), 0.0f, image, 1.0f, paint)
         nvgFillPaint(nvg, paint)
         nvgFill(nvg)
     }
@@ -216,7 +216,7 @@ class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
         nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x * scale, y * scale, data, NULL)
+        nvgText(nvg, Math.round(x * scale).toFloat(), Math.round(y * scale).toFloat(), data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -240,7 +240,7 @@ class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextSty
         nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x * scale, y * scale, data, NULL)
+        nvgText(nvg, Math.round(x * scale).toFloat(), Math.round(y * scale).toFloat(), data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {

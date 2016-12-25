@@ -144,7 +144,7 @@ class MeshViewport3D(
 
         waterPlane = HexGrid(2600.0f, 16)
 
-        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false)
+        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
         textureId = texId
         textureResolution = texWidth
 

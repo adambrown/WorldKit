@@ -1,14 +1,17 @@
 package com.grimfox.gec.ui
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.extensions.twr
+import com.grimfox.gec.opengl.loadImagePixels
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.uiRoot
 import com.grimfox.gec.util.clamp
-import com.grimfox.gec.util.getPathForResource
 import com.grimfox.gec.util.loadResource
+import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWErrorCallback
+import org.lwjgl.glfw.GLFWImage
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
@@ -23,6 +26,8 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.awt.Rectangle
@@ -31,6 +36,9 @@ import java.lang.Math.round
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
+
+val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
+val JSON = jacksonObjectMapper()
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
@@ -53,7 +61,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, t
             ui.swapBuffers()
         }
     } catch (e: Throwable) {
-        e.printStackTrace()
+        LOG.error("Error in main UI loop", e)
     } finally {
         ui.hide()
         ui.close()
@@ -70,8 +78,12 @@ interface UiLayout {
 
     fun createFont(resource: String, name: String): Int
 
-    fun createImage(resource: String, options: Int): Int
+    fun createGlfwImage(resource: String): GLFWImage
 
+    fun createGlfwImages(vararg resources: String): GLFWImage.Buffer
+
+//    fun createImage(resource: String, options: Int): Int
+//
     fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int
 
     fun root(builder: Block.() -> Unit) {
@@ -101,6 +113,8 @@ interface UserInterface {
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
+
+    fun setWindowIcon(images: GLFWImage.Buffer)
 
     fun show()
 
@@ -162,6 +176,9 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             window.restoreHandler = value
         }
 
+    override fun setWindowIcon(images: GLFWImage.Buffer) {
+        glfwSetWindowIcon(window.id, images)
+    }
 
     override fun show() {
         glfwShowWindow(window.id)
@@ -260,10 +277,26 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         return nvgCreateFontMem(nvg, name, fontData, 0)
     }
 
-    override fun createImage(resource: String, options: Int): Int {
-        return nvgCreateImage(nvg, getPathForResource(resource), options)
+    override fun createGlfwImage(resource: String): GLFWImage {
+        val (width, height, data) = loadImagePixels(resource)
+        val image = GLFWImage.create()
+        image.set(width, height, data)
+        return image
     }
 
+    override fun createGlfwImages(vararg resources: String): GLFWImage.Buffer {
+        val buffer = GLFWImage.Buffer(BufferUtils.createByteBuffer(resources.size * GLFWImage.SIZEOF))
+        resources.forEach {
+            buffer.put(createGlfwImage(it))
+        }
+        buffer.flip()
+        return buffer
+    }
+
+//    override fun createImage(resource: String, options: Int): Int {
+//        return nvgCreateImage(nvg, getPathForResource(resource), options)
+//    }
+//
     override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int {
         return nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
     }
@@ -536,6 +569,8 @@ private class WindowContext(
                         hasMoved = true
                     }
                     if (hasMoved) {
+                        val lastCurrentWidth = currentWidth
+                        val lastcurrentHeight = currentHeight
                         monitors.forEachIndexed { i, monitorSpec ->
                             if (mouseX >= monitorSpec.mouseSpaceX1 && mouseX <= monitorSpec.mouseSpaceX2 && mouseY >= monitorSpec.mouseSpaceY1 && mouseY <= monitorSpec.mouseSpaceY2) {
                                 adjustForCurrentMonitor(monitorSpec, this)
@@ -563,6 +598,9 @@ private class WindowContext(
                             newWindowY = (currentMonitor.maximizedY1 + currentMonitor.maximizedHeight) - height
                         }
                         glfwSetWindowPos(id, newWindowX, newWindowY)
+                        if (currentWidth != lastCurrentWidth || currentHeight != lastcurrentHeight) {
+                            glfwSetWindowSize(id, currentWidth, currentHeight)
+                        }
                         x = newWindowX
                         y = newWindowY
                         restoreX = x
@@ -653,11 +691,12 @@ private fun createWindow(width: Int, height: Int): WindowContext {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
-        glfwWindowHint(GLFW_SAMPLES, 8)
+        glfwWindowHint(GLFW_SAMPLES, 4)
         if (Platform.get() === Platform.MACOSX) {
             glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
         }
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
+        LOG.info("Creating window with width: $width, height: $height")
         windowId = glfwCreateWindow(width, height, "GLFW Nuklear Demo", NULL, NULL)
         if (windowId == NULL) throw RuntimeException("Failed to create the GLFW window")
         glfwSetWindowPos(windowId, currentMonitor.centerX - width / 2 + 1, currentMonitor.centerY - height / 2 + 1)
@@ -722,6 +761,12 @@ private fun createWindow(width: Int, height: Int): WindowContext {
             }
         }
     }
+    var windowSize = getWindowSize(windowId)
+    if (windowSize.first != width && windowSize.second != height) {
+        glfwSetWindowSize(windowId, width, height)
+    }
+    windowSize = getWindowSize(windowId)
+    LOG.info("Created window with width: ${windowSize.first}, height: ${windowSize.second}")
     initializeWindowState(window)
     return window
 }
@@ -815,6 +860,16 @@ private fun initializeWindowState(window: WindowContext) {
                 adjustForCurrentMonitor(monitorSpec, window)
             }
         }
+        glfwSetWindowSize(window.id, window.currentWidth, window.currentHeight)
+    }
+}
+
+private fun getWindowSize(windowId: Long): Pair<Int, Int> {
+    twr(stackPush()) { stack ->
+        val w = stack.mallocInt(1)
+        val h = stack.mallocInt(1)
+        glfwGetWindowSize(windowId, w, h)
+        return Pair(w.get(0), h.get(0))
     }
 }
 
@@ -823,11 +878,11 @@ private fun adjustForCurrentMonitor(monitorSpec: MonitorSpec, window: WindowCont
     window.currentMonitor = monitorSpec
     if (lastMonitor != window.currentMonitor && lastMonitor.scaleFactor != window.currentMonitor.scaleFactor) {
         val sizeAdjustment = ((window.currentMonitor.scaleFactor / lastMonitor.scaleFactor) / lastMonitor.overRender) * window.currentMonitor.overRender
+        LOG.info("sizeAdjustment: $sizeAdjustment, width: ${window.width}, height: ${window.height}, currentWidth: ${window.currentWidth}, currentHeight: ${window.currentHeight}")
         window.width = round(window.width * sizeAdjustment).toInt()
         window.height = round(window.height * sizeAdjustment).toInt()
         window.currentWidth = round(window.currentWidth * sizeAdjustment).toInt()
         window.currentHeight = round(window.currentHeight * sizeAdjustment).toInt()
-        glfwSetWindowSize(window.id, window.currentWidth, window.currentHeight)
     }
 }
 
@@ -925,13 +980,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             }
             val avgDpi = (dpiX + dpiY) / 2.0
             screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
-//            if (isPrimary) {
-//                val avgDpi = (dpiX + dpiY) / 2.0
-//                primaryScaleCorrection = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
-//            }
-//            if (primaryScaleCorrection != 1.0) {
-//                screen.scaleFactor = clamp(Math.round((Math.round(screen.scaleFactor * primaryScaleCorrection * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
-//            }
             monitors.add(MonitorSpec(
                     id = monitorId,
                     dpiX = dpiX,
@@ -974,6 +1022,7 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                 currentMonitor = monitorSpec
             }
         }
+        LOG.info(JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Pair(screens, monitors)))
     }
     return Pair(monitors, currentMonitor)
 }

@@ -3,6 +3,7 @@ package com.grimfox.gec.opengl
 import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.opengl.GL30.*
 import org.lwjgl.opengl.GL31.*
 import java.awt.Transparency
@@ -12,7 +13,26 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
 
-fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {
+fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
+    val bufferedImage = getResourceStream(resource).use { ImageIO.read(it) }
+    val width = bufferedImage.width
+    val height = bufferedImage.height
+    val sampleModel = bufferedImage.sampleModel
+    val dataBuffer = bufferedImage.raster.dataBuffer
+    val imageBuffer = ByteBuffer.allocateDirect(width * height * 4)
+    val bands = intArrayOf(0, 1, 2, 3)
+    var offset = 0
+    for (y in 0..height - 1) {
+        for (x in 0..width - 1) {
+            for (band in 0..3) {
+                imageBuffer.put(offset++, sampleModel.getSample(x, y, bands[band], dataBuffer).toByte())
+            }
+        }
+    }
+    return Triple(width, height, imageBuffer)
+}
+
+fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, clampToEdge: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {
     val bufferedImage = getResourceStream(baseImage).use { ImageIO.read(it) }
     val width = bufferedImage.width
     val height = bufferedImage.height
@@ -152,6 +172,12 @@ fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMip
     }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+    if (clampToEdge) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    } else {
+
+    }
     glBindTexture(GL_TEXTURE_2D, 0)
     return Triple(textureId, width, height)
 }

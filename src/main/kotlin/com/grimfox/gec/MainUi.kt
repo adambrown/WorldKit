@@ -9,6 +9,8 @@ import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
+import org.lwjgl.glfw.GLFW
+import org.lwjgl.glfw.GLFWImage
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.nvglCreateImageFromHandle
 import org.lwjgl.opengl.GL11
@@ -75,16 +77,30 @@ object MainUi {
                     dynamicTextBuffer.limit(byteCount + 1)
                 }
 
-                val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
-//                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_LINEAR, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true,
-//                        "/textures/wk-icon-512.png",
-//                        "/textures/wk-icon-256.png",
-//                        "/textures/wk-icon-128.png",
-//                        "/textures/wk-icon-64.png",
-//                        "/textures/wk-icon-32.png",
-//                        "/textures/wk-icon-16.png")
-//
-//                val icon = createImage(texId, texWidth, texHeight, 0)
+//                val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
+                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,
+                        "/textures/wk-icon-512.png",
+                        "/textures/wk-icon-256.png",
+                        "/textures/wk-icon-128.png",
+                        "/textures/wk-icon-64.png",
+                        "/textures/wk-icon-32.png",
+                        "/textures/wk-icon-16.png")
+
+
+                setWindowIcon(createGlfwImages(
+                        "/textures/wk-icon-16.png",
+                        "/textures/wk-icon-24.png",
+                        "/textures/wk-icon-32.png",
+                        "/textures/wk-icon-40.png",
+                        "/textures/wk-icon-48.png",
+                        "/textures/wk-icon-64.png",
+                        "/textures/wk-icon-96.png",
+                        "/textures/wk-icon-128.png",
+                        "/textures/wk-icon-192.png",
+                        "/textures/wk-icon-256.png"
+                ))
+
+                val icon = createImage(texId, texWidth, texHeight, 0)
 
                 meshViewport.init()
 

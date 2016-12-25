@@ -1,3 +1,17 @@
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath group: 'org.jetbrains.kotlin', name: 'kotlin-gradle-plugin', version: kotlin_version
+        classpath group: 'com.grimfox', name: 'packr-gradle-plugin', version: 'unspecified'
+    }
+}
+
+
 description 'Game Environment Creator'
 
 import org.gradle.internal.os.OperatingSystem
@@ -16,6 +30,7 @@ switch (OperatingSystem.current()) {
 
 apply plugin: 'kotlin'
 apply plugin: 'application'
+apply plugin: 'com.grimfox.packr-gradle-plugin'
 
 mainClassName = 'com.grimfox.gec.Main'
 
@@ -28,16 +43,6 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 task wrapper(type: Wrapper) {
     gradleVersion = '3.0'
-}
-
-buildscript {
-    repositories {
-        mavenCentral()
-        jcenter()
-    }
-    dependencies {
-        classpath group: 'org.jetbrains.kotlin', name: 'kotlin-gradle-plugin', version: kotlin_version
-    }
 }
 
 repositories {
@@ -90,4 +95,13 @@ dependencies {
     // LWJGL dependencies END
 
     runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
+}
+
+buildExecutables {
+    executable {
+        name = 'WorldKit'
+        platform = 'windows64'
+        jdk = file('file://D:/sandbox/oracle-jdk-8.zip')
+        mainClass = 'com.grimfox.gec.MainUi'
+    }
 }
