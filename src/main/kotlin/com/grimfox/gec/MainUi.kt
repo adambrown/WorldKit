@@ -124,7 +124,6 @@ object MainUi {
                         vSizing = GROW
                         layout = VERTICAL
                         hAlign = LEFT
-                        vAlign = TOP
                         block {
                             leftPanel = this
                             val labelWidth = 92
@@ -132,53 +131,108 @@ object MainUi {
                             width = 268
                             layout = HORIZONTAL
                             hAlign = LEFT
-                            vAlign = TOP
-                            hSpacer(MEDIUM_SPACER_SIZE)
                             block {
                                 hSizing = GROW
                                 layout = HORIZONTAL
-                                vSpacer(MEDIUM_SPACER_SIZE)
-                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-                                vButtonRow(LARGE_ROW_HEIGHT) {
-                                    button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-                                    button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                hAlign = LEFT
+                                block {
+                                    xOffset = SMALL_SPACER_SIZE
+                                    yOffset = SMALL_SPACER_SIZE
+                                    width = -SMALL_SPACER_SIZE
+                                    height = -2 * SMALL_SPACER_SIZE
+                                    block {
+                                        hSizing = STATIC
+                                        width = 1
+                                        hAlign = LEFT
+                                        layout = HORIZONTAL
+                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    }
+                                    block {
+                                        hSizing = GROW
+                                        layout = HORIZONTAL
+                                        block {
+                                            vSizing = STATIC
+                                            height = 1
+                                            layout = VERTICAL
+                                            shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        }
+                                        block {
+                                            vSizing = GROW
+                                            layout = VERTICAL
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            block {
+                                                hSizing = GROW
+                                                layout = HORIZONTAL
+                                                vSpacer(MEDIUM_SPACER_SIZE)
+                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
+                                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                vButtonRow(LARGE_ROW_HEIGHT) {
+                                                    button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
+                                                    button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                                }
+//                                                val dynamicLabel = label(dynamicText)
+//                                                dynamicLabel.layout = VERTICAL
+//                                                dynamicLabel.vAlign = TOP
+//                                                dynamicLabel.vSizing = STATIC
+//                                                dynamicLabel.height = LARGE_ROW_HEIGHT
+                                            }
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                        }
+                                        block {
+                                            vSizing = STATIC
+                                            height = 1
+                                            layout = VERTICAL
+                                            shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        }
+                                    }
+                                    block {
+                                        hSizing = STATIC
+                                        width = 1
+                                        hAlign = LEFT
+                                        layout = HORIZONTAL
+                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    }
                                 }
-//                                val dynamicLabel = label(dynamicText)
-//                                dynamicLabel.layout = VERTICAL
-//                                dynamicLabel.vAlign = TOP
-//                                dynamicLabel.vSizing = STATIC
-//                                dynamicLabel.height = LARGE_ROW_HEIGHT
                             }
-                            val resizer = hSpacer(MEDIUM_SPACER_SIZE)
-                            resizer.isMouseAware = true
-                            var lastX = 0
-                            resizer.onMouseDown { button, x, y ->
-                                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                                    lastX = x
+                            block {
+                                hSizing = STATIC
+                                width = SMALL_SPACER_SIZE
+                                layout = HORIZONTAL
+                                val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE { copy(
+                                        template = template.copy(
+                                                vSizing = STATIC,
+                                                height = 3 * LARGE_ROW_HEIGHT,
+                                                vAlign = MIDDLE,
+                                                hSizing = RELATIVE,
+                                                width = -2,
+                                                hAlign = CENTER))})
+                                var lastX = 0
+                                onMouseDown { button, x, y ->
+                                    if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                                        lastX = x
+                                    }
                                 }
-                            }
-                            resizer.onMouseDrag { button, x, y ->
-                                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                                    val delta = x - lastX
-                                    val adjustedDelta = Math.min((root.width / 2.0f).toInt(), Math.max(200, leftPanel.width + delta)) - leftPanel.width
-                                    lastX += adjustedDelta
-                                    leftPanel.width += adjustedDelta
+                                onMouseDrag { button, x, y ->
+                                    if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                                        val delta = x - lastX
+                                        val adjustedDelta = Math.min((root.width / 2.0f).toInt(), Math.max(220, leftPanel.width + delta)) - leftPanel.width
+                                        lastX += adjustedDelta
+                                        leftPanel.width += adjustedDelta
+                                    }
                                 }
+                                supplantEvents(grabber)
                             }
-                            resizer.shape = BUTTON_MOUSE_DOWN
                         }
                         rightPanel = block {
                             hSizing = GROW
                             layout = HORIZONTAL
                             hAlign = LEFT
-                            vAlign = TOP
                             block {
-                                xOffset = SMALL_SPACER_SIZE
+                                xOffset = 0
                                 yOffset = SMALL_SPACER_SIZE
-                                width = -2 * SMALL_SPACER_SIZE
+                                width = -SMALL_SPACER_SIZE
                                 height = -2 * SMALL_SPACER_SIZE
                                 block {
                                     hSizing = STATIC
@@ -193,7 +247,6 @@ object MainUi {
                                     block {
                                         vSizing = STATIC
                                         height = 1
-                                        vAlign = TOP
                                         layout = VERTICAL
                                         shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
                                     }
@@ -201,22 +254,6 @@ object MainUi {
                                         vSizing = GROW
                                         layout = VERTICAL
                                         meshViewport3D(meshViewport)
-//                                        block {
-//                                            layout = ABSOLUTE
-//                                            shape = ShapeMeshViewport3D(meshViewport)
-//                                            onMouseDown { button, x, y ->
-//                                                meshViewport.onMouseDown(button, x, y)
-//                                            }
-//                                            onMouseRelease { button, x, y ->
-//                                                meshViewport.onMouseRelease(button)
-//                                            }
-//                                            onMouseDrag { button, x, y ->
-//                                                meshViewport.onMouseDrag(x, y)
-//                                            }
-//                                            onScroll { x, y ->
-//                                                meshViewport.onScroll(y)
-//                                            }
-//                                        }
                                         block {
                                             val toolbar = this
                                             vSizing = STATIC
@@ -283,7 +320,6 @@ object MainUi {
                                     block {
                                         vSizing = STATIC
                                         height = 1
-                                        vAlign = TOP
                                         layout = VERTICAL
                                         shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
                                     }

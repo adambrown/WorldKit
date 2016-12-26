@@ -134,6 +134,8 @@ interface UserInterface {
 
     fun restoreWindow()
 
+    fun setCursor(cursor: Long)
+
     operator fun invoke(block: UserInterface.() -> Unit) {
         this.block()
     }
@@ -213,6 +215,10 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
 
     override fun restoreWindow() {
         window.restore()
+    }
+
+    override fun setCursor(cursor: Long) {
+        glfwSetCursor(window.id, cursor)
     }
 
     override fun toggleMaximized() {
@@ -753,10 +759,10 @@ private fun createWindow(width: Int, height: Int): WindowContext {
             glfwGetCursorPos(windowId, cx, cy)
             val x = cx.get(0)
             val y = cy.get(0)
-            val dragAreaY1 = Math.round(window.layout.dragArea.y * window.currentMonitor.scaleFactor)
-            val dragAreaY2 = Math.round((dragAreaY1 + window.layout.dragArea.height) * window.currentMonitor.scaleFactor)
             val dragAreaX1 = Math.round(window.layout.dragArea.x * window.currentMonitor.scaleFactor)
-            val dragAreaX2 = Math.round((dragAreaX1 + window.layout.dragArea.width) * window.currentMonitor.scaleFactor)
+            val dragAreaX2 = Math.round(dragAreaX1 + window.layout.dragArea.width * window.currentMonitor.scaleFactor)
+            val dragAreaY1 = Math.round(window.layout.dragArea.y * window.currentMonitor.scaleFactor)
+            val dragAreaY2 = Math.round(dragAreaY1 + window.layout.dragArea.height * window.currentMonitor.scaleFactor)
             if (y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
