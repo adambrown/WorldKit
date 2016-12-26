@@ -49,6 +49,9 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, t
         ui.mouseClickHandler = { button, x, y, isDown ->
             ui.root.handleMouseAction(button, x, y, isDown)
         }
+        ui.scrollHandler = { x, y ->
+            ui.root.handleScroll(x, y)
+        }
         ui.show()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
@@ -110,6 +113,7 @@ interface UserInterface {
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
     var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean) -> Unit
+    var scrollHandler: (x: Double, y: Double) -> Unit
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
@@ -159,6 +163,11 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         get() = window.mouseClickHandler
         set(value) {
             window.mouseClickHandler = value
+        }
+    override var scrollHandler: (Double, Double) -> Unit
+        get() = window.scrollHandler
+        set(value) {
+            window.scrollHandler = value
         }
     override var maximizeHandler: () -> Unit
         get() = window.maximizeHandler
@@ -438,6 +447,7 @@ private class WindowContext(
 
         var currentMonitor: MonitorSpec = NO_MONITOR,
         var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> },
+        var scrollHandler: (Double, Double) -> Unit = { x, y -> },
         var maximizeHandler: () -> Unit = {},
         var minimizeHandler: () -> Unit = {},
         var restoreHandler: () -> Unit = {}
@@ -570,7 +580,7 @@ private class WindowContext(
                     }
                     if (hasMoved) {
                         val lastCurrentWidth = currentWidth
-                        val lastcurrentHeight = currentHeight
+                        val lastCurrentHeight = currentHeight
                         monitors.forEachIndexed { i, monitorSpec ->
                             if (mouseX >= monitorSpec.mouseSpaceX1 && mouseX <= monitorSpec.mouseSpaceX2 && mouseY >= monitorSpec.mouseSpaceY1 && mouseY <= monitorSpec.mouseSpaceY2) {
                                 adjustForCurrentMonitor(monitorSpec, this)
@@ -598,7 +608,7 @@ private class WindowContext(
                             newWindowY = (currentMonitor.maximizedY1 + currentMonitor.maximizedHeight) - height
                         }
                         glfwSetWindowPos(id, newWindowX, newWindowY)
-                        if (currentWidth != lastCurrentWidth || currentHeight != lastcurrentHeight) {
+                        if (currentWidth != lastCurrentWidth || currentHeight != lastCurrentHeight) {
                             glfwSetWindowSize(id, currentWidth, currentHeight)
                         }
                         x = newWindowX
@@ -726,6 +736,7 @@ private fun createWindow(width: Int, height: Int): WindowContext {
     glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
         window.scrollX += xOffset.toFloat()
         window.scrollY += yOffset.toFloat()
+        window.scrollHandler(xOffset, yOffset)
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
 
@@ -742,10 +753,10 @@ private fun createWindow(width: Int, height: Int): WindowContext {
             glfwGetCursorPos(windowId, cx, cy)
             val x = cx.get(0)
             val y = cy.get(0)
-            val dragAreaY1 = window.layout.dragArea.y
-            val dragAreaY2 = dragAreaY1 + window.layout.dragArea.height
-            val dragAreaX1 = window.layout.dragArea.x
-            val dragAreaX2 = dragAreaX1 + window.layout.dragArea.width
+            val dragAreaY1 = Math.round(window.layout.dragArea.y * window.currentMonitor.scaleFactor)
+            val dragAreaY2 = Math.round((dragAreaY1 + window.layout.dragArea.height) * window.currentMonitor.scaleFactor)
+            val dragAreaX1 = Math.round(window.layout.dragArea.x * window.currentMonitor.scaleFactor)
+            val dragAreaX2 = Math.round((dragAreaX1 + window.layout.dragArea.width) * window.currentMonitor.scaleFactor)
             if (y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
                     && button == GLFW_MOUSE_BUTTON_LEFT
                     && action == GLFW_PRESS) {
@@ -790,7 +801,8 @@ private fun handleStandardMouseAction(window: WindowContext, action: Int, button
             window.isMouse2Down = false
         }
     }
-    window.mouseClickHandler(button, Math.round(x).toInt(), Math.round(y).toInt(), action == GLFW_PRESS)
+    val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+    window.mouseClickHandler(button, Math.round(x / scale).toInt(), Math.round(y / scale).toInt(), action == GLFW_PRESS)
 }
 
 private fun startDrag(stack: MemoryStack, window: WindowContext) {

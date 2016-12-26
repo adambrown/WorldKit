@@ -10,9 +10,6 @@ import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.glfw.GLFWImage
-import org.lwjgl.nanovg.NanoVG.*
-import org.lwjgl.nanovg.NanoVGGL3.nvglCreateImageFromHandle
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
@@ -42,7 +39,7 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
-        val dynamicTextRef = ref("some dynamic text")
+//        val dynamicTextRef = ref("some dynamic text")
 
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
@@ -67,17 +64,16 @@ object MainUi {
                     MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
                 }
 
-                val dynamicTextBuffer = ByteBuffer.allocateDirect(250)
+//                val dynamicTextBuffer = ByteBuffer.allocateDirect(250)
+//
+//                val dynamicTextBytes = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
+//                dynamicTextBuffer.limit(dynamicTextBytes + 1)
+//                val dynamicText = DynamicTextUtf8(dynamicTextBuffer, TEXT_STYLE_NORMAL)
+//                dynamicTextRef.listener { old, new ->
+//                    val byteCount = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
+//                    dynamicTextBuffer.limit(byteCount + 1)
+//                }
 
-                val dynamicTextBytes = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
-                dynamicTextBuffer.limit(dynamicTextBytes + 1)
-                val dynamicText = DynamicTextUtf8(dynamicTextBuffer, TEXT_STYLE_NORMAL)
-                dynamicTextRef.listener { old, new ->
-                    val byteCount = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
-                    dynamicTextBuffer.limit(byteCount + 1)
-                }
-
-//                val icon = createImage("/textures/wk-icon-128.png", NVG_IMAGE_GENERATE_MIPMAPS)
                 val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,
                         "/textures/wk-icon-512.png",
                         "/textures/wk-icon-256.png",
@@ -85,7 +81,7 @@ object MainUi {
                         "/textures/wk-icon-64.png",
                         "/textures/wk-icon-32.png",
                         "/textures/wk-icon-16.png")
-
+                val icon = createImage(texId, texWidth, texHeight, 0)
 
                 setWindowIcon(createGlfwImages(
                         "/textures/wk-icon-16.png",
@@ -99,8 +95,6 @@ object MainUi {
                         "/textures/wk-icon-192.png",
                         "/textures/wk-icon-256.png"
                 ))
-
-                val icon = createImage(texId, texWidth, texHeight, 0)
 
                 meshViewport.init()
 
@@ -131,7 +125,8 @@ object MainUi {
                         layout = VERTICAL
                         hAlign = LEFT
                         vAlign = TOP
-                        leftPanel = block {
+                        block {
+                            leftPanel = this
                             val labelWidth = 92
                             hSizing = STATIC
                             width = 268
@@ -151,13 +146,29 @@ object MainUi {
                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
                                 }
-                                val dynamicLabel = label(dynamicText)
-                                dynamicLabel.layout = VERTICAL
-                                dynamicLabel.vAlign = TOP
-                                dynamicLabel.vSizing = STATIC
-                                dynamicLabel.height = LARGE_ROW_HEIGHT
+//                                val dynamicLabel = label(dynamicText)
+//                                dynamicLabel.layout = VERTICAL
+//                                dynamicLabel.vAlign = TOP
+//                                dynamicLabel.vSizing = STATIC
+//                                dynamicLabel.height = LARGE_ROW_HEIGHT
                             }
-                            hSpacer(MEDIUM_SPACER_SIZE)
+                            val resizer = hSpacer(MEDIUM_SPACER_SIZE)
+                            resizer.isMouseAware = true
+                            var lastX = 0
+                            resizer.onMouseDown { button, x, y ->
+                                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                                    lastX = x
+                                }
+                            }
+                            resizer.onMouseDrag { button, x, y ->
+                                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                                    val delta = x - lastX
+                                    val adjustedDelta = Math.min((root.width / 2.0f).toInt(), Math.max(200, leftPanel.width + delta)) - leftPanel.width
+                                    lastX += adjustedDelta
+                                    leftPanel.width += adjustedDelta
+                                }
+                            }
+                            resizer.shape = BUTTON_MOUSE_DOWN
                         }
                         rightPanel = block {
                             hSizing = GROW
@@ -189,10 +200,23 @@ object MainUi {
                                     block {
                                         vSizing = GROW
                                         layout = VERTICAL
-                                        block {
-                                            layout = ABSOLUTE
-                                            shape = ShapeMeshViewport3D(meshViewport)
-                                        }
+                                        meshViewport3D(meshViewport)
+//                                        block {
+//                                            layout = ABSOLUTE
+//                                            shape = ShapeMeshViewport3D(meshViewport)
+//                                            onMouseDown { button, x, y ->
+//                                                meshViewport.onMouseDown(button, x, y)
+//                                            }
+//                                            onMouseRelease { button, x, y ->
+//                                                meshViewport.onMouseRelease(button)
+//                                            }
+//                                            onMouseDrag { button, x, y ->
+//                                                meshViewport.onMouseDrag(x, y)
+//                                            }
+//                                            onScroll { x, y ->
+//                                                meshViewport.onScroll(y)
+//                                            }
+//                                        }
                                         block {
                                             val toolbar = this
                                             vSizing = STATIC
@@ -200,9 +224,26 @@ object MainUi {
                                             var tools = NO_BLOCK
                                             var expandToolbarButton = NO_BLOCK
                                             var collapseToolbarButton = NO_BLOCK
+                                            isFallThrough = true
                                             hButtonRow {
-                                                expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) { tools.isVisible = true; collapseToolbarButton.isVisible = true; expandToolbarButton.isVisible = false; toolbar.shape = BACKGROUND_RECT }
-                                                collapseToolbarButton = button(text("-"), LARGE_TEXT_BUTTON_STYLE) { tools.isVisible = false; collapseToolbarButton.isVisible = false; expandToolbarButton.isVisible = true; toolbar.shape = NO_SHAPE }
+                                                expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) {
+                                                    tools.isVisible = true
+                                                    tools.isMouseAware = true
+                                                    collapseToolbarButton.isVisible = true
+                                                    collapseToolbarButton.isMouseAware = true
+                                                    expandToolbarButton.isVisible = false
+                                                    expandToolbarButton.isMouseAware = false
+                                                    toolbar.shape = BACKGROUND_RECT
+                                                }
+                                                collapseToolbarButton = button(text("-"), LARGE_TEXT_BUTTON_STYLE) {
+                                                    tools.isVisible = false
+                                                    tools.isMouseAware = false
+                                                    collapseToolbarButton.isVisible = false
+                                                    collapseToolbarButton.isMouseAware = false
+                                                    expandToolbarButton.isVisible = true
+                                                    expandToolbarButton.isMouseAware = true
+                                                    toolbar.shape = NO_SHAPE
+                                                }
                                                 collapseToolbarButton.isVisible = false
                                             }
                                             tools = block {
@@ -262,8 +303,7 @@ object MainUi {
         }
 
         ui(uiLayout, 1280, 720) {
-            meshViewport.doInput(relativeMouseX, relativeMouseY, scrollY, isMouse1Down, isMouse2Down)
-            dynamicTextRef.value = "$width x $height / $pixelWidth x $pixelHeight / $mouseX : $mouseY"
+//            dynamicTextRef.value = "$width x $height / $pixelWidth x $pixelHeight / $mouseX : $mouseY"
         }
     }
 }

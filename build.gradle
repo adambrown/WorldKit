@@ -103,5 +103,6 @@ buildExecutables {
         platform = 'windows64'
         jdk = file('file://D:/sandbox/oracle-jdk-8.zip')
         mainClass = 'com.grimfox.gec.MainUi'
+        minimizeJre = 'oraclejre8'
     }
 }

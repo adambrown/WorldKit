@@ -6,6 +6,8 @@ import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.Reference
 import org.joml.*
 import org.lwjgl.BufferUtils
+import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
+import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
@@ -47,9 +49,6 @@ class MeshViewport3D(
     private val translation = Vector3f(defaultTranslation)
     private val deltaTranslation = Vector3f()
     private val pivot = Vector3f(0.0f, 0.0f, 0.0f)
-
-    private var lastScroll = 0.0f
-    private var scroll = 0.0f
 
     private val perspectiveToOrtho = 340.0f
 
@@ -98,17 +97,29 @@ class MeshViewport3D(
     private var heightMapProgram: Int = 0
     private var waterPlaneProgram: Int = 0
 
-    var deltaX: Float = 0.0f
-    var deltaY: Float = 0.0f
-    var lastMouseX = 0.0f
-    var lastMouseY = 0.0f
-    var mouseSpeed = 0.0035f
-    var lastMouse1Down = false
-    var lastMouse2Down = false
-    var isRollOn = false
-    var isRotateOn = false
-    var isTranslateOn = false
-    var isResetOn = false
+    private var lastScroll = 0.0f
+    private var scroll = 0.0f
+    private var deltaScroll = 0.0f
+
+    private var deltaX: Float = 0.0f
+    private var deltaY: Float = 0.0f
+
+    private var lastMouseX = 0.0f
+    private var lastMouseY = 0.0f
+
+    private var mouseSpeed = 0.0035f
+
+    private var mouseX = 0
+    private var mouseY = 0
+
+    private var hotZoneX1 = 0
+    private var hotZoneX2 = 0
+    private var hotZoneY1 = 0
+    private var hotZoneY2 = 0
+
+    private var isRollOn = false
+    private var isRotateOn = false
+    private var isTranslateOn = false
 
     private lateinit var heightMap: HexGrid
 
@@ -153,21 +164,79 @@ class MeshViewport3D(
         modelMatrix.translate(translation)
     }
 
-    var mouseX = 0
-    var mouseY = 0
-    var mouseWheel = 0.0f
-    var isMouse1Down = false
-    var isMouse2Down = false
-
-    fun doInput(mouseX: Int, mouseY: Int, mouseWheel: Float, isMouse1Down: Boolean, isMouse2Down: Boolean) {
-        this.mouseX = mouseX
-        this.mouseY = mouseY
-        this.mouseWheel = mouseWheel
-        this.isMouse1Down = isMouse1Down
-        this.isMouse2Down = isMouse2Down
+    fun onMouseDown(button: Int, x: Int, y: Int) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            if (x <= hotZoneX1 || x > hotZoneX2 || y <= hotZoneY1 || y > hotZoneY2) {
+                if (!isRollOn && !isRotateOn && !isTranslateOn) {
+                    lastMouseX = x.toFloat()
+                    lastMouseY = y.toFloat()
+                    isRollOn = true
+                }
+            } else {
+                if (!isRollOn && !isRotateOn && !isTranslateOn) {
+                    lastMouseX = x.toFloat()
+                    lastMouseY = y.toFloat()
+                    isRotateOn = true
+                    modelMatrix.getTranslation(pivot)
+                }
+            }
+        } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            if (!isRollOn && !isRotateOn && !isTranslateOn) {
+                lastMouseX = x.toFloat()
+                lastMouseY = y.toFloat()
+                isTranslateOn = true
+            }
+        }
     }
 
-    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int) {
+    fun onMouseDrag(x: Int, y: Int) {
+        mouseX = x
+        mouseY = y
+    }
+
+    fun onMouseRelease(button: Int) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            isRollOn = false
+            isRotateOn = false
+        } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            isTranslateOn = false
+        }
+    }
+
+    fun onScroll(scrollDelta: Double) {
+        lastScroll = scroll
+        deltaScroll = scrollDelta.toFloat()
+        scroll += deltaScroll
+        if (isTranslateOn) {
+            zoom -= deltaScroll * (zoomIncrement * zoom)
+            zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
+        } else {
+            val scaledScroll = deltaScroll * 76.0f
+            translation.z += scaledScroll
+            tempMatrix.translation(0.0f, 0.0f, scaledScroll)
+            tempMatrix.mul(modelMatrix, modelMatrix)
+        }
+    }
+
+    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+
+        if (width < 1 || height < 1) {
+            return
+        }
+
+        val adjustedWidth = round(width / scale)
+        val adjustedHeight = round(height / scale)
+        val adjustedX = round(xPosition / scale)
+        val adjustedY = round(yPosition / scale)
+
+        val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+        hotZoneX1 = adjustedX + marginWidth
+        hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
+        val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+        val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+        hotZoneY1 = adjustedY + marginHeight
+        hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
 
         val flippedY = rootHeight - (yPosition + height)
 
@@ -188,76 +257,7 @@ class MeshViewport3D(
             projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
         }
 
-        lastScroll = scroll
-        scroll = mouseWheel
-        val deltaScroll = scroll - lastScroll
-
-        val isMouseOver = mouseX > xPosition && mouseX < xPosition + width && mouseY > yPosition && mouseY < yPosition + height
-
-        val adjustedMouseX = mouseX - xPosition
-        val adjustedMouseY = mouseY - yPosition
-
-        val marginWidth = Math.min(220, ((width * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneWidth = width - (2 * marginWidth)
-        val marginHeight = Math.min(220, ((height * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneHeight = height - (2 * marginHeight)
-
         val mouseDistanceMultiplier = (heightMap.width / (height))
-
-        if (isMouseOver) {
-            val isMouseOverMargin = isMouseOver && (adjustedMouseX <= marginWidth || adjustedMouseX > marginWidth + hotZoneWidth || adjustedMouseY <= marginHeight || adjustedMouseY > marginHeight + hotZoneHeight)
-            if (isMouseOverMargin) {
-                if (isMouse1Down) {
-                    if (!lastMouse1Down && !isMouse2Down && !isRotateOn && !isTranslateOn) {
-                        lastMouse1Down = true
-                        isRollOn = true
-                    }
-                }
-            } else {
-                if (isMouse1Down) {
-                    if (!lastMouse1Down && !isMouse2Down && !isRotateOn && !isTranslateOn) {
-                        lastMouse1Down = true
-                        isRotateOn = true
-                        modelMatrix.getTranslation(pivot)
-                    }
-                }
-            }
-            if (isMouse2Down) {
-                if (!lastMouse2Down && !isMouse1Down && !isRotateOn && !isTranslateOn) {
-                    lastMouse2Down = true
-                    isTranslateOn = true
-                }
-                zoom -= deltaScroll * (zoomIncrement * zoom)
-                zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
-            } else {
-                val scaledScroll = deltaScroll * 76.0f
-                translation.z += scaledScroll
-                tempMatrix.translation(0.0f, 0.0f, scaledScroll)
-                tempMatrix.mul(modelMatrix, modelMatrix)
-            }
-            if (isMouse1Down && isMouse2Down) {
-                if (isRotateOn || isTranslateOn || (!lastMouse1Down && !lastMouse2Down)) {
-                    isRotateOn = false
-                    isTranslateOn = false
-                    isResetOn = true
-                }
-            }
-        }
-        if (isMouse1Down) {
-            lastMouse1Down = true
-        }
-        if (isMouse2Down) {
-            lastMouse2Down = true
-        }
-        if (!isMouse1Down) {
-            isRollOn = false
-            isRotateOn = false
-            lastMouse1Down = false
-        }
-        if (!isMouse2Down) {
-            isTranslateOn = false
-            lastMouse2Down = false
-        }
 
         if (doReset) {
             translation.set(defaultTranslation)
@@ -271,7 +271,6 @@ class MeshViewport3D(
 
         lastMouseX = mouseX.toFloat()
         lastMouseY = mouseY.toFloat()
-
 
         if (isTranslateOn) {
             translation.x += deltaX * mouseDistanceMultiplier
@@ -291,12 +290,12 @@ class MeshViewport3D(
             }
         } else if (isRollOn) {
             var deltaRoll = 0.0f
-            if (adjustedMouseX <= width / 2) {
+            if (mouseX - adjustedX <= adjustedWidth / 2) {
                 deltaRoll += deltaY
             } else {
                 deltaRoll -= deltaY
             }
-            if (adjustedMouseY <= height / 2) {
+            if (mouseY - adjustedY <= adjustedHeight / 2) {
                 deltaRoll -= deltaX
             } else {
                 deltaRoll += deltaX

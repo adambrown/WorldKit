@@ -68,11 +68,47 @@ class ScissorStack(val nvg: Long) {
         return clip
     }
 
-    inline fun suspendIf(condition: Boolean, block: () -> Unit) {
+    fun suspendIf(condition: Boolean, parents: Int, block: () -> Unit) {
+        if (parents < 1) {
+            suspendIf(condition, block)
+        } else {
+            if (condition) {
+                suspendWhile(parents, block)
+            } else {
+                block()
+            }
+        }
+    }
+
+    fun suspendIf(condition: Boolean, block: () -> Unit) {
         if (condition) {
             suspendWhile(block)
         } else {
             block()
+        }
+    }
+
+    fun suspendWhile(parents: Int, block: () -> Unit) {
+        val suspended = ArrayList<Vector4f>()
+        for (i in 1..parents) {
+            if (stack.isNotEmpty()) {
+                suspended.add(stack.removeAt(stack.size - 1))
+            }
+        }
+        if (stack.isEmpty()) {
+            suspend()
+        } else {
+            resume()
+        }
+        block()
+        suspended.reverse()
+        suspended.forEach {
+            stack.add(it)
+        }
+        if (stack.isEmpty()) {
+            suspend()
+        } else {
+            resume()
         }
     }
 
@@ -367,10 +403,9 @@ class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgSave(nvg)
         nvgReset(nvg)
-        viewport.onDrawFrame(Math.round(block.x * scale), Math.round(block.y * scale), Math.round(block.width * scale), Math.round(block.height * scale), Math.round(block.root.height * scale))
+        viewport.onDrawFrame(Math.round(block.x * scale), Math.round(block.y * scale), Math.round(block.width * scale), Math.round(block.height * scale), Math.round(block.root.height * scale), scale)
         nvgRestore(nvg)
     }
-
 }
 
 fun uiRoot(x: Int, y: Int, width: Int, height: Int, builder: Block.() -> Unit): Block {
@@ -387,9 +422,9 @@ data class BlockTemplate(
         val xOffset: Int = 0,
         val yOffset: Int = 0,
         val hSizing: Sizing = RELATIVE,
-        val width: Int = 100,
+        val width: Int = 10000,
         val vSizing: Sizing = RELATIVE,
-        val height: Int = 100,
+        val height: Int = 10000,
         val padLeft: Int = 0,
         val padRight: Int = 0,
         val padTop: Int = 0,
@@ -420,7 +455,9 @@ abstract class Block {
     abstract var text: Text
     abstract var lastBlock: Block?
     abstract var isMouseAware: Boolean
+    abstract var isFallThrough: Boolean
     abstract var canOverflow: Boolean
+    abstract var overflowCount: Int
     abstract var onMouseOver: (Block.() -> Unit)?
     abstract var onMouseOut: (Block.() -> Unit)?
     abstract var onMouseDown: (Block.(button: Int, x: Int, y: Int) -> Unit)?
@@ -428,45 +465,62 @@ abstract class Block {
     abstract var onMouseRelease: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
+    abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
 
     fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean) {
-        val mouseOver = mouseOver
-        if (mouseOver != null) {
-            if (isDown) {
-                val mouseDownFun = mouseOver.onMouseDown
-                if (mouseDownFun != null) {
-                    awaitingRelease.add(Pair(button, mouseOver))
-                    mouseOver.mouseDownFun(button, x, y)
-                }
-            } else {
-                val mouseUpFun = mouseOver.onMouseUp
-                if (mouseUpFun != null) {
-                    mouseOver.mouseUpFun(button, x, y)
-                }
-                awaitingRelease.forEach {
-                    if (it.first == button && it.second == mouseOver) {
-                        val mouseClickFun = mouseOver.onMouseClick
-                        if (mouseClickFun != null) {
-                            mouseOver.mouseClickFun(button, x, y)
+        if (this === root) {
+            val mouseOver = mouseOver
+            if (mouseOver != null) {
+                if (isDown) {
+                    val mouseDownFun = mouseOver.onMouseDown
+                    if (mouseDownFun != null) {
+                        awaitingRelease.add(Pair(button, mouseOver))
+                        mouseOver.mouseDownFun(button, x, y)
+                    }
+                } else {
+                    val mouseUpFun = mouseOver.onMouseUp
+                    if (mouseUpFun != null) {
+                        mouseOver.mouseUpFun(button, x, y)
+                    }
+                    awaitingRelease.forEach {
+                        if (it.first == button && it.second == mouseOver) {
+                            val mouseClickFun = mouseOver.onMouseClick
+                            if (mouseClickFun != null) {
+                                mouseOver.mouseClickFun(button, x, y)
+                            }
                         }
                     }
                 }
             }
-        }
-        if (!isDown) {
-            for (i in awaitingRelease.size - 1 downTo 0) {
-                val it = awaitingRelease[i]
-                if (it.first == button) {
-                    awaitingRelease.removeAt(i)
-                    val mouseReleaseFun = it.second.onMouseRelease
-                    if (mouseReleaseFun != null) {
-                        it.second.mouseReleaseFun(button, x, y)
+            if (!isDown) {
+                for (i in awaitingRelease.size - 1 downTo 0) {
+                    val it = awaitingRelease[i]
+                    if (it.first == button) {
+                        awaitingRelease.removeAt(i)
+                        val mouseReleaseFun = it.second.onMouseRelease
+                        if (mouseReleaseFun != null) {
+                            it.second.mouseReleaseFun(button, x, y)
+                        }
                     }
                 }
             }
+        } else {
+            root.handleMouseAction(button, x, y, isDown)
+        }
+    }
+
+    fun handleScroll(scrollX: Double, scrollY: Double) {
+        if (this === root) {
+            val mouseOver = mouseOver
+            val scrollFun = mouseOver?.onScroll
+            if (mouseOver != null && scrollFun != null) {
+                mouseOver.scrollFun(scrollX, scrollY)
+            }
+        } else {
+            root.handleScroll(scrollX, scrollY)
         }
     }
 
@@ -512,6 +566,9 @@ abstract class Block {
             (children.size - 1 downTo 0)
                     .mapNotNull { children[it].getMouseOverBlock(mouseX, mouseY) }
                     .forEach { return it }
+            if (isFallThrough) {
+                return null
+            }
             return this
         }
         return null
@@ -537,12 +594,12 @@ abstract class Block {
 
     private fun draw(scissorStack: ScissorStack, scale: Float) {
         if (isVisible) {
-            scissorStack.suspendIf(canOverflow) {
+            scissorStack.suspendIf(canOverflow, overflowCount) {
                 shape.draw(nvg, this, scale)
             }
             val strokeSize = shape.stroke.size
             scissorStack.push(Vector4f((x.toFloat() + strokeSize) * scale, (y.toFloat() + strokeSize) * scale, (x.toFloat() + width - strokeSize) * scale, (y.toFloat() + height - strokeSize) * scale))
-            scissorStack.suspendIf(canOverflow) {
+            scissorStack.suspendIf(canOverflow, overflowCount) {
                 text.draw(nvg, this, scale)
             }
             children.forEach {
@@ -583,6 +640,14 @@ abstract class Block {
         this.onMouseClick = onMouseClick
     }
 
+    fun onMouseDrag(onMouseDrag: Block.(Int, Int, Int) -> Unit) {
+        this.onMouseDrag = onMouseDrag
+    }
+
+    fun onScroll(onScroll: Block.(Double, Double) -> Unit) {
+        this.onScroll = onScroll
+    }
+
     operator fun invoke(builder: Block.() -> Unit): Block {
         this.builder()
         return this
@@ -594,8 +659,10 @@ abstract class Block {
 }
 
 private open class RootBlock(override var x: Int, override var y: Int, override var width: Int, override var height: Int) : Block() {
-    override val root = this
-    override val parent = this
+    override val root: RootBlock
+        get() = this
+    override val parent: RootBlock
+        get() = this
     override val children = ArrayList<Block>()
     override var nvg: Long = -1
     override var isVisible: Boolean
@@ -662,8 +729,16 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         get() = true
         set(value) {
         }
+    override var isFallThrough: Boolean
+        get() = false
+        set(value) {
+        }
     override var canOverflow: Boolean
         get() = false
+        set(value) {
+        }
+    override var overflowCount: Int
+        get() = -1
         set(value) {
         }
     override var onMouseOver: (Block.() -> Unit)?
@@ -694,6 +769,10 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         get() = null
         set(value) {
         }
+    override var onScroll: (Block.(Double, Double) -> Unit)?
+        get() = null
+        set(value) {
+        }
     override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
@@ -719,8 +798,8 @@ private class DefaultBlock(
         override var yOffset: Int = 0,
         override var hSizing: Sizing = RELATIVE,
         override var vSizing: Sizing = RELATIVE,
-        width: Int = 100,
-        height: Int = 100,
+        width: Int = 10000,
+        height: Int = 10000,
         override var padLeft: Int = 0,
         override var padRight: Int = 0,
         override var padTop: Int = 0,
@@ -728,15 +807,18 @@ private class DefaultBlock(
         override var shape: Shape = NO_SHAPE,
         override var text: Text = NO_TEXT,
         override var canOverflow: Boolean = false,
+        override var overflowCount: Int = -1,
         override var lastBlock: Block? = null,
         override var isMouseAware: Boolean = parent.isMouseAware,
+        override var isFallThrough: Boolean = false,
         override var onMouseOver: (Block.() -> Unit)? = null,
         override var onMouseOut: (Block.() -> Unit)? = null,
         override var onMouseDown: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseUp: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null) : Block() {
+        override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null,
+        override var onScroll: (Block.(Double, Double) -> Unit)? = null) : Block() {
 
     override var awaitingRelease: MutableList<Pair<Int, Block>>
         get() = ArrayList()
@@ -768,7 +850,7 @@ private class DefaultBlock(
                     if (_width < 0) {
                         return (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight).toInt() + _width
                     } else {
-                        return ((Math.min(100, _width) / 100.0f) * (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight)).toInt()
+                        return ((Math.min(10000, _width) / 10000.0f) * (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight)).toInt()
                     }
                 }
                 SHRINK -> {
@@ -889,7 +971,7 @@ private class DefaultBlock(
                     if (_height < 0) {
                         return (parent.height - (parent.shape.stroke.size * 2)).toInt() + _height
                     } else {
-                        return ((Math.min(100, _height) / 100.0f) * (parent.height - (parent.shape.stroke.size * 2))).toInt()
+                        return ((Math.min(10000, _height) / 10000.0f) * (parent.height - (parent.shape.stroke.size * 2))).toInt()
                     }
                 }
                 SHRINK -> {

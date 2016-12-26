@@ -3,8 +3,7 @@ package com.grimfox.gec
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
-import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
-import com.grimfox.gec.ui.widgets.Layout.VERTICAL
+import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.ui.widgets.toggle
@@ -320,8 +319,8 @@ fun Block.supplantEvents(other: Block): Block {
     return this
 }
 
-fun Block.hSpacer(space: Int) {
-    block {
+fun Block.hSpacer(space: Int): Block {
+    return block {
         hSizing = STATIC
         width = space
         layout = HORIZONTAL
@@ -329,8 +328,8 @@ fun Block.hSpacer(space: Int) {
     }
 }
 
-fun Block.vSpacer(space: Int) {
-    block {
+fun Block.vSpacer(space: Int): Block {
+    return block {
         vSizing = STATIC
         height = space
         layout = VERTICAL
@@ -483,4 +482,23 @@ fun Block.icon(imageRef: Int, imageWidth: Int, imageHeight: Int, layoutWidth: In
 
 fun Block.icon(imageRef: Int, imageSize: Int, layoutSize: Int): Block {
     return icon(imageRef, imageSize, imageSize, layoutSize, layoutSize)
+}
+
+fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
+    return block {
+        layout = ABSOLUTE
+        shape = ShapeMeshViewport3D(meshViewport)
+        onMouseDown { button, x, y ->
+            meshViewport.onMouseDown(button, x, y)
+        }
+        onMouseRelease { button, x, y ->
+            meshViewport.onMouseRelease(button)
+        }
+        onMouseDrag { button, x, y ->
+            meshViewport.onMouseDrag(x, y)
+        }
+        onScroll { x, y ->
+            meshViewport.onScroll(y)
+        }
+    }
 }

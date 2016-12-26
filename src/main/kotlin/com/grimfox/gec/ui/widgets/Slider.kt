@@ -124,7 +124,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                 padTop = style.barFilledTemplate.padTop
                 padBottom = style.barFilledTemplate.padBottom
                 hSizing = RELATIVE
-                width = round(100 * valueFunctionInverse(valueReference.value))
+                width = round(10000 * valueFunctionInverse(valueReference.value))
                 shape = style.barFilledNormal
                 isMouseAware = false
             }
@@ -146,6 +146,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                 shape = style.switchNormal
                 isMouseAware = false
                 canOverflow = true
+                overflowCount = 1
             }
             isMouseAware = false
         }
@@ -157,12 +158,12 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                     barFilled.width = 0
                     0.0f
                 } else if (x >= maxX) {
-                    barFilled.width = 100
+                    barFilled.width = 10000
                     1.0f
                 } else {
                     val range = maxX - minX
                     val scale = (x - minX) / range.toFloat()
-                    barFilled.width = round(100 * scale)
+                    barFilled.width = round(10000 * scale)
                     scale
                 }
                 valueReference.value = valueFunction(scale)
@@ -203,7 +204,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
         }
         onMouseDrag = updateSlider
         valueReference.listener { old, new ->
-            barFilled.width = round(100 * valueFunctionInverse(new))
+            barFilled.width = round(10000 * valueFunctionInverse(new))
         }
     }
 }
