@@ -17,6 +17,7 @@ import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
 import java.nio.ByteBuffer
 import java.util.*
+import javax.swing.SwingConstants.NORTH_EAST
 
 enum class HorizontalAlignment {
     LEFT,
@@ -390,6 +391,92 @@ class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
         nvgRoundedRect(nvg, (block.x.toFloat() + halfStroke) * scale, (block.y.toFloat() + halfStroke) * scale, (block.width.toFloat() - stroke.size) * scale, (block.height.toFloat() - stroke.size) * scale, (Math.min(cornerRadius, Math.min(block.width, block.height) / 2.0f)) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
+    }
+}
+
+private const val TRIANGLE_SIDE = 0.70710678118
+
+class ShapeTriangle(override val fill: Fill, override val stroke: Stroke, val direction: Direction) : Shape {
+
+    enum class Direction {
+        NORTH,
+        NORTH_EAST,
+        EAST,
+        SOUTH_EAST,
+        SOUTH,
+        SOUTH_WEST,
+        WEST,
+        NORTH_WEST
+    }
+
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        val halfStroke = stroke.size / 2.0
+        val x1 = (block.x + halfStroke) * scale
+        val x2 = x1 + (block.width - stroke.size) * scale
+        val y1 = (block.y + halfStroke) * scale
+        val y2 = y1 + (block.height - stroke.size) * scale
+        nvgBeginPath(nvg)
+        when (direction) {
+            Direction.NORTH -> {
+                val x3 = (x1 + x2) / 2.0
+                val y3 = (y1 + y2) / 2.0
+                nvgMoveTo(nvg, x3.toFloat(), y1.toFloat())
+                nvgLineTo(nvg, x2.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x1.toFloat(), y3.toFloat())
+            }
+            Direction.NORTH_EAST -> {
+                val x3 = x2 - (x2 - x1) * TRIANGLE_SIDE
+                val y3 = y1 + (y2 - y1) * TRIANGLE_SIDE
+                nvgMoveTo(nvg, x2.toFloat(), y1.toFloat())
+                nvgLineTo(nvg, x2.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y1.toFloat())
+            }
+            Direction.EAST -> {
+                val x3 = (x1 + x2) / 2.0
+                val y3 = (y1 + y2) / 2.0
+                nvgMoveTo(nvg, x2.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y2.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y1.toFloat())
+            }
+            Direction.SOUTH_EAST -> {
+                val x3 = x2 - (x2 - x1) * TRIANGLE_SIDE
+                val y3 = y2 - (y2 - y1) * TRIANGLE_SIDE
+                nvgMoveTo(nvg, x2.toFloat(), y2.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y2.toFloat())
+                nvgLineTo(nvg, x2.toFloat(), y3.toFloat())
+            }
+            Direction.SOUTH -> {
+                val x3 = (x1 + x2) / 2.0
+                val y3 = (y1 + y2) / 2.0
+                nvgMoveTo(nvg, x3.toFloat(), y2.toFloat())
+                nvgLineTo(nvg, x1.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x2.toFloat(), y3.toFloat())
+            }
+            Direction.SOUTH_WEST -> {
+                val x3 = x1 + (x2 - x1) * TRIANGLE_SIDE
+                val y3 = y2 - (y2 - y1) * TRIANGLE_SIDE
+                nvgMoveTo(nvg, x1.toFloat(), y2.toFloat())
+                nvgLineTo(nvg, x1.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y2.toFloat())
+            }
+            Direction.WEST -> {
+                val x3 = (x1 + x2) / 2.0
+                val y3 = (y1 + y2) / 2.0
+                nvgMoveTo(nvg, x1.toFloat(), y3.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y1.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y2.toFloat())
+            }
+            Direction.NORTH_WEST -> {
+                val x3 = x1 + (x2 - x1) * TRIANGLE_SIDE
+                val y3 = y1 + (y2 - y1) * TRIANGLE_SIDE
+                nvgMoveTo(nvg, x1.toFloat(), y1.toFloat())
+                nvgLineTo(nvg, x3.toFloat(), y1.toFloat())
+                nvgLineTo(nvg, x1.toFloat(), y3.toFloat())
+            }
+        }
+        nvgClosePath(nvg)
         fill.draw(nvg, block, scale)
         stroke.draw(nvg, block, scale)
     }

@@ -502,3 +502,25 @@ fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
         }
     }
 }
+
+fun Block.resizeArea(hAlign: HorizontalAlignment, direction: ShapeTriangle.Direction): Block {
+    return block {
+        hSizing = STATIC
+        vSizing = STATIC
+        width = SMALL_ROW_HEIGHT
+        height = SMALL_ROW_HEIGHT
+        layout = ABSOLUTE
+        this.hAlign = hAlign
+        vAlign = BOTTOM
+        val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE {
+            copy(
+                    template = BlockTemplate(
+                            yOffset = 4,
+                            width = -4,
+                            height = -4),
+                    mouseOver = ShapeTriangle(mouseOver.fill, mouseOver.stroke, direction),
+                    mouseDown = ShapeTriangle(mouseDown.fill, mouseDown.stroke, direction))
+        })
+        supplantEvents(grabber)
+    }
+}

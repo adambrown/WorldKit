@@ -22,6 +22,7 @@ import org.lwjgl.opengl.GL43
 import org.lwjgl.opengl.GLUtil.setupDebugMessageCallback
 import org.lwjgl.opengl.KHRDebug
 import org.lwjgl.system.Callback
+import org.lwjgl.system.Configuration
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
@@ -32,6 +33,7 @@ import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.awt.Rectangle
 import java.awt.Toolkit
+import java.io.PrintStream
 import java.lang.Math.round
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
@@ -78,6 +80,10 @@ interface UiLayout {
     var root: Block
 
     var dragArea: Block
+
+    var resizeAreaSouthEast: Block
+
+    var resizeAreaSouthWest: Block
 
     fun createFont(resource: String, name: String): Int
 
@@ -285,6 +291,8 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
     override lateinit var root: Block
     override lateinit var dragArea: Block
+    override lateinit var resizeAreaSouthEast: Block
+    override lateinit var resizeAreaSouthWest: Block
 
     override fun createFont(resource: String, name: String): Int {
         val fontData = loadResource(resource, 160 * 1024)
@@ -713,13 +721,43 @@ private fun createWindow(width: Int, height: Int): WindowContext {
         }
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
         LOG.info("Creating window with width: $width, height: $height")
-        windowId = glfwCreateWindow(width, height, "GLFW Nuklear Demo", NULL, NULL)
+        windowId = glfwCreateWindow(width, height, "WorldKit", NULL, NULL)
         if (windowId == NULL) throw RuntimeException("Failed to create the GLFW window")
         glfwSetWindowPos(windowId, currentMonitor.centerX - width / 2 + 1, currentMonitor.centerY - height / 2 + 1)
     }
     glfwMakeContextCurrent(windowId)
+    Configuration.DEBUG.set(true)
+    val errorStream = object : PrintStream(System.err) {
+
+        val buffer = StringBuffer()
+
+        override fun println(x: String?) {
+            if (buffer.isNotEmpty()) {
+                LOG.error(buffer.toString().trim())
+                buffer.delete(0, buffer.length)
+            }
+            buffer.append("$x\n")
+        }
+
+        override fun printf(format: String, vararg args: Any?): PrintStream {
+            val string = String.format(format, *args)
+            buffer.append(string)
+            return this
+        }
+
+        override fun printf(l: Locale, format: String, vararg args: Any?): PrintStream {
+            val string = String.format(l, format, *args)
+            buffer.append(string)
+            return this
+        }
+
+        init {
+            Runtime.getRuntime().addShutdownHook(Thread({ println("") }))
+        }
+    }
+    Configuration.DEBUG_STREAM.set(errorStream)
     val caps = createCapabilities()
-    val debugProc = setupDebugMessageCallback()
+    val debugProc = setupDebugMessageCallback(errorStream)
     if (caps.OpenGL43) {
         GL43.glDebugMessageControl(GL43.GL_DEBUG_SOURCE_API, GL43.GL_DEBUG_TYPE_OTHER, GL43.GL_DEBUG_SEVERITY_NOTIFICATION, null as IntBuffer?, false)
     } else if (caps.GL_KHR_debug) {
@@ -759,23 +797,15 @@ private fun createWindow(width: Int, height: Int): WindowContext {
             glfwGetCursorPos(windowId, cx, cy)
             val x = cx.get(0)
             val y = cy.get(0)
-            val dragAreaX1 = Math.round(window.layout.dragArea.x * window.currentMonitor.scaleFactor)
-            val dragAreaX2 = Math.round(dragAreaX1 + window.layout.dragArea.width * window.currentMonitor.scaleFactor)
-            val dragAreaY1 = Math.round(window.layout.dragArea.y * window.currentMonitor.scaleFactor)
-            val dragAreaY2 = Math.round(dragAreaY1 + window.layout.dragArea.height * window.currentMonitor.scaleFactor)
-            if (y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
-                    && button == GLFW_MOUSE_BUTTON_LEFT
-                    && action == GLFW_PRESS) {
+            val scale = window.currentMonitor.scaleFactor
+            if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
                 startDrag(stack, window)
-                handleStandardMouseAction(window, action, button, x, y)
-            } else if ((y >= window.currentHeight - window.resizeAreaHeight && y <= window.currentHeight)
-                    && ((x >= window.currentWidth - window.resizeAreaWidth && x <= window.currentWidth) || (x >= 0 && x <= window.resizeAreaWidth))
-                    && (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)) {
-                startResize(stack, window, x <= window.resizeAreaWidth)
-                handleStandardMouseAction(window, action, button, x, y)
-            } else {
-                handleStandardMouseAction(window, action, button, x, y)
+            } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                startResize(stack, window, false)
+            } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                startResize(stack, window, true)
             }
+            handleStandardMouseAction(window, action, button, x, y)
         }
     }
     var windowSize = getWindowSize(windowId)
@@ -786,6 +816,15 @@ private fun createWindow(width: Int, height: Int): WindowContext {
     LOG.info("Created window with width: ${windowSize.first}, height: ${windowSize.second}")
     initializeWindowState(window)
     return window
+}
+
+private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boolean {
+    val dragAreaX1 = round(area.x * scale)
+    val dragAreaX2 = round(dragAreaX1 + area.width * scale)
+    val dragAreaY1 = round(area.y * scale)
+    val dragAreaY2 = round(dragAreaY1 + area.height * scale)
+    val mouseIsInArea = y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
+    return mouseIsInArea
 }
 
 private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double) {

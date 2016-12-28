@@ -151,9 +151,9 @@ class MeshViewport3D(
                 listOf(positionAttributeWater, uvAttributeWater),
                 listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
 
-        heightMap = HexGrid(2560.0f, 512)
+        heightMap = HexGrid(2560.0f, 512, positionAttribute, uvAttribute)
 
-        waterPlane = HexGrid(2600.0f, 16)
+        waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater)
 
         val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
         textureId = texId
@@ -358,8 +358,8 @@ class MeshViewport3D(
         glUniformMatrix3fv(nMatrixUniformWater.location, false, normalMatrix.get(0, floatBuffer))
         glUniformMatrix4fv(mvpMatrixUniformWater.location, false, mvpMatrix.get(0, floatBuffer))
         glUniform3f(lightDirectionUniformWater.location, lightDirection.x, lightDirection.y, lightDirection.z)
-        glUniform4f(colorUniformWater.location, 0.1f, 0.2f, 0.4f, 1.0f)
-        glUniform4f(ambientUniformWater.location, 0.4f, 0.4f, 0.4f, 1.0f)
+        glUniform4f(colorUniformWater.location, 0.1f, 0.2f, 0.5f, 1.0f)
+        glUniform4f(ambientUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
         glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
         glUniform1f(shininessUniformWater.location, 5.0f)
@@ -367,7 +367,7 @@ class MeshViewport3D(
         waterPlane.render()
     }
 
-    internal inner class HexGrid(val width: Float, xResolution: Int) {
+    internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute) {
 
         val halfXIncrement = width / (xResolution * 2 - 1)
         val xIncrement = halfXIncrement * 2
@@ -494,7 +494,7 @@ class MeshViewport3D(
                     throw RuntimeException("error generating vao")
                 }
             } catch (t: Throwable) {
-                t.printStackTrace()
+                LOG.error(t.message, t)
                 throw t
             }
         }
