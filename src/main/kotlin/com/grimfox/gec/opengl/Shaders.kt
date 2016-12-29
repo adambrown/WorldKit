@@ -6,7 +6,11 @@ import org.lwjgl.opengl.GL20.*
 
 object Shaders
 
-data class ShaderAttribute(val name: String, val location: Int)
+data class ShaderAttribute(val name: String) {
+    internal var _location: Int = -1
+    val location: Int
+        get() = _location
+}
 
 data class ShaderUniform(val name: String) {
     internal var _location: Int = -1
@@ -54,13 +58,8 @@ fun createAndLinkProgram(shaderHandles: List<Int>, attributes: List<ShaderAttrib
             programHandle = 0
         }
         if (programHandle != 0) {
-            if (attributes.map { it.location }.toSet().size != attributes.size) {
-                errorString = " Multiple attributes bound to the same index."
-                glDeleteProgram(programHandle)
-                programHandle = 0
-            }
             attributes.forEach {
-                glBindAttribLocation(programHandle, it.location, it.name)
+                it._location = glGetAttribLocation(programHandle, it.name)
             }
             uniforms.forEach {
                 it._location = glGetUniformLocation(programHandle, it.name)

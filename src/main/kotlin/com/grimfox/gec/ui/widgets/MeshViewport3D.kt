@@ -81,11 +81,11 @@ class MeshViewport3D(
     private val shininessUniformWater = ShaderUniform("shininess")
     private val heightScaleUniformWater = ShaderUniform("heightScale")
 
-    private val positionAttribute = ShaderAttribute("position", 0)
-    private val uvAttribute = ShaderAttribute("uv", 1)
+    private val positionAttribute = ShaderAttribute("position")
+    private val uvAttribute = ShaderAttribute("uv")
 
-    private val positionAttributeWater = ShaderAttribute("position", 0)
-    private val uvAttributeWater = ShaderAttribute("uv", 1)
+    private val positionAttributeWater = ShaderAttribute("position")
+    private val uvAttributeWater = ShaderAttribute("uv")
 
     private var textureId = -1
     private var textureResolution = 0
