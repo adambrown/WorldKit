@@ -5,7 +5,6 @@ import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.opengl.GL30.*
-import org.lwjgl.opengl.GL31.*
 import java.awt.Transparency
 import java.awt.color.ColorSpace
 import java.awt.image.*
@@ -175,8 +174,6 @@ fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMip
     if (clampToEdge) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-    } else {
-
     }
     glBindTexture(GL_TEXTURE_2D, 0)
     return Triple(textureId, width, height)

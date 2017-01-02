@@ -503,7 +503,15 @@ fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
     }
 }
 
-fun Block.resizeArea(hAlign: HorizontalAlignment, direction: ShapeTriangle.Direction): Block {
+fun Block.resizeArea(direction: ShapeTriangle.Direction): Block {
+    val hAlign: HorizontalAlignment
+    val xOffset = if (direction == ShapeTriangle.Direction.SOUTH_EAST) {
+        hAlign = RIGHT
+        4
+    } else {
+        hAlign = LEFT
+        0
+    }
     return block {
         hSizing = STATIC
         vSizing = STATIC
@@ -515,6 +523,7 @@ fun Block.resizeArea(hAlign: HorizontalAlignment, direction: ShapeTriangle.Direc
         val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE {
             copy(
                     template = BlockTemplate(
+                            xOffset = xOffset,
                             yOffset = 4,
                             width = -4,
                             height = -4),

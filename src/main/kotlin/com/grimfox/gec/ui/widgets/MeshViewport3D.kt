@@ -141,6 +141,10 @@ class MeshViewport3D(
         val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
         val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
 
+        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
+        textureId = texId
+        textureResolution = texWidth
+
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
                 listOf(positionAttribute, uvAttribute),
@@ -151,13 +155,9 @@ class MeshViewport3D(
                 listOf(positionAttributeWater, uvAttributeWater),
                 listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
 
-        heightMap = HexGrid(2560.0f, 512, positionAttribute, uvAttribute)
+        heightMap = HexGrid(2560.0f, 512, positionAttribute, uvAttribute, true)
 
-        waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater)
-
-        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
-        textureId = texId
-        textureResolution = texWidth
+        waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
         lightDirection.normalize()
 
@@ -367,7 +367,7 @@ class MeshViewport3D(
         waterPlane.render()
     }
 
-    internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute) {
+    internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute, val useStrips: Boolean) {
 
         val halfXIncrement = width / (xResolution * 2 - 1)
         val xIncrement = halfXIncrement * 2
@@ -421,42 +421,102 @@ class MeshViewport3D(
                 val stripCount = yResolution - 1
                 val scaffoldVerts = (stripCount - 1) + 2
                 val vertsPerStrip = xResolution * 2
-                indexCount = stripCount * vertsPerStrip + scaffoldVerts
+                indexCount = if (useStrips) { stripCount * vertsPerStrip + scaffoldVerts } else { (2 * (xResolution - 1) * (yResolution - 1) + yResolution) * 3 }
 
-                val heightMapIndexData = BufferUtils.createIntBuffer(stripCount * vertsPerStrip + scaffoldVerts)
-                for (strip in 0..stripCount - 1) {
-                    if (strip == 0) {
-                        heightMapIndexData.put(0)
+                val heightMapIndexData = if (useStrips) {
+                    val heightMapIndexData = BufferUtils.createIntBuffer(indexCount)
+                    for (strip in 0..stripCount - 1) {
+                        if (strip == 0) {
+                            heightMapIndexData.put(0)
+                        }
+                        if (strip % 2 == 0) {
+                            var topStart = (strip * xResolution) + 1
+                            var bottomStart = topStart + xResolution
+                            for (i in 0..xResolution - 1) {
+                                heightMapIndexData.put(bottomStart++)
+                                heightMapIndexData.put(topStart++)
+                            }
+                            if (strip != stripCount - 1) {
+                                heightMapIndexData.put(bottomStart + xResolution - 1)
+                            }
+                        } else {
+                            val topStart = (strip * xResolution) + 1
+                            val bottomStart = topStart + xResolution
+                            val scaffold = bottomStart + xResolution
+                            var bottomEnd = scaffold - 1
+                            var topEnd = bottomStart - 1
+                            for (i in 0..xResolution - 1) {
+                                heightMapIndexData.put(bottomEnd--)
+                                heightMapIndexData.put(topEnd--)
+                            }
+                            if (strip != stripCount - 1) {
+                                heightMapIndexData.put(scaffold)
+                            }
+                        }
+                        if (strip == stripCount - 1) {
+                            heightMapIndexData.put(vertexCount - 1)
+                        }
                     }
-                    if (strip % 2 == 0) {
-                        var topStart = (strip * xResolution) + 1
-                        var bottomStart = topStart + xResolution
-                        for (i in 0..xResolution - 1) {
-                            heightMapIndexData.put(bottomStart++)
-                            heightMapIndexData.put(topStart++)
-                        }
-                        if (strip != stripCount - 1) {
-                            heightMapIndexData.put(bottomStart + xResolution - 1)
-                        }
-                    } else {
-                        val topStart = (strip * xResolution) + 1
-                        val bottomStart = topStart + xResolution
-                        val scaffold = bottomStart + xResolution
-                        var bottomEnd = scaffold - 1
-                        var topEnd = bottomStart - 1
-                        for (i in 0..xResolution - 1) {
-                            heightMapIndexData.put(bottomEnd--)
-                            heightMapIndexData.put(topEnd--)
-                        }
-                        if (strip != stripCount - 1) {
-                            heightMapIndexData.put(scaffold)
+                    heightMapIndexData.flip()
+                    heightMapIndexData
+                } else {
+                    val heightMapIndexData = BufferUtils.createIntBuffer(indexCount)
+                    var a: Int
+                    var b = -1
+                    var c = -1
+                    var windCc = false
+                    fun push(value: Int) {
+                        windCc = !windCc
+                        a = b
+                        b = c
+                        c = value
+                        if (a > -1 && a != b && b != c && c != a) {
+                            if (windCc) {
+                                heightMapIndexData.put(a)
+                                heightMapIndexData.put(b)
+                                heightMapIndexData.put(c)
+                            } else {
+                                heightMapIndexData.put(a)
+                                heightMapIndexData.put(c)
+                                heightMapIndexData.put(b)
+                            }
                         }
                     }
-                    if (strip == stripCount - 1) {
-                        heightMapIndexData.put(vertexCount - 1)
+                    for (strip in 0..stripCount - 1) {
+                        if (strip == 0) {
+                            push(0)
+                        }
+                        if (strip % 2 == 0) {
+                            var topStart = (strip * xResolution) + 1
+                            var bottomStart = topStart + xResolution
+                            for (i in 0..xResolution - 1) {
+                                push(bottomStart++)
+                                push(topStart++)
+                            }
+                            if (strip != stripCount - 1) {
+                                push(bottomStart + xResolution - 1)
+                            }
+                        } else {
+                            val topStart = (strip * xResolution) + 1
+                            val bottomStart = topStart + xResolution
+                            val scaffold = bottomStart + xResolution
+                            var bottomEnd = scaffold - 1
+                            var topEnd = bottomStart - 1
+                            for (i in 0..xResolution - 1) {
+                                push(bottomEnd--)
+                                push(topEnd--)
+                            }
+                            if (strip != stripCount - 1) {
+                                push(scaffold)
+                            }
+                        }
+                        if (strip == stripCount - 1) {
+                            push(vertexCount - 1)
+                        }
                     }
+                    heightMapIndexData.flip()
+                    heightMapIndexData
                 }
-                heightMapIndexData.flip()
 
                 vao = glGenVertexArrays()
 
@@ -464,6 +524,7 @@ class MeshViewport3D(
 
                     val stride = floatsPerVertex * 4
                     glBindVertexArray(vao)
+
                     val vbo = glGenBuffers()
                     val ibo = glGenBuffers()
 
@@ -472,11 +533,16 @@ class MeshViewport3D(
 
                         glBufferData(GL_ARRAY_BUFFER, heightMapVertexData, GL_STATIC_DRAW)
 
-                        glEnableVertexAttribArray(positionAttribute.location)
-                        glVertexAttribPointer(positionAttribute.location, 2, GL_FLOAT, false, stride, 0)
 
-                        glEnableVertexAttribArray(uvAttribute.location)
-                        glVertexAttribPointer(uvAttribute.location, 2, GL_FLOAT, false, stride, 8)
+                        if (positionAttribute.location >= 0) {
+                            glEnableVertexAttribArray(positionAttribute.location)
+                            glVertexAttribPointer(positionAttribute.location, 2, GL_FLOAT, false, stride, 0)
+                        }
+
+                        if (uvAttribute.location >= 0) {
+                            glEnableVertexAttribArray(uvAttribute.location)
+                            glVertexAttribPointer(uvAttribute.location, 2, GL_FLOAT, false, stride, 8)
+                        }
 
                         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)
 
@@ -502,7 +568,11 @@ class MeshViewport3D(
         fun render() {
             if (vao > 0) {
                 glBindVertexArray(vao)
-                glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0)
+                if (useStrips) {
+                    glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0)
+                } else {
+                    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0)
+                }
                 glBindVertexArray(0)
             }
         }

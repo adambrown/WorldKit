@@ -336,25 +336,8 @@ object MainUi {
                             }
                         }
                     }
-                    resizeAreaSouthEast = block {
-                        hSizing = STATIC
-                        vSizing = STATIC
-                        width = SMALL_ROW_HEIGHT
-                        height = SMALL_ROW_HEIGHT
-                        layout = ABSOLUTE
-                        hAlign = RIGHT
-                        vAlign = BOTTOM
-                        val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE { copy(
-                                template = BlockTemplate(
-                                        xOffset = 4,
-                                        yOffset = 4,
-                                        width = -4,
-                                        height = -4),
-                                mouseOver = ShapeTriangle(mouseOver.fill, mouseOver.stroke, ShapeTriangle.Direction.SOUTH_EAST),
-                                mouseDown = ShapeTriangle(mouseDown.fill, mouseDown.stroke, ShapeTriangle.Direction.SOUTH_EAST))})
-                        supplantEvents(grabber)
-                    }
-                    resizeAreaSouthWest = resizeArea(LEFT, ShapeTriangle.Direction.SOUTH_WEST)
+                    resizeAreaSouthEast = resizeArea(ShapeTriangle.Direction.SOUTH_EAST)
+                    resizeAreaSouthWest = resizeArea(ShapeTriangle.Direction.SOUTH_WEST)
                 }
             }
         }
