@@ -25,13 +25,13 @@ class SliderStyle(
         val barUnfilledTemplate: BlockTemplate = BlockTemplate(
                 vAlign = MIDDLE,
                 vSizing = STATIC,
-                height = 6),
+                height = 6.0f),
         val barFilledTemplate: BlockTemplate = BlockTemplate(
                 hAlign = LEFT,
                 hSizing = RELATIVE,
                 vAlign = MIDDLE,
                 vSizing = STATIC,
-                height = 8),
+                height = 8.0f),
         val switchTemplate: BlockTemplate = BlockTemplate(
                 hAlign = LEFT,
                 vAlign = MIDDLE,
@@ -124,7 +124,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                 padTop = style.barFilledTemplate.padTop
                 padBottom = style.barFilledTemplate.padBottom
                 hSizing = RELATIVE
-                width = round(10000 * valueFunctionInverse(valueReference.value))
+                width = 10000.0f * valueFunctionInverse(valueReference.value)
                 shape = style.barFilledNormal
                 isMouseAware = false
             }
@@ -155,15 +155,15 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                 val minX = slider.x
                 val maxX = minX + slider.width
                 val scale = if (minX >= x) {
-                    barFilled.width = 0
+                    barFilled.width = 0.0f
                     0.0f
                 } else if (x >= maxX) {
-                    barFilled.width = 10000
+                    barFilled.width = 10000.0f
                     1.0f
                 } else {
                     val range = maxX - minX
-                    val scale = (x - minX) / range.toFloat()
-                    barFilled.width = round(10000 * scale)
+                    val scale = (x - minX) / range
+                    barFilled.width = 10000.0f * scale
                     scale
                 }
                 valueReference.value = valueFunction(scale)
@@ -204,7 +204,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
         }
         onMouseDrag = updateSlider
         valueReference.listener { old, new ->
-            barFilled.width = round(10000 * valueFunctionInverse(new))
+            barFilled.width = 10000.0f * valueFunctionInverse(new)
         }
     }
 }

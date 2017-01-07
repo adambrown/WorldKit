@@ -3,8 +3,9 @@ package com.grimfox.gec.ui
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.loadImagePixels
-import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.ui.widgets.uiRoot
+import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.loadResource
 import org.lwjgl.BufferUtils
@@ -95,8 +96,10 @@ interface UiLayout {
 //
     fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int
 
+    fun createMultiGlyph(vararg glyphs: GlyphLayer): Block.() -> Block
+
     fun root(builder: Block.() -> Unit) {
-        root = uiRoot(0, 0, 0, 0, builder)
+        root = uiRoot(0.0f, 0.0f, 0.0f, 0.0f, builder)
     }
 }
 
@@ -268,8 +271,8 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         glViewport(0, 0, width, height)
         nvgSave(nvg)
         val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
-        root.width = (width / scale).toInt()
-        root.height = (height / scale).toInt()
+        root.width = width / scale
+        root.height = height / scale
         root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
         nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
         root.draw(nvg, scale)
@@ -282,6 +285,8 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         glfwSwapBuffers(window.id)
     }
 }
+
+data class GlyphLayer(val text: String, val font: Reference<Int>, val size: Float, val color: NVGColor, val xOffset: Float, val yOffset: Float)
 
 private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
@@ -322,6 +327,66 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 //
     override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int {
         return nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
+    }
+
+    private data class ResolvedGlyphLayer(val text: Text, var xOffset: Float, var yOffset: Float, var width: Float, var height: Float)
+
+    private fun glyphStyle(font: Int, size: Float, color: NVGColor): TextStyle {
+        return TextStyle(cRef(size), cRef(font), cRef(color))
+    }
+
+    private fun glyph(value: String, font: Int, size: Float, color: NVGColor): Text {
+        return StaticTextUtf8(value, glyphStyle(font, size, color))
+    }
+
+    override fun createMultiGlyph(vararg glyphs: GlyphLayer): Block.() -> Block {
+        val resolvedGlyphs = ArrayList<ResolvedGlyphLayer>()
+        var minXOffset = 0.0f
+        var minYOffset = 0.0f
+        glyphs.forEach {
+            val text = glyph(it.text, it.font.value, it.size, it.color)
+            val (width, height) = text.dimensions(nvg)
+            resolvedGlyphs.add(ResolvedGlyphLayer(text, it.xOffset, it.yOffset, width, height))
+            if (it.xOffset < minXOffset) {
+                minXOffset = it.xOffset
+            }
+            if (it.yOffset < minYOffset) {
+                minYOffset = it.yOffset
+            }
+        }
+        var maxWidth = 0.0f
+        var maxHeight = 0.0f
+        resolvedGlyphs.forEach {
+            it.xOffset -= minXOffset
+            it.yOffset -= minYOffset
+            val width = it.xOffset + it.width
+            val height = it.yOffset + it.height
+            if (width > maxWidth) {
+                maxWidth = width
+            }
+            if (height > maxHeight) {
+                maxHeight = height
+            }
+        }
+        return {
+            block {
+                hSizing = Sizing.STATIC
+                vSizing = Sizing.STATIC
+                width = maxWidth
+                height = maxHeight
+                resolvedGlyphs.forEach {
+                    block {
+                        hSizing = Sizing.STATIC
+                        vSizing = Sizing.STATIC
+                        xOffset = it.xOffset
+                        yOffset = it.yOffset
+                        width = it.width
+                        height = it.height
+                        text = it.text
+                    }
+                }
+            }
+        }
     }
 
     internal fun close() {

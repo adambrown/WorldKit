@@ -7,14 +7,12 @@ import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
+import com.grimfox.gec.util.geometry.max
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
-import org.joml.Math.toRadians
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
-import org.lwjgl.system.CallbackI
 import org.lwjgl.system.MemoryUtil
-import java.nio.ByteBuffer
 
 object MainUi {
 
@@ -57,6 +55,11 @@ object MainUi {
                 val glyphMinimize = glyphIndex[1]
                 val glyphRestore = glyphIndex[2]
                 val glyphMaximize = glyphIndex[3]
+                val glyphSave = glyphIndex[4]
+                val glyphFile = glyphIndex[5]
+                val glyphFolder = glyphIndex[6]
+                val glyphLoadArrow = glyphIndex[7]
+                val glyphStar = glyphIndex[8]
 
                 val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) glyphRestore else glyphMaximize, true)
                 ui.maximizeHandler = {
@@ -100,19 +103,176 @@ object MainUi {
 
                 meshViewport.init()
 
+                var layer0 = NO_BLOCK
+                var layer1 = NO_BLOCK
+
                 var topBar = NO_BLOCK
                 var contentPanel = NO_BLOCK
                 var leftPanel = NO_BLOCK
                 var rightPanel = NO_BLOCK
 
                 root {
+                    layer0 = block {
+                        isFallThrough = true
+                    }
+                    layer1 = block {
+                        isFallThrough = true
+                    }
+                }
+                layer0 {
                     topBar = block {
                         vSizing = STATIC
                         height = MEDIUM_ROW_HEIGHT
                         layout = VERTICAL
                         icon(icon, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT)
                         hSpacer(SMALL_SPACER_SIZE)
-                        button(text("File"), MENU_TEXT_BUTTON_STYLE) { println("mouse click File") }
+
+
+
+
+                        block {
+                            val menu = this
+                            topBar.renderChildren.remove(menu)
+                            layer1.renderChildren.add(menu)
+                            var active = false
+                            hSizing = SHRINK
+                            vSizing = STATIC
+                            height = MEDIUM_ROW_HEIGHT
+                            layout = HORIZONTAL
+                            isFallThrough = true
+                            block {
+                                hSizing = SHRINK
+                                vSizing = STATIC
+                                vAlign = BOTTOM
+                                height = SMALL_ROW_HEIGHT
+                                isFallThrough = true
+                                val activator = block {
+                                    hSizing = SHRINK
+                                    vSizing = STATIC
+                                    height = SMALL_ROW_HEIGHT
+                                    padLeft = SMALL_SPACER_SIZE
+                                    padRight = SMALL_SPACER_SIZE
+                                    block {
+                                        hSizing = SHRINK
+                                        vSizing = SHRINK
+                                        hAlign = CENTER
+                                        vAlign = MIDDLE
+                                        text = text("File", TEXT_STYLE_BUTTON)
+                                        isMouseAware = false
+                                    }
+                                }
+                                val dropDown = block {
+                                    val dropDown = this
+                                    isVisible = true
+                                    isMouseAware = true
+                                    layout = ABSOLUTE
+                                    yOffset = SMALL_ROW_HEIGHT - 1.0f
+                                    xOffset = -1.0f
+                                    hSizing = STATIC
+                                    vSizing = STATIC
+                                    width = 0.0f
+                                    height = 0.0f
+                                    canOverflow = true
+                                    isFallThrough = true
+                                    block {
+                                        layout = ABSOLUTE
+                                        hSizing = SHRINK
+                                        vSizing = SHRINK
+                                        canOverflow = true
+                                        block {
+                                            xOffset = 3.0f
+                                            yOffset = 3.0f
+                                            canOverflow = true
+                                            shape = SHAPE_DROP_SHADOW
+                                        }
+                                        block {
+                                            layout = ABSOLUTE
+                                            hSizing = SHRINK
+                                            vSizing = SHRINK
+                                            canOverflow = true
+                                            shape = SHAPE_MENU_BORDER
+                                            block {
+                                                hSizing = SHRINK
+                                                vSizing = SHRINK
+                                                padLeft = 1.0f
+                                                padRight = 1.0f
+                                                padTop = 1.0f
+                                                padBottom = 1.0f
+                                                shape = SHAPE_MENU_BACKGROUND
+                                                val shrinkGroup = hShrinkGroup()
+                                                menuItem(text("New project", TEXT_STYLE_BUTTON),
+                                                        createMultiGlyph(
+                                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
+                                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f)),
+                                                        text("Ctrl+N", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
+                                                        shrinkGroup)
+                                                menuItem(text("Open project", TEXT_STYLE_BUTTON),
+                                                        createMultiGlyph(
+                                                                GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
+                                                                GlyphLayer(glyphLoadArrow, glyphFont, 14.5f, COLOR_GLYPH_BLACK, -2.0f, -4.0f),
+                                                                GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.5f)),
+                                                        text("Ctrl+O", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
+                                                        shrinkGroup)
+                                                menuItem(text("Save project", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), text("Ctrl+S", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                                menuDivider(3.0f, shrinkGroup)
+                                                menuItem(text("Export maps...", TEXT_STYLE_BUTTON), {block{}}, text("Ctrl+E", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                                menuDivider(3.0f, shrinkGroup)
+                                                menuItem(text("Exit", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f)), text("Alt+F4", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                            }
+                                        }
+                                    }
+                                    block {
+                                        layout = ABSOLUTE
+                                        hSizing = SHRINK
+                                        vSizing = STATIC
+                                        height = SMALL_ROW_HEIGHT + 1
+                                        yOffset = -SMALL_ROW_HEIGHT
+                                        canOverflow = true
+                                        shape = SHAPE_MENU_BORDER
+                                        block {
+                                            hSizing = SHRINK
+                                            vSizing = STATIC
+                                            height = SMALL_ROW_HEIGHT + 2
+                                            padLeft = 1.0f
+                                            padRight = 1.0f
+                                            padTop = 1.0f
+                                            canOverflow = true
+                                            shape = SHAPE_MENU_BACKGROUND
+                                            isMouseAware = false
+                                            block {
+                                                hSizing = SHRINK
+                                                vSizing = SHRINK
+                                                hAlign = CENTER
+                                                vAlign = MIDDLE
+                                                yOffset = -1.0f
+                                                padLeft = SMALL_SPACER_SIZE
+                                                padRight = SMALL_SPACER_SIZE
+                                                text = text("File", TEXT_STYLE_BUTTON)
+                                            }
+                                        }
+                                        onMouseClick { button, x, y ->
+                                            dropDown.isVisible = false
+                                            dropDown.isMouseAware = false
+                                            activator.isMouseAware = true
+                                        }
+                                    }
+                                }
+                                dropDown.isVisible = false
+                                dropDown.isMouseAware = false
+                                activator.onMouseClick { button, x, y ->
+                                    dropDown.isVisible = true
+                                    dropDown.isMouseAware = true
+                                    activator.isMouseAware = false
+                                }
+                            }
+                        }
+
+
+
+
+
+
                         button(text("Settings"), MENU_TEXT_BUTTON_STYLE) { println("mouse click Settings") }
                         button(text("Help"), MENU_TEXT_BUTTON_STYLE) { println("mouse click Help") }
                         hSpacer(SMALL_ROW_HEIGHT)
@@ -128,9 +288,9 @@ object MainUi {
                         hAlign = LEFT
                         block {
                             leftPanel = this
-                            val labelWidth = 92
+                            val labelWidth = 92.0f
                             hSizing = STATIC
-                            width = 268
+                            width = 268.0f
                             layout = HORIZONTAL
                             hAlign = LEFT
                             block {
@@ -144,19 +304,19 @@ object MainUi {
                                     height = -2 * SMALL_SPACER_SIZE
                                     block {
                                         hSizing = STATIC
-                                        width = 1
+                                        width = 1.0f
                                         hAlign = LEFT
                                         layout = HORIZONTAL
-                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                     }
                                     block {
                                         hSizing = GROW
                                         layout = HORIZONTAL
                                         block {
                                             vSizing = STATIC
-                                            height = 1
+                                            height = 1.0f
                                             layout = VERTICAL
-                                            shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                            shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                         }
                                         block {
                                             vSizing = GROW
@@ -184,17 +344,17 @@ object MainUi {
                                         }
                                         block {
                                             vSizing = STATIC
-                                            height = 1
+                                            height = 1.0f
                                             layout = VERTICAL
-                                            shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                            shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                         }
                                     }
                                     block {
                                         hSizing = STATIC
-                                        width = 1
+                                        width = 1.0f
                                         hAlign = LEFT
                                         layout = HORIZONTAL
-                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                     }
                                 }
                             }
@@ -208,18 +368,18 @@ object MainUi {
                                                 height = 3 * LARGE_ROW_HEIGHT,
                                                 vAlign = MIDDLE,
                                                 hSizing = RELATIVE,
-                                                width = -2,
+                                                width = -2.0f,
                                                 hAlign = CENTER))})
-                                var lastX = 0
+                                var lastX = 0.0f
                                 onMouseDown { button, x, y ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                                        lastX = x
+                                        lastX = x.toFloat()
                                     }
                                 }
                                 onMouseDrag { button, x, y ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         val delta = x - lastX
-                                        val adjustedDelta = Math.min((root.width / 2.0f).toInt(), Math.max(220, leftPanel.width + delta)) - leftPanel.width
+                                        val adjustedDelta = Math.min(root.width / 2.0f, Math.max(220.0f, leftPanel.width + delta)) - leftPanel.width
                                         lastX += adjustedDelta
                                         leftPanel.width += adjustedDelta
                                     }
@@ -232,25 +392,25 @@ object MainUi {
                             layout = HORIZONTAL
                             hAlign = LEFT
                             block {
-                                xOffset = 0
+                                xOffset = 0.0f
                                 yOffset = SMALL_SPACER_SIZE
                                 width = -SMALL_SPACER_SIZE
                                 height = -2 * SMALL_SPACER_SIZE
                                 block {
                                     hSizing = STATIC
-                                    width = 1
+                                    width = 1.0f
                                     hAlign = LEFT
                                     layout = HORIZONTAL
-                                    shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                 }
                                 block {
                                     hSizing = GROW
                                     layout = HORIZONTAL
                                     block {
                                         vSizing = STATIC
-                                        height = 1
+                                        height = 1.0f
                                         layout = VERTICAL
-                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                     }
                                     block {
                                         vSizing = GROW
@@ -302,7 +462,7 @@ object MainUi {
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
-                                                hSliderRow(heightMapScaleFactor, 144, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
                                                 hSpacer(MEDIUM_SPACER_SIZE)
                                                 hDivider()
                                                 hSpacer(MEDIUM_SPACER_SIZE)
@@ -321,17 +481,17 @@ object MainUi {
                                     }
                                     block {
                                         vSizing = STATIC
-                                        height = 1
+                                        height = 1.0f
                                         layout = VERTICAL
-                                        shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                     }
                                 }
                                 block {
                                     hSizing = STATIC
-                                    width = 1
+                                    width = 1.0f
                                     hAlign = LEFT
                                     layout = HORIZONTAL
-                                    shape = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+                                    shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
                                 }
                             }
                         }

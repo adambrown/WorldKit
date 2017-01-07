@@ -480,7 +480,7 @@ object Coastline {
             subtotal += weight
             degreeWeights.add(weight.toFloat())
         }
-        val total = subtotal.toFloat()
+        val total = subtotal
         subtotal = 0.0f
         for (j in 0..5) {
             subtotal += degreeWeights[j] / total

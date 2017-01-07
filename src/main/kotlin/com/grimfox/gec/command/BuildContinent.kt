@@ -1382,7 +1382,7 @@ class BuildContinent() : Runnable {
             desiredJunctionElevation
         }
         val normalizedFlowVector = (Vector2F(entry1, drainPoint) + Vector2F(entry2, drainPoint) * (totalDist * 0.5f)).getUnit()
-        val outputVector = ((entryVector1 * dist1.toFloat()) + (entryVector2 * dist2.toFloat()) + normalizedFlowVector).getUnit()
+        val outputVector = ((entryVector1 * dist1) + (entryVector2 * dist2) + normalizedFlowVector).getUnit()
         sp3.cp1 = junction + (-outputVector * (totalDist * 0.15f))
         return Triple(Junction(vertexId, junction, totalFlow, outputVector, junctionElevation), Spline2F(mutableListOf(sp1, sp3), false), Spline2F(mutableListOf(sp2, sp3), false))
     }

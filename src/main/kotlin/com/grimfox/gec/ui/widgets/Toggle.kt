@@ -24,12 +24,12 @@ class ToggleStyle(
         val switchMouseDownOff: Shape,
         val textMouseDownOn: TextStyle,
         val textMouseDownOff: TextStyle,
-        inset: Int = 4,
+        inset: Float = 4.0f,
         val template: BlockTemplate = BlockTemplate(
                 vAlign = MIDDLE,
                 vSizing = STATIC,
-                height = 32),
-        switchSize: Int = template.height - (2 * inset),
+                height = 32.0f),
+        switchSize: Float = template.height - (2.0f * inset),
         val onTemplate: BlockTemplate = BlockTemplate(),
         val onToggleTemplate: BlockTemplate = BlockTemplate(
                 hAlign = LEFT,

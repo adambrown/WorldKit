@@ -10,17 +10,28 @@ import com.grimfox.gec.ui.widgets.toggle
 import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
+import org.lwjgl.nanovg.NVGColor
 import java.nio.ByteBuffer
 
 val textFont = ref(-1)
 val glyphFont = ref(-1)
 
-val SMALL_SPACER_SIZE = 6
-val MEDIUM_SPACER_SIZE = 12
+val SMALL_SPACER_SIZE = 6.0f
+val MEDIUM_SPACER_SIZE = 12.0f
 
-val SMALL_ROW_HEIGHT = 20
-val MEDIUM_ROW_HEIGHT = 26
-val LARGE_ROW_HEIGHT = 32
+val SMALL_ROW_HEIGHT = 20.0f
+val MEDIUM_ROW_HEIGHT = 26.0f
+val LARGE_ROW_HEIGHT = 32.0f
+
+val COLOR_GLYPH_RED = color(255, 57, 43)
+val COLOR_GLYPH_BLUE = color(26, 161, 226)
+val COLOR_GLYPH_YELLOW = color(217, 177, 114)
+val COLOR_GLYPH_GREEN = color(142, 210, 138)
+val COLOR_GLYPH_WHITE = color(243, 243, 243)
+val COLOR_GLYPH_BLACK = color(0, 0, 0)
+
+val COLOR_BLACK = color(5, 5, 6, 72)
+val COLOR_BLACK_TRANSPARENT = color(5, 5, 6, 0)
 
 val COLOR_BACKGROUND = color(45, 45, 48)
 val FILL_BACKGROUND = FillColor(COLOR_BACKGROUND)
@@ -51,11 +62,11 @@ val BUTTON_NORMAL = NO_SHAPE
 val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
 val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
-val SWITCH_HEIGHT = 12
-val ELEMENT_INSET = 3
+val SWITCH_HEIGHT = 12.0f
+val ELEMENT_INSET = 3.0f
 
-val TOGGLE_WIDTH = 52
-val TOGGLE_HEIGHT = SWITCH_HEIGHT + (ELEMENT_INSET * 2)
+val TOGGLE_WIDTH = 52.0f
+val TOGGLE_HEIGHT = SWITCH_HEIGHT + (ELEMENT_INSET * 2.0f)
 val TOGGLE_CORNER_RADIUS = TOGGLE_HEIGHT / 2.0f
 
 val FILL_TOGGLE_BACKGROUND_NORMAL = FillColor(COLOR_BEVELS)
@@ -92,16 +103,35 @@ val SLIDER_SWITCH_MOUSE_OVER = ShapeCircle(FillColor(COLOR_CLICK_ITEMS_LIGHTER),
 val SLIDER_BAR_FILLED_MOUSE_DOWN = ShapeRoundedRectangle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE, 4.0f)
 val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO_STROKE)
 
+val COLOR_MENU_BACKGROUND = color(27, 27, 28)
+val COLOR_MENU_HIGHLIGHT = color(62, 62, 64)
+val COLOR_BORDERS_AND_FRAMES = color(63, 63, 70)
 
-val TEXT_STYLE_NORMAL = TextStyle(cRef(16.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON = TextStyle(cRef(16.0f), textFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_GLYPH = TextStyle(cRef(16.0f), glyphFont, cRef(COLOR_BUTTON_TEXT))
-val TEXT_STYLE_LARGE = TextStyle(cRef(22.0f), textFont, cRef(COLOR_NORMAL_TEXT))
-val TEXT_STYLE_BUTTON_LARGE = TextStyle(cRef(22.0f), textFont, cRef(COLOR_BUTTON_TEXT))
+val FILL_MENU_BACKGROUND = FillColor(COLOR_MENU_BACKGROUND)
+val FILL_MENU_BORDER = FillColor(COLOR_MENU_HIGHLIGHT)
+val FILL_BORDERS_AND_FRAMES = FillColor(COLOR_BORDERS_AND_FRAMES)
+
+
+val SHAPE_MENU_BACKGROUND = ShapeRectangle(FILL_MENU_BACKGROUND, NO_STROKE)
+val SHAPE_MENU_BORDER = ShapeRectangle(FILL_MENU_BORDER, NO_STROKE)
+val SHAPE_BORDER_AND_FRAME_RECTANGLE = ShapeRectangle(FILL_BORDERS_AND_FRAMES, NO_STROKE)
+
+val FONT_SIZE_15 = cRef(15.0f)
+val FONT_SIZE_16 = cRef(16.0f)
+val FONT_SIZE_22 = cRef(22.0f)
+
+val TEXT_STYLE_NORMAL = TextStyle(FONT_SIZE_15, textFont, cRef(COLOR_NORMAL_TEXT))
+val TEXT_STYLE_BUTTON = TextStyle(FONT_SIZE_15, textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_GLYPH = TextStyle(FONT_SIZE_16, glyphFont, cRef(COLOR_BUTTON_TEXT))
+
+val TEXT_STYLE_BUTTON_LARGE = TextStyle(FONT_SIZE_22, textFont, cRef(COLOR_BUTTON_TEXT))
+
 
 val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
 val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)
 
+val FILL_DROP_SHADOW = FillBoxGradient(COLOR_BLACK, COLOR_BLACK_TRANSPARENT, 6.0f, 12.0f)
+val SHAPE_DROP_SHADOW = ShapeDropShadow(FILL_DROP_SHADOW, NO_STROKE, 6.0f, 6.0f)
 
 val TOGGLE_STYLE = ToggleStyle(
         backgroundNormal = TOGGLE_BACKGROUND_NORMAL,
@@ -141,8 +171,8 @@ val SLIDER_STYLE = SliderStyle(
                 hSizing = GROW,
                 layout = HORIZONTAL),
         sliderTemplate = BlockTemplate(
-                padLeft = Math.round(SWITCH_HEIGHT / 2.0f),
-                padRight = Math.round(SWITCH_HEIGHT / 2.0f)),
+                padLeft = SWITCH_HEIGHT / 2.0f,
+                padRight = SWITCH_HEIGHT / 2.0f),
         switchTemplate = BlockTemplate(
                 vAlign = MIDDLE,
                 hSizing = STATIC,
@@ -153,13 +183,13 @@ val SLIDER_STYLE = SliderStyle(
         barUnfilledTemplate = BlockTemplate(
                 vAlign = MIDDLE,
                 vSizing = STATIC,
-                height = Math.round(SWITCH_HEIGHT / 3.0f) - 2),
+                height = (SWITCH_HEIGHT / 3.0f) - 2.0f),
         barFilledTemplate = BlockTemplate(
                 hAlign = LEFT,
                 hSizing = RELATIVE,
                 vAlign = MIDDLE,
                 vSizing = STATIC,
-                height = Math.round(SWITCH_HEIGHT / 3.0f)))
+                height = SWITCH_HEIGHT / 3.0f))
 
 val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
         normal = BUTTON_NORMAL,
@@ -225,8 +255,16 @@ fun text(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
     return StaticTextUtf8(value, style)
 }
 
+fun glyphStyle(size: Float, color: NVGColor): TextStyle {
+    return TextStyle(cRef(size), glyphFont, cRef(color))
+}
+
 fun glyph(value: String, style: TextStyle = TEXT_STYLE_GLYPH): Text {
     return StaticTextUtf8(value, style)
+}
+
+fun glyph(value: String, size: Float, color: NVGColor): Text {
+    return StaticTextUtf8(value, glyphStyle(size, color))
 }
 
 fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text {
@@ -236,7 +274,7 @@ fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text {
 val TEXT_ON = text("On")
 val TEXT_OFF = text("Off")
 
-fun Block.label(text: Text, width: Int): Block {
+fun Block.label(text: Text, width: Float): Block {
     return block {
         hSizing = STATIC
         this.width = width
@@ -254,7 +292,7 @@ fun Block.label(text: Text, width: Int): Block {
 }
 
 fun Block.label(text: Text): Block {
-    val label = label(text, 0)
+    val label = label(text, 0.0f)
     label.hSizing = SHRINK
     return label
 }
@@ -319,7 +357,7 @@ fun Block.supplantEvents(other: Block): Block {
     return this
 }
 
-fun Block.hSpacer(space: Int): Block {
+fun Block.hSpacer(space: Float): Block {
     return block {
         hSizing = STATIC
         width = space
@@ -328,7 +366,7 @@ fun Block.hSpacer(space: Int): Block {
     }
 }
 
-fun Block.vSpacer(space: Int): Block {
+fun Block.vSpacer(space: Float): Block {
     return block {
         vSizing = STATIC
         height = space
@@ -341,26 +379,26 @@ fun Block.hDivider() {
     block {
         hSizing = STATIC
         width = SMALL_SPACER_SIZE
-        height = -2 * SMALL_SPACER_SIZE
+        height = -2.0f * SMALL_SPACER_SIZE
         yOffset = SMALL_SPACER_SIZE
         layout = HORIZONTAL
         isMouseAware = false
         block {
             hSizing = STATIC
-            width = 1
+            width = 1.0f
             shape = DIVIDER_DARK
             layout = HORIZONTAL
         }
         block {
             hSizing = STATIC
-            width = 1
+            width = 1.0f
             shape = DIVIDER_LIGHT
             layout = HORIZONTAL
         }
     }
 }
 
-fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Int, label: Text, labelWidth: Int, gap: Int): Block {
+fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: Text, labelWidth: Float, gap: Float): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -378,7 +416,7 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Int, label: Tex
     }
 }
 
-fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Int): Block {
+fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float): Block {
     return block {
         val row = this
         hSizing = SHRINK
@@ -395,7 +433,7 @@ fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Int):
     }
 }
 
-fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Int, label: Text, labelWidth: Int, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Text, labelWidth: Float, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -413,7 +451,7 @@ fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Int, label: Text,
     }
 }
 
-fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Int, label: Text, gap: Int, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Float, label: Text, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return block {
         val row = this
         hSizing = SHRINK
@@ -431,7 +469,7 @@ fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Int, label: Text, 
     }
 }
 
-fun Block.vButtonRow(height: Int, buttons: Block.() -> Unit): Block {
+fun Block.vButtonRow(height: Float, buttons: Block.() -> Unit): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -460,7 +498,87 @@ fun Block.hButtonRow(buttons: Block.() -> Unit): Block {
     }
 }
 
-fun Block.icon(imageRef: Int, imageWidth: Int, imageHeight: Int, layoutWidth: Int, layoutHeight: Int): Block {
+fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
+    return block {
+        hSizing = SHRINK_GROUP
+        hShrinkGroup = shrinkGroup
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block{
+            hSizing = STATIC
+            width = 32.0f
+            layout = HORIZONTAL
+        }
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                vSizing = STATIC
+                this.height = 1.0f
+                hSizing = RELATIVE
+                width = -2.0f
+                shape = SHAPE_MENU_BORDER
+                hAlign = LEFT
+                vAlign = MIDDLE
+            }
+        }
+    }
+}
+
+fun Block.menuItem(text: Text, glyph: Block.() -> Block, hotKey: Text, height: Float, shrinkGroup: ShrinkGroup): Block {
+    return block {
+        hSizing = SHRINK_GROUP
+        hShrinkGroup = shrinkGroup
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block{
+            hSizing = STATIC
+            width = 32.0f
+            layout = HORIZONTAL
+            block {
+                this.hSizing = SHRINK
+                this.vSizing = SHRINK
+                this.hAlign = CENTER
+                this.vAlign = MIDDLE
+                glyph()
+            }
+        }
+        block {
+            hSizing = SHRINK
+            vSizing = SHRINK
+            hAlign = LEFT
+            vAlign = MIDDLE
+            layout = HORIZONTAL
+            this.text = text
+        }
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+        }
+        block {
+            hSizing = STATIC
+            layout = HORIZONTAL
+            width = MEDIUM_SPACER_SIZE
+        }
+        block {
+            hSizing = SHRINK
+            vSizing = SHRINK
+            hAlign = LEFT
+            vAlign = MIDDLE
+            layout = HORIZONTAL
+            this.text = hotKey
+        }
+        block {
+            hSizing = STATIC
+            width = 22.0f
+            layout = HORIZONTAL
+        }
+    }
+}
+
+fun Block.icon(imageRef: Int, imageWidth: Float, imageHeight: Float, layoutWidth: Float, layoutHeight: Float): Block {
     return block {
         hSizing = STATIC
         vSizing = STATIC
@@ -480,7 +598,7 @@ fun Block.icon(imageRef: Int, imageWidth: Int, imageHeight: Int, layoutWidth: In
     }
 }
 
-fun Block.icon(imageRef: Int, imageSize: Int, layoutSize: Int): Block {
+fun Block.icon(imageRef: Int, imageSize: Float, layoutSize: Float): Block {
     return icon(imageRef, imageSize, imageSize, layoutSize, layoutSize)
 }
 
@@ -507,10 +625,10 @@ fun Block.resizeArea(direction: ShapeTriangle.Direction): Block {
     val hAlign: HorizontalAlignment
     val xOffset = if (direction == ShapeTriangle.Direction.SOUTH_EAST) {
         hAlign = RIGHT
-        4
+        4.0f
     } else {
         hAlign = LEFT
-        0
+        0.0f
     }
     return block {
         hSizing = STATIC
@@ -524,9 +642,9 @@ fun Block.resizeArea(direction: ShapeTriangle.Direction): Block {
             copy(
                     template = BlockTemplate(
                             xOffset = xOffset,
-                            yOffset = 4,
-                            width = -4,
-                            height = -4),
+                            yOffset = 4.0f,
+                            width = -4.0f,
+                            height = -4.0f),
                     mouseOver = ShapeTriangle(mouseOver.fill, mouseOver.stroke, direction),
                     mouseDown = ShapeTriangle(mouseDown.fill, mouseDown.stroke, direction))
         })

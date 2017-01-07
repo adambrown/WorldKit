@@ -15,9 +15,10 @@ import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
+import java.lang.Math.max
+import java.lang.Math.min
 import java.nio.ByteBuffer
 import java.util.*
-import javax.swing.SwingConstants.NORTH_EAST
 
 enum class HorizontalAlignment {
     LEFT,
@@ -40,6 +41,7 @@ enum class Layout {
 enum class Sizing {
     STATIC,
     SHRINK,
+    SHRINK_GROUP,
     GROW,
     RELATIVE
 }
@@ -48,8 +50,8 @@ class ScissorStack(val nvg: Long) {
 
     private val stack = ArrayList<Vector4f>()
 
-    fun push(clip: Vector4f): Vector4f {
-        if (stack.isNotEmpty()) {
+    fun push(clip: Vector4f, canOverflow: Boolean = false): Vector4f {
+        if (stack.isNotEmpty() && !canOverflow) {
             val current = stack.last()
             if (clip.x < current.x) {
                 clip.x = current.x
@@ -64,9 +66,20 @@ class ScissorStack(val nvg: Long) {
                 clip.w = current.w
             }
         }
-        nvgScissor(nvg, clip.x, clip.y, clip.z - clip.x, clip.w - clip.y)
+        apply(clip)
         stack.add(clip)
         return clip
+    }
+
+    fun apply(clip: Vector4f) {
+        nvgScissor(nvg, clip.x, clip.y, clip.z - clip.x, clip.w - clip.y)
+    }
+
+    fun peek(): Vector4f? {
+        if (stack.isNotEmpty()) {
+            return stack.last()
+        }
+        return null
     }
 
     fun suspendIf(condition: Boolean, parents: Int, block: () -> Unit) {
@@ -185,6 +198,17 @@ class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
     }
 }
 
+class FillBoxGradient(val innerColor: NVGColor, val outerColor: NVGColor, val cornerRadius: Float, val feather: Float) : Fill {
+
+    private val paint = NVGPaint.create()
+
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        nvgBoxGradient(nvg, block.x * scale, block.y * scale, block.width * scale, block.height * scale, cornerRadius, feather, innerColor, outerColor, paint)
+        nvgFillPaint(nvg, paint)
+        nvgFill(nvg)
+    }
+}
+
 interface Stroke {
 
     val size: Float
@@ -192,7 +216,7 @@ interface Stroke {
     fun draw(nvg: Long, block: Block, scale: Float)
 }
 
-private class StrokeNone() : Stroke {
+private class StrokeNone : Stroke {
 
     override val size = 0.0f
 
@@ -228,7 +252,7 @@ interface Text {
     fun dimensions(nvg: Long): Pair<Float, Float>
 }
 
-private class TextNone() : Text {
+private class TextNone : Text {
 
     override var style: TextStyle = TextStyle(cRef(0.0f), cRef(-1), cRef(NO_COLOR))
     override val data: ByteBuffer = ByteBuffer.wrap(ByteArray(0))
@@ -248,12 +272,12 @@ class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
     override val length: Int = data.limit()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
-        nvgFontFaceId(nvg, style.font.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgFontFaceId(nvg, style.font.value)
         nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, Math.round(x * scale).toFloat(), Math.round(y * scale).toFloat(), data, NULL)
+        nvgText(nvg, x * scale, y * scale, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -272,12 +296,12 @@ class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextSty
     override val length: Int get() = data.limit()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
-        nvgFontFaceId(nvg, style.font.value)
         val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgFontFaceId(nvg, style.font.value)
         nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, Math.round(x * scale).toFloat(), Math.round(y * scale).toFloat(), data, NULL)
+        nvgText(nvg, x * scale, y * scale, data, NULL)
     }
 
     override fun dimensions(nvg: Long): Pair<Float, Float> {
@@ -295,11 +319,11 @@ private fun calculatePositionAndAlignmentForText(block: Block): Triple<Float, Fl
     val x: Float
     val hAlignMask = when (block.hAlign) {
         LEFT -> {
-            x = block.x.toFloat()
+            x = block.x
             NVG_ALIGN_LEFT
         }
         RIGHT -> {
-            x = block.x.toFloat() + block.width
+            x = block.x + block.width
             NVG_ALIGN_RIGHT
         }
         CENTER -> {
@@ -310,11 +334,11 @@ private fun calculatePositionAndAlignmentForText(block: Block): Triple<Float, Fl
     val y: Float
     val vAlignMask = when (block.vAlign) {
         TOP -> {
-            y = block.y.toFloat()
+            y = block.y
             NVG_ALIGN_TOP
         }
         BOTTOM -> {
-            y = block.y.toFloat() + block.height
+            y = block.y + block.height
             NVG_ALIGN_BOTTOM
         }
         MIDDLE -> {
@@ -334,7 +358,7 @@ interface Shape {
     fun draw(nvg: Long, block: Block, scale: Float)
 }
 
-private class ShapeNone() : Shape {
+private class ShapeNone : Shape {
 
     override val fill: Fill = NO_FILL
     override val stroke: Stroke = NO_STROKE
@@ -357,7 +381,7 @@ class ShapeRectangle(override val fill: Fill, override val stroke: Stroke) : Sha
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgRect(nvg, (block.x.toFloat() + halfStroke) * scale, (block.y.toFloat() + halfStroke) * scale, (block.width.toFloat() - stroke.size) * scale, (block.height.toFloat() - stroke.size) * scale)
+        nvgRect(nvg, (block.x + halfStroke) * scale, (block.y + halfStroke) * scale, (block.width - stroke.size) * scale, (block.height - stroke.size) * scale)
         fill.draw(nvg, block, scale)
         stroke.draw(nvg, block, scale)
     }
@@ -368,7 +392,7 @@ class ShapeCircle(override val fill: Fill, override val stroke: Stroke) : Shape 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgCircle(nvg, (block.x + (block.width / 2.0f)) * scale, (block.y + (block.height / 2.0f)) * scale, (Math.min(block.width, block.height) / 2.0f - halfStroke) * scale)
+        nvgCircle(nvg, (block.x + (block.width / 2.0f)) * scale, (block.y + (block.height / 2.0f)) * scale, (min(block.width, block.height) / 2.0f - halfStroke) * scale)
         fill.draw(nvg, block, scale)
         stroke.draw(nvg, block, scale)
     }
@@ -379,7 +403,7 @@ class ShapeEllipse(override val fill: Fill, override val stroke: Stroke) : Shape
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgEllipse(nvg, ((block.x.toFloat() + block.width.toFloat()) / 2.0f) * scale, ((block.y.toFloat() + block.height.toFloat()) / 2.0f) * scale, (block.width / 2.0f - halfStroke) * scale, (block.height / 2.0f - halfStroke) * scale)
+        nvgEllipse(nvg, ((block.x + block.width) / 2.0f) * scale, ((block.y + block.height) / 2.0f) * scale, (block.width / 2.0f - halfStroke) * scale, (block.height / 2.0f - halfStroke) * scale)
         fill.draw(nvg, block, scale)
         stroke.draw(nvg, block, scale)
     }
@@ -390,7 +414,29 @@ class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
         nvgBeginPath(nvg)
-        nvgRoundedRect(nvg, (block.x.toFloat() + halfStroke) * scale, (block.y.toFloat() + halfStroke) * scale, (block.width.toFloat() - stroke.size) * scale, (block.height.toFloat() - stroke.size) * scale, (Math.min(cornerRadius, Math.min(block.width, block.height) / 2.0f)) * scale)
+        nvgRoundedRect(nvg, (block.x + halfStroke) * scale, (block.y + halfStroke) * scale, (block.width - stroke.size) * scale, (block.height - stroke.size) * scale, (min(cornerRadius, min(block.width, block.height) / 2.0f)) * scale)
+        fill.draw(nvg, block, scale)
+        stroke.draw(nvg, block, scale)
+    }
+}
+
+class ShapeDropShadow(override val fill: Fill, override val stroke: Stroke, val inset: Float, val cornerRadius: Float) : Shape {
+
+    private val insetX2 = inset * 2
+
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        val halfStroke = stroke.size / 2.0f
+        nvgBeginPath(nvg)
+        val x = (block.x + halfStroke) * scale
+        val y = (block.y + halfStroke) * scale
+        val width = (block.width - stroke.size) * scale
+        val height = (block.height - stroke.size) * scale
+        val actualCornerRadius = (min(cornerRadius, min(block.width, block.height) / 2.0f)) * scale
+        val scaledInset = inset * scale
+        val scaledInsetX2 = insetX2 * scale
+        nvgRoundedRect(nvg, x + scaledInset, y + scaledInset, width - scaledInsetX2, height - scaledInsetX2, max(actualCornerRadius - scaledInset, 0.0f))
+        nvgRoundedRect(nvg, x, y, width, height, actualCornerRadius)
+        nvgPathWinding(nvg, NVG_HOLE)
         fill.draw(nvg, block, scale)
         stroke.draw(nvg, block, scale)
     }
@@ -495,7 +541,7 @@ class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
     }
 }
 
-fun uiRoot(x: Int, y: Int, width: Int, height: Int, builder: Block.() -> Unit): Block {
+fun uiRoot(x: Float, y: Float, width: Float, height: Float, builder: Block.() -> Unit): Block {
     val root = RootBlock(x, y, width, height)
     root.builder()
     return root
@@ -506,38 +552,79 @@ data class BlockTemplate(
         val hAlign: HorizontalAlignment = LEFT,
         val vAlign: VerticalAlignment = TOP,
         val layout: Layout = ABSOLUTE,
-        val xOffset: Int = 0,
-        val yOffset: Int = 0,
+        val xOffset: Float = 0.0f,
+        val yOffset: Float = 0.0f,
         val hSizing: Sizing = RELATIVE,
-        val width: Int = 10000,
+        val width: Float = 10000.0f,
         val vSizing: Sizing = RELATIVE,
-        val height: Int = 10000,
-        val padLeft: Int = 0,
-        val padRight: Int = 0,
-        val padTop: Int = 0,
-        val padBottom: Int = 0)
+        val height: Float = 10000.0f,
+        val padLeft: Float = 0.0f,
+        val padRight: Float = 0.0f,
+        val padTop: Float = 0.0f,
+        val padBottom: Float = 0.0f)
+
+
+
+interface ShrinkGroup {
+    val isCalculated: Boolean
+}
+
+private class ShrinkGroupInternal(internal val blocks: MutableList<Block>, internal val horizontal: Boolean, override var isCalculated: Boolean = false): ShrinkGroup {
+
+    private var _size: Float = 0.0f
+
+    internal val size: Float
+    get() {
+        if (isCalculated) {
+            return _size
+        } else {
+            var max = 0.0f
+            blocks.forEach {
+                if (horizontal) {
+                    max = max(it.width, max)
+                } else {
+                    max = max(it.height, max)
+                }
+            }
+            _size = max
+            isCalculated = true
+            return _size
+        }
+    }
+}
+
+fun hShrinkGroup(): ShrinkGroup {
+    return ShrinkGroupInternal(ArrayList(), true)
+}
+
+fun vShrinkGroup(): ShrinkGroup {
+    return ShrinkGroupInternal(ArrayList(), false)
+}
 
 abstract class Block {
     abstract val root: Block
     abstract val parent: Block
     abstract var nvg: Long
-    abstract val children: MutableList<Block>
+    abstract val layoutChildren: MutableList<Block>
+    abstract val renderChildren: MutableList<Block>
     abstract var isVisible: Boolean
     abstract var hAlign: HorizontalAlignment
     abstract var vAlign: VerticalAlignment
     abstract var layout: Layout
-    abstract var xOffset: Int
-    abstract var yOffset: Int
-    abstract var x: Int
-    abstract var y: Int
+    abstract var xOffset: Float
+    abstract var yOffset: Float
+    abstract var x: Float
+    abstract var y: Float
     abstract var hSizing: Sizing
-    abstract var width: Int
+    abstract var hShrinkGroup: ShrinkGroup?
+    abstract var width: Float
     abstract var vSizing: Sizing
-    abstract var height: Int
-    abstract var padLeft: Int
-    abstract var padRight: Int
-    abstract var padTop: Int
-    abstract var padBottom: Int
+    abstract var vShrinkGroup: ShrinkGroup?
+    abstract var height: Float
+    abstract var padLeft: Float
+    abstract var padRight: Float
+    abstract var padTop: Float
+    abstract var padBottom: Float
     abstract var shape: Shape
     abstract var text: Text
     abstract var lastBlock: Block?
@@ -563,8 +650,8 @@ abstract class Block {
             if (mouseOver != null) {
                 if (isDown) {
                     val mouseDownFun = mouseOver.onMouseDown
+                    awaitingRelease.add(Pair(button, mouseOver))
                     if (mouseDownFun != null) {
-                        awaitingRelease.add(Pair(button, mouseOver))
                         mouseOver.mouseDownFun(button, x, y)
                     }
                 } else {
@@ -639,7 +726,11 @@ abstract class Block {
     private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Block? {
         if (isVisible) {
             this.nvg = nvg
-            prepareForIteration()
+            try {
+                prepareForIteration()
+            } catch (t: Throwable) {
+                t.printStackTrace()
+            }
             return getMouseOverBlock(mouseX, mouseY)
         }
         return null
@@ -647,11 +738,11 @@ abstract class Block {
 
     private fun getMouseOverBlock(mouseX: Int, mouseY: Int): Block? {
         if (isVisible) {
-            if (!isMouseAware || mouseX < x || mouseX > x + width || mouseY < y || mouseY > y + height) {
+            if (!isMouseAware || ((mouseX < x || mouseX > x + width || mouseY < y || mouseY > y + height) && !isFallThrough)) {
                 return null
             }
-            (children.size - 1 downTo 0)
-                    .mapNotNull { children[it].getMouseOverBlock(mouseX, mouseY) }
+            (renderChildren.size - 1 downTo 0)
+                    .mapNotNull { renderChildren[it].getMouseOverBlock(mouseX, mouseY) }
                     .forEach { return it }
             if (isFallThrough) {
                 return null
@@ -670,11 +761,21 @@ abstract class Block {
     }
 
     private fun prepareForIteration() {
+        val shrinkGroups = HashSet<ShrinkGroup>()
+        prepareForIteration(shrinkGroups)
+        shrinkGroups.forEach {
+            if (it is ShrinkGroupInternal) {
+                it.size
+            }
+        }
+    }
+
+    open protected fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>) {
         var lastChild: Block? = null
-        children.forEach {
+        layoutChildren.forEach {
             it.lastBlock = lastChild
             it.nvg = nvg
-            it.prepareForIteration()
+            it.prepareForIteration(shrinkGroups)
             lastChild = it
         }
     }
@@ -683,22 +784,23 @@ abstract class Block {
         if (isVisible) {
             scissorStack.suspendIf(canOverflow, overflowCount) {
                 shape.draw(nvg, this, scale)
+                val strokeSize = shape.stroke.size
+                scissorStack.push(Vector4f((x + strokeSize) * scale, (y + strokeSize) * scale, (x + width - strokeSize) * scale, (y + height - strokeSize) * scale), canOverflow)
+                scissorStack.suspendIf(canOverflow, overflowCount) {
+                    text.draw(nvg, this, scale)
+                }
+                renderChildren.forEach {
+                    it.draw(scissorStack, scale)
+                }
+                scissorStack.pop()
             }
-            val strokeSize = shape.stroke.size
-            scissorStack.push(Vector4f((x.toFloat() + strokeSize) * scale, (y.toFloat() + strokeSize) * scale, (x.toFloat() + width - strokeSize) * scale, (y.toFloat() + height - strokeSize) * scale))
-            scissorStack.suspendIf(canOverflow, overflowCount) {
-                text.draw(nvg, this, scale)
-            }
-            children.forEach {
-                it.draw(scissorStack, scale)
-            }
-            scissorStack.pop()
         }
     }
 
     fun block(builder: Block.() -> Unit): Block {
         val block = DefaultBlock(root, this)
-        this.children.add(block)
+        this.layoutChildren.add(block)
+        this.renderChildren.add(block)
         block.builder()
         return block
     }
@@ -745,12 +847,21 @@ abstract class Block {
     }
 }
 
-private open class RootBlock(override var x: Int, override var y: Int, override var width: Int, override var height: Int) : Block() {
+private open class RootBlock(override var x: Float, override var y: Float, override var width: Float, override var height: Float) : Block() {
+    override var hShrinkGroup: ShrinkGroup?
+        get() = null
+        set(value) {
+        }
+    override var vShrinkGroup: ShrinkGroup?
+        get() = null
+        set(value) {
+        }
     override val root: RootBlock
         get() = this
     override val parent: RootBlock
         get() = this
-    override val children = ArrayList<Block>()
+    override val layoutChildren = ArrayList<Block>()
+    override val renderChildren = ArrayList<Block>()
     override var nvg: Long = -1
     override var isVisible: Boolean
         get() = true
@@ -768,12 +879,12 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         get() = ABSOLUTE
         set(value) {
         }
-    override var xOffset: Int
-        get() = 0
+    override var xOffset: Float
+        get() = 0.0f
         set(value) {
         }
-    override var yOffset: Int
-        get() = 0
+    override var yOffset: Float
+        get() = 0.0f
         set(value) {
         }
     override var hSizing: Sizing
@@ -784,20 +895,20 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
         get() = STATIC
         set(value) {
         }
-    override var padLeft: Int
-        get() = 0
+    override var padLeft: Float
+        get() = 0.0f
         set(value) {
         }
-    override var padRight: Int
-        get() = 0
+    override var padRight: Float
+        get() = 0.0f
         set(value) {
         }
-    override var padTop: Int
-        get() = 0
+    override var padTop: Float
+        get() = 0.0f
         set(value) {
         }
-    override var padBottom: Int
-        get() = 0
+    override var padBottom: Float
+        get() = 0.0f
         set(value) {
         }
     override var shape: Shape
@@ -865,7 +976,7 @@ private open class RootBlock(override var x: Int, override var y: Int, override 
     override var lastMouseOver: Block? = null
 }
 
-val NO_BLOCK: Block = object : RootBlock(-1, -1, -1, -1) {
+val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
     override var isVisible: Boolean
         get() = false
         set(value) {
@@ -876,21 +987,22 @@ private class DefaultBlock(
         override val root: Block,
         override val parent: Block,
         override var nvg: Long = -1,
-        override val children: MutableList<Block> = ArrayList(),
+        override val layoutChildren: MutableList<Block> = ArrayList(),
+        override val renderChildren: MutableList<Block> = ArrayList(),
         override var isVisible: Boolean = true,
         override var hAlign: HorizontalAlignment = LEFT,
         override var vAlign: VerticalAlignment = TOP,
         override var layout: Layout = ABSOLUTE,
-        override var xOffset: Int = 0,
-        override var yOffset: Int = 0,
+        override var xOffset: Float = 0.0f,
+        override var yOffset: Float = 0.0f,
         override var hSizing: Sizing = RELATIVE,
         override var vSizing: Sizing = RELATIVE,
-        width: Int = 10000,
-        height: Int = 10000,
-        override var padLeft: Int = 0,
-        override var padRight: Int = 0,
-        override var padTop: Int = 0,
-        override var padBottom: Int = 0,
+        width: Float = 10000.0f,
+        height: Float = 10000.0f,
+        override var padLeft: Float = 0.0f,
+        override var padRight: Float = 0.0f,
+        override var padTop: Float = 0.0f,
+        override var padBottom: Float = 0.0f,
         override var shape: Shape = NO_SHAPE,
         override var text: Text = NO_TEXT,
         override var canOverflow: Boolean = false,
@@ -921,60 +1033,113 @@ private class DefaultBlock(
         set(value) {
         }
 
+    private var _hShrinkGroup: ShrinkGroupInternal? = null
+    private var _vShrinkGroup: ShrinkGroupInternal? = null
+
+    override var hShrinkGroup: ShrinkGroup?
+        get() = _hShrinkGroup
+        set(value) {
+            if (value is ShrinkGroupInternal) {
+                _hShrinkGroup?.blocks?.remove(this)
+                val shrinkGroup = value
+                if (!shrinkGroup.blocks.contains(this)) {
+                    shrinkGroup.blocks.add(this)
+                }
+                _hShrinkGroup = shrinkGroup
+            } else if (value == null) {
+                _hShrinkGroup?.blocks?.remove(this)
+                _hShrinkGroup = null
+            }
+        }
+    override var vShrinkGroup: ShrinkGroup?
+        get() = _vShrinkGroup
+        set(value) {
+            if (value is ShrinkGroupInternal) {
+                _vShrinkGroup?.blocks?.remove(this)
+                val shrinkGroup = value
+                if (!shrinkGroup.blocks.contains(this)) {
+                    shrinkGroup.blocks.add(this)
+                }
+                _vShrinkGroup = shrinkGroup
+            } else if (value == null) {
+                _vShrinkGroup?.blocks?.remove(this)
+                _vShrinkGroup = null
+            }
+        }
+
+    override fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>) {
+        var shrinkGroup = _hShrinkGroup
+        if (shrinkGroup != null) {
+            shrinkGroup.isCalculated = false
+            shrinkGroups.add(shrinkGroup)
+        }
+        shrinkGroup = _vShrinkGroup
+        if (shrinkGroup != null) {
+            shrinkGroup.isCalculated = false
+            shrinkGroups.add(shrinkGroup)
+        }
+        super.prepareForIteration(shrinkGroups)
+    }
+
     private var _width = width
     private var _height = height
 
-    override var width: Int
+    override var width: Float
         get() {
             if (!isVisible) {
-                return 0
+                return 0.0f
             }
             when (hSizing) {
                 STATIC -> {
-                    return Math.max(0, _width)
+                    return max(0.0f, _width)
                 }
                 RELATIVE -> {
-                    if (_width < 0) {
-                        return (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight).toInt() + _width
+                    if (_width < 0.0f) {
+                        return parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight + _width
                     } else {
-                        return ((Math.min(10000, _width) / 10000.0f) * (parent.width - (parent.shape.stroke.size * 2) - padLeft - padRight)).toInt()
+                        return (min(10000.0f, _width) / 10000.0f) * (parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight)
                     }
                 }
-                SHRINK -> {
-                    var leftWidth = 0
-                    var horizontalWidth = 0
-                    var lastHorizontal = 0
-                    var centerWidth = 0
-                    var rightWidth = 0
-                    children.forEach {
-                        if (it.hAlign == CENTER && it.hSizing != RELATIVE && it.hSizing != GROW) {
-                            centerWidth = Math.max(it.width + it.padLeft + it.padRight, centerWidth)
-                        }
-                        if (it.hAlign == RIGHT && it.hSizing != RELATIVE && it.hSizing != GROW) {
-                            rightWidth = Math.max(it.width + it.padLeft + it.padRight, rightWidth)
-                        }
-                        if (it.hAlign == LEFT && it.hSizing != RELATIVE && it.hSizing != GROW) {
-                            if (it.layout == ABSOLUTE) {
-                                leftWidth = Math.max(it.width + it.padLeft + it.padRight, leftWidth)
-                            } else if (it.layout == HORIZONTAL) {
-                                lastHorizontal = it.width + it.padLeft + it.padRight
-                                horizontalWidth += lastHorizontal
-                            } else {
-                                val paddedWidth = it.width + it.padLeft + it.padRight
-                                if (paddedWidth > lastHorizontal) {
-                                    horizontalWidth += paddedWidth - lastHorizontal
-                                    lastHorizontal = paddedWidth
+                SHRINK, SHRINK_GROUP -> {
+                    val shrinkGroup = _hShrinkGroup
+                    if (hSizing == SHRINK_GROUP && shrinkGroup != null && shrinkGroup.isCalculated) {
+                        return shrinkGroup.size
+                    } else {
+                        var leftWidth = 0.0f
+                        var horizontalWidth = 0.0f
+                        var lastHorizontal = 0.0f
+                        var centerWidth = 0.0f
+                        var rightWidth = 0.0f
+                        layoutChildren.forEach {
+                            if (it.hAlign == CENTER && it.hSizing != RELATIVE && it.hSizing != GROW) {
+                                centerWidth = max(it.width + it.padLeft + it.padRight, centerWidth)
+                            }
+                            if (it.hAlign == RIGHT && it.hSizing != RELATIVE && it.hSizing != GROW) {
+                                rightWidth = max(it.width + it.padLeft + it.padRight, rightWidth)
+                            }
+                            if (it.hAlign == LEFT && it.hSizing != RELATIVE && it.hSizing != GROW) {
+                                if (it.layout == ABSOLUTE) {
+                                    leftWidth = max(it.width + it.padLeft + it.padRight, leftWidth)
+                                } else if (it.layout == HORIZONTAL) {
+                                    lastHorizontal = it.width + it.padLeft + it.padRight
+                                    horizontalWidth += lastHorizontal
+                                } else {
+                                    val paddedWidth = it.width + it.padLeft + it.padRight
+                                    if (paddedWidth > lastHorizontal) {
+                                        horizontalWidth += paddedWidth - lastHorizontal
+                                        lastHorizontal = paddedWidth
+                                    }
                                 }
                             }
                         }
+                        val textDimensions = text.dimensions(nvg)
+                        leftWidth = max(leftWidth, horizontalWidth)
+                        return max(max(max(textDimensions.first, leftWidth), centerWidth), rightWidth) + (2 * shape.stroke.size)
                     }
-                    val textDimensions = text.dimensions(nvg)
-                    leftWidth = Math.max(leftWidth, horizontalWidth)
-                    return Math.max(Math.max(Math.max((textDimensions.first + 0.5f).toInt(), leftWidth), centerWidth), rightWidth) + ((2 * shape.stroke.size) + 0.5f).toInt()
                 }
                 GROW -> {
-                    val parentWidth = if (parent.hSizing == SHRINK) {
-                        0
+                    val parentWidth = if (parent.hSizing == SHRINK && (parent.hShrinkGroup == null || !(parent.hShrinkGroup?.isCalculated ?: false))) {
+                        0.0f
                     } else {
                         parent.width
                     }
@@ -982,18 +1147,18 @@ private class DefaultBlock(
                         return parentWidth
                     }
                     if (layout == ABSOLUTE) {
-                        return Math.max(0, parentWidth - x)
+                        return max(0.0f, parentWidth - x)
                     }
-                    var leftWidth = 0
-                    var horizontalWidth = 0
-                    var lastHorizontal = 0
-                    var centerWidth = 0
-                    var rightWidth = 0
-                    var growCount = 0
-                    var growIndexOfThis = 0
-                    var thisBaseWidth = 0
+                    var leftWidth = 0.0f
+                    var horizontalWidth = 0.0f
+                    var lastHorizontal = 0.0f
+                    var centerWidth = 0.0f
+                    var rightWidth = 0.0f
+                    var growCount = 0.0f
+                    var growIndexOfThis = 0.0f
+                    var thisBaseWidth = 0.0f
                     var modifyBaseWidth = false
-                    parent.children.forEach {
+                    parent.layoutChildren.forEach {
                         if (it == this) {
                             growIndexOfThis = growCount
                         }
@@ -1001,14 +1166,14 @@ private class DefaultBlock(
                             growCount++
                         }
                         if (it.hAlign == CENTER && it.hSizing != RELATIVE && it.hSizing != GROW) {
-                            centerWidth = Math.max(it.width + it.padLeft + it.padRight, centerWidth)
+                            centerWidth = max(it.width + it.padLeft + it.padRight, centerWidth)
                         }
                         if (it.hAlign == RIGHT && it.hSizing != RELATIVE && it.hSizing != GROW) {
-                            rightWidth = Math.max(it.width + it.padLeft + it.padRight, rightWidth)
+                            rightWidth = max(it.width + it.padLeft + it.padRight, rightWidth)
                         }
                         if (it.hAlign == LEFT && it.hSizing != RELATIVE && it.hSizing != GROW) {
                             if (it.layout == ABSOLUTE) {
-                                leftWidth = Math.max(it.width + it.padLeft + it.padRight, leftWidth)
+                                leftWidth = max(it.width + it.padLeft + it.padRight, leftWidth)
                             } else if (it.layout == HORIZONTAL) {
                                 lastHorizontal = it.width + it.padLeft + it.padRight
                                 horizontalWidth += lastHorizontal
@@ -1029,10 +1194,10 @@ private class DefaultBlock(
                             modifyBaseWidth = true
                         }
                     }
-                    leftWidth = Math.max(leftWidth, horizontalWidth)
-                    val fixedChildWidth = Math.max(Math.max(leftWidth, centerWidth), rightWidth)
+                    leftWidth = max(leftWidth, horizontalWidth)
+                    val fixedChildWidth = max(max(leftWidth, centerWidth), rightWidth)
                     val growWidth = if (parent.hSizing == SHRINK) {
-                        0
+                        0.0f
                     } else {
                         parentWidth - fixedChildWidth
                     }
@@ -1045,57 +1210,62 @@ private class DefaultBlock(
             _width = value
         }
 
-    override var height: Int
+    override var height: Float
         get() {
             if (!isVisible) {
-                return 0
+                return 0.0f
             }
             when (vSizing) {
                 STATIC -> {
-                    return Math.max(0, _height)
+                    return max(0.0f, _height)
                 }
                 RELATIVE -> {
                     if (_height < 0) {
-                        return (parent.height - (parent.shape.stroke.size * 2)).toInt() + _height
+                        return parent.height - (parent.shape.stroke.size * 2) + _height
                     } else {
-                        return ((Math.min(10000, _height) / 10000.0f) * (parent.height - (parent.shape.stroke.size * 2))).toInt()
+                        return (min(10000.0f, _height) / 10000.0f) * (parent.height - (parent.shape.stroke.size * 2.0f))
                     }
                 }
-                SHRINK -> {
-                    var topHeight = 0
-                    var verticalHeight = 0
-                    var lastVertical = 0
-                    var middleHeight = 0
-                    var bottomHeight = 0
-                    children.forEach {
-                        if (it.vAlign == MIDDLE && it.vSizing != RELATIVE && it.vSizing != GROW) {
-                            middleHeight = Math.max(it.height + it.padTop + it.padBottom, middleHeight)
-                        }
-                        if (it.vAlign == BOTTOM && it.vSizing != RELATIVE && it.vSizing != GROW) {
-                            bottomHeight = Math.max(it.height + it.padTop + it.padBottom, bottomHeight)
-                        }
-                        if (it.vAlign == TOP && it.vSizing != RELATIVE && it.vSizing != GROW) {
-                            if (it.layout == ABSOLUTE) {
-                                topHeight = Math.max(it.height + it.padTop + it.padBottom, topHeight)
-                            } else if (it.layout == VERTICAL) {
-                                lastVertical = it.height + it.padTop + it.padBottom
-                                verticalHeight += lastVertical
-                            } else {
-                                val paddedHeight = it.height + it.padTop + it.padBottom
-                                if (paddedHeight > lastVertical) {
-                                    verticalHeight += paddedHeight - lastVertical
-                                    lastVertical = paddedHeight
+                SHRINK, SHRINK_GROUP -> {
+                    val shrinkGroup = _vShrinkGroup
+                    if (vSizing == SHRINK_GROUP && shrinkGroup != null && shrinkGroup.isCalculated) {
+                        return shrinkGroup.size
+                    } else {
+                        var topHeight = 0.0f
+                        var verticalHeight = 0.0f
+                        var lastVertical = 0.0f
+                        var middleHeight = 0.0f
+                        var bottomHeight = 0.0f
+                        layoutChildren.forEach {
+                            if (it.vAlign == MIDDLE && it.vSizing != RELATIVE && it.vSizing != GROW) {
+                                middleHeight = max(it.height + it.padTop + it.padBottom, middleHeight)
+                            }
+                            if (it.vAlign == BOTTOM && it.vSizing != RELATIVE && it.vSizing != GROW) {
+                                bottomHeight = max(it.height + it.padTop + it.padBottom, bottomHeight)
+                            }
+                            if (it.vAlign == TOP && it.vSizing != RELATIVE && it.vSizing != GROW) {
+                                if (it.layout == ABSOLUTE) {
+                                    topHeight = max(it.height + it.padTop + it.padBottom, topHeight)
+                                } else if (it.layout == VERTICAL) {
+                                    lastVertical = it.height + it.padTop + it.padBottom
+                                    verticalHeight += lastVertical
+                                } else {
+                                    val paddedHeight = it.height + it.padTop + it.padBottom
+                                    if (paddedHeight > lastVertical) {
+                                        verticalHeight += paddedHeight - lastVertical
+                                        lastVertical = paddedHeight
+                                    }
                                 }
                             }
                         }
+                        val textDimensions = text.dimensions(nvg)
+                        topHeight = max(topHeight, verticalHeight)
+                        return max(max(max(textDimensions.second, topHeight), middleHeight), bottomHeight) + (2 * shape.stroke.size)
                     }
-                    val textDimensions = text.dimensions(nvg)
-                    topHeight = Math.max(topHeight, verticalHeight)
-                    return Math.max(Math.max(Math.max((textDimensions.second + 0.5f).toInt(), topHeight), middleHeight), bottomHeight) + ((2 * shape.stroke.size) + 0.5f).toInt()
                 }
                 GROW -> {
-                    val parentHeight = if (parent.vSizing == SHRINK) {
-                        0
+                    val parentHeight = if (parent.vSizing == SHRINK && (parent.vShrinkGroup == null || !(parent.vShrinkGroup?.isCalculated ?: false))) {
+                        0.0f
                     } else {
                         parent.height
                     }
@@ -1103,18 +1273,18 @@ private class DefaultBlock(
                         return parentHeight
                     }
                     if (layout == ABSOLUTE) {
-                        return Math.max(0, parentHeight - y)
+                        return max(0.0f, parentHeight - y)
                     }
-                    var topHeight = 0
-                    var verticalHeight = 0
-                    var lastVertical = 0
-                    var middleHeight = 0
-                    var bottomHeight = 0
-                    var growCount = 0
-                    var growIndexOfThis = 0
-                    var thisBaseHeight = 0
+                    var topHeight = 0.0f
+                    var verticalHeight = 0.0f
+                    var lastVertical = 0.0f
+                    var middleHeight = 0.0f
+                    var bottomHeight = 0.0f
+                    var growCount = 0.0f
+                    var growIndexOfThis = 0.0f
+                    var thisBaseHeight = 0.0f
                     var modifyBaseHeight = false
-                    parent.children.forEach {
+                    parent.layoutChildren.forEach {
                         if (it == this) {
                             growIndexOfThis = growCount
                         }
@@ -1122,14 +1292,14 @@ private class DefaultBlock(
                             growCount++
                         }
                         if (it.vAlign == MIDDLE && it.vSizing != RELATIVE && it.vSizing != GROW) {
-                            middleHeight = Math.max(it.height + it.padTop + it.padBottom, middleHeight)
+                            middleHeight = max(it.height + it.padTop + it.padBottom, middleHeight)
                         }
                         if (it.vAlign == BOTTOM && it.vSizing != RELATIVE && it.vSizing != GROW) {
-                            bottomHeight = Math.max(it.height + it.padTop + it.padBottom, bottomHeight)
+                            bottomHeight = max(it.height + it.padTop + it.padBottom, bottomHeight)
                         }
                         if (it.vAlign == TOP && it.vSizing != RELATIVE && it.vSizing != GROW) {
                             if (it.layout == ABSOLUTE) {
-                                topHeight = Math.max(it.height + it.padTop + it.padBottom, topHeight)
+                                topHeight = max(it.height + it.padTop + it.padBottom, topHeight)
                             } else if (it.layout == VERTICAL) {
                                 lastVertical = it.height + it.padTop + it.padBottom
                                 verticalHeight += it.height
@@ -1150,10 +1320,10 @@ private class DefaultBlock(
                             modifyBaseHeight = true
                         }
                     }
-                    topHeight = Math.max(topHeight, verticalHeight)
-                    val fixedChildHeight = Math.max(Math.max(topHeight, middleHeight), bottomHeight)
+                    topHeight = max(topHeight, verticalHeight)
+                    val fixedChildHeight = max(max(topHeight, middleHeight), bottomHeight)
                     val growHeight = if (parent.vSizing == SHRINK) {
-                        0
+                        0.0f
                     } else {
                         parentHeight - fixedChildHeight
                     }
@@ -1166,7 +1336,7 @@ private class DefaultBlock(
             _height = value
         }
 
-    override var x: Int
+    override var x: Float
         get() {
             if (layout == ABSOLUTE || lastBlock == null) {
                 return getXRelativeTo(parent.x, parent.width)
@@ -1179,7 +1349,7 @@ private class DefaultBlock(
         set(value) {
         }
 
-    override var y: Int
+    override var y: Float
         get() {
             if (layout == ABSOLUTE || lastBlock == null) {
                 return getYRelativeTo(parent.y, parent.height)
@@ -1193,7 +1363,7 @@ private class DefaultBlock(
         set(value) {
         }
 
-    private fun getXRelativeTo(relativeX: Int, relativeWidth: Int): Int {
+    private fun getXRelativeTo(relativeX: Float, relativeWidth: Float): Float {
         if (hAlign == LEFT) {
             return relativeX + padLeft + xOffset
         }
@@ -1203,7 +1373,7 @@ private class DefaultBlock(
         return relativeX + (relativeWidth - padLeft - padRight) / 2 - width / 2 + xOffset + padLeft
     }
 
-    private fun getYRelativeTo(relativeY: Int, relativeHeight: Int): Int {
+    private fun getYRelativeTo(relativeY: Float, relativeHeight: Float): Float {
         if (vAlign == TOP) {
             return relativeY + padTop + yOffset
         }

@@ -20,9 +20,9 @@ import org.lwjgl.system.MemoryUtil.*
 
 class DemoData {
 
-    val entypo = loadResource("demo/nanovg/entypo.ttf", 40 * 1024)
-    val RobotoRegular = loadResource("demo/nanovg/Roboto-Regular.ttf", 150 * 1024)
-    val RobotoBold = loadResource("demo/nanovg/Roboto-Bold.ttf", 150 * 1024)
+    val entypo = loadResource("/demo/nanovg/entypo.ttf", 40 * 1024)
+    val RobotoRegular = loadResource("/demo/nanovg/Roboto-Regular.ttf", 150 * 1024)
+    val RobotoBold = loadResource("/demo/nanovg/Roboto-Bold.ttf", 150 * 1024)
 
     var fontNormal: Int = 0
     var fontBold: Int = 0
@@ -959,7 +959,7 @@ fun loadDemoData(vg: Long, data: DemoData): Int {
 
     i = 0
     while (i < 12) {
-        val file = "demo/nanovg/images/image" + (i + 1) + ".jpg"
+        val file = "/demo/nanovg/images/image" + (i + 1) + ".jpg"
         val img = loadResource(file, 32 * 1024)
         data.images[i] = nvgCreateImageMem(vg, 0, img)
         if (data.images[i] == 0) {
