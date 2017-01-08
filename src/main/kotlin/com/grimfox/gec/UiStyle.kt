@@ -10,6 +10,7 @@ import com.grimfox.gec.ui.widgets.toggle
 import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
+import org.lwjgl.glfw.GLFW
 import org.lwjgl.nanovg.NVGColor
 import java.nio.ByteBuffer
 
@@ -58,9 +59,9 @@ val COLOR_BUTTON_MOUSE_OVER = color(64, 62, 64)
 val FILL_BUTTON_MOUSE_OVER = FillColor(COLOR_BUTTON_MOUSE_OVER)
 val FILL_BUTTON_MOUSE_DOWN = FillColor(COLOR_ACTIVE_HIGHLIGHT)
 
-val BUTTON_NORMAL = NO_SHAPE
-val BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
-val BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
+val SHAPE_BUTTON_NORMAL = NO_SHAPE
+val SHAPE_BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
+val SHAPE_BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
 val SWITCH_HEIGHT = 12.0f
 val ELEMENT_INSET = 3.0f
@@ -192,11 +193,11 @@ val SLIDER_STYLE = SliderStyle(
                 height = SWITCH_HEIGHT / 3.0f))
 
 val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
-        normal = BUTTON_NORMAL,
+        normal = SHAPE_BUTTON_NORMAL,
         textNormal = TEXT_STYLE_GLYPH,
-        mouseOver = BUTTON_MOUSE_OVER,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
         textMouseOver = TEXT_STYLE_GLYPH,
-        mouseDown = BUTTON_MOUSE_DOWN,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
         textMouseDown = TEXT_STYLE_GLYPH,
         template = BlockTemplate(
                 hSizing = STATIC,
@@ -208,11 +209,11 @@ val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
                 layout = HORIZONTAL))
 
 val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
-        normal = BUTTON_NORMAL,
+        normal = SHAPE_BUTTON_NORMAL,
         textNormal = TEXT_STYLE_BUTTON,
-        mouseOver = BUTTON_MOUSE_OVER,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
         textMouseOver = TEXT_STYLE_BUTTON,
-        mouseDown = BUTTON_MOUSE_DOWN,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
         textMouseDown = TEXT_STYLE_BUTTON,
         template = BlockTemplate(
                 hSizing = SHRINK,
@@ -229,11 +230,11 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 padRight = SMALL_SPACER_SIZE))
 
 val LARGE_TEXT_BUTTON_STYLE = ButtonStyle(
-        normal = BUTTON_NORMAL,
+        normal = SHAPE_BUTTON_NORMAL,
         textNormal = TEXT_STYLE_BUTTON_LARGE,
-        mouseOver = BUTTON_MOUSE_OVER,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
         textMouseOver = TEXT_STYLE_BUTTON_LARGE,
-        mouseDown = BUTTON_MOUSE_DOWN,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
         textMouseDown = TEXT_STYLE_BUTTON_LARGE,
         template = BlockTemplate(
                 hSizing = SHRINK,
@@ -526,8 +527,10 @@ fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
     }
 }
 
-fun Block.menuItem(text: Text, glyph: Block.() -> Block, hotKey: Text, height: Float, shrinkGroup: ShrinkGroup): Block {
+fun Block.menuItem(text: Text, glyph: Block.() -> Block = {block{}}, hotKey: Text = NO_TEXT, height: Float, shrinkGroup: ShrinkGroup, onClick: () -> Unit = {}): Block {
     return block {
+        var mouseDownOver = false
+        var mouseOver = false
         hSizing = SHRINK_GROUP
         hShrinkGroup = shrinkGroup
         vSizing = STATIC
@@ -537,6 +540,7 @@ fun Block.menuItem(text: Text, glyph: Block.() -> Block, hotKey: Text, height: F
             hSizing = STATIC
             width = 32.0f
             layout = HORIZONTAL
+            isMouseAware = false
             block {
                 this.hSizing = SHRINK
                 this.vSizing = SHRINK
@@ -552,15 +556,18 @@ fun Block.menuItem(text: Text, glyph: Block.() -> Block, hotKey: Text, height: F
             vAlign = MIDDLE
             layout = HORIZONTAL
             this.text = text
+            isMouseAware = false
         }
         block {
             hSizing = GROW
             layout = HORIZONTAL
+            isMouseAware = false
         }
         block {
             hSizing = STATIC
             layout = HORIZONTAL
             width = MEDIUM_SPACER_SIZE
+            isMouseAware = false
         }
         block {
             hSizing = SHRINK
@@ -569,11 +576,42 @@ fun Block.menuItem(text: Text, glyph: Block.() -> Block, hotKey: Text, height: F
             vAlign = MIDDLE
             layout = HORIZONTAL
             this.text = hotKey
+            isMouseAware = false
         }
         block {
             hSizing = STATIC
             width = 22.0f
             layout = HORIZONTAL
+            isMouseAware = false
+        }
+        onMouseOver {
+            mouseOver = true
+            if (!mouseDownOver) {
+                shape = SHAPE_MENU_BORDER
+            }
+        }
+        onMouseOut {
+            mouseOver = false
+            if (!mouseDownOver) {
+                shape = NO_SHAPE
+            }
+        }
+        onMouseDown { button, x, y ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                mouseDownOver = true
+                shape = SHAPE_BUTTON_MOUSE_DOWN
+            }
+        }
+        onMouseRelease { button, x, y ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
+                mouseDownOver = false
+                shape = if (mouseOver) SHAPE_MENU_BORDER else NO_SHAPE
+            }
+        }
+        onMouseClick { button, x, y ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                onClick()
+            }
         }
     }
 }

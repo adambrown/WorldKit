@@ -135,6 +135,9 @@ object MainUi {
                             topBar.renderChildren.remove(menu)
                             layer1.renderChildren.add(menu)
                             var active = false
+                            var mouseDownOnActivator = false
+                            var mouseOverActivator = false
+                            var mouseOverDeActivator = false
                             hSizing = SHRINK
                             vSizing = STATIC
                             height = MEDIUM_ROW_HEIGHT
@@ -199,26 +202,36 @@ object MainUi {
                                                 padTop = 1.0f
                                                 padBottom = 1.0f
                                                 shape = SHAPE_MENU_BACKGROUND
-                                                val shrinkGroup = hShrinkGroup()
-                                                menuItem(text("New project", TEXT_STYLE_BUTTON),
-                                                        createMultiGlyph(
-                                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
-                                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
-                                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f)),
-                                                        text("Ctrl+N", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
-                                                        shrinkGroup)
-                                                menuItem(text("Open project", TEXT_STYLE_BUTTON),
-                                                        createMultiGlyph(
-                                                                GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
-                                                                GlyphLayer(glyphLoadArrow, glyphFont, 14.5f, COLOR_GLYPH_BLACK, -2.0f, -4.0f),
-                                                                GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.5f)),
-                                                        text("Ctrl+O", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
-                                                        shrinkGroup)
-                                                menuItem(text("Save project", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), text("Ctrl+S", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
-                                                menuDivider(3.0f, shrinkGroup)
-                                                menuItem(text("Export maps...", TEXT_STYLE_BUTTON), {block{}}, text("Ctrl+E", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
-                                                menuDivider(3.0f, shrinkGroup)
-                                                menuItem(text("Exit", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f)), text("Alt+F4", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                                block {
+                                                    hSizing = SHRINK
+                                                    vSizing = SHRINK
+                                                    padLeft = 2.0f
+                                                    padRight = 2.0f
+                                                    padTop = 2.0f
+                                                    padBottom = 2.0f
+                                                    val shrinkGroup = hShrinkGroup()
+                                                    menuItem(text("New project", TEXT_STYLE_BUTTON),
+                                                            createMultiGlyph(
+                                                                    GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                                                    GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
+                                                                    GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f)),
+                                                            text("Ctrl+N", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
+                                                            shrinkGroup)
+                                                    menuItem(text("Open project", TEXT_STYLE_BUTTON),
+                                                            createMultiGlyph(
+                                                                    GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
+                                                                    GlyphLayer(glyphLoadArrow, glyphFont, 14.5f, COLOR_GLYPH_BLACK, -2.0f, -4.0f),
+                                                                    GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.5f)),
+                                                            text("Ctrl+O", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
+                                                            shrinkGroup)
+                                                    menuItem(text("Save project", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), text("Ctrl+S", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                                    menuDivider(3.0f, shrinkGroup)
+                                                    menuItem(text("Export maps...", TEXT_STYLE_BUTTON), { block {} }, text("Ctrl+E", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
+                                                    menuDivider(3.0f, shrinkGroup)
+                                                    menuItem(text("Exit", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f)), text("Alt+F4", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup) {
+                                                        closeWindow()
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -255,19 +268,48 @@ object MainUi {
                                             dropDown.isVisible = false
                                             dropDown.isMouseAware = false
                                             activator.isMouseAware = true
+                                            layer1.isFallThrough = true
+                                        }
+                                        onMouseOver {
+                                            mouseOverDeActivator = true
+                                        }
+                                        onMouseOut {
+                                            mouseOverDeActivator = false
                                         }
                                     }
                                 }
                                 dropDown.isVisible = false
                                 dropDown.isMouseAware = false
-                                activator.onMouseClick { button, x, y ->
+                                activator.onMouseOver {
+                                    mouseOverActivator = true
+                                }
+                                activator.onMouseOut {
+                                    mouseOverActivator = false
+                                }
+                                activator.onMouseDown { button, x, y ->
+                                    mouseDownOnActivator = true
                                     dropDown.isVisible = true
                                     dropDown.isMouseAware = true
                                     activator.isMouseAware = false
+                                    layer1.isFallThrough = false
+                                }
+                                activator.onMouseRelease { button, x, y ->
+                                    if (mouseDownOnActivator && !(mouseOverDeActivator || mouseOverActivator)) {
+                                        dropDown.isVisible = false
+                                        dropDown.isMouseAware = false
+                                        activator.isMouseAware = true
+                                        layer1.isFallThrough = true
+                                    }
+                                    mouseDownOnActivator = false
+                                }
+                                layer1.onMouseClick { button, x, y ->
+                                    dropDown.isVisible = false
+                                    dropDown.isMouseAware = false
+                                    activator.isMouseAware = true
+                                    layer1.isFallThrough = true
                                 }
                             }
                         }
-
 
 
 
