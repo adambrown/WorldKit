@@ -9,13 +9,13 @@ import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.*
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.net.URISyntaxException
 import java.awt.Desktop
 import java.net.URI
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 
 
 object MainUi {
@@ -133,72 +133,46 @@ object MainUi {
                         layout = VERTICAL
                         icon(icon, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT)
                         hSpacer(SMALL_SPACER_SIZE)
-
-
-
-
-                        block {
-                            val menuBar = this
-                            topBar.renderChildren.remove(menuBar)
-                            menuLayer.renderChildren.add(menuBar)
-                            val recentProjectsAvailable = ref(true)
-                            val doesActiveProjectExist = ref(false)
-                            val mouseDownOnActivator = ref(false)
-                            val mouseDownOnDeActivator = ref(false)
-                            val mouseOverActivator = ref(false)
-                            val mouseOverDeActivator = ref(false)
-                            val activeMenu = ref<Pair<Block, () -> Unit>?>(null)
-                            hSizing = SHRINK
-                            vSizing = STATIC
-                            height = MEDIUM_ROW_HEIGHT
-                            layout = HORIZONTAL
-                            isFallThrough = true
-                            val fileMenu = menu("File", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                        val recentProjectsAvailable = ref(false)
+                        val doesActiveProjectExist = ref(false)
+                        menuBar(menuLayer, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                            menu("File") {
                                 menuItem("New project", "Ctrl+N",
-                                        createMultiGlyph(
-                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                        createMultiGlyph(GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
                                                 GlyphLayer(glyphStar, glyphFont, 10.0f, COLOR_GLYPH_GREEN, -1.0f, -1.0f))) {
                                     println("New project")
                                 }
                                 menuItem("Open project", "Ctrl+O",
-                                        createMultiGlyph(
-                                                GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
+                                        createMultiGlyph(GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
                                                 GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.0f))) {
                                     println("Open project")
                                 }
-                                menuItem("Save project", "Ctrl+S",
-                                        createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), isActive = doesActiveProjectExist) {
+                                menuItem("Save project", "Ctrl+S", createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), isActive = doesActiveProjectExist) {
                                     println("Save project")
                                 }
                                 menuDivider()
+                                var recentProjects: DropDownList? = null
                                 subMenu("Recent projects", isActive = recentProjectsAvailable) {
-                                    menuItem("Project 1") {
-                                        println("Project 1")
+                                    recentProjects = this
+                                }
+                                val counter = AtomicInteger(0)
+                                menuItem("Add Project") {
+                                    val functionRef: MutableReference<() -> Unit> = mRef({})
+                                    val projectBlock = recentProjects?.menuItem("Project ${counter.incrementAndGet()}") {
+                                        functionRef.value()
                                     }
-                                    menuItem("Project 2") {
-                                        println("Project 2")
-                                    }
-                                    menuItem("Project 3") {
-                                        println("Project 3")
-                                    }
-                                    subMenu("Foobar", isActive = ref(false)) {
-                                        menuItem("Project 1") {
-                                            println("Project 1")
+                                    if (projectBlock != null) {
+                                        if (counter.get() > 0) {
+                                            recentProjectsAvailable.value = true
                                         }
-                                        menuItem("Project 2") {
-                                            println("Project 2")
+                                        functionRef.value = {
+                                            recentProjects?.removeItem(projectBlock)
+                                            val count = counter.decrementAndGet()
+                                            if (count == 0) {
+                                                recentProjectsAvailable.value = false
+                                            }
                                         }
-                                    }
-                                    subMenu("Working", isActive = ref(true)) {
-                                        menuItem("Project 1") {
-                                            println("Project 1")
-                                        }
-                                        menuItem("Project 2") {
-                                            println("Project 2")
-                                        }
-                                    }
-                                    menuItem("Project 5") {
-                                        println("Project 5")
+                                        recentProjects?.moveItemToIndex(projectBlock, 0)
                                     }
                                 }
                                 menuDivider()
@@ -210,7 +184,7 @@ object MainUi {
                                     closeWindow()
                                 }
                             }
-                            val settingsMenu = menu("Settings", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                            menu("Settings") {
                                 menuItem("Preferences", "Ctrl+P", createMultiGlyph(GlyphLayer(glyphGear, glyphFont, 20.0f, COLOR_GLYPH_LIGHT_GREY, 0.0f, 0.0f))) {
                                     println("Preferences")
                                 }
@@ -218,10 +192,9 @@ object MainUi {
                                     println("Restore default preferences")
                                 }
                             }
-                            val helpMenu = menu("Help", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                            menu("Help") {
                                 menuItem("Help", "Ctrl+F1",
-                                        createMultiGlyph(
-                                                GlyphLayer(glyphCircle, glyphFont, 20.0f, COLOR_GLYPH_DARK_BLUE, 0.0f, 0.0f),
+                                        createMultiGlyph(GlyphLayer(glyphCircle, glyphFont, 20.0f, COLOR_GLYPH_DARK_BLUE, 0.0f, 0.0f),
                                                 GlyphLayer(glyphHelp, glyphFont, 20.0f, COLOR_TRUE_WHITE, 0.0f, 0.0f))) {
                                     openWebPage("file://D:/sandbox/world-creation/gec/src/main/resources/textures/wk-icon-1024.png")
                                 }
@@ -252,11 +225,6 @@ object MainUi {
                                 }
                             }
                         }
-
-
-
-
-
                         hSpacer(SMALL_SPACER_SIZE)
                         dragArea = dragArea(text("WorldKit - No Project"))
                         hSpacer(SMALL_SPACER_SIZE)
