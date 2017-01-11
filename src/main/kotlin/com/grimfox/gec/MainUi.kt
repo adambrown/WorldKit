@@ -64,6 +64,9 @@ object MainUi {
                 val glyphFolder = glyphIndex[6]
                 val glyphLoadArrow = glyphIndex[7]
                 val glyphStar = glyphIndex[8]
+                val glyphGear = glyphIndex[9]
+                val glyphCircle = glyphIndex[10]
+                val glyphHelp = glyphIndex[11]
 
                 val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) glyphRestore else glyphMaximize, true)
                 ui.maximizeHandler = {
@@ -208,11 +211,7 @@ object MainUi {
                                 }
                             }
                             val settingsMenu = menu("Settings", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
-                                menuItem("Preferences", "Ctrl+P",
-                                        createMultiGlyph(
-                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
-                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
-                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f))) {
+                                menuItem("Preferences", "Ctrl+P", createMultiGlyph(GlyphLayer(glyphGear, glyphFont, 20.0f, COLOR_GLYPH_LIGHT_GREY, 0.0f, 0.0f))) {
                                     println("Preferences")
                                 }
                                 menuItem("Restore default preferences") {
@@ -222,9 +221,8 @@ object MainUi {
                             val helpMenu = menu("Help", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                                 menuItem("Help", "Ctrl+F1",
                                         createMultiGlyph(
-                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
-                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
-                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f))) {
+                                                GlyphLayer(glyphCircle, glyphFont, 20.0f, COLOR_GLYPH_DARK_BLUE, 0.0f, 0.0f),
+                                                GlyphLayer(glyphHelp, glyphFont, 20.0f, COLOR_TRUE_WHITE, 0.0f, 0.0f))) {
                                     openWebPage("file://D:/sandbox/world-creation/gec/src/main/resources/textures/wk-icon-1024.png")
                                 }
                                 menuDivider()
