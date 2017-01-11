@@ -7,6 +7,7 @@ import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.Utils.LOG
 import com.grimfox.gec.util.cRef
 import org.joml.Vector4f
 import org.lwjgl.nanovg.NVGColor
@@ -640,6 +641,7 @@ abstract class Block {
     abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
+    abstract var onTick: (Block.(mouseX: Int, mouseY: Int) -> Unit)?
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
@@ -726,11 +728,13 @@ abstract class Block {
     private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Block? {
         if (isVisible) {
             this.nvg = nvg
+            val onTicks: MutableList<Block.(Int, Int) -> Unit> = ArrayList()
             try {
-                prepareForIteration()
+                prepareForIteration(onTicks)
             } catch (t: Throwable) {
-                t.printStackTrace()
+                LOG.error("Error iterating ui blocks.", t)
             }
+            onTicks.forEach { it(mouseX, mouseY) }
             return getMouseOverBlock(mouseX, mouseY)
         }
         return null
@@ -760,9 +764,9 @@ abstract class Block {
         }
     }
 
-    private fun prepareForIteration() {
+    private fun prepareForIteration(onTicks: MutableList<Block.(Int, Int) -> Unit>? = null) {
         val shrinkGroups = HashSet<ShrinkGroup>()
-        prepareForIteration(shrinkGroups)
+        prepareForIteration(shrinkGroups, onTicks)
         shrinkGroups.forEach {
             if (it is ShrinkGroupInternal) {
                 it.size
@@ -770,12 +774,18 @@ abstract class Block {
         }
     }
 
-    open protected fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>) {
+    open protected fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>, onTicks: MutableList<Block.(Int, Int) -> Unit>?) {
         var lastChild: Block? = null
         layoutChildren.forEach {
             it.lastBlock = lastChild
             it.nvg = nvg
-            it.prepareForIteration(shrinkGroups)
+            if (onTicks!= null) {
+                val onTick = it.onTick
+                if (onTick != null) {
+                    onTicks.add(onTick)
+                }
+            }
+            it.prepareForIteration(shrinkGroups, onTicks)
             lastChild = it
         }
     }
@@ -971,6 +981,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = null
         set(value) {
         }
+    override var onTick: (Block.(Int, Int) -> Unit)?
+        get() = null
+        set(value) {
+        }
     override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
@@ -1017,7 +1031,8 @@ private class DefaultBlock(
         override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onScroll: (Block.(Double, Double) -> Unit)? = null) : Block() {
+        override var onScroll: (Block.(Double, Double) -> Unit)? = null,
+        override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
 
     override var awaitingRelease: MutableList<Pair<Int, Block>>
         get() = ArrayList()
@@ -1067,7 +1082,7 @@ private class DefaultBlock(
             }
         }
 
-    override fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>) {
+    override fun prepareForIteration(shrinkGroups: MutableSet<ShrinkGroup>, onTicks: MutableList<Block.(Int, Int) -> Unit>?) {
         var shrinkGroup = _hShrinkGroup
         if (shrinkGroup != null) {
             shrinkGroup.isCalculated = false
@@ -1078,7 +1093,7 @@ private class DefaultBlock(
             shrinkGroup.isCalculated = false
             shrinkGroups.add(shrinkGroup)
         }
-        super.prepareForIteration(shrinkGroups)
+        super.prepareForIteration(shrinkGroups, onTicks)
     }
 
     private var _width = width

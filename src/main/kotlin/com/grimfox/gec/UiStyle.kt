@@ -10,7 +10,6 @@ import com.grimfox.gec.ui.widgets.toggle
 import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
-import org.lwjgl.glfw.GLFW
 import org.lwjgl.nanovg.NVGColor
 import java.nio.ByteBuffer
 
@@ -107,6 +106,8 @@ val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO
 val COLOR_MENU_BACKGROUND = color(27, 27, 28)
 val COLOR_MENU_HIGHLIGHT = color(62, 62, 64)
 val COLOR_BORDERS_AND_FRAMES = color(63, 63, 70)
+
+val COLOR_DISABLED_CLICKABLE = color(78, 78, 80)
 
 val FILL_MENU_BACKGROUND = FillColor(COLOR_MENU_BACKGROUND)
 val FILL_MENU_BORDER = FillColor(COLOR_MENU_HIGHLIGHT)
@@ -495,123 +496,6 @@ fun Block.hButtonRow(buttons: Block.() -> Unit): Block {
             hAlign = CENTER
             vAlign = MIDDLE
             buttons()
-        }
-    }
-}
-
-fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
-    return block {
-        hSizing = SHRINK_GROUP
-        hShrinkGroup = shrinkGroup
-        vSizing = STATIC
-        this.height = height
-        layout = VERTICAL
-        block{
-            hSizing = STATIC
-            width = 32.0f
-            layout = HORIZONTAL
-        }
-        block {
-            hSizing = GROW
-            layout = HORIZONTAL
-            block {
-                vSizing = STATIC
-                this.height = 1.0f
-                hSizing = RELATIVE
-                width = -2.0f
-                shape = SHAPE_MENU_BORDER
-                hAlign = LEFT
-                vAlign = MIDDLE
-            }
-        }
-    }
-}
-
-fun Block.menuItem(text: Text, glyph: Block.() -> Block = {block{}}, hotKey: Text = NO_TEXT, height: Float, shrinkGroup: ShrinkGroup, onClick: () -> Unit = {}): Block {
-    return block {
-        var mouseDownOver = false
-        var mouseOver = false
-        hSizing = SHRINK_GROUP
-        hShrinkGroup = shrinkGroup
-        vSizing = STATIC
-        this.height = height
-        layout = VERTICAL
-        block{
-            hSizing = STATIC
-            width = 32.0f
-            layout = HORIZONTAL
-            isMouseAware = false
-            block {
-                this.hSizing = SHRINK
-                this.vSizing = SHRINK
-                this.hAlign = CENTER
-                this.vAlign = MIDDLE
-                glyph()
-            }
-        }
-        block {
-            hSizing = SHRINK
-            vSizing = SHRINK
-            hAlign = LEFT
-            vAlign = MIDDLE
-            layout = HORIZONTAL
-            this.text = text
-            isMouseAware = false
-        }
-        block {
-            hSizing = GROW
-            layout = HORIZONTAL
-            isMouseAware = false
-        }
-        block {
-            hSizing = STATIC
-            layout = HORIZONTAL
-            width = MEDIUM_SPACER_SIZE
-            isMouseAware = false
-        }
-        block {
-            hSizing = SHRINK
-            vSizing = SHRINK
-            hAlign = LEFT
-            vAlign = MIDDLE
-            layout = HORIZONTAL
-            this.text = hotKey
-            isMouseAware = false
-        }
-        block {
-            hSizing = STATIC
-            width = 22.0f
-            layout = HORIZONTAL
-            isMouseAware = false
-        }
-        onMouseOver {
-            mouseOver = true
-            if (!mouseDownOver) {
-                shape = SHAPE_MENU_BORDER
-            }
-        }
-        onMouseOut {
-            mouseOver = false
-            if (!mouseDownOver) {
-                shape = NO_SHAPE
-            }
-        }
-        onMouseDown { button, x, y ->
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                mouseDownOver = true
-                shape = SHAPE_BUTTON_MOUSE_DOWN
-            }
-        }
-        onMouseRelease { button, x, y ->
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
-                mouseDownOver = false
-                shape = if (mouseOver) SHAPE_MENU_BORDER else NO_SHAPE
-            }
-        }
-        onMouseClick { button, x, y ->
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                onClick()
-            }
         }
     }
 }

@@ -7,12 +7,16 @@ import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
-import com.grimfox.gec.util.geometry.max
-import com.grimfox.gec.util.mRef
-import com.grimfox.gec.util.ref
+import com.grimfox.gec.util.*
 import org.lwjgl.glfw.GLFW
+import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
+import java.net.URISyntaxException
+import java.awt.Desktop
+import java.net.URI
+import java.net.URL
+
 
 object MainUi {
 
@@ -103,8 +107,8 @@ object MainUi {
 
                 meshViewport.init()
 
-                var layer0 = NO_BLOCK
-                var layer1 = NO_BLOCK
+                var mainLayer = NO_BLOCK
+                var menuLayer = NO_BLOCK
 
                 var topBar = NO_BLOCK
                 var contentPanel = NO_BLOCK
@@ -112,14 +116,14 @@ object MainUi {
                 var rightPanel = NO_BLOCK
 
                 root {
-                    layer0 = block {
+                    mainLayer = block {
                         isFallThrough = true
                     }
-                    layer1 = block {
+                    menuLayer = block {
                         isFallThrough = true
                     }
                 }
-                layer0 {
+                mainLayer {
                     topBar = block {
                         vSizing = STATIC
                         height = MEDIUM_ROW_HEIGHT
@@ -131,182 +135,122 @@ object MainUi {
 
 
                         block {
-                            val menu = this
-                            topBar.renderChildren.remove(menu)
-                            layer1.renderChildren.add(menu)
-                            var active = false
-                            var mouseDownOnActivator = false
-                            var mouseOverActivator = false
-                            var mouseOverDeActivator = false
+                            val menuBar = this
+                            topBar.renderChildren.remove(menuBar)
+                            menuLayer.renderChildren.add(menuBar)
+                            val recentProjectsAvailable = ref(true)
+                            val doesActiveProjectExist = ref(false)
+                            val mouseDownOnActivator = ref(false)
+                            val mouseDownOnDeActivator = ref(false)
+                            val mouseOverActivator = ref(false)
+                            val mouseOverDeActivator = ref(false)
+                            val activeMenu = ref<Pair<Block, () -> Unit>?>(null)
                             hSizing = SHRINK
                             vSizing = STATIC
                             height = MEDIUM_ROW_HEIGHT
                             layout = HORIZONTAL
                             isFallThrough = true
-                            block {
-                                hSizing = SHRINK
-                                vSizing = STATIC
-                                vAlign = BOTTOM
-                                height = SMALL_ROW_HEIGHT
-                                isFallThrough = true
-                                val activator = block {
-                                    hSizing = SHRINK
-                                    vSizing = STATIC
-                                    height = SMALL_ROW_HEIGHT
-                                    padLeft = SMALL_SPACER_SIZE
-                                    padRight = SMALL_SPACER_SIZE
-                                    block {
-                                        hSizing = SHRINK
-                                        vSizing = SHRINK
-                                        hAlign = CENTER
-                                        vAlign = MIDDLE
-                                        text = text("File", TEXT_STYLE_BUTTON)
-                                        isMouseAware = false
-                                    }
+                            val fileMenu = menu("File", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                                menuItem("New project", "Ctrl+N",
+                                        createMultiGlyph(
+                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                                GlyphLayer(glyphStar, glyphFont, 10.0f, COLOR_GLYPH_GREEN, -1.0f, -1.0f))) {
+                                    println("New project")
                                 }
-                                val dropDown = block {
-                                    val dropDown = this
-                                    isVisible = true
-                                    isMouseAware = true
-                                    layout = ABSOLUTE
-                                    yOffset = SMALL_ROW_HEIGHT - 1.0f
-                                    xOffset = -1.0f
-                                    hSizing = STATIC
-                                    vSizing = STATIC
-                                    width = 0.0f
-                                    height = 0.0f
-                                    canOverflow = true
-                                    isFallThrough = true
-                                    block {
-                                        layout = ABSOLUTE
-                                        hSizing = SHRINK
-                                        vSizing = SHRINK
-                                        canOverflow = true
-                                        block {
-                                            xOffset = 3.0f
-                                            yOffset = 3.0f
-                                            canOverflow = true
-                                            shape = SHAPE_DROP_SHADOW
+                                menuItem("Open project", "Ctrl+O",
+                                        createMultiGlyph(
+                                                GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
+                                                GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.0f))) {
+                                    println("Open project")
+                                }
+                                menuItem("Save project", "Ctrl+S",
+                                        createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), isActive = doesActiveProjectExist) {
+                                    println("Save project")
+                                }
+                                menuDivider()
+                                subMenu("Recent projects", isActive = recentProjectsAvailable) {
+                                    menuItem("Project 1") {
+                                        println("Project 1")
+                                    }
+                                    menuItem("Project 2") {
+                                        println("Project 2")
+                                    }
+                                    menuItem("Project 3") {
+                                        println("Project 3")
+                                    }
+                                    subMenu("Foobar", isActive = ref(false)) {
+                                        menuItem("Project 1") {
+                                            println("Project 1")
                                         }
-                                        block {
-                                            layout = ABSOLUTE
-                                            hSizing = SHRINK
-                                            vSizing = SHRINK
-                                            canOverflow = true
-                                            shape = SHAPE_MENU_BORDER
-                                            block {
-                                                hSizing = SHRINK
-                                                vSizing = SHRINK
-                                                padLeft = 1.0f
-                                                padRight = 1.0f
-                                                padTop = 1.0f
-                                                padBottom = 1.0f
-                                                shape = SHAPE_MENU_BACKGROUND
-                                                block {
-                                                    hSizing = SHRINK
-                                                    vSizing = SHRINK
-                                                    padLeft = 2.0f
-                                                    padRight = 2.0f
-                                                    padTop = 2.0f
-                                                    padBottom = 2.0f
-                                                    val shrinkGroup = hShrinkGroup()
-                                                    menuItem(text("New project", TEXT_STYLE_BUTTON),
-                                                            createMultiGlyph(
-                                                                    GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
-                                                                    GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
-                                                                    GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f)),
-                                                            text("Ctrl+N", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
-                                                            shrinkGroup)
-                                                    menuItem(text("Open project", TEXT_STYLE_BUTTON),
-                                                            createMultiGlyph(
-                                                                    GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
-                                                                    GlyphLayer(glyphLoadArrow, glyphFont, 14.5f, COLOR_GLYPH_BLACK, -2.0f, -4.0f),
-                                                                    GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.5f)),
-                                                            text("Ctrl+O", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT,
-                                                            shrinkGroup)
-                                                    menuItem(text("Save project", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), text("Ctrl+S", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
-                                                    menuDivider(3.0f, shrinkGroup)
-                                                    menuItem(text("Export maps...", TEXT_STYLE_BUTTON), { block {} }, text("Ctrl+E", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup)
-                                                    menuDivider(3.0f, shrinkGroup)
-                                                    menuItem(text("Exit", TEXT_STYLE_BUTTON), createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f)), text("Alt+F4", TEXT_STYLE_BUTTON), MEDIUM_ROW_HEIGHT, shrinkGroup) {
-                                                        closeWindow()
-                                                    }
-                                                }
-                                            }
+                                        menuItem("Project 2") {
+                                            println("Project 2")
                                         }
                                     }
-                                    block {
-                                        layout = ABSOLUTE
-                                        hSizing = SHRINK
-                                        vSizing = STATIC
-                                        height = SMALL_ROW_HEIGHT + 1
-                                        yOffset = -SMALL_ROW_HEIGHT
-                                        canOverflow = true
-                                        shape = SHAPE_MENU_BORDER
-                                        block {
-                                            hSizing = SHRINK
-                                            vSizing = STATIC
-                                            height = SMALL_ROW_HEIGHT + 2
-                                            padLeft = 1.0f
-                                            padRight = 1.0f
-                                            padTop = 1.0f
-                                            canOverflow = true
-                                            shape = SHAPE_MENU_BACKGROUND
-                                            isMouseAware = false
-                                            block {
-                                                hSizing = SHRINK
-                                                vSizing = SHRINK
-                                                hAlign = CENTER
-                                                vAlign = MIDDLE
-                                                yOffset = -1.0f
-                                                padLeft = SMALL_SPACER_SIZE
-                                                padRight = SMALL_SPACER_SIZE
-                                                text = text("File", TEXT_STYLE_BUTTON)
-                                            }
+                                    subMenu("Working", isActive = ref(true)) {
+                                        menuItem("Project 1") {
+                                            println("Project 1")
                                         }
-                                        onMouseClick { button, x, y ->
-                                            dropDown.isVisible = false
-                                            dropDown.isMouseAware = false
-                                            activator.isMouseAware = true
-                                            layer1.isFallThrough = true
-                                        }
-                                        onMouseOver {
-                                            mouseOverDeActivator = true
-                                        }
-                                        onMouseOut {
-                                            mouseOverDeActivator = false
+                                        menuItem("Project 2") {
+                                            println("Project 2")
                                         }
                                     }
-                                }
-                                dropDown.isVisible = false
-                                dropDown.isMouseAware = false
-                                activator.onMouseOver {
-                                    mouseOverActivator = true
-                                }
-                                activator.onMouseOut {
-                                    mouseOverActivator = false
-                                }
-                                activator.onMouseDown { button, x, y ->
-                                    mouseDownOnActivator = true
-                                    dropDown.isVisible = true
-                                    dropDown.isMouseAware = true
-                                    activator.isMouseAware = false
-                                    layer1.isFallThrough = false
-                                }
-                                activator.onMouseRelease { button, x, y ->
-                                    if (mouseDownOnActivator && !(mouseOverDeActivator || mouseOverActivator)) {
-                                        dropDown.isVisible = false
-                                        dropDown.isMouseAware = false
-                                        activator.isMouseAware = true
-                                        layer1.isFallThrough = true
+                                    menuItem("Project 5") {
+                                        println("Project 5")
                                     }
-                                    mouseDownOnActivator = false
                                 }
-                                layer1.onMouseClick { button, x, y ->
-                                    dropDown.isVisible = false
-                                    dropDown.isMouseAware = false
-                                    activator.isMouseAware = true
-                                    layer1.isFallThrough = true
+                                menuDivider()
+                                menuItem("Export maps", "Ctrl+E", isActive = doesActiveProjectExist) {
+                                    println("Export maps")
+                                }
+                                menuDivider()
+                                menuItem("Exit", "Alt+F4", createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f))) {
+                                    closeWindow()
+                                }
+                            }
+                            val settingsMenu = menu("Settings", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                                menuItem("Preferences", "Ctrl+P",
+                                        createMultiGlyph(
+                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
+                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f))) {
+                                    println("Preferences")
+                                }
+                                menuItem("Restore default preferences") {
+                                    println("Restore default preferences")
+                                }
+                            }
+                            val helpMenu = menu("Help", menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                                menuItem("Help", "Ctrl+F1",
+                                        createMultiGlyph(
+                                                GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
+                                                GlyphLayer(glyphStar, glyphFont, 11.5f, COLOR_GLYPH_BLACK, -1.9f, -2.0f),
+                                                GlyphLayer(glyphStar, glyphFont, 9.0f, COLOR_GLYPH_GREEN, -0.6f, -1.0f))) {
+                                    openWebPage("file://D:/sandbox/world-creation/gec/src/main/resources/textures/wk-icon-1024.png")
+                                }
+                                menuDivider()
+                                menuItem("Getting started") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuItem("Tutorials") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuDivider()
+                                menuItem("Website") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuItem("Wiki") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuItem("Forum") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuDivider()
+                                menuItem("Install offline help") {
+                                    openWebPage("http://www.google.com")
+                                }
+                                menuDivider()
+                                menuItem("About WorldKit") {
+                                    println("About WorldKit")
                                 }
                             }
                         }
@@ -315,10 +259,8 @@ object MainUi {
 
 
 
-                        button(text("Settings"), MENU_TEXT_BUTTON_STYLE) { println("mouse click Settings") }
-                        button(text("Help"), MENU_TEXT_BUTTON_STYLE) { println("mouse click Help") }
-                        hSpacer(SMALL_ROW_HEIGHT)
-                        dragArea = dragArea(text("WorldKit - Edit Mode"))
+                        hSpacer(SMALL_SPACER_SIZE)
+                        dragArea = dragArea(text("WorldKit - No Project"))
                         hSpacer(SMALL_SPACER_SIZE)
                         button(glyph(glyphMinimize), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
@@ -547,5 +489,32 @@ object MainUi {
         ui(uiLayout, 1280, 720) {
 //            dynamicTextRef.value = "$width x $height / $pixelWidth x $pixelHeight / $mouseX : $mouseY"
         }
+    }
+}
+
+fun openWebPage(uri: URI) {
+    val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
+    if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
+        try {
+            desktop.browse(uri)
+        } catch (e: Exception) {
+            LOG.error("Unable to open web page: $uri", e)
+        }
+    }
+}
+
+fun openWebPage(url: URL) {
+    try {
+        openWebPage(url.toURI())
+    } catch (e: URISyntaxException) {
+        LOG.error("Unable to open web page: $url", e)
+    }
+}
+
+fun openWebPage(url: String) {
+    try {
+        openWebPage(URL(url))
+    } catch (e: Exception) {
+        LOG.error("Unable to open web page: $url", e)
     }
 }
