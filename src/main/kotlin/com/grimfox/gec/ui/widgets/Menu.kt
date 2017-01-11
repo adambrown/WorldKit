@@ -249,9 +249,58 @@ private fun Block.subMenu(text: Text,
             }
         }
         val activateDropDown = {
+            val graceStart = System.nanoTime()
             opened = true
             dropDown.isVisible = true
             dropDown.isMouseAware = true
+            val dropDownList = dropDown.layoutChildren.first()
+            inputOverride = dropDown
+            val endOverride = {
+                inputOverride = null
+                dropDown.onMouseDown = null
+                dropDown.onMouseUp = null
+                dropDown.onTick = null
+            }
+            dropDown.onMouseDown = { button, x, y ->
+                endOverride()
+            }
+            dropDown.onMouseUp = { button, x, y ->
+                endOverride()
+            }
+            var lastX: Int? = null
+            var lastY: Int? = null
+            val leftX = dropDownList.x
+            val topY = dropDownList.y
+            val bottomY = topY + dropDownList.height
+            dropDown.onTick = { x, y ->
+                val lastXFinal = lastX
+                val lastYFinal = lastY
+                if (lastXFinal == null || lastYFinal == null) {
+                    lastX = x
+                    lastY = y
+                } else if (x < lastXFinal || x >= leftX || y >= bottomY || y <= topY) {
+                    endOverride()
+                } else {
+                    val deltaX = x - lastXFinal
+                    val deltaY = Math.max(0.0f, y.toFloat() - lastYFinal)
+                    val remainingY = Math.abs(bottomY - y)
+                    val remainingX = Math.abs(leftX - x)
+                    val remainingRatio = (remainingX / remainingY) * 0.4f
+                    val deltaRatio = if (deltaY < 0.1f) {
+                        Float.MAX_VALUE
+                    } else {
+                        deltaX / deltaY
+                    }
+                    if (deltaRatio < remainingRatio) {
+                        endOverride()
+                    } else {
+                        val now = System.nanoTime()
+                        if (now - graceStart > 2500000000) {
+                            endOverride()
+                        }
+                    }
+                }
+            }
             arrowBlock.shape = downShape
             val activeItemValue = activeItem.value
             if (activeItemValue != null && activeItemValue.first != thisItem) {
@@ -298,7 +347,7 @@ private fun Block.subMenu(text: Text,
                         if (deltaY < 5) {
                             val newTime = System.nanoTime()
                             val deltaTime = newTime - lastTime
-                            if (!opened && deltaTime > 400000000) {
+                            if (!opened && deltaTime > 350000000) {
                                 onTick = null
                                 activateDropDown()
                             }

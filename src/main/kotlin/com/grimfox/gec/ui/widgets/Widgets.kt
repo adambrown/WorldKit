@@ -642,6 +642,7 @@ abstract class Block {
     abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
     abstract var onTick: (Block.(mouseX: Int, mouseY: Int) -> Unit)?
+    abstract var inputOverride: Block?
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
@@ -703,7 +704,12 @@ abstract class Block {
     fun handleNewMousePosition(nvg: Long, mouseX: Int, mouseY: Int) {
         if (this === root) {
             lastMouseOver = mouseOver
-            mouseOver = getMouseOverBlock(nvg, mouseX, mouseY)
+            mouseOver = if (inputOverride != null) {
+                getMouseOverBlock(nvg, mouseX, mouseY)
+                inputOverride
+            } else {
+                getMouseOverBlock(nvg, mouseX, mouseY)
+            }
             if (mouseOver != lastMouseOver) {
                 val mouseOutFun = lastMouseOver?.onMouseOut
                 if (mouseOutFun != null) {
@@ -985,6 +991,7 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = null
         set(value) {
         }
+    override var inputOverride: Block? = null
     override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
@@ -993,6 +1000,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
 val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
     override var isVisible: Boolean
         get() = false
+        set(value) {
+        }
+    override var inputOverride: Block?
+        get() = null
         set(value) {
         }
 }
@@ -1033,6 +1044,12 @@ private class DefaultBlock(
         override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onScroll: (Block.(Double, Double) -> Unit)? = null,
         override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
+
+    override var inputOverride: Block?
+        get() = root.inputOverride
+        set(value) {
+            root.inputOverride = value
+        }
 
     override var awaitingRelease: MutableList<Pair<Int, Block>>
         get() = ArrayList()
