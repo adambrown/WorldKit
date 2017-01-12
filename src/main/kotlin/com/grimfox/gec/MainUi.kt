@@ -13,10 +13,9 @@ import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.net.URISyntaxException
 import java.awt.Desktop
+import java.io.File
 import java.net.URI
 import java.net.URL
-import java.util.concurrent.atomic.AtomicInteger
-
 
 object MainUi {
 
@@ -43,7 +42,40 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
-//        val dynamicTextRef = ref("some dynamic text")
+        val preferences = Preferences()
+
+        val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
+        currentProject.listener { old, new ->
+            val name = new?.folder?.canonicalPath ?: "No Project"
+            val showPath = if (name.length < 55) {
+                name
+            } else {
+                "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
+            }
+            titleText.reference.value = "WorldKit - $showPath"
+        }
+
+        fun selectFolderDialog(defaultFolder: File): File? {
+            val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
+            if (folderName != null && folderName.isNotBlank()) {
+                return File(folderName)
+            }
+//            val pointerBytes = BufferUtils.createByteBuffer(PointerBuffer.POINTER_SIZE)
+//            val pointer = PointerBuffer.create(pointerBytes)
+//            val status = NFD_PickFolder(defaultFolder.canonicalPath, pointer)
+//            if (status == NFD_OKAY) {
+//                try {
+//                    val folderName = MemoryUtil.memUTF8(pointer.get())
+//                    pointerBytes.flip()
+//                    if (folderName != null && folderName.isNotBlank()) {
+//                        return File(folderName)
+//                    }
+//                } finally {
+//                    NFD_Free(pointerBytes)
+//                }
+//            }
+            return null
+        }
 
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
@@ -54,37 +86,13 @@ object MainUi {
                 textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
                 glyphFont.value = createFont("/fonts/WorldKitUi.ttf", "Glyphs")
 
-                val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }
-                val glyphClose = glyphIndex[0]
-                val glyphMinimize = glyphIndex[1]
-                val glyphRestore = glyphIndex[2]
-                val glyphMaximize = glyphIndex[3]
-                val glyphSave = glyphIndex[4]
-                val glyphFile = glyphIndex[5]
-                val glyphFolder = glyphIndex[6]
-                val glyphLoadArrow = glyphIndex[7]
-                val glyphStar = glyphIndex[8]
-                val glyphGear = glyphIndex[9]
-                val glyphCircle = glyphIndex[10]
-                val glyphHelp = glyphIndex[11]
-
-                val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) glyphRestore else glyphMaximize, true)
+                val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, true)
                 ui.maximizeHandler = {
-                    MemoryUtil.memUTF8(glyphRestore, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_RESTORE, true, maxRestoreGlyph, 0)
                 }
                 ui.restoreHandler = {
-                    MemoryUtil.memUTF8(glyphMaximize, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_MAXIMIZE, true, maxRestoreGlyph, 0)
                 }
-
-//                val dynamicTextBuffer = ByteBuffer.allocateDirect(250)
-//
-//                val dynamicTextBytes = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
-//                dynamicTextBuffer.limit(dynamicTextBytes + 1)
-//                val dynamicText = DynamicTextUtf8(dynamicTextBuffer, TEXT_STYLE_NORMAL)
-//                dynamicTextRef.listener { old, new ->
-//                    val byteCount = MemoryUtil.memUTF8(dynamicTextRef.value, true, dynamicTextBuffer, 0)
-//                    dynamicTextBuffer.limit(byteCount + 1)
-//                }
 
                 val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,
                         "/textures/wk-icon-512.png",
@@ -112,6 +120,7 @@ object MainUi {
 
                 var mainLayer = NO_BLOCK
                 var menuLayer = NO_BLOCK
+                var dialogLayer = NO_BLOCK
 
                 var topBar = NO_BLOCK
                 var contentPanel = NO_BLOCK
@@ -125,6 +134,88 @@ object MainUi {
                     menuLayer = block {
                         isFallThrough = true
                     }
+                    dialogLayer = block {
+                        isFallThrough = false
+                        isMouseAware = true
+                        isVisible = false
+                        shape = FILL_GREY_OUT
+                    }
+                }
+                var saveDialog = NO_BLOCK
+                val saveDialogCallback = mRef {}
+                dialogLayer {
+                    saveDialog = block {
+                        hAlign = CENTER
+                        vAlign = MIDDLE
+                        hSizing = SHRINK
+                        vSizing = SHRINK
+                        block {
+                            xOffset = 4.0f
+                            yOffset = 4.0f
+                            canOverflow = true
+                            shape = SHAPE_DROP_SHADOW_DARK
+                            isMouseAware = false
+                        }
+                        block {
+                            shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
+                            block {
+                                xOffset = 1.0f
+                                yOffset = 1.0f
+                                width = -2.0f
+                                height = -2.0f
+                                shape = BACKGROUND_RECT
+                            }
+                        }
+                        block {
+                            layout = ABSOLUTE
+                            hAlign = CENTER
+                            vAlign = MIDDLE
+                            hSizing = SHRINK
+                            vSizing = SHRINK
+                            padLeft = MEGA_SPACER_SIZE
+                            padRight = MEGA_SPACER_SIZE
+                            padTop = LARGE_SPACER_SIZE
+                            padBottom = MEDIUM_SPACER_SIZE
+                            block {
+                                layout = VERTICAL
+                                hSizing = SHRINK
+                                vSizing = STATIC
+                                height = LARGE_ROW_HEIGHT
+                                label(text("Would you like to save the current project before continuing?"))
+                            }
+                            vSpacer(MEDIUM_SPACER_SIZE)
+                            vButtonRow(LARGE_ROW_HEIGHT) {
+                                button(text("Save"), POSITIVE_TEXT_BUTTON_STYLE) {
+                                    saveDialog.isVisible = false
+                                    ui.ignoreInput = true
+                                    try {
+                                        val newProjectFolder = selectFolderDialog(preferences.projectFolder)
+                                        if (newProjectFolder != null) {
+                                            println("Save $newProjectFolder")
+                                            dialogLayer.isVisible = false
+                                            saveDialogCallback.value()
+                                        } else {
+                                            dialogLayer.isVisible = false
+                                        }
+                                    } finally {
+                                        ui.ignoreInput = false
+                                    }
+                                }
+                                hSpacer(SMALL_SPACER_SIZE)
+                                button(text("Delete"), NORMAL_TEXT_BUTTON_STYLE) {
+                                    saveDialog.isVisible = false
+                                    dialogLayer.isVisible = false
+                                    saveDialogCallback.value()
+                                }
+                                hSpacer(SMALL_SPACER_SIZE)
+                                button(text("Cancel"), NORMAL_TEXT_BUTTON_STYLE) {
+                                    saveDialog.isVisible = false
+                                    dialogLayer.isVisible = false
+                                }
+                            }
+                        }
+                    }
+                    saveDialog.isVisible = false
                 }
                 mainLayer {
                     topBar = block {
@@ -133,59 +224,43 @@ object MainUi {
                         layout = VERTICAL
                         icon(icon, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT)
                         hSpacer(SMALL_SPACER_SIZE)
-                        val recentProjectsAvailable = ref(false)
-                        val doesActiveProjectExist = ref(false)
                         menuBar(menuLayer, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                             menu("File") {
-                                menuItem("New project", "Ctrl+N",
-                                        createMultiGlyph(GlyphLayer(glyphFile, glyphFont, 16.0f, COLOR_GLYPH_WHITE, 0.0f, 0.0f),
-                                                GlyphLayer(glyphStar, glyphFont, 10.0f, COLOR_GLYPH_GREEN, -1.0f, -1.0f))) {
-                                    println("New project")
+                                menuItem("New project", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
+                                    if (currentProject.value != null) {
+                                        dialogLayer.isVisible = true
+                                        saveDialog.isVisible = true
+                                        saveDialogCallback.value = {
+                                            currentProject.value = Project()
+                                        }
+                                    } else {
+                                        currentProject.value = Project()
+                                    }
                                 }
-                                menuItem("Open project", "Ctrl+O",
-                                        createMultiGlyph(GlyphLayer(glyphFolder, glyphFont, 16.0f, COLOR_GLYPH_YELLOW, 0.0f, 0.0f),
-                                                GlyphLayer(glyphLoadArrow, glyphFont, 12.0f, COLOR_GLYPH_BLUE, -1.0f, -3.0f))) {
+                                menuItem("Open project", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
                                     println("Open project")
                                 }
-                                menuItem("Save project", "Ctrl+S", createMultiGlyph(GlyphLayer(glyphSave, glyphFont, 16.0f, COLOR_GLYPH_BLUE, 0.0f, 0.0f)), isActive = doesActiveProjectExist) {
+                                menuItem("Save project", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
                                     println("Save project")
                                 }
                                 menuDivider()
-                                var recentProjects: DropDownList? = null
                                 subMenu("Recent projects", isActive = recentProjectsAvailable) {
-                                    recentProjects = this
+                                    recentProjectsDropdown.value = this
                                 }
-                                val counter = AtomicInteger(0)
-                                menuItem("Add Project") {
-                                    val functionRef: MutableReference<() -> Unit> = mRef({})
-                                    val projectBlock = recentProjects?.menuItem("Project ${counter.incrementAndGet()}") {
-                                        functionRef.value()
-                                    }
-                                    if (projectBlock != null) {
-                                        if (counter.get() > 0) {
-                                            recentProjectsAvailable.value = true
-                                        }
-                                        functionRef.value = {
-                                            recentProjects?.removeItem(projectBlock)
-                                            val count = counter.decrementAndGet()
-                                            if (count == 0) {
-                                                recentProjectsAvailable.value = false
-                                            }
-                                        }
-                                        recentProjects?.moveItemToIndex(projectBlock, 0)
-                                    }
+                                menuItem("Clear recent projects", isActive = recentProjectsAvailable) {
+                                    clearRecentProjects()
                                 }
                                 menuDivider()
                                 menuItem("Export maps", "Ctrl+E", isActive = doesActiveProjectExist) {
                                     println("Export maps")
                                 }
                                 menuDivider()
-                                menuItem("Exit", "Alt+F4", createMultiGlyph(GlyphLayer(glyphClose, glyphFont, 16.0f, COLOR_GLYPH_RED, 0.0f, 0.0f))) {
+                                menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {
                                     closeWindow()
                                 }
                             }
                             menu("Settings") {
-                                menuItem("Preferences", "Ctrl+P", createMultiGlyph(GlyphLayer(glyphGear, glyphFont, 20.0f, COLOR_GLYPH_LIGHT_GREY, 0.0f, 0.0f))) {
+                                menuItem("Preferences", "Ctrl+P", BLOCK_GLYPH_GEAR) {
                                     println("Preferences")
                                 }
                                 menuItem("Restore default preferences") {
@@ -193,9 +268,7 @@ object MainUi {
                                 }
                             }
                             menu("Help") {
-                                menuItem("Help", "Ctrl+F1",
-                                        createMultiGlyph(GlyphLayer(glyphCircle, glyphFont, 20.0f, COLOR_GLYPH_DARK_BLUE, 0.0f, 0.0f),
-                                                GlyphLayer(glyphHelp, glyphFont, 20.0f, COLOR_TRUE_WHITE, 0.0f, 0.0f))) {
+                                menuItem("Help", "Ctrl+F1", BLOCK_GLYPH_HELP) {
                                     openWebPage("file://D:/sandbox/world-creation/gec/src/main/resources/textures/wk-icon-1024.png")
                                 }
                                 menuDivider()
@@ -226,11 +299,11 @@ object MainUi {
                             }
                         }
                         hSpacer(SMALL_SPACER_SIZE)
-                        dragArea = dragArea(text("WorldKit - No Project"))
+                        dragArea = dragArea(titleText.text)
                         hSpacer(SMALL_SPACER_SIZE)
-                        button(glyph(glyphMinimize), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
+                        button(glyph(GLYPH_MINIMIZE), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
-                        button(glyph(glyphClose), WINDOW_DECORATE_BUTTON_STYLE) { closeWindow() }
+                        button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) { closeWindow() }
                     }
                     contentPanel = block {
                         vSizing = GROW
@@ -284,11 +357,6 @@ object MainUi {
                                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
                                                 }
-//                                                val dynamicLabel = label(dynamicText)
-//                                                dynamicLabel.layout = VERTICAL
-//                                                dynamicLabel.vAlign = TOP
-//                                                dynamicLabel.vSizing = STATIC
-//                                                dynamicLabel.height = LARGE_ROW_HEIGHT
                                             }
                                             hSpacer(MEDIUM_SPACER_SIZE)
                                         }

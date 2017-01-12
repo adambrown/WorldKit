@@ -36,7 +36,7 @@ interface MonitoredReference<T> : MutableReference<T> {
 
     override var value: T
 
-    fun listener(listener: (oldValue: T, newValue: T) -> Unit)
+    fun listener(listener: (oldValue: T, newValue: T) -> Unit): MonitoredReference<T>
 }
 
 private class CRef<out T>(override val value: T) : Reference<T>
@@ -58,8 +58,9 @@ private class Ref<T>(value: T) : MonitoredReference<T> {
             }
         }
 
-    override fun listener(listener: (oldValue: T, newValue: T) -> Unit) {
+    override fun listener(listener: (oldValue: T, newValue: T) -> Unit): MonitoredReference<T> {
         listeners.add(listener)
+        return this
     }
 }
 

@@ -18,24 +18,18 @@ val glyphFont = ref(-1)
 
 val SMALL_SPACER_SIZE = 6.0f
 val MEDIUM_SPACER_SIZE = 12.0f
+val LARGE_SPACER_SIZE = 24.0f
+val MEGA_SPACER_SIZE = 48.0f
 
 val SMALL_ROW_HEIGHT = 20.0f
 val MEDIUM_ROW_HEIGHT = 26.0f
 val LARGE_ROW_HEIGHT = 32.0f
 
-val COLOR_TRUE_WHITE = color(255, 255, 255)
+val COLOR_DROP_SHADOW_BLACK = color(5, 5, 6, 72)
+val COLOR_DROP_SHADOW_BLACK_TRANSPARENT = color(5, 5, 6, 0)
 
-val COLOR_GLYPH_RED = color(255, 57, 43)
-val COLOR_GLYPH_BLUE = color(26, 161, 226)
-val COLOR_GLYPH_DARK_BLUE = color(0, 122, 204)
-val COLOR_GLYPH_YELLOW = color(217, 177, 114)
-val COLOR_GLYPH_GREEN = color(142, 210, 138)
-val COLOR_GLYPH_WHITE = color(243, 243, 243)
-val COLOR_GLYPH_LIGHT_GREY = color(152, 152, 154)
-val COLOR_GLYPH_BLACK = color(0, 0, 0)
-
-val COLOR_BLACK = color(5, 5, 6, 72)
-val COLOR_BLACK_TRANSPARENT = color(5, 5, 6, 0)
+val COLOR_DROP_SHADOW_DARK_BLACK = color(5, 5, 6, 132)
+val COLOR_DROP_SHADOW_DARK_BLACK_TRANSPARENT = color(5, 5, 6, 0)
 
 val COLOR_BACKGROUND = color(45, 45, 48)
 val FILL_BACKGROUND = FillColor(COLOR_BACKGROUND)
@@ -59,12 +53,22 @@ val COLOR_BUTTON_TEXT = color(243, 243, 243)
 
 val COLOR_BUTTON_MOUSE_OVER = color(64, 62, 64)
 
+val COLOR_POSITIVE_HIGHLIGHT = color(67, 128, 64)
+val COLOR_NEGATIVE_HIGHLIGHT = color(128, 67, 64)
+
+val FILL_POSITIVE_HIGHLIGHT = FillColor(COLOR_POSITIVE_HIGHLIGHT)
+val FILL_NEGATIVE_HIGHLIGHT = FillColor(COLOR_NEGATIVE_HIGHLIGHT)
+
 val FILL_BUTTON_MOUSE_OVER = FillColor(COLOR_BUTTON_MOUSE_OVER)
 val FILL_BUTTON_MOUSE_DOWN = FillColor(COLOR_ACTIVE_HIGHLIGHT)
 
 val SHAPE_BUTTON_NORMAL = NO_SHAPE
 val SHAPE_BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
 val SHAPE_BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
+
+val SHAPE_BUTTON_POSITIVE = ShapeRectangle(FILL_POSITIVE_HIGHLIGHT, NO_STROKE)
+val SHAPE_BUTTON_NEGATIVE = ShapeRectangle(FILL_NEGATIVE_HIGHLIGHT, NO_STROKE)
+
 
 val SWITCH_HEIGHT = 12.0f
 val ELEMENT_INSET = 3.0f
@@ -136,8 +140,14 @@ val TEXT_STYLE_BUTTON_LARGE = TextStyle(FONT_SIZE_22, textFont, cRef(COLOR_BUTTO
 val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
 val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)
 
-val FILL_DROP_SHADOW = FillBoxGradient(COLOR_BLACK, COLOR_BLACK_TRANSPARENT, 6.0f, 12.0f)
+val FILL_DROP_SHADOW = FillBoxGradient(COLOR_DROP_SHADOW_BLACK, COLOR_DROP_SHADOW_BLACK_TRANSPARENT, 6.0f, 12.0f)
 val SHAPE_DROP_SHADOW = ShapeDropShadow(FILL_DROP_SHADOW, NO_STROKE, 6.0f, 6.0f)
+val FILL_DROP_SHADOW_DARK = FillBoxGradient(COLOR_DROP_SHADOW_DARK_BLACK, COLOR_DROP_SHADOW_DARK_BLACK_TRANSPARENT, 8.0f, 16.0f)
+val SHAPE_DROP_SHADOW_DARK = ShapeDropShadow(FILL_DROP_SHADOW_DARK, NO_STROKE, 8.0f, 8.0f)
+
+val COLOR_GREY_OUT = color(5, 5, 6, 156)
+
+val FILL_GREY_OUT = ShapeRectangle(FillColor(COLOR_GREY_OUT), NO_STROKE)
 
 val TOGGLE_STYLE = ToggleStyle(
         backgroundNormal = TOGGLE_BACKGROUND_NORMAL,
@@ -215,6 +225,48 @@ val WINDOW_DECORATE_BUTTON_STYLE = ButtonStyle(
 
 val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
         normal = SHAPE_BUTTON_NORMAL,
+        textNormal = TEXT_STYLE_BUTTON,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_BUTTON,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_BUTTON,
+        template = BlockTemplate(
+                hSizing = SHRINK,
+                vSizing = STATIC,
+                height = SMALL_ROW_HEIGHT,
+                vAlign = MIDDLE,
+                layout = HORIZONTAL),
+        textShapeTemplate = BlockTemplate(
+                hAlign = CENTER,
+                vAlign = MIDDLE,
+                hSizing = SHRINK,
+                vSizing = SHRINK,
+                padLeft = SMALL_SPACER_SIZE,
+                padRight = SMALL_SPACER_SIZE))
+
+val POSITIVE_TEXT_BUTTON_STYLE = ButtonStyle(
+        normal = SHAPE_BUTTON_POSITIVE,
+        textNormal = TEXT_STYLE_BUTTON,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_BUTTON,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_BUTTON,
+        template = BlockTemplate(
+                hSizing = SHRINK,
+                vSizing = STATIC,
+                height = SMALL_ROW_HEIGHT,
+                vAlign = MIDDLE,
+                layout = HORIZONTAL),
+        textShapeTemplate = BlockTemplate(
+                hAlign = CENTER,
+                vAlign = MIDDLE,
+                hSizing = SHRINK,
+                vSizing = SHRINK,
+                padLeft = SMALL_SPACER_SIZE,
+                padRight = SMALL_SPACER_SIZE))
+
+val NEGATIVE_TEXT_BUTTON_STYLE = ButtonStyle(
+        normal = SHAPE_BUTTON_NEGATIVE,
         textNormal = TEXT_STYLE_BUTTON,
         mouseOver = SHAPE_BUTTON_MOUSE_OVER,
         textMouseOver = TEXT_STYLE_BUTTON,

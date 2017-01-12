@@ -17,12 +17,12 @@ class MenuBar(private val block: Block,
               private val mouseOverActivator: MonitoredReference<Boolean>,
               private val mouseOverDeActivator: MonitoredReference<Boolean>) {
 
-    fun menu(title: String, builder: DropDownList.() -> Unit): Block {
+    fun menu(title: String, builder: DropdownList.() -> Unit): Block {
         return block.menu(title, menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, rowHeight, textStyle, textColorInactive, builder)
     }
 }
 
-class DropDownList(private val block: Block, private val rowHeight: Float, private val textStyle: TextStyle, private val textColorInactive: NVGColor, private val mouseDownOnActivator: MonitoredReference<Boolean>, private val deactivate: () -> Unit, private val activeItem: MutableReference<Pair<Block, () -> Unit>?>) {
+class DropdownList(private val block: Block, private val rowHeight: Float, private val textStyle: TextStyle, private val textColorInactive: NVGColor, private val mouseDownOnActivator: MonitoredReference<Boolean>, private val deactivate: () -> Unit, private val activeItem: MutableReference<Pair<Block, () -> Unit>?>) {
 
     private val shrinkGroup = hShrinkGroup()
 
@@ -30,7 +30,7 @@ class DropDownList(private val block: Block, private val rowHeight: Float, priva
         return block.menuItem(text(text, textStyle), if (hotKey != null) { text(hotKey, textStyle) } else { NO_TEXT }, glyph, rowHeight, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, onClick)
     }
 
-    fun subMenu(text: String, isActive: MonitoredReference<Boolean> = ref(true), builder: DropDownList.() -> Unit): Block {
+    fun subMenu(text: String, isActive: MonitoredReference<Boolean> = ref(true), builder: DropdownList.() -> Unit): Block {
         return block.subMenu(text(text, textStyle), rowHeight, textStyle, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, builder)
     }
 
@@ -92,7 +92,7 @@ private fun Block.menu(
         rowHeight: Float,
         textStyle: TextStyle,
         textColorInactive: NVGColor,
-        builder: DropDownList.() -> Unit): Block {
+        builder: DropdownList.() -> Unit): Block {
     val titleText = text(title, textStyle)
     return block {
         val menu = this
@@ -378,7 +378,7 @@ private fun Block.subMenu(text: Text,
                           mouseDownOnActivator: MonitoredReference<Boolean>,
                           deactivate: () -> Unit,
                           activeItem: MutableReference<Pair<Block, () -> Unit>?>,
-                          builder: DropDownList.() -> Unit): Block {
+                          builder: DropdownList.() -> Unit): Block {
     return block {
         val inactiveShape = ShapeTriangle(FillColor(textColorInactive), NO_STROKE, ShapeTriangle.Direction.EAST)
         val activeShape = ShapeTriangle(FillColor(textStyle.color.value), NO_STROKE, ShapeTriangle.Direction.EAST)
@@ -661,7 +661,7 @@ private fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
     }
 }
 
-private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textColorInactive: NVGColor, mouseDownOnActivator: MonitoredReference<Boolean>, deactivate: () -> Unit, activeItem: MutableReference<Pair<Block, () -> Unit>?>, builder: DropDownList.() -> Unit): Block {
+private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textColorInactive: NVGColor, mouseDownOnActivator: MonitoredReference<Boolean>, deactivate: () -> Unit, activeItem: MutableReference<Pair<Block, () -> Unit>?>, builder: DropdownList.() -> Unit): Block {
     return block {
         layout = Layout.ABSOLUTE
         hSizing = Sizing.SHRINK
@@ -699,7 +699,7 @@ private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textC
                     padTop = 2.0f
                     padBottom = 2.0f
                     isFallThrough = true
-                    DropDownList(this, rowHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivate, activeItem).builder()
+                    DropdownList(this, rowHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivate, activeItem).builder()
                 }
             }
         }

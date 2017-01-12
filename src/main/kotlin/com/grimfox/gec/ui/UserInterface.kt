@@ -39,6 +39,7 @@ import java.lang.Math.round
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
+import java.util.concurrent.locks.ReentrantLock
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON = jacksonObjectMapper()
@@ -121,6 +122,7 @@ interface UserInterface {
     val isMinimized: Boolean
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
+    var  ignoreInput: Boolean
     var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean) -> Unit
     var scrollHandler: (x: Double, y: Double) -> Unit
     var maximizeHandler: () -> Unit
@@ -170,6 +172,11 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     override val scrollY: Float get() = window.scrollY
     override val isMouse1Down: Boolean get() = window.isMouse1Down
     override val isMouse2Down: Boolean get() = window.isMouse2Down
+    override var ignoreInput: Boolean
+        get() = window.ignoreInput
+        set(value) {
+            window.ignoreInput = value
+        }
     override var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit
         get() = window.mouseClickHandler
         set(value) {
@@ -524,6 +531,8 @@ private class WindowContext(
         var monitors: List<MonitorSpec> = emptyList(),
         var warpLines: List<WarpLine> = emptyList(),
 
+        var ignoreInput: Boolean = false,
+
         var currentMonitor: MonitorSpec = NO_MONITOR,
         var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> },
         var scrollHandler: (Double, Double) -> Unit = { x, y -> },
@@ -534,53 +543,57 @@ private class WindowContext(
 ) {
 
     internal fun handleFrameInput() {
-        twr(stackPush()) { stack ->
-            val w = stack.mallocInt(1)
-            val h = stack.mallocInt(1)
+        if (!ignoreInput) {
+            twr(stackPush()) { stack ->
+                val w = stack.mallocInt(1)
+                val h = stack.mallocInt(1)
 
-            glfwGetWindowSize(id, w, h)
-            currentWidth = w.get(0)
-            currentHeight = h.get(0)
+                glfwGetWindowSize(id, w, h)
+                currentWidth = w.get(0)
+                currentHeight = h.get(0)
 
-            glfwGetFramebufferSize(id, w, h)
-            currentPixelWidth = w.get(0)
-            currentPixelHeight = h.get(0)
+                glfwGetFramebufferSize(id, w, h)
+                currentPixelWidth = w.get(0)
+                currentPixelHeight = h.get(0)
 
-            if (currentPixelWidth <= 0 || currentPixelHeight <= 0 && !isMinimized) {
-                isMinimized = true
-                minimizeHandler()
-            } else if (currentPixelWidth > 0 && currentPixelHeight > 0 && isMinimized) {
-                isMinimized = false
+                if (currentPixelWidth <= 0 || currentPixelHeight <= 0 && !isMinimized) {
+                    isMinimized = true
+                    minimizeHandler()
+                } else if (currentPixelWidth > 0 && currentPixelHeight > 0 && isMinimized) {
+                    isMinimized = false
+                }
+
+                val lastMouseX = mouseX
+                val lastMouseY = mouseY
+                glfwGetWindowPos(id, w, h)
+                x = w[0]
+                y = h[0]
+                val pointerLocation = MouseInfo.getPointerInfo()?.location
+                if (pointerLocation == null) {
+                    val x = stack.mallocDouble(1)
+                    val y = stack.mallocDouble(1)
+                    glfwGetCursorPos(id, x, y)
+                    val newMouseX = Math.round(mouseX + (x[0] - relativeMouseX)).toInt()
+                    val newMouseY = Math.round(mouseY + (y[0] - relativeMouseY)).toInt()
+                    val (mouseWarpX, mouseWarpY) = getWarp(lastMouseX, lastMouseY, newMouseX, newMouseY)
+                    mouseX = newMouseX + mouseWarpX
+                    mouseY = newMouseY + mouseWarpY
+                } else {
+                    mouseX = pointerLocation.x
+                    mouseY = pointerLocation.y
+                }
+                relativeMouseX = mouseX.toDouble() - x
+                relativeMouseY = mouseY.toDouble() - y
             }
-
-            val lastMouseX = mouseX
-            val lastMouseY = mouseY
-            glfwGetWindowPos(id, w, h)
-            x = w[0]
-            y = h[0]
-            val pointerLocation = MouseInfo.getPointerInfo()?.location
-            if (pointerLocation == null) {
-                val x = stack.mallocDouble(1)
-                val y = stack.mallocDouble(1)
-                glfwGetCursorPos(id, x, y)
-                val newMouseX = Math.round(mouseX + (x[0] - relativeMouseX)).toInt()
-                val newMouseY = Math.round(mouseY + (y[0] - relativeMouseY)).toInt()
-                val (mouseWarpX, mouseWarpY) = getWarp(lastMouseX, lastMouseY, newMouseX, newMouseY)
-                mouseX = newMouseX + mouseWarpX
-                mouseY = newMouseY + mouseWarpY
-            } else {
-                mouseX = pointerLocation.x
-                mouseY = pointerLocation.y
-            }
-            relativeMouseX = mouseX.toDouble() - x
-            relativeMouseY = mouseY.toDouble() - y
         }
         glfwPollEvents()
     }
 
     internal fun handleDragAndResize() {
-        handleDragging()
-        handleResizing()
+        if (!ignoreInput) {
+            handleDragging()
+            handleResizing()
+        }
     }
 
     private fun handleResizing() {
@@ -843,34 +856,40 @@ private fun createWindow(width: Int, height: Int): WindowContext {
     glfwSwapInterval(1)
     val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, warpLines = warpLines, width = width, height = height)
     glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
-        window.scrollX += xOffset.toFloat()
-        window.scrollY += yOffset.toFloat()
-        window.scrollHandler(xOffset, yOffset)
+        if (!window.ignoreInput) {
+            window.scrollX += xOffset.toFloat()
+            window.scrollY += yOffset.toFloat()
+            window.scrollHandler(xOffset, yOffset)
+        }
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
 
     }
     glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
-        when (key) {
-            GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
+        if (!window.ignoreInput) {
+            when (key) {
+                GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
+            }
         }
     }
     glfwSetMouseButtonCallback(window.id) { windowId, button, action, mods ->
-        twr(stackPush()) { stack ->
-            val cx = stack.mallocDouble(1)
-            val cy = stack.mallocDouble(1)
-            glfwGetCursorPos(windowId, cx, cy)
-            val x = cx.get(0)
-            val y = cy.get(0)
-            val scale = window.currentMonitor.scaleFactor
-            if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                startDrag(stack, window)
-            } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                startResize(stack, window, false)
-            } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                startResize(stack, window, true)
+        if (!window.ignoreInput) {
+            twr(stackPush()) { stack ->
+                val cx = stack.mallocDouble(1)
+                val cy = stack.mallocDouble(1)
+                glfwGetCursorPos(windowId, cx, cy)
+                val x = cx.get(0)
+                val y = cy.get(0)
+                val scale = window.currentMonitor.scaleFactor
+                if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    startDrag(stack, window)
+                } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    startResize(stack, window, false)
+                } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    startResize(stack, window, true)
+                }
+                handleStandardMouseAction(window, action, button, x, y)
             }
-            handleStandardMouseAction(window, action, button, x, y)
         }
     }
     var windowSize = getWindowSize(windowId)
@@ -891,6 +910,8 @@ private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boo
     val mouseIsInArea = y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
     return mouseIsInArea
 }
+
+private val HANDLE_MOUSE_LOCK = ReentrantLock(true)
 
 private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double) {
     if (action == GLFW_RELEASE) {
