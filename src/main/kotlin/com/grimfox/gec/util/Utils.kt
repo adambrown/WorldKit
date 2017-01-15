@@ -53,9 +53,7 @@ private class Ref<T>(value: T) : MonitoredReference<T> {
         set(value) {
             val old = _value
             _value = value
-            if (old != value) {
-                listeners.forEach { it(old, value) }
-            }
+            listeners.forEach { it(old, value) }
         }
 
     override fun listener(listener: (oldValue: T, newValue: T) -> Unit): MonitoredReference<T> {

@@ -20,6 +20,8 @@ import java.net.URL
 object MainUi {
 
     @JvmStatic fun main(vararg args: String) {
+        val preferences = loadPreferences()
+
         val DEFAULT_HEIGHT_SCALE = 130.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
         val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
@@ -42,39 +44,10 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
-        val preferences = Preferences()
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
         currentProject.listener { old, new ->
-            val name = new?.folder?.canonicalPath ?: "No Project"
-            val showPath = if (name.length < 55) {
-                name
-            } else {
-                "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
-            }
-            titleText.reference.value = "WorldKit - $showPath"
-        }
-
-        fun selectFolderDialog(defaultFolder: File): File? {
-            val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
-            if (folderName != null && folderName.isNotBlank()) {
-                return File(folderName)
-            }
-//            val pointerBytes = BufferUtils.createByteBuffer(PointerBuffer.POINTER_SIZE)
-//            val pointer = PointerBuffer.create(pointerBytes)
-//            val status = NFD_PickFolder(defaultFolder.canonicalPath, pointer)
-//            if (status == NFD_OKAY) {
-//                try {
-//                    val folderName = MemoryUtil.memUTF8(pointer.get())
-//                    pointerBytes.flip()
-//                    if (folderName != null && folderName.isNotBlank()) {
-//                        return File(folderName)
-//                    }
-//                } finally {
-//                    NFD_Free(pointerBytes)
-//                }
-//            }
-            return null
+            updateTitle(titleText, new)
         }
 
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
@@ -141,14 +114,16 @@ object MainUi {
                         shape = FILL_GREY_OUT
                     }
                 }
-                var saveDialog = NO_BLOCK
+                var overwriteWarningDialog = NO_BLOCK
                 val saveDialogCallback = mRef {}
                 dialogLayer {
-                    saveDialog = block {
+                    overwriteWarningDialog = block {
                         hAlign = CENTER
                         vAlign = MIDDLE
-                        hSizing = SHRINK
-                        vSizing = SHRINK
+                        hSizing = STATIC
+                        vSizing = STATIC
+                        width = 400.0f
+                        height = 140.0f
                         block {
                             xOffset = 4.0f
                             yOffset = 4.0f
@@ -167,55 +142,56 @@ object MainUi {
                             }
                         }
                         block {
-                            layout = ABSOLUTE
-                            hAlign = CENTER
-                            vAlign = MIDDLE
-                            hSizing = SHRINK
-                            vSizing = SHRINK
-                            padLeft = MEGA_SPACER_SIZE
-                            padRight = MEGA_SPACER_SIZE
-                            padTop = LARGE_SPACER_SIZE
-                            padBottom = MEDIUM_SPACER_SIZE
+                            padLeft = LARGE_SPACER_SIZE
+                            padRight = LARGE_SPACER_SIZE
+                            vSpacer(MEDIUM_SPACER_SIZE)
                             block {
                                 layout = VERTICAL
-                                hSizing = SHRINK
-                                vSizing = STATIC
-                                height = LARGE_ROW_HEIGHT
-                                label(text("Would you like to save the current project before continuing?"))
+                                vSizing = GROW
+                                block {
+                                    hSizing = SHRINK
+                                    layout = HORIZONTAL
+                                    canOverflow = true
+                                    block {
+                                        hSizing = SHRINK
+                                        vSizing = SHRINK
+                                        hAlign = CENTER
+                                        vAlign = MIDDLE
+                                        canOverflow = true
+                                        BLOCK_GLYPH_WARNING(60.0f).invoke(this)
+                                    }
+                                }
+                                hSpacer(LARGE_SPACER_SIZE)
+                                block {
+                                    hSizing = GROW
+                                    layout = HORIZONTAL
+                                    hAlign = LEFT
+                                    vAlign = MIDDLE
+                                    text = paragraph("Would you like to save the current project before creating a new one?")
+                                }
                             }
                             vSpacer(MEDIUM_SPACER_SIZE)
                             vButtonRow(LARGE_ROW_HEIGHT) {
-                                button(text("Save"), POSITIVE_TEXT_BUTTON_STYLE) {
-                                    saveDialog.isVisible = false
-                                    ui.ignoreInput = true
-                                    try {
-                                        val newProjectFolder = selectFolderDialog(preferences.projectFolder)
-                                        if (newProjectFolder != null) {
-                                            println("Save $newProjectFolder")
-                                            dialogLayer.isVisible = false
-                                            saveDialogCallback.value()
-                                        } else {
-                                            dialogLayer.isVisible = false
-                                        }
-                                    } finally {
-                                        ui.ignoreInput = false
-                                    }
-                                }
+                                button(text("Yes"), DIALOG_BUTTON_STYLE) {
+                                    overwriteWarningDialog.isVisible = false
+                                    saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
+                                }.with { width = 60.0f }
                                 hSpacer(SMALL_SPACER_SIZE)
-                                button(text("Delete"), NORMAL_TEXT_BUTTON_STYLE) {
-                                    saveDialog.isVisible = false
+                                button(text("No"), DIALOG_BUTTON_STYLE) {
+                                    overwriteWarningDialog.isVisible = false
                                     dialogLayer.isVisible = false
                                     saveDialogCallback.value()
-                                }
+                                }.with { width = 60.0f }
                                 hSpacer(SMALL_SPACER_SIZE)
-                                button(text("Cancel"), NORMAL_TEXT_BUTTON_STYLE) {
-                                    saveDialog.isVisible = false
+                                button(text("Cancel"), DIALOG_BUTTON_STYLE) {
+                                    overwriteWarningDialog.isVisible = false
                                     dialogLayer.isVisible = false
-                                }
+                                }.with { width = 60.0f }
                             }
+                            vSpacer(MEDIUM_SPACER_SIZE)
                         }
                     }
-                    saveDialog.isVisible = false
+                    overwriteWarningDialog.isVisible = false
                 }
                 mainLayer {
                     topBar = block {
@@ -226,10 +202,10 @@ object MainUi {
                         hSpacer(SMALL_SPACER_SIZE)
                         menuBar(menuLayer, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                             menu("File") {
-                                menuItem("New project", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
+                                menuItem("New...", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
                                     if (currentProject.value != null) {
                                         dialogLayer.isVisible = true
-                                        saveDialog.isVisible = true
+                                        overwriteWarningDialog.isVisible = true
                                         saveDialogCallback.value = {
                                             currentProject.value = Project()
                                         }
@@ -237,18 +213,30 @@ object MainUi {
                                         currentProject.value = Project()
                                     }
                                 }
-                                menuItem("Open project", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
-                                    println("Open project")
+                                menuItem("Open...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
+                                    if (currentProject.value != null) {
+                                        dialogLayer.isVisible = true
+                                        overwriteWarningDialog.isVisible = true
+                                        saveDialogCallback.value = {
+                                            currentProject.value = Project()
+                                        }
+                                    } else {
+                                        currentProject.value = Project()
+                                    }
                                 }
-                                menuItem("Save project", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
-                                    println("Save project")
+                                menuItem("Save", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
+                                    saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
+                                }
+                                menuItem("Save as...", "Shift+Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
+                                    saveProjectAs(currentProject.value, dialogLayer, preferences, ui, titleText)
                                 }
                                 menuDivider()
-                                subMenu("Recent projects", isActive = recentProjectsAvailable) {
+                                subMenu("Open recent", isActive = recentProjectsAvailable) {
                                     recentProjectsDropdown.value = this
-                                }
-                                menuItem("Clear recent projects", isActive = recentProjectsAvailable) {
-                                    clearRecentProjects()
+                                    menuDivider()
+                                    menuItem("Clear recent file list", isActive = recentProjectsAvailable) {
+                                        clearRecentProjects()
+                                    }
                                 }
                                 menuDivider()
                                 menuItem("Export maps", "Ctrl+E", isActive = doesActiveProjectExist) {
@@ -520,13 +508,13 @@ object MainUi {
             }
         }
 
-        ui(uiLayout, 1280, 720) {
-//            dynamicTextRef.value = "$width x $height / $pixelWidth x $pixelHeight / $mouseX : $mouseY"
+        ui(uiLayout, preferences.windowState) {
+
         }
     }
 }
 
-fun openWebPage(uri: URI) {
+private fun openWebPage(uri: URI) {
     val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
     if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
         try {
@@ -537,7 +525,7 @@ fun openWebPage(uri: URI) {
     }
 }
 
-fun openWebPage(url: URL) {
+private fun openWebPage(url: URL) {
     try {
         openWebPage(url.toURI())
     } catch (e: URISyntaxException) {
@@ -545,10 +533,18 @@ fun openWebPage(url: URL) {
     }
 }
 
-fun openWebPage(url: String) {
+private fun openWebPage(url: String) {
     try {
         openWebPage(URL(url))
     } catch (e: Exception) {
         LOG.error("Unable to open web page: $url", e)
     }
+}
+
+private fun selectFolderDialog(defaultFolder: File): File? {
+    val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
+    if (folderName != null && folderName.isNotBlank()) {
+        return File(folderName)
+    }
+    return null
 }

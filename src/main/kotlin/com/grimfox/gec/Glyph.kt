@@ -21,6 +21,8 @@ val GLYPH_STAR = glyphIndex[8]
 val GLYPH_GEAR = glyphIndex[9]
 val GLYPH_CIRCLE = glyphIndex[10]
 val GLYPH_HELP = glyphIndex[11]
+val GLYPH_WARNING_TRIANGLE = glyphIndex[12]
+val GLYPH_WARNING = glyphIndex[13]
 
 private val COLOR_TRUE_WHITE = color(255, 255, 255)
 private val COLOR_GLYPH_RED = color(255, 57, 43)
@@ -30,6 +32,9 @@ private val COLOR_GLYPH_YELLOW = color(217, 177, 114)
 private val COLOR_GLYPH_GREEN = color(142, 210, 138)
 private val COLOR_GLYPH_WHITE = color(243, 243, 243)
 private val COLOR_GLYPH_LIGHT_GREY = color(152, 152, 154)
+private val COLOR_GLYPH_BLACK = color(5, 5, 6)
+private val COLOR_GLYPH_DARK_YELLOW = color(229, 193, 11)
+private val COLOR_GLYPH_DARK_YELLOW_ALT = color(204, 177, 41)
 
 fun UiLayout.BLOCK_GLYPH_NEW_FILE(scale: Float): Block.() -> Block {
     val rescale = scale / BASE_SCALE
@@ -75,3 +80,11 @@ fun UiLayout.BLOCK_GLYPH_HELP(scale: Float): Block.() -> Block {
 }
 
 val UiLayout.BLOCK_GLYPH_HELP: Block.() -> Block get() = BLOCK_GLYPH_HELP(BASE_SCALE)
+
+fun UiLayout.BLOCK_GLYPH_WARNING(scale: Float): Block.() -> Block {
+    val rescale = scale / BASE_SCALE
+    return createMultiGlyph(GlyphLayer(GLYPH_WARNING_TRIANGLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_YELLOW_ALT, 0.0f, 0.0f),
+            GlyphLayer(GLYPH_WARNING, glyphFont, 20.0f * rescale, COLOR_GLYPH_BLACK, 0.0f, 0.0f))
+}
+
+val UiLayout.BLOCK_GLYPH_WARNING: Block.() -> Block get() = BLOCK_GLYPH_WARNING(BASE_SCALE)

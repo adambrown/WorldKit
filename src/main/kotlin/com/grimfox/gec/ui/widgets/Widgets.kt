@@ -10,12 +10,15 @@ import com.grimfox.gec.util.Reference
 import com.grimfox.gec.util.Utils.LOG
 import com.grimfox.gec.util.cRef
 import org.joml.Vector4f
+import org.lwjgl.BufferUtils
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NVGPaint
+import org.lwjgl.nanovg.NVGTextRow
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
+import org.lwjgl.system.MemoryUtil.memAddress
 import java.lang.Math.max
 import java.lang.Math.min
 import java.nio.ByteBuffer
@@ -289,6 +292,72 @@ class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
             nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
+    }
+}
+
+class StaticTextParagraphUtf8(string: String, val verticalSpace: Float, override var style: TextStyle) : Text {
+
+    override val data: ByteBuffer = MemoryUtil.memUTF8(string, false)
+    override val length: Int = data.limit()
+    private val lineHeight = BufferUtils.createFloatBuffer(1)
+    private val rows = NVGTextRow.create(3)
+
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        var (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
+        nvgFontFaceId(nvg, style.font.value)
+        nvgFontSize(nvg, style.size.value * scale)
+        nvgTextAlign(nvg, alignMask)
+        nvgTextMetrics(nvg, null, null, lineHeight)
+        val scaledHeight = lineHeight.get(0) + (verticalSpace * scale)
+        nvgFillColor(nvg, style.color.value)
+        x *= scale
+        y *= scale
+        val width = block.width * scale
+        var start = memAddress(data)
+        val end = start + data.remaining()
+        var rowCount: Int = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+        if (block.vAlign == TOP) {
+            while (rowCount != 0) {
+                for (i in 0..rowCount - 1) {
+                    val row = rows.get(i)
+                    nnvgText(nvg, x, y, row.start(), row.end())
+                    y += scaledHeight
+                }
+                start = rows.get(rowCount - 1).next()
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+            }
+        } else {
+            var yDelta = 0.0f
+            while (rowCount != 0) {
+                for (i in 0..rowCount - 1) {
+                    yDelta += scaledHeight
+                }
+                start = rows.get(rowCount - 1).next()
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+            }
+            yDelta -= verticalSpace * scale
+            if (block.vAlign == MIDDLE) {
+                y -= (yDelta - lineHeight.get(0)) * 0.5f
+            }
+            if (block.vAlign == BOTTOM) {
+                y -= yDelta - lineHeight.get(0)
+            }
+            start = memAddress(data)
+            rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+            while (rowCount != 0) {
+                for (i in 0..rowCount - 1) {
+                    val row = rows.get(i)
+                    nnvgText(nvg, x, y, row.start(), row.end())
+                    y += scaledHeight
+                }
+                start = rows.get(rowCount - 1).next()
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+            }
+        }
+    }
+
+    override fun dimensions(nvg: Long): Pair<Float, Float> {
+        return Pair(0.0f, 0.0f)
     }
 }
 

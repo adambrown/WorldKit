@@ -66,6 +66,9 @@ val SHAPE_BUTTON_NORMAL = NO_SHAPE
 val SHAPE_BUTTON_MOUSE_OVER = ShapeRectangle(FILL_BUTTON_MOUSE_OVER, NO_STROKE)
 val SHAPE_BUTTON_MOUSE_DOWN = ShapeRectangle(FILL_BUTTON_MOUSE_DOWN, NO_STROKE)
 
+val STROKE_BUTTON_DIALOG = StrokeColor(COLOR_BUTTON_MOUSE_OVER, 1.0f)
+val SHAPE_BUTTON_DIALOG = ShapeRectangle(FILL_BACKGROUND, STROKE_BUTTON_DIALOG)
+
 val SHAPE_BUTTON_POSITIVE = ShapeRectangle(FILL_POSITIVE_HIGHLIGHT, NO_STROKE)
 val SHAPE_BUTTON_NEGATIVE = ShapeRectangle(FILL_NEGATIVE_HIGHLIGHT, NO_STROKE)
 
@@ -244,6 +247,25 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 padLeft = SMALL_SPACER_SIZE,
                 padRight = SMALL_SPACER_SIZE))
 
+val DIALOG_BUTTON_STYLE = ButtonStyle(
+        normal = SHAPE_BUTTON_DIALOG,
+        textNormal = TEXT_STYLE_BUTTON,
+        mouseOver = SHAPE_BUTTON_MOUSE_OVER,
+        textMouseOver = TEXT_STYLE_BUTTON,
+        mouseDown = SHAPE_BUTTON_MOUSE_DOWN,
+        textMouseDown = TEXT_STYLE_BUTTON,
+        template = BlockTemplate(
+                hSizing = STATIC,
+                vSizing = STATIC,
+                height = SMALL_ROW_HEIGHT,
+                vAlign = MIDDLE,
+                layout = HORIZONTAL),
+        textShapeTemplate = BlockTemplate(
+                hAlign = CENTER,
+                vAlign = MIDDLE,
+                hSizing = SHRINK,
+                vSizing = SHRINK))
+
 val POSITIVE_TEXT_BUTTON_STYLE = ButtonStyle(
         normal = SHAPE_BUTTON_POSITIVE,
         textNormal = TEXT_STYLE_BUTTON,
@@ -311,6 +333,10 @@ val MENU_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE { copy(template = template
 
 fun text(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
     return StaticTextUtf8(value, style)
+}
+
+fun paragraph(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
+    return StaticTextParagraphUtf8(value, SMALL_SPACER_SIZE, style)
 }
 
 fun glyphStyle(size: Float, color: NVGColor): TextStyle {

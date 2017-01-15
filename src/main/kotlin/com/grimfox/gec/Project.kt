@@ -1,7 +1,11 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.ui.FileDialogs
+import com.grimfox.gec.ui.JSON
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.DropdownList
+import com.grimfox.gec.ui.widgets.DynamicTextReference
 import com.grimfox.gec.util.ref
 import java.io.File
 import java.util.*
@@ -78,6 +82,64 @@ fun clearRecentProjects() {
         recentProjects.clear()
         recentProjectsAvailable.value = false
     }
+}
+
+fun saveProject(project: Project?, dialogLayer: Block, preferences: Preferences, ui: UserInterface, titleText: DynamicTextReference) {
+    if (project != null) {
+        val file = project.folder
+        if (file == null) {
+            saveProjectAs(project, dialogLayer, preferences, ui, titleText)
+        } else {
+            file.outputStream().buffered().use {
+                JSON.writeValue(it, project)
+            }
+            addProjectToRecentProjects(project)
+        }
+    }
+}
+
+fun saveProjectAs(project: Project?, dialogLayer: Block, preferences: Preferences, ui: UserInterface, titleText: DynamicTextReference) {
+    if (project != null) {
+        ui.ignoreInput = true
+        try {
+            val saveFile = saveProjectDialog(preferences.projectDir, "wkp")
+            if (saveFile != null) {
+                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkp")}.wkp"
+                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
+                actualFile.outputStream().buffered().use {
+                    JSON.writeValue(it, project)
+                }
+                project.folder = actualFile
+                addProjectToRecentProjects(project)
+                updateTitle(titleText, project)
+            }
+            dialogLayer.isVisible = false
+        } finally {
+            ui.ignoreInput = false
+        }
+    }
+}
+
+fun updateTitle(titleText: DynamicTextReference, new: Project?) {
+    val name = if (new == null) {
+        "No project"
+    } else {
+        new.folder?.canonicalPath ?: "New unsaved project"
+    }
+    val showPath = if (name.length < 55) {
+        name
+    } else {
+        "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
+    }
+    titleText.reference.value = "WorldKit - $showPath"
+}
+
+private fun saveProjectDialog(defaultFolder: File, vararg filters: String): File? {
+    val saveFileName = FileDialogs.saveFile(filters.joinToString(","), defaultFolder.canonicalPath)
+    if (saveFileName != null && saveFileName.isNotBlank()) {
+        return File(saveFileName)
+    }
+    return null
 }
 
 private fun <T> sync(codeBlock: () -> T): T {

@@ -1,8 +1,10 @@
 package com.grimfox.gec.ui
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.grimfox.gec.WindowState
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.loadImagePixels
+import com.grimfox.gec.saveWindowState
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.Reference
 import com.grimfox.gec.util.cRef
@@ -46,8 +48,8 @@ val JSON = jacksonObjectMapper()
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, width: Int, height: Int, tick: UserInterface.() -> Unit) {
-    val ui = UserInterfaceInternal(createWindow(width, height))
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?, tick: UserInterface.() -> Unit) {
+    val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
         ui.mouseClickHandler = { button, x, y, isDown ->
@@ -216,6 +218,11 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     }
 
     override fun closeWindow() {
+        if (isMaximized) {
+            saveWindowState(WindowState(window.restoreX, window.restoreY, Math.round(window.width / window.currentMonitor.scaleFactor).toInt(), Math.round(window.height / window.currentMonitor.scaleFactor).toInt(), true))
+        } else {
+            saveWindowState(WindowState(window.x, window.y, Math.round(window.currentWidth / window.currentMonitor.scaleFactor).toInt(), Math.round(window.currentHeight / window.currentMonitor.scaleFactor).toInt(), false))
+        }
         glfwSetWindowShouldClose(window.id, true)
     }
 
@@ -381,8 +388,10 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
                 vSizing = Sizing.STATIC
                 width = maxWidth
                 height = maxHeight
+                canOverflow = true
                 resolvedGlyphs.forEach {
                     block {
+                        canOverflow = true
                         hSizing = Sizing.STATIC
                         vSizing = Sizing.STATIC
                         xOffset = it.xOffset
@@ -505,8 +514,8 @@ private class WindowContext(
         var scrollX: Float = 0.0f,
         var scrollY: Float = 0.0f,
 
-        var width: Int = 800,
-        var height: Int = 600,
+        var width: Int = 1280,
+        var height: Int = 720,
 
         var resizeMouseStartX: Int = 0,
         var resizeMouseStartY: Int = 0,
@@ -773,7 +782,9 @@ private class WindowContext(
     }
 }
 
-private fun createWindow(width: Int, height: Int): WindowContext {
+private fun createWindow(windowState: WindowState?): WindowContext {
+    val width = windowState?.width ?: 1280
+    val height = windowState?.height ?: 720
     GLFWErrorCallback.createPrint().set()
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
     val (screens, warpLines) = getScreensAndWarpLines()
@@ -801,7 +812,7 @@ private fun createWindow(width: Int, height: Int): WindowContext {
         LOG.info("Creating window with width: $width, height: $height")
         windowId = glfwCreateWindow(width, height, "WorldKit", NULL, NULL)
         if (windowId == NULL) throw RuntimeException("Failed to create the GLFW window")
-        glfwSetWindowPos(windowId, currentMonitor.centerX - width / 2 + 1, currentMonitor.centerY - height / 2 + 1)
+        glfwSetWindowPos(windowId, windowState?.x ?: (currentMonitor.centerX - width / 2 + 1), windowState?.y ?: (currentMonitor.centerY - height / 2 + 1))
     }
     glfwMakeContextCurrent(windowId)
     Configuration.DEBUG.set(true)
@@ -898,7 +909,7 @@ private fun createWindow(width: Int, height: Int): WindowContext {
     }
     windowSize = getWindowSize(windowId)
     LOG.info("Created window with width: ${windowSize.first}, height: ${windowSize.second}")
-    initializeWindowState(window)
+    initializeWindowState(window, windowState)
     return window
 }
 
@@ -977,7 +988,7 @@ private fun startResize(stack: MemoryStack, window: WindowContext, moveWithResiz
 }
 
 
-private fun initializeWindowState(window: WindowContext) {
+private fun initializeWindowState(window: WindowContext, windowState: WindowState?) {
     twr(stackPush()) { stack ->
         val x = stack.mallocInt(1)
         val y = stack.mallocInt(1)
@@ -1004,6 +1015,9 @@ private fun initializeWindowState(window: WindowContext) {
             }
         }
         glfwSetWindowSize(window.id, window.currentWidth, window.currentHeight)
+        if (windowState?.isMaximized ?: false) {
+            window.maximize()
+        }
     }
 }
 
