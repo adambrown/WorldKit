@@ -54,6 +54,10 @@ object MainUi {
         val overwriteWarningText = overwriteWarningDynamic.text
         val overwriteWarningReference = overwriteWarningDynamic.reference
 
+        val errorMessageDynamic = dynamicParagraph("", 500)
+        val errorMessageText = errorMessageDynamic.text
+        val errorMessageReference = errorMessageDynamic.reference
+
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
         val uiLayout = layout { ui ->
@@ -119,83 +123,36 @@ object MainUi {
                     }
                 }
                 var overwriteWarningDialog = NO_BLOCK
-                val saveDialogCallback = mRef {}
+                var errorMessageDialog = NO_BLOCK
+                val noop = {}
+                val dialogCallback = mRef(noop)
                 dialogLayer {
-                    overwriteWarningDialog = block {
-                        hAlign = CENTER
-                        vAlign = MIDDLE
-                        hSizing = STATIC
-                        vSizing = STATIC
-                        width = 400.0f
-                        height = 140.0f
-                        block {
-                            xOffset = 4.0f
-                            yOffset = 4.0f
-                            canOverflow = true
-                            shape = SHAPE_DROP_SHADOW_DARK
-                            isMouseAware = false
-                        }
-                        block {
-                            shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                            block {
-                                xOffset = 1.0f
-                                yOffset = 1.0f
-                                width = -2.0f
-                                height = -2.0f
-                                shape = BACKGROUND_RECT
-                            }
-                        }
-                        block {
-                            padLeft = LARGE_SPACER_SIZE
-                            padRight = LARGE_SPACER_SIZE
-                            vSpacer(MEDIUM_SPACER_SIZE)
-                            block {
-                                layout = VERTICAL
-                                vSizing = GROW
-                                block {
-                                    hSizing = SHRINK
-                                    layout = HORIZONTAL
-                                    canOverflow = true
-                                    block {
-                                        hSizing = SHRINK
-                                        vSizing = SHRINK
-                                        hAlign = CENTER
-                                        vAlign = MIDDLE
-                                        canOverflow = true
-                                        BLOCK_GLYPH_WARNING(60.0f).invoke(this)
-                                    }
-                                }
-                                hSpacer(LARGE_SPACER_SIZE)
-                                block {
-                                    hSizing = GROW
-                                    layout = HORIZONTAL
-                                    hAlign = LEFT
-                                    vAlign = MIDDLE
-                                    text = overwriteWarningText
-                                }
-                            }
-                            vSpacer(MEDIUM_SPACER_SIZE)
-                            vButtonRow(LARGE_ROW_HEIGHT) {
-                                button(text("Yes"), DIALOG_BUTTON_STYLE) {
-                                    overwriteWarningDialog.isVisible = false
-                                    saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
-                                }.with { width = 60.0f }
-                                hSpacer(SMALL_SPACER_SIZE)
-                                button(text("No"), DIALOG_BUTTON_STYLE) {
-                                    overwriteWarningDialog.isVisible = false
-                                    dialogLayer.isVisible = false
-                                    saveDialogCallback.value()
-                                }.with { width = 60.0f }
-                                hSpacer(SMALL_SPACER_SIZE)
-                                button(text("Cancel"), DIALOG_BUTTON_STYLE) {
-                                    overwriteWarningDialog.isVisible = false
-                                    dialogLayer.isVisible = false
-                                }.with { width = 60.0f }
-                            }
-                            vSpacer(MEDIUM_SPACER_SIZE)
-                        }
+                    overwriteWarningDialog = dialog(overwriteWarningText, BLOCK_GLYPH_WARNING(60.0f)) {
+                        button(text("Yes"), DIALOG_BUTTON_STYLE) {
+                            overwriteWarningDialog.isVisible = false
+                            saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
+                            dialogLayer.isVisible = false
+                            dialogCallback.value()
+                        }.with { width = 60.0f }
+                        hSpacer(SMALL_SPACER_SIZE)
+                        button(text("No"), DIALOG_BUTTON_STYLE) {
+                            overwriteWarningDialog.isVisible = false
+                            dialogLayer.isVisible = false
+                            dialogCallback.value()
+                        }.with { width = 60.0f }
+                        hSpacer(SMALL_SPACER_SIZE)
+                        button(text("Cancel"), DIALOG_BUTTON_STYLE) {
+                            overwriteWarningDialog.isVisible = false
+                            dialogLayer.isVisible = false
+                        }.with { width = 60.0f }
                     }
-                    overwriteWarningDialog.isVisible = false
+                    errorMessageDialog = dialog(errorMessageText, BLOCK_GLYPH_ERROR(60.0f)) {
+                        button(text("OK"), DIALOG_BUTTON_STYLE) {
+                            errorMessageDialog.isVisible = false
+                            dialogLayer.isVisible = false
+                            dialogCallback.value()
+                        }.with { width = 60.0f }
+                    }
                 }
                 mainLayer {
                     topBar = block {
@@ -211,8 +168,9 @@ object MainUi {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
                                         overwriteWarningDialog.isVisible = true
-                                        saveDialogCallback.value = {
+                                        dialogCallback.value = {
                                             currentProject.value = Project()
+                                            dialogCallback.value = noop
                                         }
                                     } else {
                                         currentProject.value = Project()
@@ -223,8 +181,14 @@ object MainUi {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
                                         overwriteWarningDialog.isVisible = true
-                                        saveDialogCallback.value = {
-                                            currentProject.value = Project()
+                                        dialogCallback.value = {
+                                            errorMessageReference.value = "Error opening project. Project does not exist."
+                                            dialogLayer.isVisible = true
+                                            errorMessageDialog.isVisible = true
+                                            dialogCallback.value = {
+                                                currentProject.value = Project()
+                                                dialogCallback.value = noop
+                                            }
                                         }
                                     } else {
                                         currentProject.value = Project()

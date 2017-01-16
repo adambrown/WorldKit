@@ -3,7 +3,6 @@ package com.grimfox.gec
 import com.grimfox.gec.ui.JSON
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.awt.Window
 import java.io.File
 
 private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)

@@ -23,8 +23,9 @@ val GLYPH_CIRCLE = glyphIndex[10]
 val GLYPH_HELP = glyphIndex[11]
 val GLYPH_WARNING_TRIANGLE = glyphIndex[12]
 val GLYPH_WARNING = glyphIndex[13]
+val GLYPH_ERROR = glyphIndex[14]
 
-private val COLOR_TRUE_WHITE = color(255, 255, 255)
+private val COLOR_GLYPH_TRUE_WHITE = color(255, 255, 255)
 private val COLOR_GLYPH_RED = color(255, 57, 43)
 private val COLOR_GLYPH_BLUE = color(26, 161, 226)
 private val COLOR_GLYPH_DARK_BLUE = color(0, 122, 204)
@@ -33,8 +34,8 @@ private val COLOR_GLYPH_GREEN = color(142, 210, 138)
 private val COLOR_GLYPH_WHITE = color(243, 243, 243)
 private val COLOR_GLYPH_LIGHT_GREY = color(152, 152, 154)
 private val COLOR_GLYPH_BLACK = color(5, 5, 6)
-private val COLOR_GLYPH_DARK_YELLOW = color(229, 193, 11)
-private val COLOR_GLYPH_DARK_YELLOW_ALT = color(204, 177, 41)
+private val COLOR_GLYPH_DARK_YELLOW = color(204, 177, 41)
+private val COLOR_GLYPH_DARK_RED = color(191, 19, 19)
 
 fun UiLayout.BLOCK_GLYPH_NEW_FILE(scale: Float): Block.() -> Block {
     val rescale = scale / BASE_SCALE
@@ -76,15 +77,23 @@ val UiLayout.BLOCK_GLYPH_GEAR: Block.() -> Block get() = BLOCK_GLYPH_GEAR(BASE_S
 fun UiLayout.BLOCK_GLYPH_HELP(scale: Float): Block.() -> Block {
     val rescale = scale / BASE_SCALE
     return createMultiGlyph(GlyphLayer(GLYPH_CIRCLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_BLUE, 0.0f, 0.0f),
-            GlyphLayer(GLYPH_HELP, glyphFont, 20.0f * rescale, COLOR_TRUE_WHITE, 0.0f, 0.0f))
+            GlyphLayer(GLYPH_HELP, glyphFont, 20.0f * rescale, COLOR_GLYPH_TRUE_WHITE, 0.0f, 0.0f))
 }
 
 val UiLayout.BLOCK_GLYPH_HELP: Block.() -> Block get() = BLOCK_GLYPH_HELP(BASE_SCALE)
 
 fun UiLayout.BLOCK_GLYPH_WARNING(scale: Float): Block.() -> Block {
     val rescale = scale / BASE_SCALE
-    return createMultiGlyph(GlyphLayer(GLYPH_WARNING_TRIANGLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_YELLOW_ALT, 0.0f, 0.0f),
+    return createMultiGlyph(GlyphLayer(GLYPH_WARNING_TRIANGLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_YELLOW, 0.0f, 0.0f),
             GlyphLayer(GLYPH_WARNING, glyphFont, 20.0f * rescale, COLOR_GLYPH_BLACK, 0.0f, 0.0f))
 }
 
 val UiLayout.BLOCK_GLYPH_WARNING: Block.() -> Block get() = BLOCK_GLYPH_WARNING(BASE_SCALE)
+
+fun UiLayout.BLOCK_GLYPH_ERROR(scale: Float): Block.() -> Block {
+    val rescale = scale / BASE_SCALE
+    return createMultiGlyph(GlyphLayer(GLYPH_CIRCLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_RED, 0.0f, 0.0f),
+            GlyphLayer(GLYPH_ERROR, glyphFont, 20.0f * rescale, COLOR_GLYPH_WHITE, 0.0f, 0.0f))
+}
+
+val UiLayout.BLOCK_GLYPH_ERROR: Block.() -> Block get() = BLOCK_GLYPH_ERROR(BASE_SCALE)
