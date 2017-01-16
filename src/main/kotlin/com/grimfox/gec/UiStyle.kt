@@ -339,6 +339,10 @@ fun paragraph(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
     return StaticTextParagraphUtf8(value, SMALL_SPACER_SIZE, style)
 }
 
+fun dynamicParagraph(value: String, limit: Int, style: TextStyle = TEXT_STYLE_NORMAL): DynamicTextParagraphReference {
+    return DynamicTextParagraphReference(value, limit, SMALL_SPACER_SIZE, style)
+}
+
 fun glyphStyle(size: Float, color: NVGColor): TextStyle {
     return TextStyle(cRef(size), glyphFont, cRef(color))
 }

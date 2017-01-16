@@ -50,123 +50,12 @@ enum class Sizing {
     RELATIVE
 }
 
-class ScissorStack(val nvg: Long) {
-
-    private val stack = ArrayList<Vector4f>()
-
-    fun push(clip: Vector4f, canOverflow: Boolean = false): Vector4f {
-        if (stack.isNotEmpty() && !canOverflow) {
-            val current = stack.last()
-            if (clip.x < current.x) {
-                clip.x = current.x
-            }
-            if (clip.y < current.y) {
-                clip.y = current.y
-            }
-            if (clip.z > current.z) {
-                clip.z = current.z
-            }
-            if (clip.w > current.w) {
-                clip.w = current.w
-            }
-        }
-        apply(clip)
-        stack.add(clip)
-        return clip
-    }
-
-    fun apply(clip: Vector4f) {
-        nvgScissor(nvg, clip.x, clip.y, clip.z - clip.x, clip.w - clip.y)
-    }
-
-    fun peek(): Vector4f? {
-        if (stack.isNotEmpty()) {
-            return stack.last()
-        }
-        return null
-    }
-
-    fun suspendIf(condition: Boolean, parents: Int, block: () -> Unit) {
-        if (parents < 1) {
-            suspendIf(condition, block)
-        } else {
-            if (condition) {
-                suspendWhile(parents, block)
-            } else {
-                block()
-            }
-        }
-    }
-
-    fun suspendIf(condition: Boolean, block: () -> Unit) {
-        if (condition) {
-            suspendWhile(block)
-        } else {
-            block()
-        }
-    }
-
-    fun suspendWhile(parents: Int, block: () -> Unit) {
-        val suspended = ArrayList<Vector4f>()
-        for (i in 1..parents) {
-            if (stack.isNotEmpty()) {
-                suspended.add(stack.removeAt(stack.size - 1))
-            }
-        }
-        if (stack.isEmpty()) {
-            suspend()
-        } else {
-            resume()
-        }
-        block()
-        suspended.reverse()
-        suspended.forEach {
-            stack.add(it)
-        }
-        if (stack.isEmpty()) {
-            suspend()
-        } else {
-            resume()
-        }
-    }
-
-    inline fun suspendWhile(block: () -> Unit) {
-        suspend()
-        block()
-        resume()
-    }
-
-    fun suspend() {
-        nvgResetScissor(nvg)
-    }
-
-    fun resume() {
-        if (!stack.isEmpty()) {
-            val current = stack.last()
-            nvgScissor(nvg, current.x, current.y, current.z - current.x, current.w - current.y)
-        }
-    }
-
-    fun pop(): Vector4f? {
-        if (stack.isEmpty()) {
-            return null
-        }
-        val top = stack.removeAt(stack.size - 1)
-        if (stack.isEmpty()) {
-            suspend()
-        } else {
-            resume()
-        }
-        return top
-    }
-}
-
 interface Fill {
 
     fun draw(nvg: Long, block: Block, scale: Float)
 }
 
-private class FillNone() : Fill {
+private class FillNone : Fill {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
     }
@@ -270,35 +159,9 @@ private class TextNone : Text {
     }
 }
 
-class StaticTextUtf8(string: String, override var style: TextStyle) : Text {
+open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalSpace: Float, override var style: TextStyle) : Text {
 
-    override val data: ByteBuffer = MemoryUtil.memUTF8(string, true)
-    override val length: Int = data.limit()
-
-    override fun draw(nvg: Long, block: Block, scale: Float) {
-        val (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
-        nvgFontFaceId(nvg, style.font.value)
-        nvgFontSize(nvg, style.size.value * scale)
-        nvgTextAlign(nvg, alignMask)
-        nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x * scale, y * scale, data, NULL)
-    }
-
-    override fun dimensions(nvg: Long): Pair<Float, Float> {
-        twr(stackPush()) { stack ->
-            val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, style.font.value)
-            nvgFontSize(nvg, style.size.value)
-            nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
-            return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
-        }
-    }
-}
-
-class StaticTextParagraphUtf8(string: String, val verticalSpace: Float, override var style: TextStyle) : Text {
-
-    override val data: ByteBuffer = MemoryUtil.memUTF8(string, false)
-    override val length: Int = data.limit()
+    override val length: Int get() = data.limit()
     private val lineHeight = BufferUtils.createFloatBuffer(1)
     private val rows = NVGTextRow.create(3)
 
@@ -361,7 +224,12 @@ class StaticTextParagraphUtf8(string: String, val verticalSpace: Float, override
     }
 }
 
-class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextStyle) : Text {
+class StaticTextParagraphUtf8(string: String, verticalSpace: Float, style: TextStyle) : DynamicTextParagraphUtf8(MemoryUtil.memUTF8(string, false), verticalSpace, style) {
+
+    override val length: Int = data.limit()
+}
+
+open class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextStyle) : Text {
 
     override val length: Int get() = data.limit()
 
@@ -383,6 +251,11 @@ class DynamicTextUtf8(override val data: ByteBuffer, override var style: TextSty
             return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
         }
     }
+}
+
+class StaticTextUtf8(string: String, style: TextStyle) : DynamicTextUtf8(MemoryUtil.memUTF8(string, true), style) {
+
+    override val length: Int = data.limit()
 }
 
 private fun calculatePositionAndAlignmentForText(block: Block): Triple<Float, Float, Int> {
@@ -716,43 +589,55 @@ abstract class Block {
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
 
+    private var reprocess = false
+
+    fun reprocessTick() {
+        root.reprocess = true
+    }
+
     fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean) {
         if (this === root) {
-            val mouseOver = mouseOver
-            if (mouseOver != null) {
-                if (isDown) {
-                    val mouseDownFun = mouseOver.onMouseDown
-                    awaitingRelease.add(Pair(button, mouseOver))
-                    if (mouseDownFun != null) {
-                        mouseOver.mouseDownFun(button, x, y)
-                    }
-                } else {
-                    val mouseUpFun = mouseOver.onMouseUp
-                    if (mouseUpFun != null) {
-                        mouseOver.mouseUpFun(button, x, y)
-                    }
-                    awaitingRelease.forEach {
-                        if (it.first == button && it.second == mouseOver) {
-                            val mouseClickFun = mouseOver.onMouseClick
-                            if (mouseClickFun != null) {
-                                mouseOver.mouseClickFun(button, x, y)
+            do {
+                reprocess = false
+                val mouseOver = mouseOver
+                if (mouseOver != null) {
+                    if (isDown) {
+                        val mouseDownFun = mouseOver.onMouseDown
+                        awaitingRelease.add(Pair(button, mouseOver))
+                        if (mouseDownFun != null) {
+                            mouseOver.mouseDownFun(button, x, y)
+                        }
+                    } else {
+                        val mouseUpFun = mouseOver.onMouseUp
+                        if (mouseUpFun != null) {
+                            mouseOver.mouseUpFun(button, x, y)
+                        }
+                        awaitingRelease.forEach {
+                            if (it.first == button && it.second == mouseOver) {
+                                val mouseClickFun = mouseOver.onMouseClick
+                                if (mouseClickFun != null) {
+                                    mouseOver.mouseClickFun(button, x, y)
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (!isDown) {
-                for (i in awaitingRelease.size - 1 downTo 0) {
-                    val it = awaitingRelease[i]
-                    if (it.first == button) {
-                        awaitingRelease.removeAt(i)
-                        val mouseReleaseFun = it.second.onMouseRelease
-                        if (mouseReleaseFun != null) {
-                            it.second.mouseReleaseFun(button, x, y)
+                if (!isDown) {
+                    for (i in awaitingRelease.size - 1 downTo 0) {
+                        val it = awaitingRelease[i]
+                        if (it.first == button) {
+                            awaitingRelease.removeAt(i)
+                            val mouseReleaseFun = it.second.onMouseRelease
+                            if (mouseReleaseFun != null) {
+                                it.second.mouseReleaseFun(button, x, y)
+                            }
                         }
                     }
                 }
-            }
+                if (reprocess) {
+                    handleNewMousePosition(nvg, x , y)
+                }
+            } while (reprocess)
         } else {
             root.handleMouseAction(button, x, y, isDown)
         }
@@ -760,6 +645,7 @@ abstract class Block {
 
     fun handleScroll(scrollX: Double, scrollY: Double) {
         if (this === root) {
+            reprocess = false
             val mouseOver = mouseOver
             val scrollFun = mouseOver?.onScroll
             if (mouseOver != null && scrollFun != null) {
@@ -772,29 +658,34 @@ abstract class Block {
 
     fun handleNewMousePosition(nvg: Long, mouseX: Int, mouseY: Int) {
         if (this === root) {
-            lastMouseOver = mouseOver
-            mouseOver = if (inputOverride != null) {
-                getMouseOverBlock(nvg, mouseX, mouseY)
-                inputOverride
-            } else {
-                getMouseOverBlock(nvg, mouseX, mouseY)
-            }
-            if (mouseOver != lastMouseOver) {
-                val mouseOutFun = lastMouseOver?.onMouseOut
-                if (mouseOutFun != null) {
-                    lastMouseOver?.mouseOutFun()
+            val reprocessAfter = reprocess
+            do {
+                reprocess = false
+                lastMouseOver = mouseOver
+                mouseOver = if (inputOverride != null) {
+                    getMouseOverBlock(nvg, mouseX, mouseY)
+                    inputOverride
+                } else {
+                    getMouseOverBlock(nvg, mouseX, mouseY)
                 }
-                val mouseOverFun = mouseOver?.onMouseOver
-                if (mouseOverFun != null) {
-                    mouseOver?.mouseOverFun()
+                if (mouseOver != lastMouseOver) {
+                    val mouseOutFun = lastMouseOver?.onMouseOut
+                    if (mouseOutFun != null) {
+                        lastMouseOver?.mouseOutFun()
+                    }
+                    val mouseOverFun = mouseOver?.onMouseOver
+                    if (mouseOverFun != null) {
+                        mouseOver?.mouseOverFun()
+                    }
                 }
-            }
-            awaitingRelease.forEach {
-                val mouseDragFun = it.second.onMouseDrag
-                if (mouseDragFun != null) {
-                    it.second.mouseDragFun(it.first, mouseX, mouseY)
+                awaitingRelease.forEach {
+                    val mouseDragFun = it.second.onMouseDrag
+                    if (mouseDragFun != null) {
+                        it.second.mouseDragFun(it.first, mouseX, mouseY)
+                    }
                 }
-            }
+            } while (reprocess)
+            reprocess = reprocessAfter
         } else {
             root.handleNewMousePosition(nvg, mouseX, mouseY)
         }

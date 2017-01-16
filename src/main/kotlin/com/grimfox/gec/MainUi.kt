@@ -50,6 +50,10 @@ object MainUi {
             updateTitle(titleText, new)
         }
 
+        val overwriteWarningDynamic = dynamicParagraph("", 300)
+        val overwriteWarningText = overwriteWarningDynamic.text
+        val overwriteWarningReference = overwriteWarningDynamic.reference
+
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
         val uiLayout = layout { ui ->
@@ -167,7 +171,7 @@ object MainUi {
                                     layout = HORIZONTAL
                                     hAlign = LEFT
                                     vAlign = MIDDLE
-                                    text = paragraph("Would you like to save the current project before creating a new one?")
+                                    text = overwriteWarningText
                                 }
                             }
                             vSpacer(MEDIUM_SPACER_SIZE)
@@ -205,6 +209,7 @@ object MainUi {
                                 menuItem("New...", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
                                     if (currentProject.value != null) {
                                         dialogLayer.isVisible = true
+                                        overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
                                         overwriteWarningDialog.isVisible = true
                                         saveDialogCallback.value = {
                                             currentProject.value = Project()
@@ -216,6 +221,7 @@ object MainUi {
                                 menuItem("Open...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
                                     if (currentProject.value != null) {
                                         dialogLayer.isVisible = true
+                                        overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
                                         overwriteWarningDialog.isVisible = true
                                         saveDialogCallback.value = {
                                             currentProject.value = Project()

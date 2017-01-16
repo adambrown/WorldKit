@@ -225,8 +225,9 @@ private fun Block.menu(
             }
             mouseDownOnActivator.value = false
         }
-        menuLayer.onMouseClick { button, x, y ->
+        menuLayer.onMouseDown { button, x, y ->
             deactivateMenuBar()
+            reprocessTick()
         }
     }
 }
