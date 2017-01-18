@@ -10,11 +10,13 @@ private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)
 val WORLD_KIT_DIR = File(File(System.getProperty("user.home")), "WorldKit")
 val WORLD_KIT_DATA_DIR = File(WORLD_KIT_DIR, "data")
 val DEFAULT_TEMP_DIR = File(WORLD_KIT_DATA_DIR, "temp")
+val CACHE_DIR = File(WORLD_KIT_DATA_DIR, "cache")
 val DEFAULT_PROJECTS_DIR = File(WORLD_KIT_DIR, "projects")
 val CONFIG_DIR = File(WORLD_KIT_DATA_DIR, "config")
 val OFFLINE_HELP_DIR = File(WORLD_KIT_DATA_DIR, "offline-help")
 val OFFLINE_HELP_INDEX_FILE = File(OFFLINE_HELP_DIR, "index.html")
 val PREFERENCES_FILE = File(CONFIG_DIR, "preferences.json")
+val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects.json")
 val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state.json")
 
 data class Preferences(
@@ -37,6 +39,7 @@ fun loadPreferences(): Preferences {
     ensureDirectoryExists(WORLD_KIT_DATA_DIR)
     ensureDirectoryExists(CONFIG_DIR)
     ensureDirectoryExists(OFFLINE_HELP_DIR)
+    ensureDirectoryExists(CACHE_DIR)
     val preferences = if (!PREFERENCES_FILE.isFile) {
         Preferences()
     } else if (!PREFERENCES_FILE.canRead()) {
@@ -55,6 +58,8 @@ fun loadPreferences(): Preferences {
     }
     if (preferences.rememberWindowState) {
         preferences.windowState = loadWindowState()
+    } else {
+        preferences.windowState = null
     }
     ensureDirectoryExists(preferences.tempDir)
     val tempDir = preferences.tempDir
@@ -63,6 +68,27 @@ fun loadPreferences(): Preferences {
     }))
     ensureDirectoryExists(preferences.projectDir)
     return preferences
+}
+
+fun savePreferences(preferences: Preferences) {
+    try {
+        ensureDirectoryExists(WORLD_KIT_DIR)
+        ensureDirectoryExists(WORLD_KIT_DATA_DIR)
+        ensureDirectoryExists(CONFIG_DIR)
+        ensureDirectoryExists(OFFLINE_HELP_DIR)
+        ensureDirectoryExists(CACHE_DIR)
+        PREFERENCES_FILE.outputStream().buffered().use {
+            JSON.writeValue(it, preferences.copy(windowState = null))
+        }
+        ensureDirectoryExists(preferences.tempDir)
+        val tempDir = preferences.tempDir
+        Runtime.getRuntime().addShutdownHook(Thread({
+            tempDir.deleteRecursively()
+        }))
+        ensureDirectoryExists(preferences.projectDir)
+    } catch (e: Exception) {
+        LOG.error("Error writing to preferences file.")
+    }
 }
 
 fun loadWindowState(): WindowState? {

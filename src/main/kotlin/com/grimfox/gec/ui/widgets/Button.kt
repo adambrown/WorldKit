@@ -4,6 +4,7 @@ import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.SHRINK
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
+import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
 data class ButtonStyle(
@@ -103,7 +104,9 @@ fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Bloc
         }
         onMouseClick { button, x, y ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                onClick()
+                task {
+                    onClick()
+                }
             }
         }
     }

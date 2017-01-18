@@ -1,9 +1,12 @@
 package com.grimfox.gec.ui
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.WindowState
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.loadImagePixels
+import com.grimfox.gec.saveRecentProjects
 import com.grimfox.gec.saveWindowState
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.Reference
@@ -38,13 +41,14 @@ import java.awt.Rectangle
 import java.awt.Toolkit
 import java.io.PrintStream
 import java.lang.Math.round
+import java.lang.Thread.sleep
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
-val JSON = jacksonObjectMapper()
+val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(NON_NULL)
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
@@ -218,6 +222,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     }
 
     override fun closeWindow() {
+        saveRecentProjects()
         if (isMaximized) {
             saveWindowState(WindowState(window.restoreX, window.restoreY, Math.round(window.width / window.currentMonitor.scaleFactor).toInt(), Math.round(window.height / window.currentMonitor.scaleFactor).toInt(), true))
         } else {
@@ -868,9 +873,16 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, warpLines = warpLines, width = width, height = height)
     glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
         if (!window.ignoreInput) {
-            window.scrollX += xOffset.toFloat()
-            window.scrollY += yOffset.toFloat()
-            window.scrollHandler(xOffset, yOffset)
+            try {
+                window.scrollX += xOffset.toFloat()
+                window.scrollY += yOffset.toFloat()
+                window.scrollHandler(xOffset, yOffset)
+            } catch (t: Throwable) {
+                LOG.error("fatal error", t)
+                println("")
+                sleep(1000)
+                throw t
+            }
         }
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
@@ -878,28 +890,42 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     }
     glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
         if (!window.ignoreInput) {
-            when (key) {
-                GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
+            try {
+                when (key) {
+                    GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
+                }
+            } catch (t: Throwable) {
+                LOG.error("fatal error", t)
+                println("")
+                sleep(1000)
+                throw t
             }
         }
     }
     glfwSetMouseButtonCallback(window.id) { windowId, button, action, mods ->
         if (!window.ignoreInput) {
-            twr(stackPush()) { stack ->
-                val cx = stack.mallocDouble(1)
-                val cy = stack.mallocDouble(1)
-                glfwGetCursorPos(windowId, cx, cy)
-                val x = cx.get(0)
-                val y = cy.get(0)
-                val scale = window.currentMonitor.scaleFactor
-                if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                    startDrag(stack, window)
-                } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                    startResize(stack, window, false)
-                } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-                    startResize(stack, window, true)
+            try {
+                twr(stackPush()) { stack ->
+                    val cx = stack.mallocDouble(1)
+                    val cy = stack.mallocDouble(1)
+                    glfwGetCursorPos(windowId, cx, cy)
+                    val x = cx.get(0)
+                    val y = cy.get(0)
+                    val scale = window.currentMonitor.scaleFactor
+                    if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                        startDrag(stack, window)
+                    } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                        startResize(stack, window, false)
+                    } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                        startResize(stack, window, true)
+                    }
+                    handleStandardMouseAction(window, action, button, x, y)
                 }
-                handleStandardMouseAction(window, action, button, x, y)
+            } catch (t: Throwable) {
+                LOG.error("fatal error", t)
+                println("")
+                sleep(1000)
+                throw t
             }
         }
     }

@@ -2,6 +2,7 @@ package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.*
 import com.grimfox.gec.util.*
+import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.nanovg.NVGColor
 import java.util.*
@@ -352,7 +353,9 @@ private fun Block.menuItem(text: Text,
         onMouseUp { button, x, y ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOnActivator.value && isActive.value) {
                 deactivate()
-                onClick()
+                task {
+                    onClick()
+                }
             }
         }
         onMouseRelease { button, x, y ->
@@ -364,7 +367,9 @@ private fun Block.menuItem(text: Text,
         onMouseClick { button, x, y ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive.value) {
                 deactivate()
-                onClick()
+                task {
+                    onClick()
+                }
             }
         }
     }

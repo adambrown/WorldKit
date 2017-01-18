@@ -65,6 +65,8 @@ dependencies {
     compile group: 'com.twelvemonkeys.imageio', name: 'imageio', version: imageio_version
     compile group: 'com.twelvemonkeys.imageio', name: 'imageio-hdr', version: imageio_version
 
+    compile group: 'nl.komponents.kovenant', name: 'kovenant', version: kovenant_version
+
     compile group: 'org.slf4j', name: 'slf4j-api', version: slf4j_version
 
     // LWJGL dependencies START

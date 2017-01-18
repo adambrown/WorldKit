@@ -1,5 +1,6 @@
 package com.grimfox.gec
 
+import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.opengl.loadTexture2D
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
@@ -14,6 +15,7 @@ import org.lwjgl.system.MemoryUtil
 import java.net.URISyntaxException
 import java.awt.Desktop
 import java.io.File
+import java.io.IOException
 import java.net.URI
 import java.net.URL
 
@@ -46,15 +48,12 @@ object MainUi {
         val resetView = mRef(false)
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
-        currentProject.listener { old, new ->
-            updateTitle(titleText, new)
-        }
 
         val overwriteWarningDynamic = dynamicParagraph("", 300)
         val overwriteWarningText = overwriteWarningDynamic.text
         val overwriteWarningReference = overwriteWarningDynamic.reference
 
-        val errorMessageDynamic = dynamicParagraph("", 500)
+        val errorMessageDynamic = dynamicParagraph("", 600)
         val errorMessageText = errorMessageDynamic.text
         val errorMessageReference = errorMessageDynamic.reference
 
@@ -100,6 +99,7 @@ object MainUi {
                 meshViewport.init()
 
                 var mainLayer = NO_BLOCK
+                var panelLayer = NO_BLOCK
                 var menuLayer = NO_BLOCK
                 var dialogLayer = NO_BLOCK
 
@@ -111,6 +111,12 @@ object MainUi {
                 root {
                     mainLayer = block {
                         isFallThrough = true
+                    }
+                    panelLayer = block {
+                        isFallThrough = false
+                        isMouseAware = true
+                        isVisible = false
+                        shape = FILL_GREY_OUT
                     }
                     menuLayer = block {
                         isFallThrough = true
@@ -124,13 +130,25 @@ object MainUi {
                 }
                 var overwriteWarningDialog = NO_BLOCK
                 var errorMessageDialog = NO_BLOCK
+                var preferencesPanel = NO_BLOCK
                 val noop = {}
                 val dialogCallback = mRef(noop)
+                val errorHandler: ErrorDialog = object: ErrorDialog {
+
+                    override fun displayErrorMessage(message: String?) {
+                        errorMessageReference.value = message ?: "An unknown error occurred."
+                        dialogLayer.isVisible = true
+                        errorMessageDialog.isVisible = true
+                        dialogCallback.value = {
+                            dialogCallback.value = noop
+                        }
+                    }
+                }
                 dialogLayer {
-                    overwriteWarningDialog = dialog(overwriteWarningText, BLOCK_GLYPH_WARNING(60.0f)) {
+                    overwriteWarningDialog = dialog(400.0f, 160.0f, overwriteWarningText, BLOCK_GLYPH_WARNING(60.0f)) {
                         button(text("Yes"), DIALOG_BUTTON_STYLE) {
                             overwriteWarningDialog.isVisible = false
-                            saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
+                            saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
                             dialogLayer.isVisible = false
                             dialogCallback.value()
                         }.with { width = 60.0f }
@@ -146,12 +164,53 @@ object MainUi {
                             dialogLayer.isVisible = false
                         }.with { width = 60.0f }
                     }
-                    errorMessageDialog = dialog(errorMessageText, BLOCK_GLYPH_ERROR(60.0f)) {
+                    errorMessageDialog = dialog(500.0f, 190.0f, errorMessageText, BLOCK_GLYPH_ERROR(60.0f)) {
                         button(text("OK"), DIALOG_BUTTON_STYLE) {
                             errorMessageDialog.isVisible = false
                             dialogLayer.isVisible = false
                             dialogCallback.value()
                         }.with { width = 60.0f }
+                    }
+
+                }
+                currentProject.listener { old, new ->
+                    updateTitle(titleText, new)
+                    doesActiveProjectExist.value = new != null
+                    if (new != null) {
+                        addProjectToRecentProjects(new.file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                    }
+                }
+                val rememberWindowState = ref(preferences.rememberWindowState)
+                val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
+                val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
+                panelLayer {
+                    preferencesPanel = panel(650.0f) {
+                        vSizing = SHRINK
+                        val shrinkGroup = hShrinkGroup()
+                        vSpacer(LARGE_SPACER_SIZE)
+                        vToggleRow(rememberWindowState, LARGE_ROW_HEIGHT, text("Remember window state:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                        vFolderRow(projectDir, LARGE_ROW_HEIGHT, text("Project folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, ui)
+                        vFolderRow(tempDir, LARGE_ROW_HEIGHT, text("Temporary folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, ui)
+                        vSpacer(MEDIUM_SPACER_SIZE)
+                        vButtonRow(LARGE_ROW_HEIGHT) {
+                            button(text("Save"), DIALOG_BUTTON_STYLE) {
+                                preferences.rememberWindowState = rememberWindowState.value
+                                preferences.projectDir = File(projectDir.reference.value)
+                                preferences.tempDir = File(tempDir.reference.value)
+                                savePreferences(preferences)
+                                preferencesPanel.isVisible = false
+                                panelLayer.isVisible = false
+                            }.with { width = 60.0f }
+                            hSpacer(SMALL_SPACER_SIZE)
+                            button(text("Cancel"), DIALOG_BUTTON_STYLE) {
+                                rememberWindowState.value = preferences.rememberWindowState
+                                projectDir.reference.value = preferences.projectDir.canonicalPath
+                                tempDir.reference.value = preferences.tempDir.canonicalPath
+                                preferencesPanel.isVisible = false
+                                panelLayer.isVisible = false
+                            }.with { width = 60.0f }
+                        }
+                        vSpacer(MEDIUM_SPACER_SIZE)
                     }
                 }
                 mainLayer {
@@ -177,28 +236,45 @@ object MainUi {
                                     }
                                 }
                                 menuItem("Open...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
+                                    val openFun = {
+                                        try {
+                                            val openedProject = openProject(dialogLayer, preferences, ui)
+                                            if (openedProject != null) {
+                                                currentProject.value = openedProject
+                                            }
+                                        } catch (e: JsonParseException) {
+                                            errorHandler.displayErrorMessage("The selected file is not a valid project.")
+                                        } catch (e: IOException) {
+                                            errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
+                                        } catch (e: Exception) {
+                                            errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
+                                        }
+                                    }
                                     if (currentProject.value != null) {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
                                         overwriteWarningDialog.isVisible = true
-                                        dialogCallback.value = {
-                                            errorMessageReference.value = "Error opening project. Project does not exist."
-                                            dialogLayer.isVisible = true
-                                            errorMessageDialog.isVisible = true
-                                            dialogCallback.value = {
-                                                currentProject.value = Project()
-                                                dialogCallback.value = noop
-                                            }
-                                        }
+                                        dialogCallback.value = openFun
                                     } else {
-                                        currentProject.value = Project()
+                                        openFun()
                                     }
                                 }
                                 menuItem("Save", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
-                                    saveProject(currentProject.value, dialogLayer, preferences, ui, titleText)
+                                    saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
                                 }
                                 menuItem("Save as...", "Shift+Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
-                                    saveProjectAs(currentProject.value, dialogLayer, preferences, ui, titleText)
+                                    saveProjectAs(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
+                                }
+                                menuItem("Close", isActive = doesActiveProjectExist) {
+                                    if (currentProject.value != null) {
+                                        dialogLayer.isVisible = true
+                                        overwriteWarningReference.value = "Do you want to save the current project before closing?"
+                                        overwriteWarningDialog.isVisible = true
+                                        dialogCallback.value = {
+                                            currentProject.value = null
+                                            dialogCallback.value = noop
+                                        }
+                                    }
                                 }
                                 menuDivider()
                                 subMenu("Open recent", isActive = recentProjectsAvailable) {
@@ -210,7 +286,7 @@ object MainUi {
                                 }
                                 menuDivider()
                                 menuItem("Export maps", "Ctrl+E", isActive = doesActiveProjectExist) {
-                                    println("Export maps")
+                                    println("Export maps...")
                                 }
                                 menuDivider()
                                 menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {
@@ -219,36 +295,48 @@ object MainUi {
                             }
                             menu("Settings") {
                                 menuItem("Preferences", "Ctrl+P", BLOCK_GLYPH_GEAR) {
-                                    println("Preferences")
+                                    panelLayer.isVisible = true
+                                    preferencesPanel.isVisible = true
                                 }
                                 menuItem("Restore default preferences") {
-                                    println("Restore default preferences")
+                                    val defaults = Preferences()
+                                    preferences.rememberWindowState = defaults.rememberWindowState
+                                    preferences.projectDir = defaults.projectDir
+                                    preferences.tempDir = defaults.tempDir
+                                    rememberWindowState.value = preferences.rememberWindowState
+                                    projectDir.reference.value = preferences.projectDir.canonicalPath
+                                    tempDir.reference.value = preferences.tempDir.canonicalPath
+                                    savePreferences(preferences)
                                 }
                             }
                             menu("Help") {
                                 menuItem("Help", "Ctrl+F1", BLOCK_GLYPH_HELP) {
-                                    openWebPage("file://D:/sandbox/world-creation/gec/src/main/resources/textures/wk-icon-1024.png")
+                                    if (OFFLINE_HELP_INDEX_FILE.isFile && OFFLINE_HELP_INDEX_FILE.canRead()) {
+                                        openWebPage(OFFLINE_HELP_INDEX_FILE.toURI(), errorHandler)
+                                    } else {
+                                        errorHandler.displayErrorMessage("The offline help files are not currently installed. Please install the offline help files, or select one of the online help options.")
+                                    }
                                 }
                                 menuDivider()
                                 menuItem("Getting started") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuItem("Tutorials") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("Website") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuItem("Wiki") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuItem("Forum") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("Install offline help") {
-                                    openWebPage("http://www.google.com")
+                                    openWebPage("http://www.google.com", errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("About WorldKit") {
@@ -263,13 +351,13 @@ object MainUi {
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
                         button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) { closeWindow() }
                     }
+                    loadRecentProjects(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                     contentPanel = block {
                         vSizing = GROW
                         layout = VERTICAL
                         hAlign = LEFT
                         block {
                             leftPanel = this
-                            val labelWidth = 92.0f
                             hSizing = STATIC
                             width = 268.0f
                             layout = HORIZONTAL
@@ -306,11 +394,12 @@ object MainUi {
                                             block {
                                                 hSizing = GROW
                                                 layout = HORIZONTAL
+                                                val shrinkGroup = hShrinkGroup()
                                                 vSpacer(MEDIUM_SPACER_SIZE)
-                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), labelWidth, MEDIUM_SPACER_SIZE)
-                                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), labelWidth, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
                                                     button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                                     button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
@@ -484,37 +573,32 @@ object MainUi {
     }
 }
 
-private fun openWebPage(uri: URI) {
+private fun openWebPage(uri: URI, onError: ErrorDialog? = null) {
     val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
     if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
         try {
             desktop.browse(uri)
         } catch (e: Exception) {
             LOG.error("Unable to open web page: $uri", e)
+            onError?.displayErrorMessage(e.message)
         }
     }
 }
 
-private fun openWebPage(url: URL) {
+private fun openWebPage(url: URL, onError: ErrorDialog? = null) {
     try {
-        openWebPage(url.toURI())
+        openWebPage(url.toURI(), onError)
     } catch (e: URISyntaxException) {
         LOG.error("Unable to open web page: $url", e)
+        onError?.displayErrorMessage(e.message)
     }
 }
 
-private fun openWebPage(url: String) {
+private fun openWebPage(url: String, onError: ErrorDialog? = null) {
     try {
-        openWebPage(URL(url))
+        openWebPage(URL(url), onError)
     } catch (e: Exception) {
         LOG.error("Unable to open web page: $url", e)
+        onError?.displayErrorMessage(e.message)
     }
-}
-
-private fun selectFolderDialog(defaultFolder: File): File? {
-    val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
-    if (folderName != null && folderName.isNotBlank()) {
-        return File(folderName)
-    }
-    return null
 }

@@ -2,14 +2,14 @@ package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.*
 
-fun Block.dialog(text: Text, glyph: Block.() -> Block, buttons: Block.() -> Unit): Block {
+fun Block.dialog(width: Float, height: Float, text: Text, glyph: Block.() -> Block, buttons: Block.() -> Unit): Block {
     val dialog = block {
         hAlign = HorizontalAlignment.CENTER
         vAlign = VerticalAlignment.MIDDLE
         hSizing = Sizing.STATIC
         vSizing = Sizing.STATIC
-        width = 400.0f
-        height = 140.0f
+        this.width = width
+        this.height = height
         block {
             xOffset = 4.0f
             yOffset = 4.0f
@@ -22,8 +22,8 @@ fun Block.dialog(text: Text, glyph: Block.() -> Block, buttons: Block.() -> Unit
             block {
                 xOffset = 1.0f
                 yOffset = 1.0f
-                width = -2.0f
-                height = -2.0f
+                this.width = -2.0f
+                this.height = -2.0f
                 shape = BACKGROUND_RECT
             }
         }

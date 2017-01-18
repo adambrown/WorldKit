@@ -1,5 +1,7 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.ui.FileDialogs
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
@@ -11,6 +13,7 @@ import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.nanovg.NVGColor
+import java.io.File
 import java.nio.ByteBuffer
 
 val textFont = ref(-1)
@@ -379,6 +382,23 @@ fun Block.label(text: Text, width: Float): Block {
     }
 }
 
+fun Block.label(text: Text, shrinkGroup: ShrinkGroup): Block {
+    return block {
+        hSizing = SHRINK_GROUP
+        hShrinkGroup = shrinkGroup
+        layout = HORIZONTAL
+        block {
+            hAlign = RIGHT
+            vAlign = MIDDLE
+            hSizing = SHRINK
+            vSizing = SHRINK
+            this.text = text
+            isMouseAware = false
+        }
+        isMouseAware = false
+    }
+}
+
 fun Block.label(text: Text): Block {
     val label = label(text, 0.0f)
     label.hSizing = SHRINK
@@ -504,6 +524,77 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
     }
 }
 
+fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val toggle = toggle(value)
+            row.supplantEvents(toggle)
+            isMouseAware = false
+        }
+    }
+}
+
+fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, ui: UserInterface): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                block {
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = folder.text
+                    isMouseAware = false
+                }
+                isMouseAware = false
+            }
+            hSpacer(MEDIUM_SPACER_SIZE)
+            val button = button(text("Select folder"), NORMAL_TEXT_BUTTON_STYLE) {
+                folder.reference.value = selectFolder(dialogLayer, ui, File(folder.reference.value)).canonicalPath
+            }
+            row.supplantEvents(button)
+            isMouseAware = false
+        }
+    }
+}
+
+private fun selectFolder(dialogLayer: Block, ui: UserInterface, currentFolder: File): File {
+    ui.ignoreInput = true
+    dialogLayer.isVisible = true
+    try {
+        return selectFolderDialog(currentFolder) ?: currentFolder
+    } finally {
+        dialogLayer.isVisible = false
+        ui.ignoreInput = false
+    }
+}
+
+private fun selectFolderDialog(defaultFolder: File): File? {
+    val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
+    if (folderName != null && folderName.isNotBlank()) {
+        return File(folderName)
+    }
+    return null
+}
+
 fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float): Block {
     return block {
         val row = this
@@ -528,6 +619,24 @@ fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Tex
         this.height = height
         layout = VERTICAL
         label(label, labelWidth)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val toggle = slider(value, function, inverseFunction)
+            row.supplantEvents(toggle)
+            isMouseAware = false
+        }
+    }
+}
+
+fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
         hSpacer(gap)
         block {
             hSizing = GROW
