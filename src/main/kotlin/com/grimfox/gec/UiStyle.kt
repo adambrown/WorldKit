@@ -75,7 +75,6 @@ val SHAPE_BUTTON_DIALOG = ShapeRectangle(FILL_BACKGROUND, STROKE_BUTTON_DIALOG)
 val SHAPE_BUTTON_POSITIVE = ShapeRectangle(FILL_POSITIVE_HIGHLIGHT, NO_STROKE)
 val SHAPE_BUTTON_NEGATIVE = ShapeRectangle(FILL_NEGATIVE_HIGHLIGHT, NO_STROKE)
 
-
 val SWITCH_HEIGHT = 12.0f
 val ELEMENT_INSET = 3.0f
 
@@ -120,6 +119,9 @@ val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO
 val COLOR_MENU_BACKGROUND = color(27, 27, 28)
 val COLOR_MENU_HIGHLIGHT = color(62, 62, 64)
 val COLOR_BORDERS_AND_FRAMES = color(63, 63, 70)
+
+val STROKE_BORDER_ONLY = StrokeColor(COLOR_BORDERS_AND_FRAMES, 1.0f)
+val SHAPE_BORDER_ONLY = ShapeRectangle(NO_FILL, STROKE_BORDER_ONLY)
 
 val COLOR_DISABLED_CLICKABLE = color(78, 78, 80)
 
@@ -542,7 +544,7 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
     }
 }
 
-fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, ui: UserInterface): Block {
+fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -568,7 +570,7 @@ fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, s
             }
             hSpacer(MEDIUM_SPACER_SIZE)
             val button = button(text("Select folder"), NORMAL_TEXT_BUTTON_STYLE) {
-                folder.reference.value = selectFolder(dialogLayer, ui, File(folder.reference.value)).canonicalPath
+                folder.reference.value = selectFolder(dialogLayer, useDialogLayer, ui, File(folder.reference.value)).canonicalPath
             }
             row.supplantEvents(button)
             isMouseAware = false
@@ -576,13 +578,17 @@ fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, s
     }
 }
 
-private fun selectFolder(dialogLayer: Block, ui: UserInterface, currentFolder: File): File {
+private fun selectFolder(dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, currentFolder: File): File {
     ui.ignoreInput = true
-    dialogLayer.isVisible = true
+    if (useDialogLayer) {
+        dialogLayer.isVisible = true
+    }
     try {
         return selectFolderDialog(currentFolder) ?: currentFolder
     } finally {
-        dialogLayer.isVisible = false
+        if (useDialogLayer) {
+            dialogLayer.isVisible = false
+        }
         ui.ignoreInput = false
     }
 }

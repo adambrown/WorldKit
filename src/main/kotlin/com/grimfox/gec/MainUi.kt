@@ -133,7 +133,7 @@ object MainUi {
                 var preferencesPanel = NO_BLOCK
                 val noop = {}
                 val dialogCallback = mRef(noop)
-                val errorHandler: ErrorDialog = object: ErrorDialog {
+                val errorHandler: ErrorDialog = object : ErrorDialog {
 
                     override fun displayErrorMessage(message: String?) {
                         errorMessageReference.value = message ?: "An unknown error occurred."
@@ -189,8 +189,8 @@ object MainUi {
                         val shrinkGroup = hShrinkGroup()
                         vSpacer(LARGE_SPACER_SIZE)
                         vToggleRow(rememberWindowState, LARGE_ROW_HEIGHT, text("Remember window state:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                        vFolderRow(projectDir, LARGE_ROW_HEIGHT, text("Project folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, ui)
-                        vFolderRow(tempDir, LARGE_ROW_HEIGHT, text("Temporary folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, ui)
+                        vFolderRow(projectDir, LARGE_ROW_HEIGHT, text("Project folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, false, ui)
+                        vFolderRow(tempDir, LARGE_ROW_HEIGHT, text("Temporary folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, false, ui)
                         vSpacer(MEDIUM_SPACER_SIZE)
                         vButtonRow(LARGE_ROW_HEIGHT) {
                             button(text("Save"), DIALOG_BUTTON_STYLE) {
@@ -372,24 +372,11 @@ object MainUi {
                                     width = -SMALL_SPACER_SIZE
                                     height = -2 * SMALL_SPACER_SIZE
                                     block {
-                                        hSizing = STATIC
-                                        width = 1.0f
-                                        hAlign = LEFT
-                                        layout = HORIZONTAL
-                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                                    }
-                                    block {
-                                        hSizing = GROW
-                                        layout = HORIZONTAL
+                                        xOffset = 1.0f
+                                        yOffset = 1.0f
+                                        width = -2.0f
+                                        height = -2.0f
                                         block {
-                                            vSizing = STATIC
-                                            height = 1.0f
-                                            layout = VERTICAL
-                                            shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                                        }
-                                        block {
-                                            vSizing = GROW
-                                            layout = VERTICAL
                                             hSpacer(MEDIUM_SPACER_SIZE)
                                             block {
                                                 hSizing = GROW
@@ -415,11 +402,9 @@ object MainUi {
                                         }
                                     }
                                     block {
-                                        hSizing = STATIC
-                                        width = 1.0f
-                                        hAlign = LEFT
-                                        layout = HORIZONTAL
-                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
+                                        shape = SHAPE_BORDER_ONLY
+                                        canOverflow = true
+                                        isMouseAware = false
                                     }
                                 }
                             }
@@ -427,14 +412,16 @@ object MainUi {
                                 hSizing = STATIC
                                 width = SMALL_SPACER_SIZE
                                 layout = HORIZONTAL
-                                val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE { copy(
-                                        template = template.copy(
-                                                vSizing = STATIC,
-                                                height = 3 * LARGE_ROW_HEIGHT,
-                                                vAlign = MIDDLE,
-                                                hSizing = RELATIVE,
-                                                width = -2.0f,
-                                                hAlign = CENTER))})
+                                val grabber = button(NO_TEXT, NORMAL_TEXT_BUTTON_STYLE {
+                                    copy(
+                                            template = template.copy(
+                                                    vSizing = STATIC,
+                                                    height = 3 * LARGE_ROW_HEIGHT,
+                                                    vAlign = MIDDLE,
+                                                    hSizing = RELATIVE,
+                                                    width = -2.0f,
+                                                    hAlign = CENTER))
+                                })
                                 var lastX = 0.0f
                                 onMouseDown { button, x, y ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
@@ -457,106 +444,82 @@ object MainUi {
                             layout = HORIZONTAL
                             hAlign = LEFT
                             block {
-                                xOffset = 0.0f
                                 yOffset = SMALL_SPACER_SIZE
                                 width = -SMALL_SPACER_SIZE
                                 height = -2 * SMALL_SPACER_SIZE
                                 block {
-                                    hSizing = STATIC
-                                    width = 1.0f
-                                    hAlign = LEFT
-                                    layout = HORIZONTAL
-                                    shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                                }
-                                block {
-                                    hSizing = GROW
-                                    layout = HORIZONTAL
+                                    xOffset = 1.0f
+                                    yOffset = 1.0f
+                                    width = -2.0f
+                                    height = -2.0f
+                                    meshViewport3D(meshViewport)
                                     block {
+                                        val toolbar = this
                                         vSizing = STATIC
-                                        height = 1.0f
-                                        layout = VERTICAL
-                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                                    }
-                                    block {
-                                        vSizing = GROW
-                                        layout = VERTICAL
-                                        meshViewport3D(meshViewport)
-                                        block {
-                                            val toolbar = this
-                                            vSizing = STATIC
-                                            height = MEDIUM_ROW_HEIGHT
-                                            var tools = NO_BLOCK
-                                            var expandToolbarButton = NO_BLOCK
-                                            var collapseToolbarButton = NO_BLOCK
-                                            isFallThrough = true
-                                            hButtonRow {
-                                                expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) {
-                                                    tools.isVisible = true
-                                                    tools.isMouseAware = true
-                                                    collapseToolbarButton.isVisible = true
-                                                    collapseToolbarButton.isMouseAware = true
-                                                    expandToolbarButton.isVisible = false
-                                                    expandToolbarButton.isMouseAware = false
-                                                    toolbar.shape = BACKGROUND_RECT
-                                                }
-                                                collapseToolbarButton = button(text("-"), LARGE_TEXT_BUTTON_STYLE) {
-                                                    tools.isVisible = false
-                                                    tools.isMouseAware = false
-                                                    collapseToolbarButton.isVisible = false
-                                                    collapseToolbarButton.isMouseAware = false
-                                                    expandToolbarButton.isVisible = true
-                                                    expandToolbarButton.isMouseAware = true
-                                                    toolbar.shape = NO_SHAPE
-                                                }
+                                        height = MEDIUM_ROW_HEIGHT
+                                        var tools = NO_BLOCK
+                                        var expandToolbarButton = NO_BLOCK
+                                        var collapseToolbarButton = NO_BLOCK
+                                        isFallThrough = true
+                                        hButtonRow {
+                                            expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) {
+                                                tools.isVisible = true
+                                                tools.isMouseAware = true
+                                                collapseToolbarButton.isVisible = true
+                                                collapseToolbarButton.isMouseAware = true
+                                                expandToolbarButton.isVisible = false
+                                                expandToolbarButton.isMouseAware = false
+                                                toolbar.shape = BACKGROUND_RECT
+                                            }
+                                            collapseToolbarButton = button(text("-"), LARGE_TEXT_BUTTON_STYLE) {
+                                                tools.isVisible = false
+                                                tools.isMouseAware = false
                                                 collapseToolbarButton.isVisible = false
+                                                collapseToolbarButton.isMouseAware = false
+                                                expandToolbarButton.isVisible = true
+                                                expandToolbarButton.isMouseAware = true
+                                                toolbar.shape = NO_SHAPE
                                             }
-                                            tools = block {
-                                                isVisible = false
-                                                hSizing = GROW
-                                                layout = HORIZONTAL
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hDivider()
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hDivider()
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hDivider()
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hDivider()
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hButtonRow {
-                                                    button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-                                                }
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hDivider()
-                                                hSpacer(MEDIUM_SPACER_SIZE)
-                                                hButtonRow {
-                                                    button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
-                                                }
-                                                hSpacer(MEDIUM_SPACER_SIZE)
+                                            collapseToolbarButton.isVisible = false
+                                        }
+                                        tools = block {
+                                            isVisible = false
+                                            hSizing = GROW
+                                            layout = HORIZONTAL
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hDivider()
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hDivider()
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hDivider()
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hDivider()
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hButtonRow {
+                                                button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                             }
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hDivider()
+                                            hSpacer(MEDIUM_SPACER_SIZE)
+                                            hButtonRow {
+                                                button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                            }
+                                            hSpacer(MEDIUM_SPACER_SIZE)
                                         }
                                     }
-                                    block {
-                                        vSizing = STATIC
-                                        height = 1.0f
-                                        layout = VERTICAL
-                                        shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
-                                    }
                                 }
                                 block {
-                                    hSizing = STATIC
-                                    width = 1.0f
-                                    hAlign = LEFT
-                                    layout = HORIZONTAL
-                                    shape = SHAPE_BORDER_AND_FRAME_RECTANGLE
+                                    shape = SHAPE_BORDER_ONLY
+                                    canOverflow = true
+                                    isMouseAware = false
                                 }
                             }
                         }

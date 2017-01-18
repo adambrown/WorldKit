@@ -477,9 +477,10 @@ class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
     override val stroke = NO_STROKE
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
+        val doubleScale = scale.toDouble()
         nvgSave(nvg)
         nvgReset(nvg)
-        viewport.onDrawFrame(Math.round(block.x * scale), Math.round(block.y * scale), Math.round(block.width * scale), Math.round(block.height * scale), Math.round(block.root.height * scale), scale)
+        viewport.onDrawFrame(Math.ceil(block.x * doubleScale).toInt(), Math.ceil(block.y * doubleScale).toInt(), Math.ceil(block.width * doubleScale).toInt(), Math.ceil(block.height * doubleScale).toInt(), Math.ceil(block.root.height * doubleScale).toInt(), scale)
         nvgRestore(nvg)
     }
 }
