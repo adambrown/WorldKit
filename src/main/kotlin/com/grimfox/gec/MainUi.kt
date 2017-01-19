@@ -18,12 +18,14 @@ import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URL
+import java.util.*
 
 object MainUi {
 
     @JvmStatic fun main(vararg args: String) {
         val preferences = loadPreferences()
 
+        val random = Random()
         val DEFAULT_HEIGHT_SCALE = 130.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
         val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
@@ -60,6 +62,7 @@ object MainUi {
         val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
 
         val uiLayout = layout { ui ->
+            val uiLayout = this
             ui {
                 background.set(45, 45, 48)
 
@@ -359,7 +362,7 @@ object MainUi {
                         block {
                             leftPanel = this
                             hSizing = STATIC
-                            width = 268.0f
+                            width = 350.0f
                             layout = HORIZONTAL
                             hAlign = LEFT
                             block {
@@ -383,6 +386,19 @@ object MainUi {
                                                 layout = HORIZONTAL
                                                 val shrinkGroup = hShrinkGroup()
                                                 vSpacer(MEDIUM_SPACER_SIZE)
+                                                val seed = ref(0L)
+                                                vLongInputRow(seed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
+                                                    hSpacer(SMALL_SPACER_SIZE)
+                                                    button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        val randomSeed = random.nextLong()
+                                                        val randomString = randomSeed.toString()
+                                                        if (randomString.length > 18) {
+                                                            seed.value = randomString.substring(0, 18).toLong()
+                                                        } else {
+                                                            seed.value = randomSeed
+                                                        }
+                                                    }
+                                                }
                                                 vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
@@ -431,7 +447,7 @@ object MainUi {
                                 onMouseDrag { button, x, y ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         val delta = x - lastX
-                                        val adjustedDelta = Math.min(root.width / 2.0f, Math.max(220.0f, leftPanel.width + delta)) - leftPanel.width
+                                        val adjustedDelta = Math.max(350.0f, Math.min(root.width * 0.75f, leftPanel.width + delta)) - leftPanel.width
                                         lastX += adjustedDelta
                                         leftPanel.width += adjustedDelta
                                     }

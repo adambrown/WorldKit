@@ -3,9 +3,11 @@ package com.grimfox.gec.ui.widgets
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.ui.NO_COLOR
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
+import com.grimfox.gec.ui.widgets.HorizontalTruncation.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
+import com.grimfox.gec.ui.widgets.VerticalTruncation.*
 import com.grimfox.gec.util.Reference
 import com.grimfox.gec.util.Utils.LOG
 import com.grimfox.gec.util.cRef
@@ -32,8 +34,20 @@ enum class HorizontalAlignment {
 
 enum class VerticalAlignment {
     TOP,
-    MIDDLE,
-    BOTTOM
+    BOTTOM,
+    MIDDLE
+}
+
+enum class HorizontalTruncation {
+    TRUNCATE_LEFT,
+    TRUNCATE_RIGHT,
+    TRUNCATE_CENTER
+}
+
+enum class VerticalTruncation {
+    TRUNCATE_TOP,
+    TRUNCATE_BOTTOM,
+    TRUNCATE_MIDDLE
 }
 
 enum class Layout {
@@ -330,6 +344,28 @@ class ShapeRectangle(override val fill: Fill, override val stroke: Stroke) : Sha
     }
 }
 
+class ShapeCursor(override val fill: Fill, override val stroke: Stroke, val selectFill: Fill, val caret: Caret, var timeOffset: Long = 0) : Shape {
+
+    override fun draw(nvg: Long, block: Block, scale: Float) {
+        if (caret.selection == 0) {
+            if (((System.currentTimeMillis() - timeOffset) / 500) % 2 == 0L) {
+                val caretOffset = caret.getOffset(scale)
+                val halfStroke = stroke.size / 2.0f
+                nvgBeginPath(nvg)
+                nvgRect(nvg, (block.x + halfStroke + caretOffset) * scale, (block.y + halfStroke) * scale, (block.width - stroke.size) * scale, (block.height - stroke.size) * scale)
+                fill.draw(nvg, block, scale)
+                stroke.draw(nvg, block, scale)
+            }
+        } else {
+            val (start, end) = caret.getOffsets(scale)
+            val halfStroke = stroke.size / 2.0f
+            nvgBeginPath(nvg)
+            nvgRect(nvg, (block.x + halfStroke + start) * scale, (block.y + halfStroke) * scale, (end - start) * scale, (block.height - stroke.size) * scale)
+            selectFill.draw(nvg, block, scale)
+        }
+    }
+}
+
 class ShapeCircle(override val fill: Fill, override val stroke: Stroke) : Shape {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
@@ -554,6 +590,8 @@ abstract class Block {
     abstract var isVisible: Boolean
     abstract var hAlign: HorizontalAlignment
     abstract var vAlign: VerticalAlignment
+    abstract var hTruncate: HorizontalTruncation
+    abstract var vTruncate: VerticalTruncation
     abstract var layout: Layout
     abstract var xOffset: Float
     abstract var yOffset: Float
@@ -581,6 +619,7 @@ abstract class Block {
     abstract var onMouseDown: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseUp: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseRelease: (Block.(button: Int, x: Int, y: Int) -> Unit)?
+    abstract var onMouseDownOverOther: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
     abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
@@ -589,6 +628,7 @@ abstract class Block {
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
+    protected abstract var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>>
 
     private var reprocess = false
 
@@ -604,9 +644,28 @@ abstract class Block {
                 if (mouseOver != null) {
                     if (isDown) {
                         val mouseDownFun = mouseOver.onMouseDown
-                        awaitingRelease.add(Pair(button, mouseOver))
                         if (mouseDownFun != null) {
                             mouseOver.mouseDownFun(button, x, y)
+                        }
+                        val toRemove = ArrayList<Pair<Int, Block>>(awaitingMouseDownOverOther.size)
+                        var needToAdd = true
+                        awaitingMouseDownOverOther.forEach {
+                            if (it.first == button) {
+                                if (it.second == mouseOver) {
+                                    needToAdd = false
+                                } else {
+                                    val mouseDownOverOtherFun = it.second.onMouseDownOverOther
+                                    if (mouseDownOverOtherFun != null) {
+                                        it.second.mouseDownOverOtherFun(button, x, y)
+                                    }
+                                }
+                            }
+                        }
+                        awaitingMouseDownOverOther.removeAll(toRemove)
+                        val pair = Pair(button, mouseOver)
+                        awaitingRelease.add(pair)
+                        if (needToAdd) {
+                            awaitingMouseDownOverOther.add(pair)
                         }
                     } else {
                         val mouseUpFun = mouseOver.onMouseUp
@@ -802,6 +861,10 @@ abstract class Block {
         this.onMouseRelease = onMouseRelease
     }
 
+    fun onMouseDownOverOther(onMouseDownOverOther: Block.(Int, Int, Int) -> Unit) {
+        this.onMouseDownOverOther = onMouseDownOverOther
+    }
+
     fun onMouseClick(onMouseClick: Block.(Int, Int, Int) -> Unit) {
         this.onMouseClick = onMouseClick
     }
@@ -850,6 +913,14 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         }
     override var vAlign: VerticalAlignment
         get() = TOP
+        set(value) {
+        }
+    override var hTruncate: HorizontalTruncation
+        get() = TRUNCATE_RIGHT
+        set(value) {
+        }
+    override var vTruncate: VerticalTruncation
+        get() = TRUNCATE_BOTTOM
         set(value) {
         }
     override var layout: Layout
@@ -936,6 +1007,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = null
         set(value) {
         }
+    override var onMouseDownOverOther: (Block.(Int, Int, Int) -> Unit)?
+        get() = null
+        set(value) {
+        }
     override var onMouseClick: (Block.(Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
@@ -956,6 +1031,7 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
     override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
+    override var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>> = ArrayList()
 }
 
 val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
@@ -978,6 +1054,8 @@ private class DefaultBlock(
         override var isVisible: Boolean = true,
         override var hAlign: HorizontalAlignment = LEFT,
         override var vAlign: VerticalAlignment = TOP,
+        override var hTruncate: HorizontalTruncation = if (hAlign == RIGHT) TRUNCATE_LEFT else if (hAlign == LEFT) TRUNCATE_RIGHT else TRUNCATE_CENTER,
+        override var vTruncate: VerticalTruncation = if (vAlign == BOTTOM) TRUNCATE_TOP else if (vAlign == TOP) TRUNCATE_BOTTOM else TRUNCATE_MIDDLE,
         override var layout: Layout = ABSOLUTE,
         override var xOffset: Float = 0.0f,
         override var yOffset: Float = 0.0f,
@@ -1001,6 +1079,7 @@ private class DefaultBlock(
         override var onMouseDown: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseUp: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)? = null,
+        override var onMouseDownOverOther: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null,
         override var onScroll: (Block.(Double, Double) -> Unit)? = null,
@@ -1025,6 +1104,10 @@ private class DefaultBlock(
         get() = null
         set(value) {
         }
+
+    override var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>>
+        get() = ArrayList()
+        set(value) {}
 
     private var _hShrinkGroup: ShrinkGroupInternal? = null
     private var _vShrinkGroup: ShrinkGroupInternal? = null
@@ -1357,22 +1440,42 @@ private class DefaultBlock(
         }
 
     private fun getXRelativeTo(relativeX: Float, relativeWidth: Float): Float {
-        if (hAlign == LEFT) {
-            return relativeX + padLeft + xOffset
+        if (width > relativeWidth) {
+            if (hTruncate == TRUNCATE_RIGHT) {
+                return relativeX + xOffset
+            }
+            if (hTruncate == TRUNCATE_LEFT) {
+                return relativeX + relativeWidth - width + xOffset
+            }
+            return relativeX + (relativeWidth - padLeft) / 2 - width / 2 + xOffset
+        } else {
+            if (hAlign == LEFT) {
+                return relativeX + padLeft + xOffset
+            }
+            if (hAlign == RIGHT) {
+                return relativeX + relativeWidth - width - padRight + xOffset
+            }
+            return relativeX + (relativeWidth - padLeft - padRight) / 2 - width / 2 + xOffset + padLeft
         }
-        if (hAlign == RIGHT) {
-            return relativeX + relativeWidth - width - padRight + xOffset
-        }
-        return relativeX + (relativeWidth - padLeft - padRight) / 2 - width / 2 + xOffset + padLeft
     }
 
     private fun getYRelativeTo(relativeY: Float, relativeHeight: Float): Float {
-        if (vAlign == TOP) {
-            return relativeY + padTop + yOffset
+        if (height > relativeHeight) {
+            if (vTruncate == TRUNCATE_BOTTOM) {
+                return relativeY + yOffset
+            }
+            if (vTruncate == TRUNCATE_TOP) {
+                return relativeY + relativeHeight - height + yOffset
+            }
+            return relativeY + (relativeHeight - padTop) / 2 - height / 2 + yOffset
+        } else {
+            if (vAlign == TOP) {
+                return relativeY + padTop + yOffset
+            }
+            if (vAlign == BOTTOM) {
+                return relativeY + relativeHeight - height - padBottom + yOffset
+            }
+            return relativeY + (relativeHeight - padTop - padBottom) / 2 - height / 2 + yOffset + padTop
         }
-        if (vAlign == BOTTOM) {
-            return relativeY + relativeHeight - height - padBottom + yOffset
-        }
-        return relativeY + (relativeHeight - padTop - padBottom) / 2 - height / 2 + yOffset + padTop
     }
 }

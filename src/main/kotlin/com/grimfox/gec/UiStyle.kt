@@ -1,10 +1,11 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.FileDialogs
-import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.color
+import com.fasterxml.jackson.databind.ser.std.StdArraySerializers
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
+import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_LEFT
+import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_RIGHT
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
@@ -12,9 +13,17 @@ import com.grimfox.gec.ui.widgets.toggle
 import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
+import com.sun.java.swing.plaf.motif.MotifTextUI.createCaret
+import org.lwjgl.glfw.GLFW
+import org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+import org.lwjgl.glfw.GLFW.GLFW_PRESS
 import org.lwjgl.nanovg.NVGColor
+import org.lwjgl.nanovg.NVGTextRow
+import org.lwjgl.nanovg.NanoVG.nvgTextGlyphPositions
 import java.io.File
+import java.math.BigDecimal
 import java.nio.ByteBuffer
+import java.util.*
 
 val textFont = ref(-1)
 val glyphFont = ref(-1)
@@ -40,6 +49,9 @@ val BACKGROUND_RECT = ShapeRectangle(FILL_BACKGROUND, NO_STROKE)
 
 val COLOR_BEVELS = color(34, 34, 35)
 val COLOR_BEVELS_LIGHTER = color(38, 38, 39)
+
+val COLOR_TEXT_BOX_BACKGROUND_NORMAL = color(51, 51, 55)
+val COLOR_TEXT_BOX_BACKGROUND_MOUSE_OVER = color(61, 61, 65)
 
 val COLOR_CLICK_ITEMS_DARKER = color(62, 62, 64)
 val COLOR_CLICK_ITEMS = color(82, 82, 84)
@@ -119,9 +131,22 @@ val SLIDER_SWITCH_MOUSE_DOWN = ShapeCircle(FillColor(COLOR_ACTIVE_HIGHLIGHT), NO
 val COLOR_MENU_BACKGROUND = color(27, 27, 28)
 val COLOR_MENU_HIGHLIGHT = color(62, 62, 64)
 val COLOR_BORDERS_AND_FRAMES = color(63, 63, 70)
+val COLOR_BORDERS_AND_FRAMES_LIGHT = color(68, 68, 75)
 
 val STROKE_BORDER_ONLY = StrokeColor(COLOR_BORDERS_AND_FRAMES, 1.0f)
 val SHAPE_BORDER_ONLY = ShapeRectangle(NO_FILL, STROKE_BORDER_ONLY)
+
+val FILL_TEXT_BOX_BACKGROUND_NORMAL = FillColor(COLOR_TEXT_BOX_BACKGROUND_NORMAL)
+val FILL_TEXT_BOX_BACKGROUND_MOUSE_OVER = FillColor(COLOR_TEXT_BOX_BACKGROUND_MOUSE_OVER)
+
+val STROKE_TEXT_BOX_NORMAL = StrokeColor(COLOR_BORDERS_AND_FRAMES, 1.0f)
+val STROKE_TEXT_BOX_MOUSE_OVER = StrokeColor(COLOR_BORDERS_AND_FRAMES_LIGHT, 1.0f)
+val STROKE_TEXT_BOX_ACTIVE = StrokeColor(COLOR_ACTIVE_HIGHLIGHT, 1.0f)
+
+
+val SHAPE_TEXT_BOX_BACKGROUND_NORMAL = ShapeRectangle(FILL_TEXT_BOX_BACKGROUND_NORMAL, STROKE_TEXT_BOX_NORMAL)
+val SHAPE_TEXT_BOX_BACKGROUND_MOUSE_OVER = ShapeRectangle(FILL_TEXT_BOX_BACKGROUND_MOUSE_OVER, STROKE_TEXT_BOX_MOUSE_OVER)
+val SHAPE_TEXT_BOX_BACKGROUND_ACTIVE = ShapeRectangle(FILL_TEXT_BOX_BACKGROUND_MOUSE_OVER, STROKE_TEXT_BOX_ACTIVE)
 
 val COLOR_DISABLED_CLICKABLE = color(78, 78, 80)
 
@@ -147,6 +172,10 @@ val TEXT_STYLE_BUTTON_LARGE = TextStyle(FONT_SIZE_22, textFont, cRef(COLOR_BUTTO
 
 val DIVIDER_DARK = ShapeRectangle(FillColor(COLOR_BEVELS), NO_STROKE)
 val DIVIDER_LIGHT = ShapeRectangle(FillColor(COLOR_CLICK_ITEMS_DARKER), NO_STROKE)
+
+val SHAPE_CURSOR = { caret: Caret ->
+    ShapeCursor(FillColor(COLOR_BUTTON_TEXT), NO_STROKE, FILL_BUTTON_MOUSE_DOWN, caret)
+}
 
 val FILL_DROP_SHADOW = FillBoxGradient(COLOR_DROP_SHADOW_BLACK, COLOR_DROP_SHADOW_BLACK_TRANSPARENT, 6.0f, 12.0f)
 val SHAPE_DROP_SHADOW = ShapeDropShadow(FILL_DROP_SHADOW, NO_STROKE, 6.0f, 6.0f)
@@ -442,7 +471,20 @@ fun combineFunctions(f1: (Block.() -> Unit)?, f2: (Block.() -> Unit)?): (Block.(
     return { f1(); f2() }
 }
 
-fun combineFunctions(f1: (Block.(Int, Int, Int) -> Unit)?, f2: (Block.(Int, Int, Int) -> Unit)?): (Block.(Int, Int, Int) -> Unit)? {
+fun <T1, T2> combineFunctions(f1: (Block.(T1, T2) -> Unit)?, f2: (Block.(T1, T2) -> Unit)?): (Block.(T1, T2) -> Unit)? {
+    if (f1 == null && f2 == null) {
+        return null
+    }
+    if (f1 == null) {
+        return f2
+    }
+    if (f2 == null) {
+        return f1
+    }
+    return { x, y -> f1(x, y); f2(x, y) }
+}
+
+fun <T1, T2, T3>combineFunctions(f1: (Block.(T1, T2, T3) -> Unit)?, f2: (Block.(T1, T2, T3) -> Unit)?): (Block.(T1, T2, T3) -> Unit)? {
     if (f1 == null && f2 == null) {
         return null
     }
@@ -462,8 +504,11 @@ fun Block.supplantEvents(other: Block): Block {
     onMouseDown = combineFunctions(onMouseDown, other.onMouseDown)
     onMouseUp = combineFunctions(onMouseUp, other.onMouseUp)
     onMouseRelease = combineFunctions(onMouseRelease, other.onMouseRelease)
+    onMouseDownOverOther = combineFunctions(onMouseDownOverOther, other.onMouseDownOverOther)
     onMouseClick = combineFunctions(onMouseClick, other.onMouseClick)
     onMouseDrag = combineFunctions(onMouseDrag, other.onMouseDrag)
+    onScroll = combineFunctions(onScroll, other.onScroll)
+    onTick = combineFunctions(onTick, other.onTick)
     return this
 }
 
@@ -508,24 +553,6 @@ fun Block.hDivider() {
     }
 }
 
-fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: Text, labelWidth: Float, gap: Float): Block {
-    return block {
-        val row = this
-        vSizing = STATIC
-        this.height = height
-        layout = VERTICAL
-        label(label, labelWidth)
-        hSpacer(gap)
-        block {
-            hSizing = GROW
-            layout = HORIZONTAL
-            val toggle = toggle(value)
-            row.supplantEvents(toggle)
-            isMouseAware = false
-        }
-    }
-}
-
 fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         val row = this
@@ -540,6 +567,138 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
             val toggle = toggle(value)
             row.supplantEvents(toggle)
             isMouseAware = false
+        }
+    }
+}
+
+fun Block.vLongInputRow(reference: MonitoredReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NVGColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val inputBox = longInputBox(reference, textStyle, textColorActive, ui, uiLayout)
+            buttons()
+            row.supplantEvents(inputBox)
+            isMouseAware = true
+            isFallThrough = true
+        }
+    }
+}
+
+private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: TextStyle, textColorActive: NVGColor, ui: UserInterface, uiLayout: UiLayout): Block {
+    val textValue = DynamicTextReference(reference.value.toString(), 18, textStyle)
+    val textStyleActive = TextStyle(textStyle.size, textStyle.font, cRef(textColorActive))
+    val caret = uiLayout.createCaret(textValue)
+    reference.listener { old, new ->
+        if (new != old) {
+            textValue.reference.value = new.toString()
+            caret.position = textValue.reference.value.length
+        }
+    }
+    val cursorShape = SHAPE_CURSOR(caret)
+    var mouseOver = false
+    var isActive = false
+    return block {
+        val textBox = this
+        vAlign = MIDDLE
+        hSizing = GROW
+        vSizing = STATIC
+        this.height = SMALL_ROW_HEIGHT + 2.0f
+        layout = HORIZONTAL
+        var cursorBlock = NO_BLOCK
+        var textBlock = NO_BLOCK
+        block {
+            xOffset = 4.0f
+            width = -2.0f
+            vSizing = STATIC
+            this.height = SMALL_ROW_HEIGHT + 2.0f
+            textBlock = block {
+                layout = HORIZONTAL
+                hAlign = LEFT
+                hTruncate = TRUNCATE_RIGHT
+                vAlign = MIDDLE
+                hSizing = SHRINK
+                vSizing = SHRINK
+                isMouseAware = false
+                cursorBlock = block {
+                    layout = ABSOLUTE
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    hSizing = STATIC
+                    vSizing = STATIC
+                    width = 1.0f
+                    this.height = textStyle.size.value
+                    shape = NO_SHAPE
+                    isMouseAware = false
+                    canOverflow = true
+                }
+                block {
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = caret.dynamicText.text
+                    isMouseAware = false
+                    canOverflow = true
+                    overflowCount = 2
+                }
+            }
+        }
+        val caretText = caret.dynamicText.text
+        isMouseAware = false
+        shape = SHAPE_TEXT_BOX_BACKGROUND_NORMAL
+        val completeFun = {
+            isActive = false
+            textBox.shape = if (mouseOver) SHAPE_TEXT_BOX_BACKGROUND_MOUSE_OVER else SHAPE_TEXT_BOX_BACKGROUND_NORMAL
+            caretText.style = if (mouseOver) textStyleActive else textStyle
+            cursorBlock.shape = NO_SHAPE
+            textBlock.hTruncate = TRUNCATE_RIGHT
+            try {
+                val newValue = BigDecimal(caret.dynamicText.reference.value)
+                reference.value = newValue.toLong()
+                textValue.reference.value = reference.value.toString()
+            } catch (ignore: Exception) {
+                textValue.reference.value = reference.value.toString()
+            }
+            caret.position = textValue.reference.value.length
+            ui.keyboardHandler = null
+        }
+        val keyboardHandler = integerTextInputKeyboardHandler(caret, cursorShape, completeFun)
+        onMouseOver {
+            mouseOver = true
+            if (!isActive) {
+                textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_MOUSE_OVER
+                caretText.style = textStyleActive
+            }
+        }
+        onMouseOut {
+            mouseOver = false
+            if (!isActive) {
+                textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_NORMAL
+                caretText.style = textStyle
+            }
+        }
+        onMouseDown { button, x, y ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                isActive = true
+                textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_ACTIVE
+                caretText.style = textStyleActive
+                cursorShape.timeOffset = System.currentTimeMillis()
+                cursorBlock.shape = cursorShape
+                caret.position = 0
+                caret.selection = caret.dynamicText.reference.value.length
+                textBlock.hTruncate = TRUNCATE_LEFT
+                ui.keyboardHandler = keyboardHandler
+            }
+        }
+        onMouseDownOverOther { button, x, y ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive) {
+                completeFun()
+            }
         }
     }
 }
@@ -612,24 +771,6 @@ fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float
             hSizing = SHRINK
             layout = HORIZONTAL
             val toggle = toggle(value)
-            row.supplantEvents(toggle)
-            isMouseAware = false
-        }
-    }
-}
-
-fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Text, labelWidth: Float, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
-    return block {
-        val row = this
-        vSizing = STATIC
-        this.height = height
-        layout = VERTICAL
-        label(label, labelWidth)
-        hSpacer(gap)
-        block {
-            hSizing = GROW
-            layout = HORIZONTAL
-            val toggle = slider(value, function, inverseFunction)
             row.supplantEvents(toggle)
             isMouseAware = false
         }

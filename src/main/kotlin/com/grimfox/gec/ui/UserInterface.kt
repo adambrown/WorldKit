@@ -105,10 +105,14 @@ interface UiLayout {
 
     fun createMultiGlyph(vararg glyphs: GlyphLayer): Block.() -> Block
 
+    fun createCaret(text: DynamicTextReference): Caret
+
     fun root(builder: Block.() -> Unit) {
         root = uiRoot(0.0f, 0.0f, 0.0f, 0.0f, builder)
     }
 }
+
+class KeyboardHandler(var onChar: ((codePoint: Int) -> Unit)?, var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Unit)?)
 
 interface UserInterface {
 
@@ -134,6 +138,7 @@ interface UserInterface {
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
+    var keyboardHandler: KeyboardHandler?
 
     fun setWindowIcon(images: GLFWImage.Buffer)
 
@@ -207,6 +212,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         get() = window.restoreHandler
         set(value) {
             window.restoreHandler = value
+        }
+
+    override var keyboardHandler: KeyboardHandler?
+        get() = window.keyboardHandler
+        set(value) {
+            window.keyboardHandler = value
         }
 
     override fun setWindowIcon(images: GLFWImage.Buffer) {
@@ -410,6 +421,10 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         }
     }
 
+    override fun createCaret(text: DynamicTextReference): Caret {
+        return Caret(nvg, text)
+    }
+
     internal fun close() {
         fonts.clear()
     }
@@ -552,7 +567,9 @@ private class WindowContext(
         var scrollHandler: (Double, Double) -> Unit = { x, y -> },
         var maximizeHandler: () -> Unit = {},
         var minimizeHandler: () -> Unit = {},
-        var restoreHandler: () -> Unit = {}
+        var restoreHandler: () -> Unit = {},
+
+        var keyboardHandler: KeyboardHandler? = null
 
 ) {
 
@@ -886,14 +903,14 @@ private fun createWindow(windowState: WindowState?): WindowContext {
         }
     }
     glfwSetCharCallback(window.id) { windowId, codePoint ->
-
+        if (!window.ignoreInput) {
+            window.keyboardHandler?.onChar?.invoke(codePoint)
+        }
     }
     glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
         if (!window.ignoreInput) {
             try {
-                when (key) {
-                    GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(windowId, true)
-                }
+                window.keyboardHandler?.onKey?.invoke(key, scanCode, action, mods)
             } catch (t: Throwable) {
                 LOG.error("fatal error", t)
                 println("")
