@@ -471,6 +471,19 @@ fun combineFunctions(f1: (Block.() -> Unit)?, f2: (Block.() -> Unit)?): (Block.(
     return { f1(); f2() }
 }
 
+fun <T1> combineFunctions(f1: (Block.(T1) -> Unit)?, f2: (Block.(T1) -> Unit)?): (Block.(T1) -> Unit)? {
+    if (f1 == null && f2 == null) {
+        return null
+    }
+    if (f1 == null) {
+        return f2
+    }
+    if (f2 == null) {
+        return f1
+    }
+    return { a -> f1(a); f2(a) }
+}
+
 fun <T1, T2> combineFunctions(f1: (Block.(T1, T2) -> Unit)?, f2: (Block.(T1, T2) -> Unit)?): (Block.(T1, T2) -> Unit)? {
     if (f1 == null && f2 == null) {
         return null
@@ -481,10 +494,10 @@ fun <T1, T2> combineFunctions(f1: (Block.(T1, T2) -> Unit)?, f2: (Block.(T1, T2)
     if (f2 == null) {
         return f1
     }
-    return { x, y -> f1(x, y); f2(x, y) }
+    return { a, b -> f1(a, b); f2(a, b) }
 }
 
-fun <T1, T2, T3>combineFunctions(f1: (Block.(T1, T2, T3) -> Unit)?, f2: (Block.(T1, T2, T3) -> Unit)?): (Block.(T1, T2, T3) -> Unit)? {
+fun <T1, T2, T3> combineFunctions(f1: (Block.(T1, T2, T3) -> Unit)?, f2: (Block.(T1, T2, T3) -> Unit)?): (Block.(T1, T2, T3) -> Unit)? {
     if (f1 == null && f2 == null) {
         return null
     }
@@ -494,7 +507,20 @@ fun <T1, T2, T3>combineFunctions(f1: (Block.(T1, T2, T3) -> Unit)?, f2: (Block.(
     if (f2 == null) {
         return f1
     }
-    return { button, x, y -> f1(button, x, y); f2(button, x, y) }
+    return { a, b, c -> f1(a, b, c); f2(a, b, c) }
+}
+
+fun <T1, T2, T3, T4> combineFunctions(f1: (Block.(T1, T2, T3, T4) -> Unit)?, f2: (Block.(T1, T2, T3, T4) -> Unit)?): (Block.(T1, T2, T3, T4) -> Unit)? {
+    if (f1 == null && f2 == null) {
+        return null
+    }
+    if (f1 == null) {
+        return f2
+    }
+    if (f2 == null) {
+        return f1
+    }
+    return { a, b, c, d -> f1(a, b, c, d); f2(a, b, c, d) }
 }
 
 fun Block.supplantEvents(other: Block): Block {
@@ -613,6 +639,7 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
         layout = HORIZONTAL
         var cursorBlock = NO_BLOCK
         var textBlock = NO_BLOCK
+        var selectRefBlock = NO_BLOCK
         block {
             xOffset = 4.0f
             width = -2.0f
@@ -638,7 +665,7 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
                     isMouseAware = false
                     canOverflow = true
                 }
-                block {
+                selectRefBlock = block {
                     hSizing = SHRINK
                     vSizing = SHRINK
                     text = caret.dynamicText.text
@@ -682,20 +709,47 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
                 caretText.style = textStyle
             }
         }
-        onMouseDown { button, x, y ->
+        var isActivating = false
+        onMouseDown { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                isActive = true
-                textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_ACTIVE
-                caretText.style = textStyleActive
-                cursorShape.timeOffset = System.currentTimeMillis()
-                cursorBlock.shape = cursorShape
-                caret.position = 0
-                caret.selection = caret.dynamicText.reference.value.length
-                textBlock.hTruncate = TRUNCATE_LEFT
-                ui.keyboardHandler = keyboardHandler
+                if (isActive) {
+                    if (mods and GLFW.GLFW_MOD_SHIFT != 0) {
+                        caret.selection = caret.getPosition(x - selectRefBlock.x) - caret.position
+                    } else {
+                        caret.position = caret.getPosition(x - selectRefBlock.x)
+                        caret.selection = 0
+                        cursorShape.timeOffset = System.currentTimeMillis()
+                    }
+                } else {
+                    isActive = true
+                    isActivating = true
+                    textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_ACTIVE
+                    caretText.style = textStyleActive
+                    cursorShape.timeOffset = System.currentTimeMillis()
+                    cursorBlock.shape = cursorShape
+                    caret.position = 0
+                    caret.selection = caret.dynamicText.reference.value.length
+                    textBlock.hTruncate = TRUNCATE_LEFT
+                    ui.keyboardHandler = keyboardHandler
+                }
             }
         }
-        onMouseDownOverOther { button, x, y ->
+        onMouseUp { button, x, y, mods ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
+                isActivating = false
+            }
+        }
+        onMouseRelease { button, x, y, mods ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
+                isActivating = false
+            }
+        }
+        onMouseDrag { button, x, y, mods ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive && !isActivating) {
+                caret.selection = caret.getPosition(x - selectRefBlock.x) - caret.position
+            }
+        }
+        onMouseDownOverOther { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive) {
                 completeFun()
             }
@@ -870,13 +924,13 @@ fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
     return block {
         layout = ABSOLUTE
         shape = ShapeMeshViewport3D(meshViewport)
-        onMouseDown { button, x, y ->
+        onMouseDown { button, x, y, mods ->
             meshViewport.onMouseDown(button, x, y)
         }
-        onMouseRelease { button, x, y ->
+        onMouseRelease { button, x, y, mods ->
             meshViewport.onMouseRelease(button)
         }
-        onMouseDrag { button, x, y ->
+        onMouseDrag { button, x, y, mods ->
             meshViewport.onMouseDrag(x, y)
         }
         onScroll { x, y ->

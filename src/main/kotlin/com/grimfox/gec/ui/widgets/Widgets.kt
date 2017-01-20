@@ -616,19 +616,19 @@ abstract class Block {
     abstract var overflowCount: Int
     abstract var onMouseOver: (Block.() -> Unit)?
     abstract var onMouseOut: (Block.() -> Unit)?
-    abstract var onMouseDown: (Block.(button: Int, x: Int, y: Int) -> Unit)?
-    abstract var onMouseUp: (Block.(button: Int, x: Int, y: Int) -> Unit)?
-    abstract var onMouseRelease: (Block.(button: Int, x: Int, y: Int) -> Unit)?
-    abstract var onMouseDownOverOther: (Block.(button: Int, x: Int, y: Int) -> Unit)?
-    abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int) -> Unit)?
-    abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int) -> Unit)?
+    abstract var onMouseDown: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
+    abstract var onMouseUp: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
+    abstract var onMouseRelease: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
+    abstract var onMouseDownOverOther: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
+    abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
+    abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
     abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
     abstract var onTick: (Block.(mouseX: Int, mouseY: Int) -> Unit)?
     abstract var inputOverride: Block?
     protected abstract var mouseOver: Block?
     protected abstract var lastMouseOver: Block?
-    protected abstract var awaitingRelease: MutableList<Pair<Int, Block>>
-    protected abstract var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>>
+    protected abstract var awaitingRelease: MutableList<Triple<Int, Block, Int>>
+    protected abstract var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>>
 
     private var reprocess = false
 
@@ -636,7 +636,7 @@ abstract class Block {
         root.reprocess = true
     }
 
-    fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean) {
+    fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) {
         if (this === root) {
             do {
                 reprocess = false
@@ -645,9 +645,9 @@ abstract class Block {
                     if (isDown) {
                         val mouseDownFun = mouseOver.onMouseDown
                         if (mouseDownFun != null) {
-                            mouseOver.mouseDownFun(button, x, y)
+                            mouseOver.mouseDownFun(button, x, y, mods)
                         }
-                        val toRemove = ArrayList<Pair<Int, Block>>(awaitingMouseDownOverOther.size)
+                        val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
                         var needToAdd = true
                         awaitingMouseDownOverOther.forEach {
                             if (it.first == button) {
@@ -656,13 +656,13 @@ abstract class Block {
                                 } else {
                                     val mouseDownOverOtherFun = it.second.onMouseDownOverOther
                                     if (mouseDownOverOtherFun != null) {
-                                        it.second.mouseDownOverOtherFun(button, x, y)
+                                        it.second.mouseDownOverOtherFun(button, x, y, mods)
                                     }
                                 }
                             }
                         }
                         awaitingMouseDownOverOther.removeAll(toRemove)
-                        val pair = Pair(button, mouseOver)
+                        val pair = Triple(button, mouseOver, mods)
                         awaitingRelease.add(pair)
                         if (needToAdd) {
                             awaitingMouseDownOverOther.add(pair)
@@ -670,13 +670,13 @@ abstract class Block {
                     } else {
                         val mouseUpFun = mouseOver.onMouseUp
                         if (mouseUpFun != null) {
-                            mouseOver.mouseUpFun(button, x, y)
+                            mouseOver.mouseUpFun(button, x, y, mods)
                         }
                         awaitingRelease.forEach {
                             if (it.first == button && it.second == mouseOver) {
                                 val mouseClickFun = mouseOver.onMouseClick
                                 if (mouseClickFun != null) {
-                                    mouseOver.mouseClickFun(button, x, y)
+                                    mouseOver.mouseClickFun(button, x, y, mods)
                                 }
                             }
                         }
@@ -689,7 +689,7 @@ abstract class Block {
                             awaitingRelease.removeAt(i)
                             val mouseReleaseFun = it.second.onMouseRelease
                             if (mouseReleaseFun != null) {
-                                it.second.mouseReleaseFun(button, x, y)
+                                it.second.mouseReleaseFun(button, x, y, mods)
                             }
                         }
                     }
@@ -699,7 +699,7 @@ abstract class Block {
                 }
             } while (reprocess)
         } else {
-            root.handleMouseAction(button, x, y, isDown)
+            root.handleMouseAction(button, x, y, isDown, mods)
         }
     }
 
@@ -741,7 +741,7 @@ abstract class Block {
                 awaitingRelease.forEach {
                     val mouseDragFun = it.second.onMouseDrag
                     if (mouseDragFun != null) {
-                        it.second.mouseDragFun(it.first, mouseX, mouseY)
+                        it.second.mouseDragFun(it.first, mouseX, mouseY, it.third)
                     }
                 }
             } while (reprocess)
@@ -849,27 +849,27 @@ abstract class Block {
         this.onMouseOut = onMouseOut
     }
 
-    fun onMouseDown(onMouseDown: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseDown(onMouseDown: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseDown = onMouseDown
     }
 
-    fun onMouseUp(onMouseUp: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseUp(onMouseUp: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseUp = onMouseUp
     }
 
-    fun onMouseRelease(onMouseRelease: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseRelease(onMouseRelease: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseRelease = onMouseRelease
     }
 
-    fun onMouseDownOverOther(onMouseDownOverOther: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseDownOverOther(onMouseDownOverOther: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseDownOverOther = onMouseDownOverOther
     }
 
-    fun onMouseClick(onMouseClick: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseClick(onMouseClick: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseClick = onMouseClick
     }
 
-    fun onMouseDrag(onMouseDrag: Block.(Int, Int, Int) -> Unit) {
+    fun onMouseDrag(onMouseDrag: Block.(Int, Int, Int, Int) -> Unit) {
         this.onMouseDrag = onMouseDrag
     }
 
@@ -995,27 +995,27 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = null
         set(value) {
         }
-    override var onMouseDown: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseDown: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
-    override var onMouseUp: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseUp: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
-    override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseRelease: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
-    override var onMouseDownOverOther: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseDownOverOther: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
-    override var onMouseClick: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
-    override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)?
+    override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
         set(value) {
         }
@@ -1028,10 +1028,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         set(value) {
         }
     override var inputOverride: Block? = null
-    override var awaitingRelease: MutableList<Pair<Int, Block>> = ArrayList()
+    override var awaitingRelease: MutableList<Triple<Int, Block, Int>> = ArrayList()
     override var mouseOver: Block? = null
     override var lastMouseOver: Block? = null
-    override var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>> = ArrayList()
+    override var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>> = ArrayList()
 }
 
 val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
@@ -1076,12 +1076,12 @@ private class DefaultBlock(
         override var isFallThrough: Boolean = false,
         override var onMouseOver: (Block.() -> Unit)? = null,
         override var onMouseOut: (Block.() -> Unit)? = null,
-        override var onMouseDown: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseUp: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseRelease: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseDownOverOther: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseClick: (Block.(Int, Int, Int) -> Unit)? = null,
-        override var onMouseDrag: (Block.(Int, Int, Int) -> Unit)? = null,
+        override var onMouseDown: (Block.(Int, Int, Int, Int) -> Unit)? = null,
+        override var onMouseUp: (Block.(Int, Int, Int, Int) -> Unit)? = null,
+        override var onMouseRelease: (Block.(Int, Int, Int, Int) -> Unit)? = null,
+        override var onMouseDownOverOther: (Block.(Int, Int, Int, Int) -> Unit)? = null,
+        override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)? = null,
+        override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)? = null,
         override var onScroll: (Block.(Double, Double) -> Unit)? = null,
         override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
 
@@ -1091,7 +1091,7 @@ private class DefaultBlock(
             root.inputOverride = value
         }
 
-    override var awaitingRelease: MutableList<Pair<Int, Block>>
+    override var awaitingRelease: MutableList<Triple<Int, Block, Int>>
         get() = ArrayList()
         set(value) {
         }
@@ -1105,7 +1105,7 @@ private class DefaultBlock(
         set(value) {
         }
 
-    override var awaitingMouseDownOverOther: MutableList<Pair<Int, Block>>
+    override var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>>
         get() = ArrayList()
         set(value) {}
 

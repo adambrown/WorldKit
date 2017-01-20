@@ -56,8 +56,8 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
-        ui.mouseClickHandler = { button, x, y, isDown ->
-            ui.root.handleMouseAction(button, x, y, isDown)
+        ui.mouseClickHandler = { button, x, y, isDown, mods ->
+            ui.root.handleMouseAction(button, x, y, isDown, mods)
         }
         ui.scrollHandler = { x, y ->
             ui.root.handleScroll(x, y)
@@ -133,7 +133,7 @@ interface UserInterface {
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
     var  ignoreInput: Boolean
-    var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean) -> Unit
+    var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) -> Unit
     var scrollHandler: (x: Double, y: Double) -> Unit
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
@@ -188,7 +188,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         set(value) {
             window.ignoreInput = value
         }
-    override var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit
+    override var mouseClickHandler: (Int, Int, Int, Boolean, Int) -> Unit
         get() = window.mouseClickHandler
         set(value) {
             window.mouseClickHandler = value
@@ -563,7 +563,7 @@ private class WindowContext(
         var ignoreInput: Boolean = false,
 
         var currentMonitor: MonitorSpec = NO_MONITOR,
-        var mouseClickHandler: (Int, Int, Int, Boolean) -> Unit = { button, x, y, isDown -> },
+        var mouseClickHandler: (Int, Int, Int, Boolean, Int) -> Unit = { button, x, y, isDown, mods -> },
         var scrollHandler: (Double, Double) -> Unit = { x, y -> },
         var maximizeHandler: () -> Unit = {},
         var minimizeHandler: () -> Unit = {},
@@ -936,7 +936,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
                     } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
                         startResize(stack, window, true)
                     }
-                    handleStandardMouseAction(window, action, button, x, y)
+                    handleStandardMouseAction(window, action, button, x, y, mods)
                 }
             } catch (t: Throwable) {
                 LOG.error("fatal error", t)
@@ -967,7 +967,7 @@ private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boo
 
 private val HANDLE_MOUSE_LOCK = ReentrantLock(true)
 
-private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double) {
+private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double, mods: Int) {
     if (action == GLFW_RELEASE) {
         window.isDragging = false
         window.hasMoved = false
@@ -987,7 +987,7 @@ private fun handleStandardMouseAction(window: WindowContext, action: Int, button
         }
     }
     val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
-    window.mouseClickHandler(button, Math.round(x / scale).toInt(), Math.round(y / scale).toInt(), action == GLFW_PRESS)
+    window.mouseClickHandler(button, Math.round(x / scale).toInt(), Math.round(y / scale).toInt(), action == GLFW_PRESS, mods)
 }
 
 private fun startDrag(stack: MemoryStack, window: WindowContext) {

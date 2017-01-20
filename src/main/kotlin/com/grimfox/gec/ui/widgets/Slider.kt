@@ -150,7 +150,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
             }
             isMouseAware = false
         }
-        val updateSlider: Block.(Int, Int, Int) -> Unit = { button, x, y ->
+        val updateSlider: Block.(Int, Int, Int, Int) -> Unit = { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 val minX = slider.x
                 val maxX = minX + slider.width
@@ -185,16 +185,16 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
                 switch.shape = style.switchNormal
             }
         }
-        onMouseDown { button, x, y ->
+        onMouseDown { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 mouseDownOver = true
                 barUnfilled.shape = style.barUnfilledMouseDown
                 barFilled.shape = style.barFilledMouseDown
                 switch.shape = style.switchMouseDown
-                updateSlider(button, x, y)
+                updateSlider(button, x, y, mods)
             }
         }
-        onMouseRelease { button, x, y ->
+        onMouseRelease { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
                 mouseDownOver = false
                 barUnfilled.shape = if (mouseOver) style.barUnfilledMouseOver else style.barUnfilledNormal

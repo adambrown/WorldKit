@@ -183,15 +183,15 @@ private fun Block.menu(
                         text = titleText
                     }
                 }
-                onMouseDown { button, x, y ->
+                onMouseDown { button, x, y, mods ->
                     mouseDownOnDeActivator.value = true
                 }
-                onMouseUp { button, x, y ->
+                onMouseUp { button, x, y, mods ->
                     if (mouseDownOnDeActivator.value) {
                         deactivateMenuBar()
                     }
                 }
-                onMouseRelease { button, x, y ->
+                onMouseRelease { button, x, y, mods ->
                     mouseDownOnDeActivator.value = false
                 }
                 onMouseOver {
@@ -216,17 +216,17 @@ private fun Block.menu(
             shape = NO_SHAPE
             mouseOverActivator.value = false
         }
-        activator.onMouseDown { button, x, y ->
+        activator.onMouseDown { button, x, y, mods ->
             mouseDownOnActivator.value = true
             activateMenu()
         }
-        activator.onMouseRelease { button, x, y ->
+        activator.onMouseRelease { button, x, y, mods ->
             if (mouseDownOnActivator.value && !(mouseOverDeActivator.value || mouseOverActivator.value)) {
                 deactivateMenuBar()
             }
             mouseDownOnActivator.value = false
         }
-        menuLayer.onMouseDown { button, x, y ->
+        menuLayer.onMouseDown { button, x, y, mods ->
             deactivateMenuBar()
             reprocessTick()
         }
@@ -344,13 +344,13 @@ private fun Block.menuItem(text: Text,
                 shape = NO_SHAPE
             }
         }
-        onMouseDown { button, x, y ->
+        onMouseDown { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive.value) {
                 mouseDownOver = true
                 shape = SHAPE_BUTTON_MOUSE_DOWN
             }
         }
-        onMouseUp { button, x, y ->
+        onMouseUp { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOnActivator.value && isActive.value) {
                 deactivate()
                 task {
@@ -358,13 +358,13 @@ private fun Block.menuItem(text: Text,
                 }
             }
         }
-        onMouseRelease { button, x, y ->
+        onMouseRelease { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
                 mouseDownOver = false
                 shape = if (mouseOver) SHAPE_MENU_BORDER else NO_SHAPE
             }
         }
-        onMouseClick { button, x, y ->
+        onMouseClick { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive.value) {
                 deactivate()
                 task {
@@ -492,10 +492,10 @@ private fun Block.subMenu(text: Text,
                 dropDown.onMouseUp = null
                 dropDown.onTick = null
             }
-            dropDown.onMouseDown = { button, x, y ->
+            dropDown.onMouseDown = { button, x, y, mods ->
                 endOverride()
             }
-            dropDown.onMouseUp = { button, x, y ->
+            dropDown.onMouseUp = { button, x, y, mods ->
                 endOverride()
             }
             var lastX: Int? = null
@@ -598,13 +598,13 @@ private fun Block.subMenu(text: Text,
             }
             onTick = null
         }
-        clickCatcher.onMouseDown { button, x, y ->
+        clickCatcher.onMouseDown { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive.value) {
                 mouseDownOver = true
                 shape = SHAPE_BUTTON_MOUSE_DOWN
             }
         }
-        clickCatcher.onMouseUp { button, x, y ->
+        clickCatcher.onMouseUp { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOnActivator.value && isActive.value) {
                 if (!opened) {
                     onTick = null
@@ -612,13 +612,13 @@ private fun Block.subMenu(text: Text,
                 }
             }
         }
-        clickCatcher.onMouseRelease { button, x, y ->
+        clickCatcher.onMouseRelease { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
                 mouseDownOver = false
                 shape = if (mouseOver) SHAPE_MENU_BORDER else NO_SHAPE
             }
         }
-        clickCatcher.onMouseClick { button, x, y ->
+        clickCatcher.onMouseClick { button, x, y, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive.value) {
                 if (!opened) {
                     onTick = null

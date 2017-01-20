@@ -288,7 +288,7 @@ object MainUi {
                                     }
                                 }
                                 menuDivider()
-                                menuItem("Export maps", "Ctrl+E", isActive = doesActiveProjectExist) {
+                                menuItem("Export maps...", "Ctrl+E", isActive = doesActiveProjectExist) {
                                     println("Export maps...")
                                 }
                                 menuDivider()
@@ -389,7 +389,7 @@ object MainUi {
                                                 val seed = ref(0L)
                                                 vLongInputRow(seed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                                                     hSpacer(SMALL_SPACER_SIZE)
-                                                    button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                    button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
                                                         val randomSeed = random.nextLong()
                                                         val randomString = randomSeed.toString()
                                                         if (randomString.length > 18) {
@@ -439,12 +439,12 @@ object MainUi {
                                                     hAlign = CENTER))
                                 })
                                 var lastX = 0.0f
-                                onMouseDown { button, x, y ->
+                                onMouseDown { button, x, y, mods ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         lastX = x.toFloat()
                                     }
                                 }
-                                onMouseDrag { button, x, y ->
+                                onMouseDrag { button, x, y, mods ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         val delta = x - lastX
                                         val adjustedDelta = Math.max(350.0f, Math.min(root.width * 0.75f, leftPanel.width + delta)) - leftPanel.width

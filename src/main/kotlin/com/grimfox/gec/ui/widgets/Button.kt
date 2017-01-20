@@ -86,7 +86,7 @@ fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Bloc
                 textShape.shape = style.textShapeNormal
             }
         }
-        onMouseDown { button, x, y ->
+        onMouseDown { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 mouseDownOver = true
                 mainBlock.shape = style.mouseDown
@@ -94,7 +94,7 @@ fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Bloc
                 textShape.shape = style.textShapeMouseDown
             }
         }
-        onMouseRelease { button, x, y ->
+        onMouseRelease { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
                 mouseDownOver = false
                 mainBlock.shape = if (mouseOver) style.mouseOver else style.normal
@@ -102,7 +102,7 @@ fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Bloc
                 textShape.shape = if (mouseOver) style.textShapeMouseOver else style.textShapeNormal
             }
         }
-        onMouseClick { button, x, y ->
+        onMouseClick { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 task {
                     onClick()

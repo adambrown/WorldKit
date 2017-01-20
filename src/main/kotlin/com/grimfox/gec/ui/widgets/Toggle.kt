@@ -251,7 +251,7 @@ fun Block.toggle(toggleValue: MonitoredReference<Boolean>, textOn: Text, textOff
                 textOff.style = style.textNormalOff
             }
         }
-        onMouseDown { button, x, y ->
+        onMouseDown { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 mouseDownOver = true
                 onToggle.shape = style.switchMouseDownOn
@@ -261,7 +261,7 @@ fun Block.toggle(toggleValue: MonitoredReference<Boolean>, textOn: Text, textOff
                 textOff.style = style.textMouseDownOff
             }
         }
-        onMouseRelease { button, x, y ->
+        onMouseRelease { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT && mouseDownOver) {
                 mouseDownOver = false
                 onToggle.shape = if (mouseOver) style.switchMouseOverOn else style.switchNormalOn
@@ -271,7 +271,7 @@ fun Block.toggle(toggleValue: MonitoredReference<Boolean>, textOn: Text, textOff
                 textOff.style = if (mouseOver) style.textMouseOverOff else style.textNormalOff
             }
         }
-        onMouseClick { button, x, y ->
+        onMouseClick { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 toggleValue.value = !toggleValue.value
                 onBlock.isVisible = toggleValue.value

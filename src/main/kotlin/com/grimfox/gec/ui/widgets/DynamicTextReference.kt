@@ -39,6 +39,7 @@ class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle:
 class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: Int = dynamicText.reference.value.length, var selection: Int = 0) {
 
     private val glyphPositions = NVGGlyphPosition.create(dynamicText.sizeLimit)
+    private var lastScale = 1.0f
 
     init {
         dynamicText.reference.listener { old, new ->
@@ -54,7 +55,8 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
         }
     }
 
-    private fun getPositions(scale: Float): List<Float> {
+    private fun getPositions(scale: Float = lastScale): List<Float> {
+        lastScale = scale
         if (dynamicText.reference.value.isEmpty()) {
             return emptyList()
         }
@@ -71,7 +73,7 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
         return positions
     }
 
-    fun getOffset(scale: Float): Float {
+    fun getOffset(scale: Float = lastScale): Float {
         val caretPositions = getPositions(scale)
         if (caretPositions.isEmpty()) {
             return 0.0f
@@ -79,7 +81,7 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
         return clampedGet(position, caretPositions)
     }
 
-    fun getOffsets(scale: Float): Pair<Float, Float> {
+    fun getOffsets(scale: Float = lastScale): Pair<Float, Float> {
         val caretPositions = getPositions(scale)
         if (caretPositions.isEmpty()) {
             return Pair(0.0f, 0.0f)
@@ -91,7 +93,7 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
         return Pair(clampedGet(position, caretPositions), clampedGet(position + selection, caretPositions))
     }
 
-    fun getPosition(scale: Float, x: Float): Int {
+    fun getPosition(x: Float, scale: Float = lastScale): Int {
         val caretPositions = getPositions(scale)
         if (caretPositions.isEmpty() || x <= caretPositions.first()) {
             return 0
