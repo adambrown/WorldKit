@@ -14,6 +14,7 @@ import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
+import java.awt.image.BufferedImage
 import java.lang.Math.round
 import java.lang.Math.sqrt
 
@@ -87,8 +88,11 @@ class MeshViewport3D(
     private val positionAttributeWater = ShaderAttribute("position")
     private val uvAttributeWater = ShaderAttribute("uv")
 
+    private var hasTexture = false
     private var textureId = -1
     private var textureResolution = 0
+    private var textureToLoad: BufferedImage? = null
+    private var textureIdToDelete: Int? = null
 
     private val background = NVGColor.create().set(30, 30, 30)
 
@@ -141,9 +145,9 @@ class MeshViewport3D(
         val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
         val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
 
-        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
-        textureId = texId
-        textureResolution = texWidth
+//        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
+//        textureId = texId
+//        textureResolution = texWidth
 
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
@@ -162,6 +166,18 @@ class MeshViewport3D(
         lightDirection.normalize()
 
         modelMatrix.translate(translation)
+    }
+
+    fun setTexture(bufferedImage: BufferedImage) {
+        synchronized(hasTexture) {
+            if (hasTexture) {
+                hasTexture = false
+                textureIdToDelete = textureId
+                textureId = -1
+                textureResolution = 0
+            }
+            textureToLoad = bufferedImage
+        }
     }
 
     fun onMouseDown(button: Int, x: Int, y: Int) {
@@ -223,109 +239,125 @@ class MeshViewport3D(
         if (width < 1 || height < 1) {
             return
         }
-
-        val adjustedWidth = round(width / scale)
-        val adjustedHeight = round(height / scale)
-        val adjustedX = round(xPosition / scale)
-        val adjustedY = round(yPosition / scale)
-
-        val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneWidth = adjustedWidth - (2 * marginWidth)
-        hotZoneX1 = adjustedX + marginWidth
-        hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
-        val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
-        val hotZoneHeight = adjustedHeight - (2 * marginHeight)
-        hotZoneY1 = adjustedY + marginHeight
-        hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
-
-        val flippedY = rootHeight - (yPosition + height)
-
-        val waterOn = waterPlaneOn.value
-        val doReset = resetView.value
-        if (doReset) {
-            resetView.value = false
-        }
-        val perspectiveOn = perspectiveOn.value
-        val rotateAroundCamera = rotateAroundCamera.value
-
-        val premulRatio = width / height.toFloat()
-        val ratio = premulRatio * zoom
-        if (perspectiveOn) {
-            projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
-        } else {
-            val orthoZoom = zoom * perspectiveToOrtho
-            projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
-        }
-
-        val mouseDistanceMultiplier = (heightMap.width / (height))
-
-        if (doReset) {
-            translation.set(defaultTranslation)
-            rotation.set(defaultRotation)
-            zoom = defaultZoom
-            modelMatrix.translation(translation).rotate(rotation)
-        }
-
-        deltaX = mouseX - lastMouseX
-        deltaY = mouseY - lastMouseY
-
-        lastMouseX = mouseX.toFloat()
-        lastMouseY = mouseY.toFloat()
-
-        if (isTranslateOn) {
-            translation.x += deltaX * mouseDistanceMultiplier
-            translation.y += deltaY * -mouseDistanceMultiplier
-            tempMatrix.translation(deltaX * mouseDistanceMultiplier, deltaY * -mouseDistanceMultiplier, 0.0f)
-            tempMatrix.mul(modelMatrix, modelMatrix)
-        }
-
-        deltaRotation.identity()
-        if (isRotateOn) {
-            deltaRotation.rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
-            if (rotateAroundCamera) {
-                modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.5f)
-            } else {
-                modelMatrix.getTranslation(deltaTranslation)
-                modelMatrix.rotateAroundLocal(deltaRotation, deltaTranslation.x, deltaTranslation.y, deltaTranslation.z)
+        synchronized(hasTexture) {
+            val texToLoad = textureToLoad
+            if (texToLoad != null) {
+                val texToDelete = textureIdToDelete
+                if (texToDelete != null) {
+                    glDeleteTextures(texToDelete)
+                    textureIdToDelete = null
+                }
+                val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, texToLoad, false, true)
+                textureId = texId
+                textureResolution = texWidth
+                hasTexture = true
+                textureToLoad = null
             }
-        } else if (isRollOn) {
-            var deltaRoll = 0.0f
-            if (mouseX - adjustedX <= adjustedWidth / 2) {
-                deltaRoll += deltaY
-            } else {
-                deltaRoll -= deltaY
+            if (hasTexture) {
+                val adjustedWidth = round(width / scale)
+                val adjustedHeight = round(height / scale)
+                val adjustedX = round(xPosition / scale)
+                val adjustedY = round(yPosition / scale)
+
+                val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+                hotZoneX1 = adjustedX + marginWidth
+                hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
+                val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+                hotZoneY1 = adjustedY + marginHeight
+                hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
+
+                val flippedY = rootHeight - (yPosition + height)
+
+                val waterOn = waterPlaneOn.value
+                val doReset = resetView.value
+                if (doReset) {
+                    resetView.value = false
+                }
+                val perspectiveOn = perspectiveOn.value
+                val rotateAroundCamera = rotateAroundCamera.value
+
+                val premulRatio = width / height.toFloat()
+                val ratio = premulRatio * zoom
+                if (perspectiveOn) {
+                    projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
+                } else {
+                    val orthoZoom = zoom * perspectiveToOrtho
+                    projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
+                }
+
+                val mouseDistanceMultiplier = (heightMap.width / (height))
+
+                if (doReset) {
+                    translation.set(defaultTranslation)
+                    rotation.set(defaultRotation)
+                    zoom = defaultZoom
+                    modelMatrix.translation(translation).rotate(rotation)
+                }
+
+                deltaX = mouseX - lastMouseX
+                deltaY = mouseY - lastMouseY
+
+                lastMouseX = mouseX.toFloat()
+                lastMouseY = mouseY.toFloat()
+
+                if (isTranslateOn) {
+                    translation.x += deltaX * mouseDistanceMultiplier
+                    translation.y += deltaY * -mouseDistanceMultiplier
+                    tempMatrix.translation(deltaX * mouseDistanceMultiplier, deltaY * -mouseDistanceMultiplier, 0.0f)
+                    tempMatrix.mul(modelMatrix, modelMatrix)
+                }
+
+                deltaRotation.identity()
+                if (isRotateOn) {
+                    deltaRotation.rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
+                    if (rotateAroundCamera) {
+                        modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.5f)
+                    } else {
+                        modelMatrix.getTranslation(deltaTranslation)
+                        modelMatrix.rotateAroundLocal(deltaRotation, deltaTranslation.x, deltaTranslation.y, deltaTranslation.z)
+                    }
+                } else if (isRollOn) {
+                    var deltaRoll = 0.0f
+                    if (mouseX - adjustedX <= adjustedWidth / 2) {
+                        deltaRoll += deltaY
+                    } else {
+                        deltaRoll -= deltaY
+                    }
+                    if (mouseY - adjustedY <= adjustedHeight / 2) {
+                        deltaRoll -= deltaX
+                    } else {
+                        deltaRoll += deltaX
+                    }
+                    deltaRotation.rotate(0.0f, 0.0f, deltaRoll * mouseSpeed * 0.5f)
+                    modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
+                }
+
+                viewMatrix.mul(modelMatrix, mvMatrix)
+                normalMatrix.set(mvMatrix).invert().transpose()
+                projectionMatrix.mul(mvMatrix, mvpMatrix)
+
+                glDisable(GL_BLEND)
+                glDisable(GL_CULL_FACE)
+                glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
+                glEnable(GL_MULTISAMPLE)
+
+                glClearColor(background.r, background.g, background.b, background.a)
+                glScissor(xPosition, flippedY, width, height)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
+
+                if (waterOn) {
+                    drawWaterPlane()
+                }
+                drawHeightMap()
+
+                glDisable(GL_SCISSOR_TEST)
             }
-            if (mouseY - adjustedY <= adjustedHeight / 2) {
-                deltaRoll -= deltaX
-            } else {
-                deltaRoll += deltaX
-            }
-            deltaRotation.rotate(0.0f, 0.0f, deltaRoll * mouseSpeed * 0.5f)
-            modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
         }
-
-        viewMatrix.mul(modelMatrix, mvMatrix)
-        normalMatrix.set(mvMatrix).invert().transpose()
-        projectionMatrix.mul(mvMatrix, mvpMatrix)
-
-        glDisable(GL_BLEND)
-        glDisable(GL_CULL_FACE)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_SCISSOR_TEST)
-        glEnable(GL_MULTISAMPLE)
-
-        glClearColor(background.r, background.g, background.b, background.a)
-        glScissor(xPosition, flippedY, width, height)
-        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-        glViewport(xPosition, flippedY, width, height)
-
-        if (waterOn) {
-            drawWaterPlane()
-        }
-        drawHeightMap()
-
-        glDisable(GL_SCISSOR_TEST)
     }
 
     private fun drawHeightMap() {

@@ -1,5 +1,6 @@
 package com.grimfox.gec.opengl
 
+import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
@@ -33,6 +34,13 @@ fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
 
 fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, clampToEdge: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {
     val bufferedImage = getResourceStream(baseImage).use { ImageIO.read(it) }
+    val mipMapImages = Array<BufferedImage>(mipMaps.size) {
+        getResourceStream(mipMaps[it]).use { ImageIO.read(it) }
+    }
+    return loadTexture2D(minFilter, magFilter, bufferedImage, generateMipMaps, clampToEdge, *mipMapImages)
+}
+
+fun loadTexture2D(minFilter: Int, magFilter: Int, bufferedImage: BufferedImage, generateMipMaps: Boolean, clampToEdge: Boolean, vararg mipMaps: BufferedImage): Triple<Int, Int, Int> {
     val width = bufferedImage.width
     val height = bufferedImage.height
     val components = bufferedImage.colorModel.numComponents
@@ -160,8 +168,7 @@ fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMip
     if (generateMipMaps) {
         glGenerateMipmap(GL_TEXTURE_2D)
     }
-    mipMaps.forEachIndexed { i, path ->
-        val mipMapImage = getResourceStream(path).use { ImageIO.read(it) }
+    mipMaps.forEachIndexed { i, mipMapImage ->
         try {
             val mipMapData = readImageData(mipMapImage, components, bufferType)
             glTexImage2D(GL_TEXTURE_2D, i + 1, internalFormat, mipMapImage.width, mipMapImage.height, 0, format, type, mipMapData)

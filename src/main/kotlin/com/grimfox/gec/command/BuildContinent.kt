@@ -24,6 +24,8 @@ import com.grimfox.gec.util.geometry.Geometry.debugResolution
 import com.grimfox.gec.util.printList
 import io.airlift.airline.Command
 import io.airlift.airline.Option
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -38,6 +40,8 @@ import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
 class BuildContinent() : Runnable {
+
+    private val LOG: Logger = LoggerFactory.getLogger(javaClass)
 
     @Option(name = arrayOf("-r", "--random"), description = "The random seed to use.", required = false)
     var randomSeed: Long = System.currentTimeMillis()
@@ -135,7 +139,7 @@ class BuildContinent() : Runnable {
                         throw exceptions.first()
                     }
                     val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
-                    val riverSplines = calculateRiverSegments(test, i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows)
+                    val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows, test)
 //                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
 //                        drawRivers(graph, regionMask, riverSet, coastline, border)
 //                    }
@@ -194,7 +198,7 @@ class BuildContinent() : Runnable {
                     buildInlandMeshes(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, globalVertices, globalTriangles)
 
                 } catch (e: GeometryException) {
-                    e.test = test
+                    e.test = test.toLong()
                     val dumpFile = File("debug/debug-${String.format("%05d", test)}-data$i.txt")
                     dumpFile.printWriter().use { writer ->
                         e.printStackTrace(writer)
@@ -246,7 +250,7 @@ class BuildContinent() : Runnable {
                 vertices.add(Point3F(((vertex.x - minX) * multiplier) + xOff, ((vertex.y - minY) * multiplier) + yOff, vertex.z))
             }
             val heightMap = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
-            val heightMapSmall = FloatArrayMatrix(512) { -Float.MAX_VALUE }
+            val heightMapSmall = FloatArrayMatrix(1024) { -Float.MAX_VALUE }
             nextTime = System.currentTimeMillis()
             println("triangles moved in ${nextTime - time}")
             time = nextTime
@@ -254,21 +258,170 @@ class BuildContinent() : Runnable {
             nextTime = System.currentTimeMillis()
             println("triangles rendered in ${nextTime - time}")
             time = nextTime
-            val coastPoints = extractCoastPoints(heightMapSmall)
+            val coastPoints = extractCoastPoints(heightMap)
             nextTime = System.currentTimeMillis()
             println("coast point spatial set built in ${nextTime - time}")
             time = nextTime
-            buildUnderwaterPoints(executor, coastPoints, heightMapSmall, 8)
-            val heightMapBilinear = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
-            sampleUnderwaterBilinear(executor, heightMapBilinear, heightMapSmall, 8)
-            sampleUnderwaterBlurred(executor, heightMap, heightMapBilinear, 8)
+            buildUnderwaterPoints(executor, coastPoints, heightMap, 8)
+//            val heightMapBilinear = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
+//            sampleUnderwaterBicubic(executor, heightMapBilinear, heightMapSmall, 8)
+//            sampleUnderwaterBlurred(executor, heightMap, heightMapBilinear, 8)
             nextTime = System.currentTimeMillis()
             println("underwater generated in ${nextTime - time}")
-            writeHeightData("test-new-${String.format("%05d", test)}-heightMapSmall", heightMapSmall)
-            writeHeightData("test-new-${String.format("%05d", test)}-heightMapBilinear", heightMapBilinear)
-            writeHeightData("test-new-${String.format("%05d", test)}-heightMap", heightMap)
+//            writeHeightData("test-new-${String.format("%05d", test)}-heightMapSmall", heightMapSmall)
+//            writeHeightData("test-new-${String.format("%05d", test)}-heightMapBilinear", heightMapBilinear)
+            val rasterizedHeights = writeHeightData(heightMap)
+            ImageIO.write(rasterizedHeights, "png", File("output/$test-new-${String.format("%05d", test)}-heightMap.png"))
             println("totalTime = ${System.currentTimeMillis() - startTime}")
         }
+    }
+
+    fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
+        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
+        val startTime = System.currentTimeMillis()
+        var time = startTime
+        LOG.info("generating landmass")
+        val virtualWidth = 100000.0f
+        val outputWidth = 4096
+        val random = Random(parameterSet.seed)
+        var (graph, regionMask) = buildRegions(parameterSet)
+        parameterSet.parameters.forEachIndexed { i, parameters ->
+            parameterSet.currentIteration = i
+            val points = generatePoints(parameters.stride, virtualWidth, random)
+            val localGraph = buildGraph(virtualWidth, points, parameters.stride)
+            regionMask = applyMask(localGraph, graph, regionMask)
+            refineCoastline(localGraph, random, regionMask, parameters)
+            graph = localGraph
+        }
+        var nextTime = System.currentTimeMillis()
+        LOG.info("regions built in ${nextTime - time}")
+        time = nextTime
+        val rivers = buildRivers(graph, regionMask, random)
+        nextTime = System.currentTimeMillis()
+        LOG.info("rivers built in ${nextTime - time}")
+        time = nextTime
+        val borders = getBorders(graph, regionMask)
+        val globalVertices = PointSet2F(0.0001f)
+        val globalTriangles = ArrayList<Int>(2000000)
+        rivers.forEachIndexed { i, body ->
+            val coastline = body.first
+            val coastMultigon = Multigon2F(coastline, 20)
+            val riverSet = body.second
+            val exceptions = body.third
+            val border = borders[i]
+            val riverGraph = buildRiverGraph(riverSet)
+            val riverVertexLookup = RiverVertexLookup(riverGraph)
+            try {
+                if (exceptions.isNotEmpty()) {
+                    throw exceptions.first()
+                }
+                val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
+                val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows)
+                val reverseRiverMap = HashMap<Int, RiverNode>()
+                riverSet.forEach {
+                    it.forEach { node ->
+                        reverseRiverMap[riverVertexLookup.getId(node.point)] = node
+                    }
+                }
+                val crestPoints = PointSet2F(0.001f)
+                val fixedCrestElevations = HashMap<Int, Float>(riverGraph.triangles.size)
+                val crestElevations = HashMap<Int, Float>(riverGraph.triangles.size)
+                riverGraph.triangles.forEach { crest ->
+                    val riverA = reverseRiverMap[crest.a.id]!!
+                    val riverB = reverseRiverMap[crest.b.id]!!
+                    val riverC = reverseRiverMap[crest.c.id]!!
+                    val elevationStart = max(riverA.elevation, max(riverB.elevation, riverC.elevation))
+                    val terrainSlopeAvg = (riverA.maxTerrainSlope + riverB.maxTerrainSlope + riverC.maxTerrainSlope) / 3.0f
+                    val radius = crest.center.distance(crest.a.point)
+                    crestPoints.add(crest.center)
+                    val crestPointId = crestPoints[crest.center]
+                    val currentCrestElevation = fixedCrestElevations[crestPointId] ?: 0.0f
+                    fixedCrestElevations[crestPointId] = max(currentCrestElevation, elevationStart + (radius * terrainSlopeAvg))
+                }
+                riverGraph.triangles.forEach { crest ->
+                    crestElevations[crest.id] = fixedCrestElevations[crestPoints[crest.center]]!!
+                }
+
+                val cellsToRiverSegments = HashMap<Int, ArrayList<RiverSegment>>()
+                riverSplines.forEach {
+                    it.forEach {
+                        cellsToRiverSegments.getOrPut(it.vertexId, { ArrayList() }).add(it)
+                    }
+                }
+
+                val renderedCells = buildCoastalMeshes(riverGraph, cellsToRiverSegments, crestElevations, coastline, coastMultigon, reverseRiverMap, globalVertices, globalTriangles)
+                buildInlandMeshes(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, globalVertices, globalTriangles)
+
+            } catch (e: GeometryException) {
+                e.test = parameterSet.seed
+                val dumpFile = File("debug/debug-${String.format("%020d", parameterSet.seed)}-data$i.txt")
+                dumpFile.printWriter().use { writer ->
+                    e.printStackTrace(writer)
+                    writer.println("\ntest = ${e.test}, id = ${e.id}\n")
+                    e.data.forEach {
+                        writer.println(it)
+                    }
+                }
+                draw(debugResolution, "debug-${String.format("%020d", parameterSet.seed)}-rivers$i", "debug", Color(160, 200, 255)) {
+                    drawRivers(graph, regionMask, riverSet, coastline, border)
+                }
+                draw(debugResolution, "debug-${String.format("%020d", parameterSet.seed)}-graph$i", "debug", Color.WHITE) {
+                    drawGraph(riverGraph)
+                    graphics.color = Color.BLACK
+                    drawVertexIds(riverGraph)
+                }
+            }
+        }
+        nextTime = System.currentTimeMillis()
+        LOG.info("meshes built in ${nextTime - time}")
+        time = nextTime
+        var minX = Float.MAX_VALUE
+        var maxX = -Float.MIN_VALUE
+        var minY = Float.MAX_VALUE
+        var maxY = -Float.MIN_VALUE
+        globalVertices.forEach {
+            if (it.x < minX) {
+                minX = it.x
+            }
+            if (it.x > maxX) {
+                maxX = it.x
+            }
+            if (it.y < minY) {
+                minY = it.y
+            }
+            if (it.y > maxY) {
+                maxY = it.y
+            }
+        }
+        val dx = maxX - minX
+        val dy = maxY - minY
+        val dMax = max(dx, dy)
+        val multiplier = 0.8455f / dMax
+        val xOff = (1.0f - (multiplier * dx)) * 0.5f
+        val yOff = (1.0f - (multiplier * dy)) * 0.5f
+        val vertices = ArrayList<Point3F>(globalVertices.size)
+        globalVertices.forEach {
+            val vertex = it as Point3F
+            vertices.add(Point3F(((vertex.x - minX) * multiplier) + xOff, ((vertex.y - minY) * multiplier) + yOff, vertex.z))
+        }
+        val heightMap = FloatArrayMatrix(outputWidth) { -Float.MAX_VALUE }
+        val heightMapSmall = FloatArrayMatrix(1024) { -Float.MAX_VALUE }
+        nextTime = System.currentTimeMillis()
+        LOG.info("triangles moved in ${nextTime - time}")
+        time = nextTime
+        renderTriangles(executor, vertices, globalTriangles, heightMap, heightMapSmall, 8)
+        nextTime = System.currentTimeMillis()
+        LOG.info("triangles rendered in ${nextTime - time}")
+        time = nextTime
+        val coastPoints = extractCoastPoints(heightMap)
+        nextTime = System.currentTimeMillis()
+        LOG.info("coast point spatial set built in ${nextTime - time}")
+        time = nextTime
+        buildUnderwaterPoints(executor, coastPoints, heightMap, 8)
+        nextTime = System.currentTimeMillis()
+        LOG.info("underwater generated in ${nextTime - time}")
+        executor.shutdownNow()
+        return writeHeightData(heightMap)
     }
 
     private fun extractCoastPoints(heightMap: FloatArrayMatrix): SpatialPointSet2F {
@@ -1112,10 +1265,10 @@ class BuildContinent() : Runnable {
         return false
     }
 
-    private fun calculateRiverSegments(test: Int, body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, random: Random, rivers: ArrayList<TreeNode<RiverNode>>, flows: FloatArray): ArrayList<TreeNode<RiverSegment>> {
+    private fun calculateRiverSegments(body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, random: Random, rivers: ArrayList<TreeNode<RiverNode>>, flows: FloatArray, test: Int? = null): ArrayList<TreeNode<RiverSegment>> {
         val trees = ArrayList<TreeNode<RiverSegment>>()
         rivers.forEach { outlet ->
-            trees.add(calculateRiverSplines(test, body, graph, coastline, coastMultigon, null, outlet,  flows))
+            trees.add(calculateRiverSplines(body, graph, coastline, coastMultigon, null, outlet, flows, test))
         }
         var direction = -1.0f
         trees.forEach { tree ->
@@ -1164,7 +1317,7 @@ class BuildContinent() : Runnable {
             var profile: RiverProfile,
             val splices: ArrayList<Pair<LineSegment2F, Point2F>> = ArrayList())
 
-    private fun calculateRiverSplines(test: Int, body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, transition: RiverNodeTransition?, node: TreeNode<RiverNode>, flows: FloatArray): TreeNode<RiverSegment> {
+    private fun calculateRiverSplines(body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, transition: RiverNodeTransition?, node: TreeNode<RiverNode>, flows: FloatArray, test: Int? = null): TreeNode<RiverSegment> {
         val vertex = graph[node.value.point]
         val vertexElevation = node.value.elevation
         val cell = vertex.cell
@@ -1203,7 +1356,7 @@ class BuildContinent() : Runnable {
             try {
                 childEdge = cell.sharedEdge(childCell)!!
             } catch (e: Exception) {
-                draw(debugResolution, "debug-${String.format("%05d", test)}-cells$body", "debug", Color.WHITE) {
+                draw(debugResolution, "debug-${String.format("%05d", test ?: 0)}-cells$body", "debug", Color.WHITE) {
                     graphics.color = Color.BLACK
                     drawCell(cell)
                     drawCell(childCell)
@@ -1266,7 +1419,7 @@ class BuildContinent() : Runnable {
             if (transitionEdge != null) {
                 junctions.value.splices.add(Pair(transitionEdge, drainPoint))
             }
-            toSplineTree(test, body, graph, coastline, coastMultigon, junctions, flows)!!
+            toSplineTree(body, graph, coastline, coastMultigon, junctions, flows, test)!!
         }
         return rootNode
     }
@@ -1294,17 +1447,17 @@ class BuildContinent() : Runnable {
         throw GeometryException("unable to find the main polygon for cell: ${vertex.id}")
     }
 
-    private fun toSplineTree(test: Int, body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, junctions: TreeNode<Junction>, flows: FloatArray): TreeNode<RiverSegment>? {
+    private fun toSplineTree(body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, junctions: TreeNode<Junction>, flows: FloatArray, test: Int? = null): TreeNode<RiverSegment>? {
         val spline = junctions.value.spline ?: return null
         val elevations = Vector2F(junctions.value.splineElevation!!, junctions.value.elevation)
         val slope = calculateSlope(spline, elevations)
         val treeNode = TreeNode(RiverSegment(spline, elevations, junctions.value.vertexId, calculateRiverProfile(junctions.value.flow, slope, elevations), junctions.value.splices))
         val riverNode = junctions.value.node
         if (riverNode != null) {
-            treeNode.children.add(calculateRiverSplines(test, body, graph, coastline, coastMultigon, RiverNodeTransition(junctions.value.elevation, junctions.value.point, junctions.value.vector, junctions.value.splices.first().first), riverNode, flows))
+            treeNode.children.add(calculateRiverSplines(body, graph, coastline, coastMultigon, RiverNodeTransition(junctions.value.elevation, junctions.value.point, junctions.value.vector, junctions.value.splices.first().first), riverNode, flows, test))
         }
         junctions.children.forEach {
-            val subTree = toSplineTree(test, body, graph, coastline, coastMultigon, it, flows)
+            val subTree = toSplineTree(body, graph, coastline, coastMultigon, it, flows, test)
             if (subTree != null) {
                 treeNode.children.add(subTree)
             }

@@ -15,7 +15,7 @@ out VertexData {
 } VertexOut;
 
 void main () {
-    vec4 position = vec4(position.xy, heightScale * 0.298, 1.0);
+    vec4 position = vec4(position.xy, heightScale * 0.29944, 1.0);
     VertexOut.position = vec3(modelViewMatrix * position);
     VertexOut.normal = normalMatrix * vec3(0.0f, 0.0f, 1.0f);
     gl_Position = modelViewProjectionMatrix * position;

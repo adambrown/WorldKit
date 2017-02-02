@@ -97,8 +97,8 @@ object Rivers {
                         fakeInteriorBorderPoints = if (landward >= 0) twoSide else oneSide
                         val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, fakeInteriorBorderPoints, fakeCoastPoints)
                         furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, fakeCoastPoints, fakeInteriorBorderPoints)
-                        terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
-                        buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
+                        terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region, regions.size)
+                        buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region, regions.size)
                     } else {
                         if (isolatedChunks.size > 1) {
                             val fakeCoastPoints = if (negateFakeWater) {
@@ -123,8 +123,8 @@ object Rivers {
                                     }
                                 }
                             }
-                            terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
-                            buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
+                            terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region, regions.size)
+                            buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region, regions.size)
                         } else {
                             val inlandExtremeId = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalWater)
                             val inland = distanceToLine(bisector, vertices[inlandExtremeId].point)
@@ -143,15 +143,15 @@ object Rivers {
                                     inlandRiverMouths.add(inlandMouthIndex)
                                 }
                             }
-                            terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region)
-                            buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region)
+                            terrainSlope = buildTerrainSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, region, regions.size)
+                            buildRiverSlopeWeights(vertices, fakeInteriorBorderPoints, fakeCoastPoints, furthestFromBorder, furthestFromCoast, region, regions.size)
                         }
                     }
                 } else {
                     val furthestFromCoast = findFurthestPointFromAllInOtherSet(vertices, interiorBorderPoints, coastalBorderPoints)
                     furthestFromBorder = findFurthestPointFromAllInOtherSet(vertices, coastalBorderPoints, interiorBorderPoints)
-                    terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region)
-                    buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region)
+                    terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region, regions.size)
+                    buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region, regions.size)
                 }
                 val regionCoastBorders = graph.findBorder(region, water, false)
                 val localRiverMouths = ArrayList<Int>()
@@ -491,7 +491,7 @@ object Rivers {
         return vertices[id1].point.distance2(vertices[id2].point)
     }
 
-    private fun buildRiverSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, furthestFromBorder: Int, furthestFromCoast: Int, region: Collection<Int>): Map<Int, Float> {
+    private fun buildRiverSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, furthestFromBorder: Int, furthestFromCoast: Int, region: Collection<Int>, regionCount: Int): Map<Int, Float> {
         val vector = perpendicularVector(vertices, furthestFromBorder, furthestFromCoast)
         var extremityLine = perpendicularLine(vertices, furthestFromBorder, furthestFromCoast)
         var minPoint: Int? = null
@@ -537,14 +537,23 @@ object Rivers {
         val maxSlope = riverSlopeWeights.values.max()!!
         val minSlope = riverSlopeWeights.values.min()!!
         val slopeDelta = maxSlope - minSlope
-        val neededSlopeDelta = MAX_RIVER_SLOPE - MIN_RIVER_SLOPE
+        val neededSlopeDelta = if (regionCount == 1) {
+            0.2f
+        } else {
+            MAX_RIVER_SLOPE - MIN_RIVER_SLOPE
+        }
+        val realMin = if (regionCount == 1) {
+            0.07f
+        } else {
+            MIN_RIVER_SLOPE
+        }
         ArrayList(riverSlopeWeights.keys).forEach {
-            riverSlopeWeights[it] = (((riverSlopeWeights[it]!! - minSlope) / slopeDelta) * neededSlopeDelta) + MIN_RIVER_SLOPE
+            riverSlopeWeights[it] = (((riverSlopeWeights[it]!! - minSlope) / slopeDelta) * neededSlopeDelta) + realMin
         }
         return riverSlopeWeights
     }
 
-    private fun buildTerrainSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, region: Collection<Int>): HashMap<Int, Float> {
+    private fun buildTerrainSlopeWeights(vertices: Vertices, border: Set<Int>, coast: Set<Int>, region: Collection<Int>, regionCount: Int): HashMap<Int, Float> {
         var minDistFromCoast = Float.MAX_VALUE
         var maxDistFromCoast = -Float.MAX_VALUE
         var minDistFromBorder = Float.MAX_VALUE
@@ -568,12 +577,21 @@ object Rivers {
         }
         val coastDelta = maxDistFromCoast - minDistFromCoast
         val borderDelta = maxDistFromBorder - minDistFromBorder
-        val slopeDelta = MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
+        val slopeDelta = if (regionCount == 1) {
+            0.2f
+        } else {
+            MAX_TERRAIN_SLOPE - MIN_TERRAIN_SLOPE
+        }
+        val realMin = if (regionCount == 1) {
+            0.1f
+        } else {
+            MIN_TERRAIN_SLOPE
+        }
         return hashMapOf(*distances.map {
             val normalizedCoast = if (coastDelta == 0.0f) 0.0f else (it.second - minDistFromCoast) / coastDelta
             val normalizedBorder = if (borderDelta == 0.0f) 0.0f else (it.third - minDistFromBorder) / borderDelta
-            val borderWeight = MIN_TERRAIN_SLOPE + (sigmoidBorder(normalizedBorder) * slopeDelta)
-            val coastWeight = MIN_TERRAIN_SLOPE + (sigmoidCoast(normalizedCoast) * slopeDelta)
+            val borderWeight = realMin + (sigmoidBorder(normalizedBorder) * slopeDelta)
+            val coastWeight = realMin + (sigmoidCoast(normalizedCoast) * slopeDelta)
             Pair(it.first, max(coastWeight, borderWeight))
         }.toTypedArray())
     }
@@ -871,7 +889,7 @@ object Rivers {
             }
         }
 
-//        draw(debugResolution, "debug-connectedBodies-${Geometry.debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE) {
+//        draw(debugResolution, "debug-connectedBodies-${geometry.debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE) {
 //            graphics.color = Color.BLACK
 //            drawMask(graph, connectedBodies.flatMap { it }.toSet(), true)
 //        }
@@ -919,7 +937,7 @@ object Rivers {
 
 
 //        connectedBodies.forEach {
-//            draw(debugResolution, "debug-connectedBodies-${Geometry.debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE) {
+//            draw(debugResolution, "debug-connectedBodies-${geometry.debugIteration.get()}-${debugCount.andIncrement}", "output", Color.WHITE) {
 //                graphics.color = Color.BLACK
 //                drawMask(graph, it, true)
 //            }

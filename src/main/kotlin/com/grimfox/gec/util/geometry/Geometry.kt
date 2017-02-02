@@ -22,7 +22,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
 
-class GeometryException(message: String? = null, cause: Throwable? = null, var test: Int? = null, var id: Int? = null, val data: ArrayList<String> = ArrayList<String>()): Exception(message, cause) {
+class GeometryException(message: String? = null, cause: Throwable? = null, var test: Long? = null, var id: Int? = null, val data: ArrayList<String> = ArrayList<String>()): Exception(message, cause) {
 
     fun with(adjustment: GeometryException.() -> Unit): GeometryException {
         this.adjustment()
@@ -940,7 +940,7 @@ fun buildMesh(edgeSkeletonIn: ArrayList<LineSegment3F>, riverSkeletonIn: ArrayLi
     } catch (g: GeometryException) {
             throw g
     } catch (e: Exception) {
-        throw GeometryException("unable to build mesh for unknown reason", e)
+        throw GeometryException("unable to build meshing for unknown reason", e)
     }
 }
 
@@ -2116,6 +2116,10 @@ fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: Matrix<Float>)
 }
 
 fun writeHeightData(name: String, heightMap: Matrix<Float>) {
+    ImageIO.write(writeHeightData(heightMap), "png", File("output/$name.png"))
+}
+
+fun writeHeightData(heightMap: Matrix<Float>): BufferedImage {
     var maxLandValue = -Double.MAX_VALUE
     var minWaterValue = Double.MAX_VALUE
     for (y in (0..heightMap.width - 1)) {
@@ -2150,7 +2154,7 @@ fun writeHeightData(name: String, heightMap: Matrix<Float>) {
             }
         }
     }
-    ImageIO.write(output, "png", File("output/$name.png"))
+    return output
 }
 
 fun max(a: Int, b: Int, c: Int) = max(max(a, b), c)

@@ -1,6 +1,8 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
+import com.grimfox.gec.command.BuildContinent
+import com.grimfox.gec.command.BuildContinent.ParameterSet
 import com.grimfox.gec.opengl.loadTexture2D
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
@@ -42,6 +44,26 @@ object MainUi {
             } else {
                 (Math.sqrt((value - 125.937) / 4160.29) + 0.46874918).toFloat()
             }))
+        }
+        fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
+            return { scale: Float ->
+                clamp(Math.round(scale * (range.last - range.first)) + range.first, range.first, range.last)
+            }
+        }
+        fun linearClampedScaleFunctionInverse(range: IntRange): (Int) -> Float {
+            return { value: Int ->
+                clamp(Math.abs((value - range.first).toFloat() / (range.last - range.first)), 0.0f, 1.0f)
+            }
+        }
+        fun linearClampedScaleFunction(min: Float, max: Float): (Float) -> Float {
+            return { scale: Float ->
+                clamp(Math.round(scale * (max - min)) + min, min, max)
+            }
+        }
+        fun linearClampedScaleFunctionInverse(min: Float, max: Float): (Float) -> Float {
+            return { value: Float ->
+                clamp(Math.abs((value - min).toFloat() / (max - min)), 0.0f, 1.0f)
+            }
         }
         val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
         val waterPlaneOn = ref(true)
@@ -386,7 +408,36 @@ object MainUi {
                                                 layout = HORIZONTAL
                                                 val shrinkGroup = hShrinkGroup()
                                                 vSpacer(MEDIUM_SPACER_SIZE)
-                                                val seed = ref(0L)
+                                                val allowUnsafe = ref(false)
+                                                val seed = ref(1L)
+                                                val regions = ref(8)
+                                                val islands = ref(1)
+                                                val stride = ref(7)
+                                                val startPoints = ref(2)
+                                                val reduction = ref(7)
+                                                val connectedness = ref(0.114f)
+                                                val regionSize = ref(0.034f)
+                                                val iterations = ref(20)
+                                                val onUpdateParamsFun = {
+                                                    if (!allowUnsafe.value) {
+                                                        stride.value = ((regions.value + 3) / 4) + 5
+                                                        val stride2 = stride.value * stride.value
+                                                        val approxInland = stride2 - (4 * stride.value) + 4
+                                                        startPoints.value = Math.min(6, Math.max(1, Math.floor(approxInland / (regions.value.toDouble() + (islands.value / 2))).toInt() - 1))
+                                                        reduction.value = Math.floor((approxInland - (startPoints.value * regions.value)) * 0.8).toInt()
+                                                        connectedness.value = Math.round(((1.0f / stride.value) * 0.77f) * 1000.0f) / 1000.0f
+                                                        val unitLength = 1.0f / stride.value
+                                                        val unit2 = unitLength * unitLength
+                                                        regionSize.value = Math.round((((unit2 * (approxInland - reduction.value)) / regions.value) * 0.763f) * 1000.0f) / 1000.0f
+                                                    }
+                                                }
+                                                onUpdateParamsFun()
+                                                regions.listener { old, new ->
+                                                    onUpdateParamsFun()
+                                                }
+                                                islands.listener { old, new ->
+                                                    onUpdateParamsFun()
+                                                }
                                                 vLongInputRow(seed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                                                     hSpacer(SMALL_SPACER_SIZE)
                                                     button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
@@ -399,13 +450,42 @@ object MainUi {
                                                         }
                                                     }
                                                 }
-                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                                vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+                                                vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Island strength:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
+                                                vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                                val unsafeBlocks = ArrayList<Block>()
+                                                unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderWithValueRow(startPoints, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start points:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..50), linearClampedScaleFunctionInverse(5..50)).with { isMouseAware = allowUnsafe.value})
+                                                allowUnsafe.listener { old, new ->
+                                                    if (!new) {
+                                                        onUpdateParamsFun()
+                                                    }
+                                                    unsafeBlocks.forEach {
+                                                        it.isMouseAware = new
+                                                    }
+                                                }
+//                                                vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+//                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+//                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+//                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
-                                                    button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-                                                    button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                                    button(text("Generate terrain"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        meshViewport.setTexture(BuildContinent().generateLandmass(ParameterSet(
+                                                                seed = seed.value,
+                                                                regionCount = regions.value,
+                                                                stride = stride.value,
+                                                                islandDesire =  islands.value,
+                                                                regionPoints = startPoints.value,
+                                                                initialReduction = reduction.value,
+                                                                connectedness = connectedness.value,
+                                                                regionSize = regionSize.value,
+                                                                maxRegionTries = iterations.value * 10,
+                                                                maxIslandTries = iterations.value * 100)))
+                                                    }
                                                 }
                                             }
                                             hSpacer(MEDIUM_SPACER_SIZE)

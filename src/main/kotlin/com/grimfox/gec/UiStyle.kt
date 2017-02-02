@@ -396,13 +396,13 @@ fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text {
 val TEXT_ON = text("On")
 val TEXT_OFF = text("Off")
 
-fun Block.label(text: Text, width: Float): Block {
+fun Block.label(text: Text, width: Float, hAlign: HorizontalAlignment = RIGHT): Block {
     return block {
         hSizing = STATIC
         this.width = width
         layout = HORIZONTAL
         block {
-            hAlign = RIGHT
+            this.hAlign = hAlign
             vAlign = MIDDLE
             hSizing = SHRINK
             vSizing = SHRINK
@@ -430,8 +430,8 @@ fun Block.label(text: Text, shrinkGroup: ShrinkGroup): Block {
     }
 }
 
-fun Block.label(text: Text): Block {
-    val label = label(text, 0.0f)
+fun Block.label(text: Text, hAlign: HorizontalAlignment = RIGHT): Block {
+    val label = label(text, 0.0f, hAlign)
     label.hSizing = SHRINK
     return label
 }
@@ -842,8 +842,42 @@ fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Tex
         block {
             hSizing = GROW
             layout = HORIZONTAL
-            val toggle = slider(value, function, inverseFunction)
-            row.supplantEvents(toggle)
+            val slider = slider(value, function, inverseFunction)
+            row.supplantEvents(slider)
+            isMouseAware = false
+        }
+    }
+}
+
+fun <T> Block.vSliderWithValueRow(value: MonitoredReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+    val dynamicText = DynamicTextReference(value.value.toString(), valueSize, textStyle)
+    value.listener { old, new ->
+        dynamicText.reference.value = new.toString()
+    }
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = STATIC
+                width = Math.ceil(textStyle.size.value * valueSize * 0.5).toFloat()
+                layout = HORIZONTAL
+                isMouseAware = false
+                label(dynamicText.text, LEFT)
+            }
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                isMouseAware = false
+                val slider = slider(value, function, inverseFunction)
+                row.supplantEvents(slider)
+            }
             isMouseAware = false
         }
     }
