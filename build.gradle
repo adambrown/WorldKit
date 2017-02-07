@@ -1,16 +1,37 @@
 
 buildscript {
+
+    ext.triangle_version = '1.0.0'
+    ext.airline_version = '0.7'
+    ext.reflections_version = '0.9.10'
+    ext.jackson_version = '2.7.5'
+    ext.joml_version = '1.9.0'
+    ext.imageio_version = '3.3.1'
+    ext.lwjgl_version = '3.1.0'
+    ext.slf4j_version = '1.7.21'
+    ext.logback_version = '1.1.7'
+    ext.kovenant_version = '3.3.0'
+
     repositories {
         mavenLocal()
-        mavenCentral()
         jcenter()
     }
+
     dependencies {
-        classpath group: 'org.jetbrains.kotlin', name: 'kotlin-gradle-plugin', version: kotlin_version
-        classpath group: 'com.grimfox', name: 'packr-gradle-plugin', version: 'unspecified'
+        classpath group: 'com.grimfox', name: 'packr-gradle-plugin', version: '1.0.0'
     }
 }
 
+plugins {
+    id 'nebula.dependency-recommender' version '3.7.0'
+    id 'nebula.resolution-rules' version '2.0.0'
+    id 'nebula.dependency-lock' version '4.3.2'
+    id 'nebula.maven-publish' version '4.9.1'
+    id 'nebula.nebula-release' version '4.0.1'
+    id 'nebula.kotlin' version '1.0.6'
+}
+
+group = 'com.grimfox'
 
 description 'Game Environment Creator'
 
@@ -28,31 +49,34 @@ switch (OperatingSystem.current()) {
         break
 }
 
-apply plugin: 'kotlin'
-apply plugin: 'application'
 apply plugin: 'com.grimfox.packr-gradle-plugin'
-
-mainClassName = 'com.grimfox.gec.Main'
-
-tasks.withType(Tar) {
-    compression = Compression.GZIP
-}
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '3.0'
+    gradleVersion = '3.3'
+}
+
+dependencyRecommendations {
+    add { org, name -> 'latest.release' }
+}
+
+dependencyLock {
+    includeTransitives = true
 }
 
 repositories {
     mavenLocal()
-    mavenCentral()
     jcenter()
 }
 
 dependencies {
-    compile group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib', version: kotlin_version
+    resolutionRules group: 'com.netflix.nebula', name: 'gradle-resolution-rules'
+
+    compile group: 'com.grimfox', name: 'triangle-kotlin', version: triangle_version
+
+    compile group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib'
 
     compile group: 'io.airlift', name: 'airline', version: airline_version
     compile group: 'org.reflections', name: 'reflections', version: reflections_version
@@ -103,7 +127,7 @@ buildExecutables {
     executable {
         name = 'WorldKit'
         platform = 'windows64'
-        jdk = file('file://D:/sandbox/oracle-jdk-8.zip')
+        jdk = file('file://D:/sandbox/oracle-jdk-8-windows64.zip')
         mainClass = 'com.grimfox.gec.MainUi'
         minimizeJre = 'oraclejre8'
     }

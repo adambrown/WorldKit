@@ -739,9 +739,11 @@ private class WindowContext(
             if (Math.abs(moveX) > 0.5 || Math.abs(moveY) > 0.5) {
                 var newWindowX = Math.round(x + moveX.toDouble()).toInt()
                 var newWindowY = Math.round(y + moveY.toDouble()).toInt()
-                if (!isMac && newWindowY < currentMonitor.mouseSpaceY1 && hasMoved && (newWindowY <= currentMonitor.mouseSpaceY1 - 15 || mouseY < currentMonitor.mouseSpaceY1 + 0.1)) {
-                    maximize()
-                    hasMoved = false
+                if (!isMac && newWindowY < currentMonitor.mouseSpaceY1) {
+                    if (hasMoved && (newWindowY <= currentMonitor.mouseSpaceY1 - 15 || mouseY < currentMonitor.mouseSpaceY1 + 0.1)) {
+                        maximize()
+                        hasMoved = false
+                    }
                 } else {
                     if (!hasMoved && (Math.abs(dragWindowStartX - newWindowX) > 10 || Math.abs(dragWindowStartY - newWindowY) > 10)) {
                         newWindowX = restore(newWindowX)
@@ -1017,18 +1019,18 @@ private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boo
 private val HANDLE_MOUSE_LOCK = ReentrantLock(true)
 
 private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double, mods: Int) {
-    if (action == GLFW_RELEASE) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         window.isDragging = false
         window.hasMoved = false
         window.isResizing = false
     }
-    if (button == GLFW_MOUSE_BUTTON_1) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
             window.isMouse1Down = true
         } else if (action == GLFW_RELEASE) {
             window.isMouse1Down = false
         }
-    } else if (button == GLFW_MOUSE_BUTTON_2) {
+    } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
         if (action == GLFW_PRESS) {
             window.isMouse2Down = true
         } else if (action == GLFW_RELEASE) {
