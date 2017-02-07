@@ -1,47 +1,31 @@
 package com.grimfox.gec.ui
 
-import com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL
+import com.fasterxml.jackson.annotation.JsonInclude.Include.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.grimfox.gec.WindowState
+import com.grimfox.gec.*
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.loadImagePixels
-import com.grimfox.gec.saveRecentProjects
-import com.grimfox.gec.saveWindowState
 import com.grimfox.gec.ui.widgets.*
-import com.grimfox.gec.util.Reference
-import com.grimfox.gec.util.cRef
-import com.grimfox.gec.util.clamp
-import com.grimfox.gec.util.loadResource
+import com.grimfox.gec.util.*
 import org.lwjgl.BufferUtils
-import org.lwjgl.glfw.Callbacks
+import org.lwjgl.glfw.*
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.glfw.GLFWErrorCallback
-import org.lwjgl.glfw.GLFWImage
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
-import org.lwjgl.opengl.ARBDebugOutput
-import org.lwjgl.opengl.GL.createCapabilities
+import org.lwjgl.opengl.*
+import org.lwjgl.opengl.GL.*
 import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL43
-import org.lwjgl.opengl.GLUtil.setupDebugMessageCallback
-import org.lwjgl.opengl.KHRDebug
-import org.lwjgl.system.Callback
-import org.lwjgl.system.Configuration
-import org.lwjgl.system.MemoryStack
-import org.lwjgl.system.MemoryStack.stackPush
-import org.lwjgl.system.MemoryUtil.NULL
-import org.lwjgl.system.Platform
+import org.lwjgl.opengl.GLUtil.*
+import org.lwjgl.system.*
+import org.lwjgl.system.MemoryStack.*
+import org.lwjgl.system.MemoryUtil.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.awt.GraphicsEnvironment
-import java.awt.MouseInfo
-import java.awt.Rectangle
-import java.awt.Toolkit
 import java.io.PrintStream
-import java.lang.Math.round
-import java.lang.Thread.sleep
+import java.lang.Math.*
+import java.lang.Thread.*
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
@@ -49,6 +33,10 @@ import java.util.concurrent.locks.ReentrantLock
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(NON_NULL)
+
+private val isMac = System.getProperty("os.name").toLowerCase().contains("mac")
+private val mouseFetcher = if (isMac) MacMouseFetcher() else WindowsMouseFetcher()
+private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsScreenInfoFetcher()
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
@@ -65,7 +53,10 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
         ui.show()
         while (!ui.shouldClose()) {
             ui.handleFrameInput()
-            ui.handleDragAndResize()
+            val needsRefresh = ui.handleDragAndResize()
+            if (needsRefresh) {
+                ui.updatePositionAndSize()
+            }
             val frameWidth = ui.width
             val frameHeight = ui.height
             ui.clearViewport(frameWidth, frameHeight)
@@ -161,6 +152,32 @@ interface UserInterface {
     operator fun invoke(block: UserInterface.() -> Unit) {
         this.block()
     }
+}
+
+private fun getMousePosition(window: WindowContext): Pair<Int, Int> {
+    return mouseFetcher.getMousePosition(window.id, window.x, window.y, window.mouseX, window.mouseY, window.relativeMouseX, window.relativeMouseY, window.warpLines)
+}
+
+internal interface MouseFetcher {
+    fun getMousePosition(windowId: Long, windowX: Int, windowY: Int, mouseX: Int, mouseY: Int, relativeMouseX: Double, relativeMouseY: Double, warpLines: List<WarpLine>): Pair<Int, Int>
+}
+
+internal class MacMouseFetcher : MouseFetcher {
+
+    override fun getMousePosition(windowId: Long, windowX: Int, windowY: Int, mouseX: Int, mouseY: Int, relativeMouseX: Double, relativeMouseY: Double, warpLines: List<WarpLine>): Pair<Int, Int> {
+        twr(stackPush()) { stack ->
+            val x = stack.mallocDouble(1)
+            val y = stack.mallocDouble(1)
+            glfwGetCursorPos(windowId, x, y)
+            val newMouseX = Math.round(windowX + x[0]).toInt()
+            val newMouseY = Math.round(windowY + y[0]).toInt()
+            return Pair(newMouseX, newMouseY)
+        }
+    }
+}
+
+private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
+    return screenInfoFetcher.getScreensAndWarpLines()
 }
 
 private class UserInterfaceInternal internal constructor(internal val window: WindowContext) : UserInterface {
@@ -276,8 +293,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         window.handleFrameInput()
     }
 
-    internal fun handleDragAndResize() {
-        window.handleDragAndResize()
+    internal fun handleDragAndResize(): Boolean {
+        return window.handleDragAndResize()
+    }
+
+    internal fun updatePositionAndSize() {
+        window.updatePositionAndSize()
     }
 
     internal fun shouldClose(): Boolean {
@@ -298,15 +319,32 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         if (isMinimized) {
             return
         }
-        glViewport(0, 0, width, height)
-        nvgSave(nvg)
-        val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
-        root.width = width / scale
-        root.height = height / scale
-        root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
-        nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
-        root.draw(nvg, scale)
-        glViewport(0, 0, width, height)
+        if (isMac) {
+            glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+            nvgSave(nvg)
+            val scale = if (window.isResizing) {
+                window.resizeScaleFactor
+            } else {
+                clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            }
+            root.width = width.toFloat()
+            root.height = height.toFloat()
+            root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
+            nvgBeginFrame(nvg, window.currentPixelWidth, window.currentPixelHeight, 1.0f)
+            root.draw(nvg, scale)
+            glViewport(0, 0, width, height)
+            glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+        } else {
+            glViewport(0, 0, width, height)
+            nvgSave(nvg)
+            val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            root.width = width / scale
+            root.height = height / scale
+            root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
+            nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
+            root.draw(nvg, scale)
+            glViewport(0, 0, width, height)
+        }
         nvgEndFrame(nvg)
         nvgRestore(nvg)
     }
@@ -465,13 +503,13 @@ private data class MonitorSpec(
 
 private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 1.0, 0, 0, 0, 0)
 
-private data class ScreenIdentity(
+internal data class ScreenIdentity(
         val x: Int,
         val y: Int,
         val width: Int,
         val height: Int)
 
-private data class WarpLine(
+internal data class WarpLine(
         val x1: Int,
         val y1: Int,
         val x2: Int,
@@ -479,7 +517,7 @@ private data class WarpLine(
         val warpX: Int,
         val warpY: Int)
 
-private data class ScreenSpec(
+internal data class ScreenSpec(
         val x1: Int,
         val y1: Int,
         val x2: Int,
@@ -500,7 +538,7 @@ private data class ScreenSpec(
 private class WindowContext(
         var id: Long = 0,
 
-        val debugProc: Callback,
+        val debugProc: Callback?,
         val nvg: Long,
         val layout: UiLayoutInternal = UiLayoutInternal(nvg),
 
@@ -544,6 +582,8 @@ private class WindowContext(
         var resizeWindowStartY: Int = 0,
 
         var resizeMove: Boolean = false,
+
+        var resizeScaleFactor: Float = 1.0f,
 
         var resizeWindowStartWidth: Int = 0,
         var resizeWindowStartHeight: Int = 0,
@@ -594,25 +634,12 @@ private class WindowContext(
                     isMinimized = false
                 }
 
-                val lastMouseX = mouseX
-                val lastMouseY = mouseY
                 glfwGetWindowPos(id, w, h)
                 x = w[0]
                 y = h[0]
-                val pointerLocation = MouseInfo.getPointerInfo()?.location
-                if (pointerLocation == null) {
-                    val x = stack.mallocDouble(1)
-                    val y = stack.mallocDouble(1)
-                    glfwGetCursorPos(id, x, y)
-                    val newMouseX = Math.round(mouseX + (x[0] - relativeMouseX)).toInt()
-                    val newMouseY = Math.round(mouseY + (y[0] - relativeMouseY)).toInt()
-                    val (mouseWarpX, mouseWarpY) = getWarp(lastMouseX, lastMouseY, newMouseX, newMouseY)
-                    mouseX = newMouseX + mouseWarpX
-                    mouseY = newMouseY + mouseWarpY
-                } else {
-                    mouseX = pointerLocation.x
-                    mouseY = pointerLocation.y
-                }
+                val (newMouseX, newMouseY) = getMousePosition(this@WindowContext)
+                mouseX = newMouseX
+                mouseY = newMouseY
                 relativeMouseX = mouseX.toDouble() - x
                 relativeMouseY = mouseY.toDouble() - y
             }
@@ -620,14 +647,31 @@ private class WindowContext(
         glfwPollEvents()
     }
 
-    internal fun handleDragAndResize() {
-        if (!ignoreInput) {
-            handleDragging()
-            handleResizing()
+    internal fun updatePositionAndSize() {
+        twr(stackPush()) { stack ->
+            val w = stack.mallocInt(1)
+            val h = stack.mallocInt(1)
+            glfwGetWindowSize(id, w, h)
+            currentWidth = w.get(0)
+            currentHeight = h.get(0)
+            glfwGetFramebufferSize(id, w, h)
+            currentPixelWidth = w.get(0)
+            currentPixelHeight = h.get(0)
+            glfwGetWindowPos(id, w, h)
+            x = w[0]
+            y = h[0]
         }
     }
 
-    private fun handleResizing() {
+    internal fun handleDragAndResize(): Boolean {
+        if (!ignoreInput) {
+            handleDragging()
+            return handleResizing()
+        }
+        return false
+    }
+
+    private fun handleResizing(): Boolean {
         if (isResizing) {
             isMaximized = false
             restoreHandler()
@@ -667,13 +711,17 @@ private class WindowContext(
                 currentWidth = newWidth
                 currentHeight = newHeight
                 glfwSetWindowSize(id, currentWidth, currentHeight)
-                if (resizeMove) {
-                    x -= resizeX
-                    restoreX = x
+                if (resizeMove || isMac) {
+                    if (resizeMove) {
+                        x -= resizeX
+                        restoreX = x
+                    }
                     glfwSetWindowPos(id, x, y)
+                    return true
                 }
             }
         }
+        return false
     }
 
     private fun handleDragging() {
@@ -691,11 +739,9 @@ private class WindowContext(
             if (Math.abs(moveX) > 0.5 || Math.abs(moveY) > 0.5) {
                 var newWindowX = Math.round(x + moveX.toDouble()).toInt()
                 var newWindowY = Math.round(y + moveY.toDouble()).toInt()
-                if (newWindowY < 0) {
-                    if (hasMoved && (newWindowY <= -15 || mouseY < 0.1)) {
-                        maximize()
-                        hasMoved = false
-                    }
+                if (!isMac && newWindowY < currentMonitor.mouseSpaceY1 && hasMoved && (newWindowY <= currentMonitor.mouseSpaceY1 - 15 || mouseY < currentMonitor.mouseSpaceY1 + 0.1)) {
+                    maximize()
+                    hasMoved = false
                 } else {
                     if (!hasMoved && (Math.abs(dragWindowStartX - newWindowX) > 10 || Math.abs(dragWindowStartY - newWindowY) > 10)) {
                         newWindowX = restore(newWindowX)
@@ -745,51 +791,49 @@ private class WindowContext(
     }
 
     internal fun restore(windowX: Int = x): Int {
-        if (isMaximized && (currentWidth != width || currentWidth != height)) {
-            val newWindowX = if (isDragging) {
-                val newWindowX = Math.round(mouseX - (relativeMouseX / currentWidth.toDouble()) * width).toInt()
-                dragWindowStartX = newWindowX
-                dragMouseStartX = mouseX
-                newWindowX
-            } else {
-                x = restoreX
-                y = restoreY
-                glfwSetWindowPos(id, x, y)
+        if (isMac) {
+            if (isMaximized) {
+                glfwRestoreWindow(id)
+                isMaximized = false
+                restoreHandler()
                 restoreX
             }
-            glfwSetWindowSize(id, width, height)
-            isMaximized = false
-            restoreHandler()
-            return newWindowX
+            return x
+        } else {
+            if (isMaximized && (currentWidth != width || currentWidth != height)) {
+                val newWindowX = if (isDragging) {
+                    val newWindowX = Math.round(mouseX - (relativeMouseX / currentWidth.toDouble()) * width).toInt()
+                    dragWindowStartX = newWindowX
+                    dragMouseStartX = mouseX
+                    newWindowX
+                } else {
+                    x = restoreX
+                    y = restoreY
+                    glfwSetWindowPos(id, x, y)
+                    restoreX
+                }
+                glfwSetWindowSize(id, width, height)
+                isMaximized = false
+                restoreHandler()
+                return newWindowX
+            }
+            return windowX
         }
-        return windowX
     }
 
     internal fun maximize() {
         if (!isMaximized) {
             restoreX = x
             restoreY = y
-            glfwSetWindowPos(id, currentMonitor.maximizedX1, currentMonitor.maximizedY1)
-            glfwSetWindowSize(id, currentMonitor.maximizedWidth, currentMonitor.maximizedHeight)
+            if (isMac) {
+                glfwMaximizeWindow(id)
+            } else {
+                glfwSetWindowPos(id, currentMonitor.maximizedX1, currentMonitor.maximizedY1)
+                glfwSetWindowSize(id, currentMonitor.maximizedWidth, currentMonitor.maximizedHeight)
+            }
             isMaximized = true
             maximizeHandler()
         }
-    }
-
-    private fun getWarp(lastX: Int, lastY: Int, currentX: Int, currentY: Int): Pair<Int, Int> {
-        var x = 0
-        var y = 0
-        for ((x1, y1, x2, y2, warpX, warpY) in warpLines) {
-            if ((lastX <= x1 && currentX > x1) || (lastX >= x1 && currentX < x1) || (lastX <= x2 && currentX > x2) || (lastX >= x2 && currentX < x2)) {
-                val interpolate = (x1 - lastX.toDouble()) / (currentX - lastX.toDouble())
-                val yCrossing = lastY + ((currentY - lastY) * interpolate)
-                if ((yCrossing <= y1 && yCrossing >= y2) || (yCrossing >= y1 && yCrossing <= y2)) {
-                    x += Math.round(Math.signum(currentX.toDouble() - lastX) * warpX).toInt()
-                    y += Math.round(Math.signum(currentY.toDouble() - lastY) * warpY).toInt()
-                }
-            }
-        }
-        return Pair(x, y)
     }
 
     internal fun close() {
@@ -797,7 +841,7 @@ private class WindowContext(
             layout.close()
         } finally {
             Callbacks.glfwFreeCallbacks(id)
-            debugProc.free()
+            debugProc?.free()
             glfwTerminate()
             glfwSetErrorCallback(null).free()
         }
@@ -928,7 +972,12 @@ private fun createWindow(windowState: WindowState?): WindowContext {
                     glfwGetCursorPos(windowId, cx, cy)
                     val x = cx.get(0)
                     val y = cy.get(0)
-                    val scale = window.currentMonitor.scaleFactor
+                    val scale = if (isMac) {
+                        1.0
+//                        clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
+                    } else {
+                        window.currentMonitor.scaleFactor
+                    }
                     if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
                         startDrag(stack, window)
                     } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
@@ -986,7 +1035,12 @@ private fun handleStandardMouseAction(window: WindowContext, action: Int, button
             window.isMouse2Down = false
         }
     }
-    val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+    val scale = if (isMac) {
+        1.0f
+//        clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+    } else {
+        clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+    }
     window.mouseClickHandler(button, Math.round(x / scale).toInt(), Math.round(y / scale).toInt(), action == GLFW_PRESS, mods)
 }
 
@@ -1000,9 +1054,9 @@ private fun startDrag(stack: MemoryStack, window: WindowContext) {
     window.restoreY = window.y
     window.isDragging = true
     window.hasMoved = false
-    val pointerLocation = MouseInfo.getPointerInfo()?.location
-    window.mouseX = pointerLocation?.x ?: window.mouseX
-    window.mouseY = pointerLocation?.y ?: window.mouseY
+    val (newMouseX, newMouseY) = getMousePosition(window)
+    window.mouseX = newMouseX
+    window.mouseY = newMouseY
     window.dragMouseStartX = window.mouseX
     window.dragMouseStartY = window.mouseY
     window.dragWindowStartX = window.x
@@ -1018,9 +1072,10 @@ private fun startResize(stack: MemoryStack, window: WindowContext, moveWithResiz
     window.width = window.currentWidth
     window.height = window.currentHeight
     window.isResizing = true
-    val pointerLocation = MouseInfo.getPointerInfo()?.location
-    window.mouseX = pointerLocation?.x ?: window.mouseX
-    window.mouseY = pointerLocation?.y ?: window.mouseY
+    window.resizeScaleFactor = clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+    val (newMouseX, newMouseY) = getMousePosition(window)
+    window.mouseX = newMouseX
+    window.mouseY = newMouseY
     window.resizeMouseStartX = window.mouseX
     window.resizeMouseStartY = window.mouseY
     window.resizeWindowStartX = window.x
@@ -1035,16 +1090,14 @@ private fun initializeWindowState(window: WindowContext, windowState: WindowStat
     twr(stackPush()) { stack ->
         val x = stack.mallocInt(1)
         val y = stack.mallocInt(1)
-        val lastMouseX = window.mouseX
-        val lastMouseY = window.mouseY
-        val pointerLocation = MouseInfo.getPointerInfo()?.location
-        window.mouseX = pointerLocation?.x ?: lastMouseX
-        window.mouseY = pointerLocation?.y ?: lastMouseY
         glfwGetWindowPos(window.id, x, y)
         window.x = x[0]
         window.y = y[0]
         window.restoreX = window.x
         window.restoreY - window.y
+        val (newMouseX, newMouseY) = getMousePosition(window)
+        window.mouseX = newMouseX
+        window.mouseY = newMouseY
         window.relativeMouseX = window.mouseX.toDouble() - window.x
         window.relativeMouseY = window.mouseY.toDouble() - window.y
         glfwGetWindowSize(window.id, x, y)
@@ -1086,66 +1139,16 @@ private fun adjustForCurrentMonitor(monitorSpec: MonitorSpec, window: WindowCont
     }
 }
 
-private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
-    val screens = LinkedHashMap<ScreenIdentity, ScreenSpec>()
-    val warpLines = ArrayList<WarpLine>()
-    val graphics = GraphicsEnvironment.getLocalGraphicsEnvironment()
-    val devices = ArrayList(graphics.screenDevices.toList())
-    devices.sortBy { it.defaultConfiguration.bounds.x }
-    var totalBounds = Rectangle()
-    for (device in devices) {
-        totalBounds = totalBounds.union(device.defaultConfiguration.bounds)
+internal interface ScreenInfoFetcher {
+
+    fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>>
+}
+
+internal class MacScreenInfoFetcher: ScreenInfoFetcher {
+
+    override fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
+        return Pair(LinkedHashMap(), emptyList())
     }
-    var lastX = 0
-    var lastIdentity: ScreenIdentity?
-    for (device in devices) {
-        val currentMode = device.displayMode
-        val graphicsConfiguration = device.defaultConfiguration
-        val bounds = graphicsConfiguration.bounds
-        val toolkit = Toolkit.getDefaultToolkit()
-        val insets = toolkit.getScreenInsets(graphicsConfiguration)
-        val x1 = bounds.x
-        val y1 = bounds.y
-        val width = bounds.width
-        val height = bounds.height
-        val x2 = x1 + width
-        val y2 = y1 + height
-        val maximizedX1 = x1 + insets.left
-        val maximizedY1 = y1 + insets.top
-        val maximizedWidth = width - insets.left - insets.right
-        val maximizedHeight = height - insets.top - insets.bottom
-        val maximizedX2 = maximizedX1 + maximizedWidth
-        val maximizedY2 = maximizedY1 + maximizedHeight
-        if (x1 > lastX || currentMode.width != width) {
-            val scaleFactor = currentMode.width / width.toDouble()
-            lastIdentity = ScreenIdentity(lastX, Math.round(y1 * scaleFactor).toInt(), currentMode.width, currentMode.height)
-            screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, width, height, currentMode.width, currentMode.height,
-                    maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, scaleFactor, width.toDouble() / currentMode.width))
-            if (x1 > lastX) {
-                warpLines.add(WarpLine(lastX, y1, x1, y1 + height, Math.abs(x1 - lastX), 0))
-            }
-            lastX += currentMode.width
-        } else {
-            lastIdentity = ScreenIdentity(x1, y1, currentMode.width, currentMode.height)
-            screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, currentMode.width, currentMode.height, currentMode.width, currentMode.height,
-                    maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, 1.0, 1.0))
-            lastX = x2
-        }
-    }
-    var minScaleFactor = 1.0
-    screens.forEach { screenIdentity, screenSpec ->
-        if (screenSpec.scaleFactor < minScaleFactor) {
-            minScaleFactor = screenSpec.scaleFactor
-        }
-    }
-    if (minScaleFactor < 1.0) {
-        val correctionFactor = 1.0 / minScaleFactor
-        screens.forEach { screenIdentity, screenSpec ->
-            screenSpec.scaleFactor *= correctionFactor
-            screenSpec.scaleFactor = clamp(Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
-        }
-    }
-    return Pair(screens, warpLines)
 }
 
 private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<MonitorSpec>, MonitorSpec> {
@@ -1174,54 +1177,81 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             val dpiY = (virtualHeight.toDouble() / physicalHeight) * 25.4
             val centerX = virtualX + (virtualWidth / 2)
             val centerY = virtualY + (virtualHeight / 2)
-            var screen = screens[ScreenIdentity(virtualX, virtualY, virtualWidth, virtualHeight)]
-            if (screen == null) {
+            var screen: ScreenSpec? = screens[ScreenIdentity(virtualX, virtualY, virtualWidth, virtualHeight)]
+            if (screen == null && screens.isNotEmpty()) {
                 screen = screens.entries.first().value
             }
-            val avgDpi = (dpiX + dpiY) / 2.0
-            screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
-            monitors.add(MonitorSpec(
-                    id = monitorId,
-                    dpiX = dpiX,
-                    dpiY = dpiY,
-                    physicalWidth = physicalWidth,
-                    physicalHeight = physicalHeight,
-                    virtualWidth = virtualWidth,
-                    virtualHeight = virtualHeight,
-                    x1 = virtualX,
-                    y1 = virtualY,
-                    x2 = virtualX + virtualWidth,
-                    y2 = virtualY + virtualHeight,
-                    centerX = centerX,
-                    centerY = centerY,
-                    mouseSpaceX1 = screen.x1,
-                    mouseSpaceY1 = screen.y1,
-                    mouseSpaceX2 = screen.x2,
-                    mouseSpaceY2 = screen.y2,
-                    mouseSpaceWidth = screen.width,
-                    mouseSpaceHeight = screen.height,
-                    maximizedWidth = screen.maximizedWidth,
-                    maximizedHeight = screen.maximizedHeight,
-                    maximizedX1 = screen.maximizedX1,
-                    maximizedY1 = screen.maximizedY1,
-                    maximizedX2 = screen.maximizedX2,
-                    maximizedY2 = screen.maximizedY2,
-                    scaleFactor = screen.scaleFactor,
-                    overRender = screen.overRender,
-                    redBits = redBits,
-                    greenBits = greenBits,
-                    blueBits = blueBits,
-                    refreshRate = refreshRate))
-        }
-        val pointerLocation = MouseInfo.getPointerInfo()?.location
-        val mouseX = pointerLocation?.x ?: 0
-        val mouseY = pointerLocation?.y ?: 0
-        currentMonitor = monitors[0]
-        monitors.forEachIndexed { i, monitorSpec ->
-            if (mouseX >= monitorSpec.mouseSpaceX1 && mouseX <= monitorSpec.mouseSpaceX2 && mouseY >= monitorSpec.mouseSpaceY1 && mouseY <= monitorSpec.mouseSpaceY2) {
-                currentMonitor = monitorSpec
+            if (screen != null) {
+                val avgDpi = (dpiX + dpiY) / 2.0
+                screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
+                monitors.add(MonitorSpec(
+                        id = monitorId,
+                        dpiX = dpiX,
+                        dpiY = dpiY,
+                        physicalWidth = physicalWidth,
+                        physicalHeight = physicalHeight,
+                        virtualWidth = virtualWidth,
+                        virtualHeight = virtualHeight,
+                        x1 = virtualX,
+                        y1 = virtualY,
+                        x2 = virtualX + virtualWidth,
+                        y2 = virtualY + virtualHeight,
+                        centerX = centerX,
+                        centerY = centerY,
+                        mouseSpaceX1 = screen.x1,
+                        mouseSpaceY1 = screen.y1,
+                        mouseSpaceX2 = screen.x2,
+                        mouseSpaceY2 = screen.y2,
+                        mouseSpaceWidth = screen.width,
+                        mouseSpaceHeight = screen.height,
+                        maximizedWidth = screen.maximizedWidth,
+                        maximizedHeight = screen.maximizedHeight,
+                        maximizedX1 = screen.maximizedX1,
+                        maximizedY1 = screen.maximizedY1,
+                        maximizedX2 = screen.maximizedX2,
+                        maximizedY2 = screen.maximizedY2,
+                        scaleFactor = screen.scaleFactor,
+                        overRender = screen.overRender,
+                        redBits = redBits,
+                        greenBits = greenBits,
+                        blueBits = blueBits,
+                        refreshRate = refreshRate))
+            } else {
+                monitors.add(MonitorSpec(
+                        id = monitorId,
+                        dpiX = dpiX,
+                        dpiY = dpiY,
+                        physicalWidth = physicalWidth,
+                        physicalHeight = physicalHeight,
+                        virtualWidth = virtualWidth,
+                        virtualHeight = virtualHeight,
+                        x1 = virtualX,
+                        y1 = virtualY,
+                        x2 = virtualX + virtualWidth,
+                        y2 = virtualY + virtualHeight,
+                        centerX = centerX,
+                        centerY = centerY,
+                        mouseSpaceX1 = virtualX,
+                        mouseSpaceY1 = virtualY,
+                        mouseSpaceX2 = virtualX + virtualWidth,
+                        mouseSpaceY2 = virtualY + virtualHeight,
+                        mouseSpaceWidth = virtualWidth,
+                        mouseSpaceHeight = virtualHeight,
+                        maximizedWidth = virtualWidth,
+                        maximizedHeight = virtualHeight,
+                        maximizedX1 = virtualX,
+                        maximizedY1 = virtualY,
+                        maximizedX2 = virtualX + virtualWidth,
+                        maximizedY2 = virtualY + virtualHeight,
+                        scaleFactor = 1.0,
+                        overRender = 1.0,
+                        redBits = redBits,
+                        greenBits = greenBits,
+                        blueBits = blueBits,
+                        refreshRate = refreshRate))
             }
         }
+        currentMonitor = monitors[0]
         LOG.info(JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Pair(screens, monitors)))
     }
     return Pair(monitors, currentMonitor)
