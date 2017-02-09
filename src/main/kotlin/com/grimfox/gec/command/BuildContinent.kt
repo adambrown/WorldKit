@@ -3,18 +3,16 @@ package com.grimfox.gec.command
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertex
-import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.util.Coastline.applyMask
 import com.grimfox.gec.util.Coastline.getBorders
 import com.grimfox.gec.util.Coastline.refineCoastline
+import com.grimfox.gec.util.Graphs.generateGraph
 import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.Rivers.RiverNode
 import com.grimfox.gec.util.Rivers.buildRiverGraph
 import com.grimfox.gec.util.Rivers.buildRivers
-import com.grimfox.gec.util.Triangulate.buildGraph
-import com.grimfox.gec.util.Utils.generatePoints
 import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.geometry.*
 import com.grimfox.gec.util.geometry.Geometry.debug
@@ -103,21 +101,22 @@ class BuildContinent() : Runnable {
                 continue
             }
             println("running test $test")
-            val virtualWidth = 100000.0f
             val outputWidth = 4096
             parameterSet.seed = test.toLong()
             val random = Random(parameterSet.seed)
             var (graph, regionMask) = buildRegions(parameterSet)
+            var nextTime = System.currentTimeMillis()
+            println("regions built in ${nextTime - time}")
+            time = nextTime
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
-                val points = generatePoints(parameters.stride, virtualWidth, random)
-                val localGraph = buildGraph(virtualWidth, points, parameters.stride)
+                val localGraph = generateGraph(parameters.stride, random, 0.8)
                 regionMask = applyMask(localGraph, graph, regionMask)
                 refineCoastline(localGraph, random, regionMask, parameters)
                 graph = localGraph
             }
-            var nextTime = System.currentTimeMillis()
-            println("regions built in ${nextTime - time}")
+            nextTime = System.currentTimeMillis()
+            println("coastline refined in ${nextTime - time}")
             time = nextTime
             val rivers = buildRivers(graph, regionMask, random)
             nextTime = System.currentTimeMillis()
@@ -281,20 +280,21 @@ class BuildContinent() : Runnable {
         val startTime = System.currentTimeMillis()
         var time = startTime
         LOG.info("generating landmass")
-        val virtualWidth = 100000.0f
         val outputWidth = 4096
         val random = Random(parameterSet.seed)
         var (graph, regionMask) = buildRegions(parameterSet)
+        var nextTime = System.currentTimeMillis()
+        println("regions built in ${nextTime - time}")
+        time = nextTime
         parameterSet.parameters.forEachIndexed { i, parameters ->
             parameterSet.currentIteration = i
-            val points = generatePoints(parameters.stride, virtualWidth, random)
-            val localGraph = buildGraph(virtualWidth, points, parameters.stride)
+            val localGraph = generateGraph(parameters.stride, random, 0.8)
             regionMask = applyMask(localGraph, graph, regionMask)
             refineCoastline(localGraph, random, regionMask, parameters)
             graph = localGraph
         }
-        var nextTime = System.currentTimeMillis()
-        LOG.info("regions built in ${nextTime - time}")
+        nextTime = System.currentTimeMillis()
+        println("coastline refined in ${nextTime - time}")
         time = nextTime
         val rivers = buildRivers(graph, regionMask, random)
         nextTime = System.currentTimeMillis()

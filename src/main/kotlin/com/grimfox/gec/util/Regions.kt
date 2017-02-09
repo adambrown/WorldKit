@@ -3,13 +3,12 @@ package com.grimfox.gec.util
 import com.grimfox.gec.command.BuildContinent.ParameterSet
 import com.grimfox.gec.model.ArrayListMatrix
 import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.model.Graph.Cell
+import com.grimfox.gec.model.Graph.Vertex
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.util.Triangulate.buildGraph
-import com.grimfox.gec.util.Utils.generatePoints
+import com.grimfox.gec.util.Graphs.generateGraph
 import java.util.*
 
 object Regions {
@@ -20,7 +19,7 @@ object Regions {
             if (this === other) return true
             if (other?.javaClass != javaClass) return false
             other as Region
-            return ids.equals(other.ids)
+            return ids == other.ids
         }
 
         override fun hashCode(): Int {
@@ -47,8 +46,7 @@ object Regions {
         var check4Fails = 0
         var tries = 0
         while (tries < parameters.maxRegionTries) {
-            val virtualWidth = 100000.0f
-            val graph = buildGraph(virtualWidth, generatePoints(parameters.stride, virtualWidth, random), parameters.stride)
+            val graph = generateGraph(parameters.stride, random, 0.8)
             val (interiorVertices, islandCount) = findInteriorVertices(graph, random, parameters, islandDesire, parameters.maxIslandTries)
             val possibleRegions = pickStartRegions(graph, interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
             var bestValue = -Float.MAX_VALUE

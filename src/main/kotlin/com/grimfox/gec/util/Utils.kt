@@ -1,17 +1,14 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.Point2F
 import org.lwjgl.BufferUtils
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.io.InputStream
 import java.math.BigInteger
-import java.net.URI
-import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.Channels
@@ -387,6 +384,24 @@ object Utils {
             }
         }
         return points
+    }
+
+    inline fun generateSemiUniformPointsD(stride: Int, width: Double, random: Random, constraint: Double = 0.5, callback: (i: Int, x: Double, y: Double) -> Unit) {
+        val realConstraint = clamp(constraint, 0.0, 1.0)
+        val gridSquare = width / stride
+        val quarterSquare = gridSquare * realConstraint
+        val margin = (gridSquare * (1.0 - realConstraint)) * 0.5
+        var i = 0
+        for (y in 0..stride - 1) {
+            val oy = (y * gridSquare) + margin
+            for (x in 0..stride - 1) {
+                callback(i++, (x * gridSquare) + margin + (random.nextDouble() * quarterSquare), oy + (random.nextDouble() * quarterSquare))
+            }
+        }
+    }
+
+    inline fun generateSemiUniformPointsF(stride: Int, width: Float, random: Random, constraint: Float = 0.5f, callback: (i: Int, x: Float, y: Float) -> Unit) {
+        generateSemiUniformPointsD(stride, width.toDouble(), random, constraint.toDouble()) { i, x, y -> callback(i, x.toFloat(), y.toFloat()) }
     }
 
     fun generatePoints(stride: Int, width: Float, random: Random, minDist: Float = (width / stride) / 3.0f): ArrayList<Point2F> {
