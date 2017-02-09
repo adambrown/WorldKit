@@ -1,5 +1,6 @@
 package com.grimfox.gec.command
 
+import com.google.common.util.concurrent.AtomicDouble
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertex
@@ -30,10 +31,9 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Math.*
 import java.util.*
-import java.util.concurrent.Future
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicLong
+//import java.util.concurrent.ThreadPoolExecutor
 import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
@@ -81,8 +81,8 @@ class BuildContinent() : Runnable {
             var parameters: ArrayList<Parameters> = arrayListOf(
                     Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
                     Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
-                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f),
-                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
+                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+//                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
             ),
             var currentIteration: Int = 0)
 
@@ -275,8 +275,51 @@ class BuildContinent() : Runnable {
         }
     }
 
+    val mute = true
+
+    private inline fun <T> timeIt(message: String? = null, accumulator: AtomicLong? = null, callback: () -> T): T {
+        if (!mute) {
+            val time = System.nanoTime()
+            val ret = callback()
+            val totalNano = System.nanoTime() - time
+            if (message != null) {
+                println("$message: ${totalNano / 1000000.0}")
+            }
+            accumulator?.addAndGet(totalNano)
+            return ret
+        } else if (accumulator != null) {
+            val time = System.nanoTime()
+            val ret = callback()
+            val totalNano = System.nanoTime() - time
+            accumulator.addAndGet(totalNano)
+            return ret
+        } else {
+            return callback()
+        }
+    }
+
+    fun generateRegions(parameterSet: ParameterSet = ParameterSet(), outputWidth: Int, executor: ExecutorService): BufferedImage {
+        val accumulatedTime = AtomicLong(0)
+        val random = Random(parameterSet.seed)
+        var (graph, regionMask) = timeIt("built regions in", accumulatedTime) { buildRegions(parameterSet) }
+        parameterSet.parameters.forEachIndexed { i, parameters ->
+            parameterSet.currentIteration = i
+            val localGraph = timeIt("generated graph $i in", accumulatedTime) { generateGraph(parameters.stride, random, 0.8) }
+            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask) }
+            timeIt("refined coastline $i in", accumulatedTime) { refineCoastline(localGraph, random, regionMask, parameters) }
+            graph = localGraph
+        }
+        println("total time to complete regions: ${accumulatedTime.get() / 1000000.0}")
+        val coastPoints = SpatialPointSet2F(7)
+        graph.vertices.forEach { coastPoints.add(it.point) }
+        val heightMap = FloatArrayMatrix(outputWidth)
+        buildClosestPoints(executor, graph, regionMask, heightMap, 128)
+        return writeHeightData(heightMap)
+    }
+
     fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
-        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
+//        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
+        val executor = Executors.newWorkStealingPool()
         val startTime = System.currentTimeMillis()
         var time = startTime
         LOG.info("generating landmass")
@@ -439,7 +482,27 @@ class BuildContinent() : Runnable {
         return coastPoints
     }
 
-    private fun buildUnderwaterPoints(executor: ThreadPoolExecutor, coastPoints: SpatialPointSet2F, heightMap: Matrix<Float>, threadCount: Int) {
+    private fun buildClosestPoints(executor: ExecutorService, graph: Graph, regionMask: Matrix<Int>, heightMap: Matrix<Float>, threadCount: Int) {
+        val widthF = heightMap.width.toFloat()
+        val futures = ArrayList<Future<*>>(threadCount)
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+                    val point = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
+                    val closePoint = graph.getClosestPoint(point, graph.getClosePoints(point, 1))
+                    val region = regionMask[closePoint]
+                    if (region != 0) {
+                        heightMap[j] = region.toFloat()
+                    } else {
+                        heightMap[j] = -1.0f
+                    }
+                }
+            })
+        }
+        futures.forEach { it.get() }
+    }
+
+    private fun buildUnderwaterPoints(executor: ExecutorService, coastPoints: SpatialPointSet2F, heightMap: Matrix<Float>, threadCount: Int) {
         val nothing = -Float.MAX_VALUE
         val widthF = heightMap.width.toFloat()
         val futures = ArrayList<Future<*>>(threadCount)
@@ -462,7 +525,7 @@ class BuildContinent() : Runnable {
         futures.forEach { it.get() }
     }
 
-    private fun sampleUnderwaterBilinear(executor: ThreadPoolExecutor, heightMap: Matrix<Float>, heightMapSmall: Matrix<Float>, threadCount: Int) {
+    private fun sampleUnderwaterBilinear(executor: ExecutorService, heightMap: Matrix<Float>, heightMapSmall: Matrix<Float>, threadCount: Int) {
         val widthF = heightMap.width.toFloat()
         val futures = ArrayList<Future<*>>(threadCount)
         val hmw = heightMap.width

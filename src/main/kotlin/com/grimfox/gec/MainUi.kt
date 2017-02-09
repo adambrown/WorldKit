@@ -4,28 +4,37 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
 import com.grimfox.gec.opengl.loadTexture2D
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.LOG
+import com.grimfox.gec.ui.layout
+import com.grimfox.gec.ui.set
+import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
-import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
-import com.grimfox.gec.ui.widgets.Layout.*
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
+import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
+import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
-import com.grimfox.gec.ui.widgets.VerticalAlignment.*
-import com.grimfox.gec.util.*
+import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
+import com.grimfox.gec.util.clamp
+import com.grimfox.gec.util.mRef
+import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
-import java.net.URISyntaxException
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
 import java.net.URI
+import java.net.URISyntaxException
 import java.net.URL
 import java.util.*
+import java.util.concurrent.Executors
 
 object MainUi {
 
     @JvmStatic fun main(vararg args: String) {
         val preferences = loadPreferences()
+        val executor = Executors.newWorkStealingPool()
 
         val random = Random()
         val DEFAULT_HEIGHT_SCALE = 130.0f
@@ -474,7 +483,18 @@ object MainUi {
 //                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
                                                     button(text("Generate terrain"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        meshViewport.setTexture(BuildContinent().generateLandmass(ParameterSet(
+//                                                        meshViewport.setTexture(BuildContinent().generateLandmass(ParameterSet(
+//                                                                seed = seed.value,
+//                                                                regionCount = regions.value,
+//                                                                stride = stride.value,
+//                                                                islandDesire = islands.value,
+//                                                                regionPoints = startPoints.value,
+//                                                                initialReduction = reduction.value,
+//                                                                connectedness = connectedness.value,
+//                                                                regionSize = regionSize.value,
+//                                                                maxRegionTries = iterations.value * 10,
+//                                                                maxIslandTries = iterations.value * 100)))
+                                                        meshViewport.setTexture(BuildContinent().generateRegions(ParameterSet(
                                                                 seed = seed.value,
                                                                 regionCount = regions.value,
                                                                 stride = stride.value,
@@ -484,7 +504,10 @@ object MainUi {
                                                                 connectedness = connectedness.value,
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
-                                                                maxIslandTries = iterations.value * 100)))
+                                                                maxIslandTries = iterations.value * 100), 512, executor))
+                                                        waterPlaneOn.value = false
+                                                        heightMapScaleFactor.value = 0.0f
+                                                        perspectiveOn.value = false
                                                     }
                                                 }
                                             }
