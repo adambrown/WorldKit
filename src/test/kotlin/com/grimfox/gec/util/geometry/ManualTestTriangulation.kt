@@ -1,6 +1,7 @@
 package com.grimfox.gec.util.geometry
 
 import com.google.common.util.concurrent.AtomicDouble
+import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Graphs
 import com.grimfox.gec.util.Triangulate

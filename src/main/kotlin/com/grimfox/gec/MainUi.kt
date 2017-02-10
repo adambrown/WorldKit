@@ -3,6 +3,7 @@ package com.grimfox.gec
 import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
+import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.opengl.loadTexture2D
 import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.layout
@@ -426,7 +427,10 @@ object MainUi {
                                                 val reduction = ref(7)
                                                 val connectedness = ref(0.114f)
                                                 val regionSize = ref(0.034f)
-                                                val iterations = ref(20)
+                                                val iterations = ref(5)
+                                                val historyBackQueue = HistoryQueue<ParameterSet>(100)
+                                                val historyCurrent = ref<ParameterSet?>(null)
+                                                val historyForwardQueue = HistoryQueue<ParameterSet>(100)
                                                 val onUpdateParamsFun = {
                                                     if (!allowUnsafe.value) {
                                                         stride.value = ((regions.value + 3) / 4) + 5
@@ -468,7 +472,7 @@ object MainUi {
                                                 unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value})
-                                                unsafeBlocks.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..50), linearClampedScaleFunctionInverse(5..50)).with { isMouseAware = allowUnsafe.value})
+                                                unsafeBlocks.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)).with { isMouseAware = allowUnsafe.value})
                                                 allowUnsafe.listener { old, new ->
                                                     if (!new) {
                                                         onUpdateParamsFun()
@@ -482,7 +486,11 @@ object MainUi {
 //                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
 //                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
-                                                    button(text("Generate terrain"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                    var backButton = NO_BLOCK
+                                                    var forwardButton = NO_BLOCK
+                                                    var backLabel = NO_BLOCK
+                                                    var forwardLabel = NO_BLOCK
+                                                    button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
 //                                                        meshViewport.setTexture(BuildContinent().generateLandmass(ParameterSet(
 //                                                                seed = seed.value,
 //                                                                regionCount = regions.value,
@@ -494,7 +502,7 @@ object MainUi {
 //                                                                regionSize = regionSize.value,
 //                                                                maxRegionTries = iterations.value * 10,
 //                                                                maxIslandTries = iterations.value * 100)))
-                                                        meshViewport.setTexture(BuildContinent().generateRegions(ParameterSet(
+                                                        val parameters = ParameterSet(
                                                                 seed = seed.value,
                                                                 regionCount = regions.value,
                                                                 stride = stride.value,
@@ -504,11 +512,125 @@ object MainUi {
                                                                 connectedness = connectedness.value,
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
-                                                                maxIslandTries = iterations.value * 100), 512, executor))
+                                                                maxIslandTries = iterations.value * 100)
+                                                        meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                        val historyLast = historyCurrent.value
+                                                        if (historyLast != null) {
+                                                            if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
+                                                                historyBackQueue.push(historyLast.copy())
+                                                            }
+                                                        }
+                                                        historyForwardQueue.clear()
+                                                        historyCurrent.value = parameters.copy()
                                                         waterPlaneOn.value = false
                                                         heightMapScaleFactor.value = 0.0f
                                                         perspectiveOn.value = false
+                                                        backButton.isVisible = historyBackQueue.size != 0
+                                                        backLabel.isVisible = historyBackQueue.size == 0
+                                                        forwardButton.isVisible = historyForwardQueue.size != 0
+                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
                                                     }
+                                                    hSpacer(SMALL_SPACER_SIZE)
+                                                    button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        val randomSeed = random.nextLong()
+                                                        val randomString = randomSeed.toString()
+                                                        if (randomString.length > 18) {
+                                                            seed.value = randomString.substring(0, 18).toLong()
+                                                        } else {
+                                                            seed.value = randomSeed
+                                                        }
+                                                        val parameters = ParameterSet(
+                                                                seed = seed.value,
+                                                                regionCount = regions.value,
+                                                                stride = stride.value,
+                                                                islandDesire =  islands.value,
+                                                                regionPoints = startPoints.value,
+                                                                initialReduction = reduction.value,
+                                                                connectedness = connectedness.value,
+                                                                regionSize = regionSize.value,
+                                                                maxRegionTries = iterations.value * 10,
+                                                                maxIslandTries = iterations.value * 100)
+                                                        meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                        val historyLast = historyCurrent.value
+                                                        if (historyLast != null) {
+                                                            if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
+                                                                historyBackQueue.push(historyLast.copy())
+                                                            }
+                                                        }
+                                                        historyForwardQueue.clear()
+                                                        historyCurrent.value = parameters.copy()
+                                                        waterPlaneOn.value = false
+                                                        heightMapScaleFactor.value = 0.0f
+                                                        perspectiveOn.value = false
+                                                        backButton.isVisible = historyBackQueue.size != 0
+                                                        backLabel.isVisible = historyBackQueue.size == 0
+                                                        forwardButton.isVisible = historyForwardQueue.size != 0
+                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
+                                                    }
+                                                    hSpacer(SMALL_SPACER_SIZE)
+                                                    fun syncParameterValues(parameters: ParameterSet) {
+                                                        val randomSeed = parameters.seed
+                                                        val randomString = randomSeed.toString()
+                                                        if (randomString.length > 18) {
+                                                            seed.value = randomString.substring(0, 18).toLong()
+                                                        } else {
+                                                            seed.value = randomSeed
+                                                        }
+                                                        regions.value = parameters.regionCount
+                                                        stride.value = parameters.stride
+                                                        islands.value = parameters.islandDesire
+                                                        startPoints.value = parameters.regionPoints
+                                                        reduction.value = parameters.initialReduction
+                                                        connectedness.value = parameters.connectedness
+                                                        regionSize.value = parameters.regionSize
+                                                        iterations.value = parameters.maxRegionTries / 10
+                                                        iterations.value = parameters.maxIslandTries / 100
+                                                    }
+                                                    backButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        val parameters = historyBackQueue.pop()
+                                                        if (parameters != null) {
+                                                            val historyLast = historyCurrent.value
+                                                            if (historyLast != null) {
+                                                                historyForwardQueue.push(historyLast.copy())
+                                                            }
+                                                            syncParameterValues(parameters)
+                                                            meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                            historyCurrent.value = parameters.copy()
+                                                            waterPlaneOn.value = false
+                                                            heightMapScaleFactor.value = 0.0f
+                                                            perspectiveOn.value = false
+                                                        }
+                                                        backButton.isVisible = historyBackQueue.size != 0
+                                                        backLabel.isVisible = historyBackQueue.size == 0
+                                                        forwardButton.isVisible = historyForwardQueue.size != 0
+                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
+                                                    }
+                                                    backLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
+                                                    backLabel.isMouseAware = false
+                                                    hSpacer(SMALL_SPACER_SIZE)
+                                                    forwardButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        val parameters = historyForwardQueue.pop()
+                                                        if (parameters != null) {
+                                                            val historyLast = historyCurrent.value
+                                                            if (historyLast != null) {
+                                                                historyBackQueue.push(historyLast.copy())
+                                                            }
+                                                            syncParameterValues(parameters)
+                                                            meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                            historyCurrent.value = parameters.copy()
+                                                            waterPlaneOn.value = false
+                                                            heightMapScaleFactor.value = 0.0f
+                                                            perspectiveOn.value = false
+                                                        }
+                                                        backButton.isVisible = historyBackQueue.size != 0
+                                                        backLabel.isVisible = historyBackQueue.size == 0
+                                                        forwardButton.isVisible = historyForwardQueue.size != 0
+                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
+                                                    }
+                                                    forwardLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
+                                                    forwardLabel.isMouseAware = false
+                                                    backButton.isVisible = false
+                                                    forwardButton.isVisible = false
                                                 }
                                             }
                                             hSpacer(MEDIUM_SPACER_SIZE)

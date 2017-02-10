@@ -1,14 +1,18 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.command.BuildContinent.Parameters
+import com.grimfox.gec.extensions.*
 import com.grimfox.gec.model.*
-import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.model.Graph.Cell
+import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Polygon2F
 import com.grimfox.gec.util.Utils.pow
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 
 object Coastline {
 
@@ -23,12 +27,49 @@ object Coastline {
         forceClaimUnwantedLand(graph, idMask, forceGiveUpDisconnectedLand(graph, idMask))
     }
 
-    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Int>) : Matrix<Int> {
-        val borderPoints = buildBorderPoints(maskGraph)
-        val land = extractLandFromIds(maskGraph, mask)
+    private fun applyMaskRaw(executor: ExecutorService, graph: Graph, maskGraph: Graph, mask: Matrix<Int>, newMask: Matrix<Int>, bodyIds: Matrix<Int>, newBodyIds: Matrix<Int>, threadCount: Int) {
+        val vertices = graph.vertices
+        val stride2 = graph.stride!! * graph.stride
+        val futures = ArrayList<Future<*>>(threadCount)
+        for (i in 0..threadCount - 1) {
+            futures.add(executor.submit {
+                for (vertexId in i..stride2 - 1 step threadCount) {
+                    val vertex = vertices[vertexId]
+                    val point = vertex.point
+                    val closePoints = maskGraph.getClosePoints(point, 1)
+                    val closePoint = maskGraph.getClosestPoint(point, closePoints)
+                    val closePointMask = mask[closePoint]
+                    if (closePointMask == 0) {
+                        newBodyIds[vertexId] = 0
+                        newMask[vertexId] = 0
+                    } else {
+                        if (closePoints.any { bodyIds[it] == 0 }) {
+                            if (vertex.cell.border.any { bodyIds[maskGraph.getClosestPoint(it, closePoints)] == 0 }) {
+                                newBodyIds[vertexId] = 0
+                                newMask[vertexId] = 0
+                            } else {
+                                newBodyIds[vertexId] = bodyIds[closePoint]
+                                newMask[vertexId] = closePointMask
+                            }
+                        } else {
+                            newBodyIds[vertexId] = bodyIds[closePoint]
+                            newMask[vertexId] = closePointMask
+                        }
+                    }
+                }
+            })
+        }
+        futures.forEach { it.get() }
+    }
+
+    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Int>, executor: ExecutorService) : Matrix<Int> {
+        val borderPointsFuture = executor.call { buildBorderPoints(maskGraph) }
+        val landFuture = executor.call { extractLandFromIds(maskGraph, mask) }
+        val land = landFuture.value
+        val borderPoints = borderPointsFuture.value
         applyBorderConstraintsToLand(land, borderPoints, mask)
         val bodies = maskGraph.getConnectedBodies(land).sortedByDescending { it.size }
-        val bodyIds = ArrayListMatrix(maskGraph.stride!!) { vertexId ->
+        val bodyIds = IntArrayMatrix(maskGraph.stride!!) { vertexId ->
             var bodyId = 0
             for (i in 0..bodies.size - 1) {
                 val body = bodies[i]
@@ -39,19 +80,34 @@ object Coastline {
             }
             bodyId
         }
-        val bodyBorders = ArrayList<LineSegment2F>()
-        bodies.forEach {
-            bodyBorders.addAll(maskGraph.findBorderEdges(it))
-        }
         val vertices = graph.vertices
-        val newBodyIds = ArrayListMatrix(graph.stride!!) { 0 }
-        val newMask = ArrayListMatrix(graph.stride) { vertexId ->
-            val vertex = vertices[vertexId]
-            val point = vertex.point
-            val closePoint = maskGraph.getClosestPoint(point)
-            newBodyIds[vertexId] = bodyIds[closePoint]
-            mask[closePoint]
-        }
+        val newBodyIds = IntArrayMatrix(graph.stride!!)
+        val newMask = IntArrayMatrix(graph.stride)
+        applyMaskRaw(executor, graph, maskGraph, mask, newMask, bodyIds, newBodyIds, 16)
+//        val newMask = IntArrayMatrix(graph.stride) { vertexId ->
+//            val vertex = vertices[vertexId]
+//            val point = vertex.point
+//            val closePoints = maskGraph.getClosePoints(point, 1)
+//            val closePoint = maskGraph.getClosestPoint(point, closePoints)
+//            val closePointMask = mask[closePoint]
+//            if (closePointMask == 0) {
+//                newBodyIds[vertexId] = 0
+//                0
+//            } else {
+//                if (closePoints.any { bodyIds[it] == 0 }) {
+//                    if (vertex.cell.border.any { bodyIds[maskGraph.getClosestPoint(it, closePoints)] == 0 }) {
+//                        newBodyIds[vertexId] = 0
+//                        0
+//                    } else {
+//                        newBodyIds[vertexId] = bodyIds[closePoint]
+//                        closePointMask
+//                    }
+//                } else {
+//                    newBodyIds[vertexId] = bodyIds[closePoint]
+//                    closePointMask
+//                }
+//            }
+//        }
         val newBodies = ArrayList<LinkedHashSet<Int>>(bodies.size)
         for (i in 0..bodies.size - 1) {
             newBodies.add(LinkedHashSet())
@@ -62,26 +118,37 @@ object Coastline {
                 newBodies[bodyId].add(i)
             }
         }
+        val futures = ArrayList<Future<*>>(newBodies.size)
         newBodies.forEachIndexed { currentBodyIndex, body ->
             val currentBodyId = currentBodyIndex + 1
-            body.forEach { currentId ->
-                val adjacents = vertices.getAdjacentVertices(currentId)
-                for (i in 0..adjacents.size - 1) {
-                    val adjacentBodyId = newBodyIds[adjacents[i]]
-                    if (adjacentBodyId > 0 && adjacentBodyId != currentBodyId) {
-                        newBodyIds[currentId] = 0
-                        newMask[currentId] = 0
+            futures.add(executor.call {
+                body.forEach { currentId ->
+                    val adjacents = vertices.getAdjacentVertices(currentId)
+                    for (i in 0..adjacents.size - 1) {
+                        val adjacentId = adjacents[i]
+                        if (adjacentId > currentId) {
+                            val adjacentBodyId = newBodyIds[adjacents[i]]
+                            if (adjacentBodyId != currentBodyId && adjacentBodyId > 0) {
+                                newBodyIds[currentId] = 0
+                                newMask[currentId] = 0
+                                break
+                            }
+                        }
                     }
                 }
-            }
-
+            })
         }
-        val newBorderPoints = buildBorderPoints(graph)
-        val water = extractWaterFromIds(graph, newMask)
-        applyBorderConstraintsToWater(water, newBorderPoints, newMask)
-
+        futures.forEach { it.join() }
+        val newBorderPointsFuture = executor.call { buildBorderPoints(graph) }
+        val waterFuture = executor.call { extractWaterFromIds(graph, newMask) }
+        val water = waterFuture.value
+        applyBorderConstraintsToWater(water, newBorderPointsFuture.value, newMask)
         val waterBodies = graph.getConnectedBodies(water)
         if (waterBodies.size > 1) {
+            val bodyBorders = ArrayList<LineSegment2F>()
+            bodies.forEach {
+                bodyBorders.addAll(maskGraph.findBorderEdges(it))
+            }
             waterBodies.sortBy { it.size }
             val ocean = waterBodies.last()
             for (i in 0..waterBodies.size - 1) {

@@ -3,18 +3,18 @@ package com.grimfox.gec.model
 import com.grimfox.gec.util.Utils.pow
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
-class FloatArrayMatrix(override val width: Int, init: ((Int) -> Float)? = null) : Matrix<Float> {
+class IntArrayMatrix(override val width: Int, init: ((Int) -> Int)? = null) : Matrix<Int> {
 
     override val exponent: Int get() = throw NotImplementedException()
     override val size = width.toLong().pow(2)
 
-    val array = if (init != null) FloatArray(size.toInt(), init) else FloatArray(size.toInt())
+    val array = if (init != null) IntArray(size.toInt(), init) else IntArray(size.toInt())
 
-    override fun set(i: Int, value: Float) {
+    override fun set(i: Int, value: Int) {
         array[i] = value
     }
 
-    override fun get(i: Int): Float {
+    override fun get(i: Int): Int {
         return array[i]
     }
 

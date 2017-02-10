@@ -1,6 +1,8 @@
 package com.grimfox.gec.extensions
 
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 
 
 class CloseableResources(resources: List<AutoCloseable> = emptyList()) : AutoCloseable {
@@ -60,4 +62,14 @@ inline fun <R, T1 : AutoCloseable, T2 : AutoCloseable, T3 : AutoCloseable, T4 : 
     } finally {
         resources.close()
     }
+}
+
+fun <T> ExecutorService.call(callable: () -> T): Future<T> {
+    return submit<T>(callable)
+}
+
+val <T> Future<T>.value: T get() = get()
+
+fun Future<*>.join(): Unit {
+    get()
 }

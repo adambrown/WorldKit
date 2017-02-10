@@ -227,6 +227,9 @@ object Regions {
         Collections.shuffle(seeds, random)
         var maxCount = 0
         for (i in 0..interiorCellIds.size - 1) {
+            if (validStarts.size >= 100) {
+                break
+            }
             val seed = seeds[i]
             val picks = LinkedHashSet<Int>()
             val canPick = LinkedHashSet(interiorCellIds)
@@ -287,6 +290,9 @@ object Regions {
     }
 
     private fun getSubsets(superSet: List<Int>, subsetSize: Int, index: Int, current: LinkedHashSet<Int>, subsets: ArrayList<LinkedHashSet<Int>>): ArrayList<LinkedHashSet<Int>> {
+        if (subsets.size >= 50) {
+            return subsets
+        }
         if (current.size == subsetSize) {
             subsets.add(LinkedHashSet(current))
             return subsets

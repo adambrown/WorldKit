@@ -75,8 +75,8 @@ class BuildContinent() : Runnable {
             var regionSize: Float = 0.035f,
             var initialReduction: Int = 7,
             var regionPoints: Int = 2,
-            var maxRegionTries: Int = 200,
-            var maxIslandTries: Int = 2000,
+            var maxRegionTries: Int = 50,
+            var maxIslandTries: Int = 500,
             var islandDesire: Int = 1,
             var parameters: ArrayList<Parameters> = arrayListOf(
                     Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
@@ -87,7 +87,7 @@ class BuildContinent() : Runnable {
             var currentIteration: Int = 0)
 
     override fun run() {
-        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
+        val executor = Executors.newWorkStealingPool()
         val parameterSet = ParameterSet()
         if (strides.isEmpty()) {
             strides.addAll(listOf(7, 40, 80, 140, 256))
@@ -111,7 +111,7 @@ class BuildContinent() : Runnable {
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
                 val localGraph = generateGraph(parameters.stride, random, 0.8)
-                regionMask = applyMask(localGraph, graph, regionMask)
+                regionMask = applyMask(localGraph, graph, regionMask, executor)
                 refineCoastline(localGraph, random, regionMask, parameters)
                 graph = localGraph
             }
@@ -275,7 +275,7 @@ class BuildContinent() : Runnable {
         }
     }
 
-    val mute = true
+    val mute = false
 
     private inline fun <T> timeIt(message: String? = null, accumulator: AtomicLong? = null, callback: () -> T): T {
         if (!mute) {
@@ -305,7 +305,7 @@ class BuildContinent() : Runnable {
         parameterSet.parameters.forEachIndexed { i, parameters ->
             parameterSet.currentIteration = i
             val localGraph = timeIt("generated graph $i in", accumulatedTime) { generateGraph(parameters.stride, random, 0.8) }
-            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask) }
+            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask, executor) }
             timeIt("refined coastline $i in", accumulatedTime) { refineCoastline(localGraph, random, regionMask, parameters) }
             graph = localGraph
         }
@@ -313,12 +313,11 @@ class BuildContinent() : Runnable {
         val coastPoints = SpatialPointSet2F(7)
         graph.vertices.forEach { coastPoints.add(it.point) }
         val heightMap = FloatArrayMatrix(outputWidth)
-        buildClosestPoints(executor, graph, regionMask, heightMap, 128)
+        buildClosestPoints(executor, graph, regionMask, heightMap, 16)
         return writeHeightData(heightMap)
     }
 
     fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
-//        val executor = ThreadPoolExecutor(8, 8, 1, TimeUnit.DAYS, LinkedBlockingQueue(8), ThreadPoolExecutor.AbortPolicy())
         val executor = Executors.newWorkStealingPool()
         val startTime = System.currentTimeMillis()
         var time = startTime
@@ -332,7 +331,7 @@ class BuildContinent() : Runnable {
         parameterSet.parameters.forEachIndexed { i, parameters ->
             parameterSet.currentIteration = i
             val localGraph = generateGraph(parameters.stride, random, 0.8)
-            regionMask = applyMask(localGraph, graph, regionMask)
+            regionMask = applyMask(localGraph, graph, regionMask, executor)
             refineCoastline(localGraph, random, regionMask, parameters)
             graph = localGraph
         }
