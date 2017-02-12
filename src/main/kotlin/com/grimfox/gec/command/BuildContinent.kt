@@ -1,6 +1,6 @@
 package com.grimfox.gec.command
 
-import com.google.common.util.concurrent.AtomicDouble
+//import java.util.concurrent.ThreadPoolExecutor
 import com.grimfox.gec.Main
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertex
@@ -31,13 +31,15 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Math.*
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.atomic.AtomicLong
-//import java.util.concurrent.ThreadPoolExecutor
 import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
-class BuildContinent() : Runnable {
+class BuildContinent : Runnable {
 
     private val LOG: Logger = LoggerFactory.getLogger(javaClass)
 
@@ -79,9 +81,11 @@ class BuildContinent() : Runnable {
             var maxIslandTries: Int = 500,
             var islandDesire: Int = 1,
             var parameters: ArrayList<Parameters> = arrayListOf(
-                    Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
-                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
-                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+//                    Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
+//                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f)
+                    Parameters(64, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    Parameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+//                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
             ),
             var currentIteration: Int = 0)
@@ -298,7 +302,7 @@ class BuildContinent() : Runnable {
         }
     }
 
-    fun generateRegions(parameterSet: ParameterSet = ParameterSet(), outputWidth: Int, executor: ExecutorService): BufferedImage {
+    fun generateRegions(parameterSet: ParameterSet = ParameterSet(), executor: ExecutorService): Pair<Graph, Matrix<Byte>> {
         val accumulatedTime = AtomicLong(0)
         val random = Random(parameterSet.seed)
         var (graph, regionMask) = timeIt("built regions in", accumulatedTime) { buildRegions(parameterSet) }
@@ -310,11 +314,24 @@ class BuildContinent() : Runnable {
             graph = localGraph
         }
         println("total time to complete regions: ${accumulatedTime.get() / 1000000.0}")
-        val coastPoints = SpatialPointSet2F(7)
-        graph.vertices.forEach { coastPoints.add(it.point) }
-        val heightMap = FloatArrayMatrix(outputWidth)
+        return Pair(graph, regionMask)
+    }
+
+    fun generateRegionsImage(parameterSet: ParameterSet = ParameterSet(), outputWidth: Int, executor: ExecutorService): BufferedImage {
+        val accumulatedTime = AtomicLong(0)
+        val random = Random(parameterSet.seed)
+        var (graph, regionMask) = timeIt("built regions in", accumulatedTime) { buildRegions(parameterSet) }
+        parameterSet.parameters.forEachIndexed { i, parameters ->
+            parameterSet.currentIteration = i
+            val localGraph = timeIt("generated graph $i in", accumulatedTime) { generateGraph(parameters.stride, random, 0.8) }
+            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask, executor) }
+            timeIt("refined coastline $i in", accumulatedTime) { refineCoastline(localGraph, random, regionMask, parameters) }
+            graph = localGraph
+        }
+        println("total time to complete regions: ${accumulatedTime.get() / 1000000.0}")
+        val heightMap = ByteArrayMatrix(outputWidth)
         buildClosestPoints(executor, graph, regionMask, heightMap, 16)
-        return writeHeightData(heightMap)
+        return writeRegionData(heightMap)
     }
 
     fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
@@ -481,22 +498,16 @@ class BuildContinent() : Runnable {
         return coastPoints
     }
 
-    private fun buildClosestPoints(executor: ExecutorService, graph: Graph, regionMask: Matrix<Int>, heightMap: Matrix<Float>, threadCount: Int) {
-        val widthF = heightMap.width.toFloat()
+    private fun buildClosestPoints(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, raster: Matrix<Byte>, threadCount: Int) {
+        val widthF = raster.width.toFloat()
         val futures = ArrayList<Future<*>>(threadCount)
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
-                    val point = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
-                    val closePoint = graph.getClosestPoint(point, graph.getClosePoints(point, 1))
-                    val region = regionMask[closePoint]
-                    if (region != 0) {
-                        heightMap[j] = region.toFloat()
-                    } else {
-                        heightMap[j] = -1.0f
-                    }
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (j in it..raster.size.toInt() - 1 step threadCount) {
+                    val point = Point2F((j % raster.width) / widthF, (j / raster.width) / widthF)
+                    raster[j] = regionMask[graph.getClosestPoint(point, graph.getClosePoints(point, 1))]
                 }
-            })
+            }
         }
         futures.forEach { it.get() }
     }

@@ -5,6 +5,7 @@ import com.grimfox.gec.extensions.*
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertices
+import com.grimfox.gec.model.geometry.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
@@ -16,7 +17,9 @@ import java.util.concurrent.Future
 
 object Coastline {
 
-    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Int>, parameters: Parameters) {
+    const val BYTE_ZERO: Byte = 0
+
+    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, parameters: Parameters) {
         val approximateAreaPerPoint = 1.0f / graph.vertices.size
         val pointsPerRegion = Math.round(parameters.minRegionSize / approximateAreaPerPoint)
         val borderPoints = buildBorderPoints(graph)
@@ -27,7 +30,7 @@ object Coastline {
         forceClaimUnwantedLand(graph, idMask, forceGiveUpDisconnectedLand(graph, idMask))
     }
 
-    private fun applyMaskRaw(executor: ExecutorService, graph: Graph, maskGraph: Graph, mask: Matrix<Int>, newMask: Matrix<Int>, bodyIds: Matrix<Int>, newBodyIds: Matrix<Int>, threadCount: Int) {
+    private fun applyMaskRaw(executor: ExecutorService, graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, newMask: Matrix<Byte>, bodyIds: Matrix<Int>, newBodyIds: Matrix<Int>, threadCount: Int) {
         val vertices = graph.vertices
         val stride2 = graph.stride!! * graph.stride
         val futures = ArrayList<Future<*>>(threadCount)
@@ -39,7 +42,7 @@ object Coastline {
                     val closePoints = maskGraph.getClosePoints(point, 1)
                     val closePoint = maskGraph.getClosestPoint(point, closePoints)
                     val closePointMask = mask[closePoint]
-                    if (closePointMask == 0) {
+                    if (closePointMask == BYTE_ZERO) {
                         newBodyIds[vertexId] = 0
                         newMask[vertexId] = 0
                     } else {
@@ -62,7 +65,7 @@ object Coastline {
         futures.forEach { it.get() }
     }
 
-    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Int>, executor: ExecutorService) : Matrix<Int> {
+    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, executor: ExecutorService) : Matrix<Byte> {
         val borderPointsFuture = executor.call { buildBorderPoints(maskGraph) }
         val landFuture = executor.call { extractLandFromIds(maskGraph, mask) }
         val land = landFuture.value
@@ -82,32 +85,8 @@ object Coastline {
         }
         val vertices = graph.vertices
         val newBodyIds = IntArrayMatrix(graph.stride!!)
-        val newMask = IntArrayMatrix(graph.stride)
+        val newMask = ByteArrayMatrix(graph.stride)
         applyMaskRaw(executor, graph, maskGraph, mask, newMask, bodyIds, newBodyIds, 16)
-//        val newMask = IntArrayMatrix(graph.stride) { vertexId ->
-//            val vertex = vertices[vertexId]
-//            val point = vertex.point
-//            val closePoints = maskGraph.getClosePoints(point, 1)
-//            val closePoint = maskGraph.getClosestPoint(point, closePoints)
-//            val closePointMask = mask[closePoint]
-//            if (closePointMask == 0) {
-//                newBodyIds[vertexId] = 0
-//                0
-//            } else {
-//                if (closePoints.any { bodyIds[it] == 0 }) {
-//                    if (vertex.cell.border.any { bodyIds[maskGraph.getClosestPoint(it, closePoints)] == 0 }) {
-//                        newBodyIds[vertexId] = 0
-//                        0
-//                    } else {
-//                        newBodyIds[vertexId] = bodyIds[closePoint]
-//                        closePointMask
-//                    }
-//                } else {
-//                    newBodyIds[vertexId] = bodyIds[closePoint]
-//                    closePointMask
-//                }
-//            }
-//        }
         val newBodies = ArrayList<LinkedHashSet<Int>>(bodies.size)
         for (i in 0..bodies.size - 1) {
             newBodies.add(LinkedHashSet())
@@ -187,17 +166,17 @@ object Coastline {
         return newMask
     }
 
-    fun getCoastline(graph: Graph, idMask: Matrix<Int>): ArrayList<Polygon2F> {
+    fun getCoastline(graph: Graph, idMask: Matrix<Byte>): ArrayList<Polygon2F> {
         val land = extractLandFromIds(graph, idMask)
         val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
         return ArrayList(bodies.flatMap { graph.findBorder(it) })
     }
 
-    fun getBorders(graph: Graph, idMask: Matrix<Int>, body: LinkedHashSet<Int>): ArrayList<Polygon2F> {
+    fun getBorders(graph: Graph, idMask: Matrix<Byte>, body: LinkedHashSet<Int>): ArrayList<Polygon2F> {
         return getBorders(graph, idMask, body, false)
     }
 
-    fun getBorders(graph: Graph, idMask: Matrix<Int>): ArrayList<ArrayList<Polygon2F>> {
+    fun getBorders(graph: Graph, idMask: Matrix<Byte>): ArrayList<ArrayList<Polygon2F>> {
         val land = extractLandFromIds(graph, idMask)
         val bodies = graph.getConnectedBodies(land).sortedByDescending { it.size }
         return ArrayList(bodies.map { getBorders(graph, idMask, it) })
@@ -221,7 +200,7 @@ object Coastline {
         return false
     }
 
-    private fun getOffLimitPoints(graph: Graph, idMask: Matrix<Int>, water: LinkedHashSet<Int>, inset: Float, radius: Float): LinkedHashSet<Int> {
+    private fun getOffLimitPoints(graph: Graph, idMask: Matrix<Byte>, water: LinkedHashSet<Int>, inset: Float, radius: Float): LinkedHashSet<Int> {
         val borderPoints = insetBorders(getBorders(graph, idMask, water, true), inset).flatMap { it.points }.toSet()
         val offLimitPoints = LinkedHashSet<Int>()
         borderPoints.forEach {
@@ -230,7 +209,7 @@ object Coastline {
         return offLimitPoints
     }
 
-    private fun getBorders(graph: Graph, idMask: Matrix<Int>, mask: LinkedHashSet<Int>, negate: Boolean = false): ArrayList<Polygon2F> {
+    private fun getBorders(graph: Graph, idMask: Matrix<Byte>, mask: LinkedHashSet<Int>, negate: Boolean = false): ArrayList<Polygon2F> {
         val regions = extractRegionsFromIds(graph, idMask)
         val borders = ArrayList<Polygon2F>()
         regions.forEach {
@@ -274,41 +253,41 @@ object Coastline {
         return reducedBorders
     }
 
-    private fun extractWaterFromIds(graph: Graph, idMask: Matrix<Int>): LinkedHashSet<Int> {
+    private fun extractWaterFromIds(graph: Graph, idMask: Matrix<Byte>): LinkedHashSet<Int> {
         val water = LinkedHashSet<Int>()
         for (i in 0..graph.vertices.size - 1) {
-            if (idMask[i] == 0) {
+            if (idMask[i] == BYTE_ZERO) {
                 water.add(i)
             }
         }
         return water
     }
 
-    private fun applyBorderConstraintsToWater(water: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Int>) {
+    private fun applyBorderConstraintsToWater(water: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>) {
         water.addAll(borderPoints)
         borderPoints.forEach {
             idMask[it] = 0
         }
     }
 
-    private fun applyBorderConstraintsToLand(land: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Int>) {
+    private fun applyBorderConstraintsToLand(land: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>) {
         land.removeAll(borderPoints)
         borderPoints.forEach {
             idMask[it] = 0
         }
     }
 
-    private fun extractLandFromIds(graph: Graph, idMask: Matrix<Int>): LinkedHashSet<Int> {
+    private fun extractLandFromIds(graph: Graph, idMask: Matrix<Byte>): LinkedHashSet<Int> {
         val land = LinkedHashSet<Int>()
         for (i in 0..graph.vertices.size - 1) {
-            if (idMask[i] != 0) {
+            if (idMask[i] != BYTE_ZERO) {
                 land.add(i)
             }
         }
         return land
     }
 
-    private fun removeIslands(graph: Graph, waterPoints: LinkedHashSet<Int>, idMask: Matrix<Int>, smallIsland: Int, largeIsland: Int) {
+    private fun removeIslands(graph: Graph, waterPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>, smallIsland: Int, largeIsland: Int) {
         val pointCount = graph.vertices.size
         if (waterPoints.size == pointCount) {
             return
@@ -332,7 +311,7 @@ object Coastline {
         }
     }
 
-    private fun removeLakes(graph: Graph, waterPoints: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Int>) {
+    private fun removeLakes(graph: Graph, waterPoints: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>) {
         val vertices = graph.vertices
         val oceanPoints = LinkedHashSet<Int>()
         var growSet = LinkedHashSet<Int>(borderPoints)
@@ -375,7 +354,7 @@ object Coastline {
         }
     }
 
-    private fun erodeCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Int>, random: Random, offLimitPoints: LinkedHashSet<Int>, landPercent: Float, smallIsland: Float, largeIsland: Float, minPerturbation: Float, maxIterations: Int, pointsPerRegion: Int) {
+    private fun erodeCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>, random: Random, offLimitPoints: LinkedHashSet<Int>, landPercent: Float, smallIsland: Float, largeIsland: Float, minPerturbation: Float, maxIterations: Int, pointsPerRegion: Int) {
         val maxLandPointCount = graph.vertices.size - borderPoints.size
         val desiredLandPointCount = Math.min(maxLandPointCount, Math.round(graph.vertices.size * landPercent))
         val largeIslandCount = Math.max(0, Math.min(Int.MAX_VALUE.toLong(), Math.round(largeIsland.toDouble() * graph.vertices.size)).toInt())
@@ -419,7 +398,7 @@ object Coastline {
                                                     coastalPoints: HashMap<Int, Int>,
                                                     coastalPointDegrees: ArrayList<ArrayList<Int>>,
                                                     borderPoints: LinkedHashSet<Int>,
-                                                    idMask: Matrix<Int>,
+                                                    idMask: Matrix<Byte>,
                                                     random: Random,
                                                     desiredLandPointCount: Int, minPerturbation: Float = 0.2f, maxIterations: Int = 10) {
         val maxLandPointCount = graph.vertices.size - borderPoints.size
@@ -436,7 +415,7 @@ object Coastline {
         }
     }
 
-    private fun modifyCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Int>, random: Random, offLimitPoints: LinkedHashSet<Int>, pointCountToRemove: Int, pointsPerRegion: Int) {
+    private fun modifyCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, borderPoints: LinkedHashSet<Int>, idMask: Matrix<Byte>, random: Random, offLimitPoints: LinkedHashSet<Int>, pointCountToRemove: Int, pointsPerRegion: Int) {
         val adjustedCount = pointCountToRemove + pointCountToRemove / 4
         var skips = reduceCoastline(graph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, offLimitPoints, adjustedCount, pointsPerRegion)
         var pointCountToAdd = (adjustedCount - skips) / 2
@@ -484,7 +463,7 @@ object Coastline {
         return coastalPointDegrees
     }
 
-    private fun reduceCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, idMask: Matrix<Int>, random: Random, offLimitPoints: LinkedHashSet<Int>, iterations: Int, pointsPerRegion: Int): Int {
+    private fun reduceCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, idMask: Matrix<Byte>, random: Random, offLimitPoints: LinkedHashSet<Int>, iterations: Int, pointsPerRegion: Int): Int {
         val regions = extractRegionsFromIds(graph, idMask)
         val vertices = graph.vertices
         var skips = 0
@@ -567,7 +546,7 @@ object Coastline {
         return pickList
     }
 
-    private fun buildUpCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, borderPoints: Set<Int>, idMask: Matrix<Int>, random: Random, iterations: Int): Int {
+    private fun buildUpCoastline(graph: Graph, waterPoints: LinkedHashSet<Int>, coastalPoints: HashMap<Int, Int>, coastalPointDegrees: ArrayList<ArrayList<Int>>, borderPoints: Set<Int>, idMask: Matrix<Byte>, random: Random, iterations: Int): Int {
         val vertices = graph.vertices
         var skips = 0
         for (i in 1..iterations) {
@@ -646,7 +625,7 @@ object Coastline {
         return skips
     }
 
-    private fun forceGiveUpDisconnectedLand(graph: Graph, idMask: Matrix<Int>): LinkedHashSet<Int> {
+    private fun forceGiveUpDisconnectedLand(graph: Graph, idMask: Matrix<Byte>): LinkedHashSet<Int> {
         val unclaimedLand = LinkedHashSet<Int>()
         extractRegionsFromIds(graph, idMask).forEach {
             giveUpDisconnectedLand(graph, unclaimedLand, it)
@@ -657,7 +636,7 @@ object Coastline {
         return unclaimedLand
     }
 
-    private fun extractRegionsFromIds(graph: Graph, idMask: Matrix<Int>): ArrayList<LinkedHashSet<Int>> {
+    private fun extractRegionsFromIds(graph: Graph, idMask: Matrix<Byte>): ArrayList<LinkedHashSet<Int>> {
         val regions = ArrayList<LinkedHashSet<Int>>()
         for (i in 0..graph.vertices.size - 1) {
             val regionId = idMask[i]
@@ -685,7 +664,7 @@ object Coastline {
         }
     }
 
-    private fun forceClaimUnwantedLand(graph: Graph, idMask: Matrix<Int>, unclaimedLand: LinkedHashSet<Int>) {
+    private fun forceClaimUnwantedLand(graph: Graph, idMask: Matrix<Byte>, unclaimedLand: LinkedHashSet<Int>) {
         val vertices = graph.vertices
         var lastSize = 0
         while (unclaimedLand.isNotEmpty() && unclaimedLand.size != lastSize) {
@@ -701,7 +680,7 @@ object Coastline {
         }
     }
 
-    private fun tryClaimLand(vertices: Vertices, idMask: Matrix<Int>, unclaimedLand: LinkedHashSet<Int>, unclaimedId: Int) {
+    private fun tryClaimLand(vertices: Vertices, idMask: Matrix<Byte>, unclaimedLand: LinkedHashSet<Int>, unclaimedId: Int) {
         vertices.getAdjacentVertices(unclaimedId).forEach { adjacentId ->
             val adjacentMask = idMask[adjacentId]
             if (adjacentMask > 0) {

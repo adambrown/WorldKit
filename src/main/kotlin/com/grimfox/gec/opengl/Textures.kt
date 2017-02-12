@@ -1,5 +1,7 @@
 package com.grimfox.gec.opengl
 
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11
@@ -30,6 +32,43 @@ fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
         }
     }
     return Triple(width, height, imageBuffer)
+}
+
+fun loadGraphPointsAsTexture(graph: Graph): Triple<Int, Int, Int> {
+    val width = graph.stride!!
+    val bytes = ByteBuffer.allocateDirect(width * width * 8).order(ByteOrder.nativeOrder())
+    val data = bytes.asFloatBuffer()
+    data.put(graph.vertexIdsToPoints)
+    data.flip()
+    val textureId = GL11.glGenTextures()
+    glBindTexture(GL_TEXTURE_2D, textureId)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 8)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, width, 0, GL_RG, GL_FLOAT, data)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    glBindTexture(GL_TEXTURE_2D, 0)
+    return Triple(textureId, width, width)
+}
+
+fun loadRegionMaskAsTexture(regionMask: Matrix<Byte>): Triple<Int, Int, Int> {
+    val width = regionMask.width
+    val data = ByteBuffer.allocateDirect(width * width)
+    for (i in 0..regionMask.size.toInt() - 1) {
+        data.put(Math.round((com.grimfox.gec.util.geometry.clamp(regionMask[i].toFloat(), 0.0f, 16.0f) / 16.0f) * 255).toByte())
+    }
+    data.flip()
+    val textureId = GL11.glGenTextures()
+    glBindTexture(GL_TEXTURE_2D, textureId)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, width, 0, GL_RED, GL_UNSIGNED_BYTE, data)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    glBindTexture(GL_TEXTURE_2D, 0)
+    return Triple(textureId, width, width)
 }
 
 fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, clampToEdge: Boolean, vararg mipMaps: String): Triple<Int, Int, Int> {

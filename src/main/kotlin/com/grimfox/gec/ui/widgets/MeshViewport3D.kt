@@ -1,5 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.util.MutableReference
@@ -23,7 +25,8 @@ class MeshViewport3D(
         val rotateAroundCamera: Reference<Boolean>,
         val perspectiveOn: Reference<Boolean>,
         val waterPlaneOn: Reference<Boolean>,
-        val heightMapScaleFactor: Reference<Float>) {
+        val heightMapScaleFactor: Reference<Float>,
+        val imagePlaneOn: Reference<Boolean>) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -82,17 +85,34 @@ class MeshViewport3D(
     private val shininessUniformWater = ShaderUniform("shininess")
     private val heightScaleUniformWater = ShaderUniform("heightScale")
 
+    private val mvpMatrixUniformImage = ShaderUniform("modelViewProjectionMatrix")
+//    private val imageTextureUniform = ShaderUniform("imageTexture")
+    private val graphTextureUniform = ShaderUniform("graphTexture")
+    private val maskTextureUniform = ShaderUniform("maskTexture")
+
     private val positionAttribute = ShaderAttribute("position")
     private val uvAttribute = ShaderAttribute("uv")
 
     private val positionAttributeWater = ShaderAttribute("position")
     private val uvAttributeWater = ShaderAttribute("uv")
 
+    private val positionAttributeImage = ShaderAttribute("position")
+    private val uvAttributeImage = ShaderAttribute("uv")
+
     private var hasTexture = false
     private var textureId = -1
     private var textureResolution = 0
     private var textureToLoad: BufferedImage? = null
     private var textureIdToDelete: Int? = null
+    private var textureMagFilter: Int = GL_LINEAR
+
+    private var hasGraph = false
+    private var graphTextureId = -1
+    private var maskTextureId = -1
+    private var graphTextureIdToDelete: Int? = null
+    private var maskTextureIdToDelete: Int? = null
+    private var graphToLoad: Graph? = null
+    private var maskToLoad: Matrix<Byte>? = null
 
     private val background = NVGColor.create().set(30, 30, 30)
 
@@ -100,6 +120,7 @@ class MeshViewport3D(
 
     private var heightMapProgram: Int = 0
     private var waterPlaneProgram: Int = 0
+    private var imagePlaneProgram: Int = 0
 
     private var lastScroll = 0.0f
     private var scroll = 0.0f
@@ -129,6 +150,8 @@ class MeshViewport3D(
 
     private lateinit var waterPlane: HexGrid
 
+    private lateinit var imagePlane: ImagePlane
+
     fun init() {
 
         glEnable(GL_DEPTH_TEST)
@@ -145,6 +168,9 @@ class MeshViewport3D(
         val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
         val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
 
+        val imageVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/image-plane.vert"))
+        val imageFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/image-plane.frag"))
+
 //        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
 //        textureId = texId
 //        textureResolution = texWidth
@@ -159,16 +185,23 @@ class MeshViewport3D(
                 listOf(positionAttributeWater, uvAttributeWater),
                 listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
 
+        imagePlaneProgram = createAndLinkProgram(
+                listOf(imageVertexShader, imageFragmentShader),
+                listOf(positionAttributeImage, uvAttributeImage),
+                listOf(mvpMatrixUniformImage, graphTextureUniform, maskTextureUniform))
+
         heightMap = HexGrid(2560.0f, 512, positionAttribute, uvAttribute, true)
 
         waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
+
+        imagePlane = ImagePlane(2600.0f, positionAttributeImage, uvAttributeImage)
 
         lightDirection.normalize()
 
         modelMatrix.translate(translation)
     }
 
-    fun setTexture(bufferedImage: BufferedImage) {
+    fun setTexture(bufferedImage: BufferedImage, magFilter: Int = GL_LINEAR) {
         synchronized(hasTexture) {
             if (hasTexture) {
                 hasTexture = false
@@ -177,6 +210,25 @@ class MeshViewport3D(
                 textureResolution = 0
             }
             textureToLoad = bufferedImage
+            textureMagFilter = magFilter
+        }
+    }
+
+    fun setGraph(pair: Pair<Graph, Matrix<Byte>>) {
+        setGraph(pair.first, pair.second)
+    }
+
+    fun setGraph(graph: Graph, mask: Matrix<Byte>) {
+        synchronized(hasTexture) {
+            if (hasGraph) {
+                hasGraph = false
+                graphTextureIdToDelete = graphTextureId
+                maskTextureIdToDelete = maskTextureId
+                graphTextureId = -1
+                maskTextureId = -1
+            }
+            graphToLoad = graph
+            maskToLoad = mask
         }
     }
 
@@ -235,24 +287,84 @@ class MeshViewport3D(
     }
 
     fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+        if (imagePlaneOn.value) {
+            onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
+        } else {
+            onDrawFrameInternalHeightmap(xPosition, yPosition, width, height, rootHeight, scale)
+        }
+    }
+
+    private fun onDrawFrameInternalImage(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+        if (width < 1 || height < 1) {
+            return
+        }
+        synchronized(hasTexture) {
+            handleNewHeightMapLoad()
+            handleNewGraphLoad()
+            if (hasGraph) {
+                val adjustedWidth = round(width / scale)
+                val adjustedHeight = round(height / scale)
+                val adjustedX = round(xPosition / scale)
+                val adjustedY = round(yPosition / scale)
+
+                val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+                hotZoneX1 = adjustedX + marginWidth
+                hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
+                val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+                hotZoneY1 = adjustedY + marginHeight
+                hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
+
+                val flippedY = rootHeight - (yPosition + height)
+
+                val premulRatio = width / height.toFloat()
+                val orthoZoom = zoom * perspectiveToOrtho
+                projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
+
+                translation.set(defaultTranslation)
+                rotation.set(defaultRotation)
+                zoom = defaultZoom
+                modelMatrix.translation(translation).rotate(rotation)
+
+                deltaX = mouseX - lastMouseX
+                deltaY = mouseY - lastMouseY
+
+                lastMouseX = mouseX.toFloat()
+                lastMouseY = mouseY.toFloat()
+
+                deltaRotation.identity()
+
+                viewMatrix.mul(modelMatrix, mvMatrix)
+                projectionMatrix.mul(mvMatrix, mvpMatrix)
+
+                glDisable(GL_BLEND)
+                glDisable(GL_CULL_FACE)
+                glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
+                glEnable(GL_MULTISAMPLE)
+
+                glClearColor(background.r, background.g, background.b, background.a)
+                glScissor(xPosition, flippedY, width, height)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
+
+                drawImagePlane()
+
+                glDisable(GL_SCISSOR_TEST)
+            }
+        }
+    }
+
+    private fun onDrawFrameInternalHeightmap(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
 
         if (width < 1 || height < 1) {
             return
         }
         synchronized(hasTexture) {
-            val texToLoad = textureToLoad
-            if (texToLoad != null) {
-                val texToDelete = textureIdToDelete
-                if (texToDelete != null) {
-                    glDeleteTextures(texToDelete)
-                    textureIdToDelete = null
-                }
-                val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, texToLoad, false, true)
-                textureId = texId
-                textureResolution = texWidth
-                hasTexture = true
-                textureToLoad = null
-            }
+            handleNewHeightMapLoad()
+            handleNewGraphLoad()
             if (hasTexture) {
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
@@ -360,6 +472,44 @@ class MeshViewport3D(
         }
     }
 
+    private fun handleNewHeightMapLoad() {
+        val texToLoad = textureToLoad
+        if (texToLoad != null) {
+            val texToDelete = textureIdToDelete
+            if (texToDelete != null) {
+                glDeleteTextures(texToDelete)
+                textureIdToDelete = null
+            }
+            val (texId, texWidth) = loadTexture2D(GL_NEAREST, textureMagFilter, texToLoad, false, true)
+            textureId = texId
+            textureResolution = texWidth
+            hasTexture = true
+            textureToLoad = null
+        }
+    }
+
+    private fun handleNewGraphLoad() {
+        val graphToLoadInternal = graphToLoad
+        val maskToLoadInternal = maskToLoad
+        if (graphToLoadInternal != null && maskToLoadInternal != null) {
+            var texToDelete = graphTextureIdToDelete
+            if (texToDelete != null) {
+                glDeleteTextures(texToDelete)
+                graphTextureIdToDelete = null
+            }
+            texToDelete = maskTextureIdToDelete
+            if (texToDelete != null) {
+                glDeleteTextures(texToDelete)
+            }
+            val (graphTexId) = loadGraphPointsAsTexture(graphToLoadInternal)
+            graphTextureId = graphTexId
+            val (maskTexId) = loadRegionMaskAsTexture(maskToLoadInternal)
+            maskTextureId = maskTexId
+            hasGraph = true
+            graphToLoad = null
+        }
+    }
+
     private fun drawHeightMap() {
         glUseProgram(heightMapProgram)
         glUniformMatrix4fv(mvMatrixUniform.location, false, mvMatrix.get(0, floatBuffer))
@@ -397,6 +547,85 @@ class MeshViewport3D(
         glUniform1f(shininessUniformWater.location, 5.0f)
         glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor.value)
         waterPlane.render()
+    }
+
+    private fun drawImagePlane() {
+        glUseProgram(imagePlaneProgram)
+        glUniformMatrix4fv(mvpMatrixUniformImage.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform1i(graphTextureUniform.location, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, graphTextureId)
+        glUniform1i(maskTextureUniform.location, 1)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, maskTextureId)
+        imagePlane.render()
+    }
+
+    internal class ImagePlane(val width: Float, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute) {
+
+        val minXY = width / -2.0f
+        val maxXY = minXY + width
+
+        var vao = 0
+
+        init {
+            try {
+                val floatsPerVertex = 4
+                val vertexCount = 4
+                val vertexData = BufferUtils.createFloatBuffer(vertexCount * floatsPerVertex)
+                vertexData.put(minXY).put(maxXY).put(0.0f).put(0.0f)
+                vertexData.put(maxXY).put(maxXY).put(1.0f).put(0.0f)
+                vertexData.put(maxXY).put(minXY).put(1.0f).put(1.0f)
+                vertexData.put(minXY).put(minXY).put(0.0f).put(1.0f)
+                vertexData.flip()
+                val indexData = BufferUtils.createIntBuffer(6)
+                indexData.put(0).put(1).put(2).put(2).put(3).put(0)
+                indexData.flip()
+                vao = glGenVertexArrays()
+                if (vao > 0) {
+                    val stride = floatsPerVertex * 4
+                    glBindVertexArray(vao)
+                    val vbo = glGenBuffers()
+                    val ibo = glGenBuffers()
+                    if (vbo > 0 && ibo > 0) {
+                        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+                        glBufferData(GL_ARRAY_BUFFER, vertexData, GL_STATIC_DRAW)
+                        if (positionAttribute.location >= 0) {
+                            glEnableVertexAttribArray(positionAttribute.location)
+                            glVertexAttribPointer(positionAttribute.location, 2, GL_FLOAT, false, stride, 0)
+                        }
+                        if (uvAttribute.location >= 0) {
+                            glEnableVertexAttribArray(uvAttribute.location)
+                            glVertexAttribPointer(uvAttribute.location, 2, GL_FLOAT, false, stride, 8)
+                        }
+                        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo)
+                        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexData, GL_STATIC_DRAW)
+                    } else {
+                        throw RuntimeException("error setting up buffers")
+                    }
+                    glBindVertexArray(0)
+                    glDeleteBuffers(vbo)
+                    glDeleteBuffers(ibo)
+                } else {
+                    throw RuntimeException("error generating vao")
+                }
+            } catch (t: Throwable) {
+                LOG.error(t.message, t)
+                throw t
+            }
+        }
+
+        fun render() {
+            if (vao > 0) {
+                glBindVertexArray(vao)
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
+                glBindVertexArray(0)
+            }
+        }
+
+        fun finalize() {
+            glDeleteVertexArrays(vao)
+        }
     }
 
     internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute, val useStrips: Boolean) {

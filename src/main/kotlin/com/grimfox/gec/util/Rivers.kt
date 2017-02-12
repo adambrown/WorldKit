@@ -17,6 +17,8 @@ import java.util.*
 
 object Rivers {
 
+    const val BYTE_ZERO: Byte = 0
+
     enum class NodeType {
         CONTINUATION,
         SYMMETRIC,
@@ -43,7 +45,7 @@ object Rivers {
     val MAX_TERRAIN_SLOPE = 0.95f
     val MAX_RIVER_CHILDREN = 3
 
-    fun buildRivers(graph: Graph, idMask: Matrix<Int>, random: Random): ArrayList<Triple<Polygon2F, ArrayList<TreeNode<RiverNode>>, ArrayList<GeometryException>>> {
+    fun buildRivers(graph: Graph, idMask: Matrix<Byte>, random: Random): ArrayList<Triple<Polygon2F, ArrayList<TreeNode<RiverNode>>, ArrayList<GeometryException>>> {
         val vertices = graph.vertices
         val (water, regions) = extractRegionsFromIdMask(graph, idMask)
         val (beach, coastalWater) = extractBeachFromGraphAndWater(vertices, water)
@@ -345,13 +347,13 @@ object Rivers {
         return Pair(beach, coastalWater)
     }
 
-    private fun extractRegionsFromIdMask(graph: Graph, idMask: Matrix<Int>): Pair<LinkedHashSet<Int>, ArrayList<LinkedHashSet<Int>>> {
+    private fun extractRegionsFromIdMask(graph: Graph, idMask: Matrix<Byte>): Pair<LinkedHashSet<Int>, ArrayList<LinkedHashSet<Int>>> {
         val water = LinkedHashSet<Int>()
         val regions = ArrayList<LinkedHashSet<Int>>()
         val vertices = graph.vertices
         for (i in 0..vertices.size - 1) {
             val maskValue = idMask[i]
-            if (maskValue == 0) {
+            if (maskValue == BYTE_ZERO) {
                 water.add(i)
             } else {
                 val regionId = maskValue - 1

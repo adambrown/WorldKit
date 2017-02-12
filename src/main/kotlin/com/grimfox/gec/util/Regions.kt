@@ -6,6 +6,7 @@ import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertex
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Graphs.generateGraph
@@ -27,9 +28,9 @@ object Regions {
         }
     }
 
-    fun buildRegions(parameters: ParameterSet): Pair<Graph, Matrix<Int>> {
+    fun buildRegions(parameters: ParameterSet): Pair<Graph, Matrix<Byte>> {
         val random = Random(parameters.seed)
-        val results = ArrayList<Triple<Graph, Matrix<Int>, Int>>()
+        val results = ArrayList<Triple<Graph, Matrix<Byte>, Int>>()
         for (i in 0..parameters.islandDesire) {
             results.add(buildRegions(random, parameters, i))
         }
@@ -37,9 +38,9 @@ object Regions {
         return Pair(winner.first, winner.second)
     }
 
-    private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, Matrix<Int>, Int> {
+    private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, Matrix<Byte>, Int> {
         var bestGraphValue = -Float.MAX_VALUE
-        var bestPair: Triple<Graph, Matrix<Int>, Int>? = null
+        var bestPair: Triple<Graph, Matrix<Byte>, Int>? = null
         var check1Fails = 0
         var check2Fails = 0
         var check3Fails = 0
@@ -111,10 +112,10 @@ object Regions {
             if (bestValueId < 0) {
                 if (fixerValue > bestGraphValue) {
                     bestGraphValue = fixerValue
-                    bestPair = Triple(graph, ArrayListMatrix(graph.stride!!) { findRegionId(possibleRegions[fixerId], it) }, islandCount)
+                    bestPair = Triple(graph, ByteArrayMatrix(graph.stride!!) { findRegionId(possibleRegions[fixerId], it) }, islandCount)
                 }
             } else {
-                return Triple(graph, ArrayListMatrix(graph.stride!!) { findRegionId(possibleRegions[bestValueId], it) }, islandCount)
+                return Triple(graph, ByteArrayMatrix(graph.stride!!) { findRegionId(possibleRegions[bestValueId], it) }, islandCount)
             }
             tries++
         }
@@ -276,10 +277,10 @@ object Regions {
         }
     }
 
-    private fun findRegionId(regions: ArrayList<Region>, id: Int): Int {
+    private fun findRegionId(regions: ArrayList<Region>, id: Int): Byte {
         regions.forEachIndexed { i, region ->
             if (region.ids.contains(id)) {
-                return i + 1
+                return (i + 1).toByte()
             }
         }
         return 0

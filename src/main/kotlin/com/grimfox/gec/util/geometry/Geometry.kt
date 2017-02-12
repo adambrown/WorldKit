@@ -1966,7 +1966,7 @@ fun renderTriangle(a: Point3F, b: Point3F, c: Point3F, heightMap: Matrix<Float>)
     }
 
     fun interpolateZ(x: Int, y: Int): Float {
-        val height = clamp(minZ, maxZ, -((na * x) + (nb * y) + d) / nc)
+        val height = clamp(-((na * x) + (nb * y) + d) / nc, minZ, maxZ)
         if (height.isNaN()) {
             if (debug) {
                 throw GeometryException("collinear triangle").with {
@@ -2157,6 +2157,17 @@ fun writeHeightData(heightMap: Matrix<Float>): BufferedImage {
     return output
 }
 
+fun writeRegionData(heightMap: Matrix<Byte>): BufferedImage {
+    val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_BYTE_GRAY)
+    val raster = output.raster
+    for (y in (0..heightMap.width - 1)) {
+        for (x in (0..heightMap.width - 1)) {
+            raster.setSample(x, y, 0, Math.round((clamp(heightMap[x, y].toFloat(), 0.0f, 16.0f) / 16.0f) * 255))
+        }
+    }
+    return output
+}
+
 fun max(a: Int, b: Int, c: Int) = max(max(a, b), c)
 
 fun min(a: Int, b: Int, c: Int) = min(min(a, b), c)
@@ -2165,5 +2176,5 @@ fun min(a: Float, b: Float, c: Float) = min(min(a, b), c)
 
 fun max(a: Float, b: Float, c: Float) = max(max(a, b), c)
 
-fun clamp(min: Float, max: Float, f: Float) = min(max(min, f), max)
+fun clamp(f: Float, min: Float, max: Float) = min(max(min, f), max)
 

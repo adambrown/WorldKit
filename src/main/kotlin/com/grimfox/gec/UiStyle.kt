@@ -37,6 +37,76 @@ val SMALL_ROW_HEIGHT = 20.0f
 val MEDIUM_ROW_HEIGHT = 26.0f
 val LARGE_ROW_HEIGHT = 32.0f
 
+val COLOR_REGION_0 = color(243, 0, 81)
+val COLOR_REGION_1 = color(0, 155, 255)
+val COLOR_REGION_2 = color(0, 185, 23)
+val COLOR_REGION_3 = color(254, 137, 0)
+val COLOR_REGION_4 = color(213, 255, 0)
+val COLOR_REGION_5 = color(181, 0, 255)
+val COLOR_REGION_6 = color(255, 0, 246)
+val COLOR_REGION_7 = color(10, 55, 168)
+val COLOR_REGION_8 = color(0, 255, 120)
+val COLOR_REGION_9 = color(255, 177, 103)
+val COLOR_REGION_10 = color(164, 36, 0)
+val COLOR_REGION_11 = color(255, 166, 254)
+val COLOR_REGION_12 = color(1, 255, 254)
+val COLOR_REGION_13 = color(255, 64, 64)
+val COLOR_REGION_14 = color(0, 95, 57)
+val COLOR_REGION_15 = color(238, 210, 2)
+
+val REGION_COLORS = listOf(
+        COLOR_REGION_0,
+        COLOR_REGION_1,
+        COLOR_REGION_2,
+        COLOR_REGION_3,
+        COLOR_REGION_4,
+        COLOR_REGION_5,
+        COLOR_REGION_6,
+        COLOR_REGION_7,
+        COLOR_REGION_8,
+        COLOR_REGION_9,
+        COLOR_REGION_10,
+        COLOR_REGION_11,
+        COLOR_REGION_12,
+        COLOR_REGION_13,
+        COLOR_REGION_14,
+        COLOR_REGION_15)
+
+val COLOR_REGION_ALT_0 = color(73, 238, 73)
+val COLOR_REGION_ALT_1 = color(255, 163, 240)
+val COLOR_REGION_ALT_2 = color(255, 255, 135)
+val COLOR_REGION_ALT_3 = color(160, 62, 227)
+val COLOR_REGION_ALT_4 = color(214, 136, 56)
+val COLOR_REGION_ALT_5 = color(106, 106, 255)
+val COLOR_REGION_ALT_6 = color(246, 88, 88)
+val COLOR_REGION_ALT_7 = color(48, 205, 206)
+val COLOR_REGION_ALT_8 = color(44, 146, 44)
+val COLOR_REGION_ALT_9 = color(194, 43, 168)
+val COLOR_REGION_ALT_10 = color(178, 179, 45)
+val COLOR_REGION_ALT_11 = color(98, 46, 137)
+val COLOR_REGION_ALT_12 = color(126, 87, 49)
+val COLOR_REGION_ALT_13 = color(42, 42, 169)
+val COLOR_REGION_ALT_14 = color(158, 41, 41)
+val COLOR_REGION_ALT_15 = color(52, 116, 116)
+
+val REGION_COLORS_ALT = listOf(
+        COLOR_REGION_ALT_0,
+        COLOR_REGION_ALT_1,
+        COLOR_REGION_ALT_2,
+        COLOR_REGION_ALT_3,
+        COLOR_REGION_ALT_4,
+        COLOR_REGION_ALT_5,
+        COLOR_REGION_ALT_6,
+        COLOR_REGION_ALT_7,
+        COLOR_REGION_ALT_8,
+        COLOR_REGION_ALT_9,
+        COLOR_REGION_ALT_10,
+        COLOR_REGION_ALT_11,
+        COLOR_REGION_ALT_12,
+        COLOR_REGION_ALT_13,
+        COLOR_REGION_ALT_14,
+        COLOR_REGION_ALT_15)
+
 val COLOR_DROP_SHADOW_BLACK = color(5, 5, 6, 72)
 val COLOR_DROP_SHADOW_BLACK_TRANSPARENT = color(5, 5, 6, 0)
 

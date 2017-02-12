@@ -5,10 +5,7 @@ import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.opengl.loadTexture2D
-import com.grimfox.gec.ui.LOG
-import com.grimfox.gec.ui.layout
-import com.grimfox.gec.ui.set
-import com.grimfox.gec.ui.ui
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
@@ -21,6 +18,7 @@ import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL11.GL_NEAREST
 import org.lwjgl.system.MemoryUtil
 import java.awt.Desktop
 import java.io.File
@@ -67,12 +65,12 @@ object MainUi {
         }
         fun linearClampedScaleFunction(min: Float, max: Float): (Float) -> Float {
             return { scale: Float ->
-                clamp(Math.round(scale * (max - min)) + min, min, max)
+                clamp((scale * (max - min)) + min, min, max)
             }
         }
         fun linearClampedScaleFunctionInverse(min: Float, max: Float): (Float) -> Float {
             return { value: Float ->
-                clamp(Math.abs((value - min).toFloat() / (max - min)), 0.0f, 1.0f)
+                clamp(Math.abs((value - min) / (max - min)), 0.0f, 1.0f)
             }
         }
         val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
@@ -80,6 +78,7 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
+        val imageModeOn = ref(false)
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
 
@@ -91,7 +90,7 @@ object MainUi {
         val errorMessageText = errorMessageDynamic.text
         val errorMessageReference = errorMessageDynamic.reference
 
-        val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor)
+        val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageModeOn)
 
         val uiLayout = layout { ui ->
             val uiLayout = this
@@ -465,6 +464,8 @@ object MainUi {
                                                 }
                                                 vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
                                                 vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Island strength:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
+                                                vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30))
+                                                vSpacer(MEDIUM_ROW_HEIGHT)
                                                 vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 val unsafeBlocks = ArrayList<Block>()
                                                 unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value})
@@ -472,7 +473,6 @@ object MainUi {
                                                 unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value})
-                                                unsafeBlocks.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)).with { isMouseAware = allowUnsafe.value})
                                                 allowUnsafe.listener { old, new ->
                                                     if (!new) {
                                                         onUpdateParamsFun()
@@ -485,6 +485,7 @@ object MainUi {
 //                                                vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
 //                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
 //                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                                vSpacer(MEDIUM_ROW_HEIGHT)
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
                                                     var backButton = NO_BLOCK
                                                     var forwardButton = NO_BLOCK
@@ -513,7 +514,8 @@ object MainUi {
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
                                                                 maxIslandTries = iterations.value * 100)
-                                                        meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                        meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                        imageModeOn.value = true
                                                         val historyLast = historyCurrent.value
                                                         if (historyLast != null) {
                                                             if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
@@ -522,9 +524,6 @@ object MainUi {
                                                         }
                                                         historyForwardQueue.clear()
                                                         historyCurrent.value = parameters.copy()
-                                                        waterPlaneOn.value = false
-                                                        heightMapScaleFactor.value = 0.0f
-                                                        perspectiveOn.value = false
                                                         backButton.isVisible = historyBackQueue.size != 0
                                                         backLabel.isVisible = historyBackQueue.size == 0
                                                         forwardButton.isVisible = historyForwardQueue.size != 0
@@ -550,7 +549,8 @@ object MainUi {
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
                                                                 maxIslandTries = iterations.value * 100)
-                                                        meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                        meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                        imageModeOn.value = true
                                                         val historyLast = historyCurrent.value
                                                         if (historyLast != null) {
                                                             if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
@@ -559,9 +559,6 @@ object MainUi {
                                                         }
                                                         historyForwardQueue.clear()
                                                         historyCurrent.value = parameters.copy()
-                                                        waterPlaneOn.value = false
-                                                        heightMapScaleFactor.value = 0.0f
-                                                        perspectiveOn.value = false
                                                         backButton.isVisible = historyBackQueue.size != 0
                                                         backLabel.isVisible = historyBackQueue.size == 0
                                                         forwardButton.isVisible = historyForwardQueue.size != 0
@@ -594,11 +591,9 @@ object MainUi {
                                                                 historyForwardQueue.push(historyLast.copy())
                                                             }
                                                             syncParameterValues(parameters)
-                                                            meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                            meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                            imageModeOn.value = true
                                                             historyCurrent.value = parameters.copy()
-                                                            waterPlaneOn.value = false
-                                                            heightMapScaleFactor.value = 0.0f
-                                                            perspectiveOn.value = false
                                                         }
                                                         backButton.isVisible = historyBackQueue.size != 0
                                                         backLabel.isVisible = historyBackQueue.size == 0
@@ -616,11 +611,9 @@ object MainUi {
                                                                 historyBackQueue.push(historyLast.copy())
                                                             }
                                                             syncParameterValues(parameters)
-                                                            meshViewport.setTexture(BuildContinent().generateRegions(parameters.copy(), 256, executor))
+                                                            meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                            imageModeOn.value = true
                                                             historyCurrent.value = parameters.copy()
-                                                            waterPlaneOn.value = false
-                                                            heightMapScaleFactor.value = 0.0f
-                                                            perspectiveOn.value = false
                                                         }
                                                         backButton.isVisible = historyBackQueue.size != 0
                                                         backLabel.isVisible = historyBackQueue.size == 0
