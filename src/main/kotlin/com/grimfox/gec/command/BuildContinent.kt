@@ -21,6 +21,7 @@ import com.grimfox.gec.util.geometry.Geometry.debugCount
 import com.grimfox.gec.util.geometry.Geometry.debugIteration
 import com.grimfox.gec.util.geometry.Geometry.debugResolution
 import com.grimfox.gec.util.printList
+import com.grimfox.gec.util.timeIt
 import io.airlift.airline.Command
 import io.airlift.airline.Option
 import org.slf4j.Logger
@@ -35,7 +36,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.atomic.AtomicLong
 import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
@@ -115,8 +115,9 @@ class BuildContinent : Runnable {
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
                 val localGraph = generateGraph(parameters.stride, random, 0.8)
-                regionMask = applyMask(localGraph, graph, regionMask, executor)
-                refineCoastline(localGraph, random, regionMask, parameters)
+                val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
+                regionMask = mask
+                refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
                 graph = localGraph
             }
             nextTime = System.currentTimeMillis()
@@ -279,59 +280,20 @@ class BuildContinent : Runnable {
         }
     }
 
-    val mute = false
-
-    private inline fun <T> timeIt(message: String? = null, accumulator: AtomicLong? = null, callback: () -> T): T {
-        if (!mute) {
-            val time = System.nanoTime()
-            val ret = callback()
-            val totalNano = System.nanoTime() - time
-            if (message != null) {
-                println("$message: ${totalNano / 1000000.0}")
-            }
-            accumulator?.addAndGet(totalNano)
-            return ret
-        } else if (accumulator != null) {
-            val time = System.nanoTime()
-            val ret = callback()
-            val totalNano = System.nanoTime() - time
-            accumulator.addAndGet(totalNano)
-            return ret
-        } else {
-            return callback()
-        }
-    }
-
     fun generateRegions(parameterSet: ParameterSet = ParameterSet(), executor: ExecutorService): Pair<Graph, Matrix<Byte>> {
-        val accumulatedTime = AtomicLong(0)
-        val random = Random(parameterSet.seed)
-        var (graph, regionMask) = timeIt("built regions in", accumulatedTime) { buildRegions(parameterSet) }
-        parameterSet.parameters.forEachIndexed { i, parameters ->
-            parameterSet.currentIteration = i
-            val localGraph = timeIt("generated graph $i in", accumulatedTime) { generateGraph(parameters.stride, random, 0.8) }
-            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask, executor) }
-            timeIt("refined coastline $i in", accumulatedTime) { refineCoastline(localGraph, random, regionMask, parameters) }
-            graph = localGraph
+        return timeIt("generated regions in") {
+            val random = Random(parameterSet.seed)
+            var (graph, regionMask) = buildRegions(parameterSet)
+            parameterSet.parameters.forEachIndexed { i, parameters ->
+                parameterSet.currentIteration = i
+                val localGraph = generateGraph(parameters.stride, random, 0.8)
+                val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
+                regionMask = mask
+                refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
+                graph = localGraph
+            }
+            Pair(graph, regionMask)
         }
-        println("total time to complete regions: ${accumulatedTime.get() / 1000000.0}")
-        return Pair(graph, regionMask)
-    }
-
-    fun generateRegionsImage(parameterSet: ParameterSet = ParameterSet(), outputWidth: Int, executor: ExecutorService): BufferedImage {
-        val accumulatedTime = AtomicLong(0)
-        val random = Random(parameterSet.seed)
-        var (graph, regionMask) = timeIt("built regions in", accumulatedTime) { buildRegions(parameterSet) }
-        parameterSet.parameters.forEachIndexed { i, parameters ->
-            parameterSet.currentIteration = i
-            val localGraph = timeIt("generated graph $i in", accumulatedTime) { generateGraph(parameters.stride, random, 0.8) }
-            regionMask = timeIt("applied mask $i in", accumulatedTime) { applyMask(localGraph, graph, regionMask, executor) }
-            timeIt("refined coastline $i in", accumulatedTime) { refineCoastline(localGraph, random, regionMask, parameters) }
-            graph = localGraph
-        }
-        println("total time to complete regions: ${accumulatedTime.get() / 1000000.0}")
-        val heightMap = ByteArrayMatrix(outputWidth)
-        buildClosestPoints(executor, graph, regionMask, heightMap, 16)
-        return writeRegionData(heightMap)
     }
 
     fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
@@ -348,8 +310,9 @@ class BuildContinent : Runnable {
         parameterSet.parameters.forEachIndexed { i, parameters ->
             parameterSet.currentIteration = i
             val localGraph = generateGraph(parameters.stride, random, 0.8)
-            regionMask = applyMask(localGraph, graph, regionMask, executor)
-            refineCoastline(localGraph, random, regionMask, parameters)
+            val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
+            regionMask = mask
+            refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
             graph = localGraph
         }
         nextTime = System.currentTimeMillis()

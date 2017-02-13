@@ -18,6 +18,7 @@ import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 
 interface Reference<out T> {
 
@@ -163,6 +164,41 @@ fun clamp(value: Double, min: Double, max: Double): Double {
         return max
     }
     return value
+}
+
+val mute = false
+
+inline fun <reified T> timeIt(callback: () -> T): T {
+    return timeIt(null, null, callback)
+}
+
+inline fun <reified T> timeIt(accumulator: AtomicLong, callback: () -> T): T {
+    return timeIt(null, accumulator, callback)
+}
+
+inline fun <reified T> timeIt(message: String, callback: () -> T): T {
+    return timeIt(message, null, callback)
+}
+
+inline fun <reified T> timeIt(message: String?, accumulator: AtomicLong?, callback: () -> T): T {
+    if (!mute) {
+        val time = System.nanoTime()
+        val ret = callback()
+        val totalNano = System.nanoTime() - time
+        if (message != null) {
+            println("$message: ${totalNano / 1000000.0}")
+        }
+        accumulator?.addAndGet(totalNano)
+        return ret
+    } else if (accumulator != null) {
+        val time = System.nanoTime()
+        val ret = callback()
+        val totalNano = System.nanoTime() - time
+        accumulator.addAndGet(totalNano)
+        return ret
+    } else {
+        return callback()
+    }
 }
 
 object Utils {

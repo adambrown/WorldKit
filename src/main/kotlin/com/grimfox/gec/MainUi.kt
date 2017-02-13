@@ -16,9 +16,9 @@ import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
 import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
+import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL11.GL_NEAREST
 import org.lwjgl.system.MemoryUtil
 import java.awt.Desktop
 import java.io.File
@@ -34,6 +34,9 @@ object MainUi {
     @JvmStatic fun main(vararg args: String) {
         val preferences = loadPreferences()
         val executor = Executors.newWorkStealingPool()
+        for (i in 1..2) {
+            task { BuildContinent().generateRegions(ParameterSet(seed = i.toLong()), executor) }
+        }
 
         val random = Random()
         val DEFAULT_HEIGHT_SCALE = 130.0f

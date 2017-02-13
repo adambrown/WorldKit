@@ -18,8 +18,30 @@ class Graph(val vertexIdsToPoints: FloatArray,
     val vertices = Vertices()
     val triangles = Triangles()
 
+    private val vertexCache: Array<Vertex?> = arrayOfNulls(vertices.size)
+
+    private val triangleCache: Array<Triangle?> = arrayOfNulls(triangles.size)
+
     companion object {
         internal val bounds = Bounds2F(Point2F(0.0f, 0.0f), Point2F(1.0f, 1.0f))
+    }
+
+    private fun newVertex(id: Int): Vertex {
+        var vertex = vertexCache[id]
+        if (vertex == null) {
+            vertex = Vertex(id)
+            vertexCache[id] = vertex
+        }
+        return vertex
+    }
+
+    private fun newTriangle(id: Int): Triangle {
+        var triangle = triangleCache[id]
+        if (triangle == null) {
+            triangle = Triangle(id)
+            triangleCache[id] = triangle
+        }
+        return triangle
     }
 
     inner class CellEdge(val tri1: Triangle, val tri2: Triangle) {
@@ -63,9 +85,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val point: Point2F by lazy { vertices.getPoint(id) }
 
-        val adjacentVertices: List<Vertex> by lazy { vertices.getAdjacentVertices(id).map { Vertex(it) } }
+        val adjacentVertices: List<Vertex> by lazy { vertices.getAdjacentVertices(id).map { newVertex(it) } }
 
-        val adjacentTriangles: List<Triangle> by lazy { vertices.getAdjacentTriangles(id).map { Triangle(it) } }
+        val adjacentTriangles: List<Triangle> by lazy { vertices.getAdjacentTriangles(id).map { newTriangle(it) } }
 
         val cell: Cell by lazy { Cell(this) }
 
@@ -85,7 +107,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val center: Point2F by lazy { triangles.getCenter(id) }
 
-        val vertices: List<Vertex> by lazy { triangles.getVertices(id).map { Vertex(it) } }
+        val vertices: List<Vertex> by lazy { triangles.getVertices(id).map { newVertex(it) } }
 
         val a: Vertex by lazy { vertices[0] }
 
@@ -93,7 +115,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val c: Vertex by lazy { vertices[2] }
 
-        val adjacentTriangles: List<Triangle> by lazy { triangles.getAdjacentTriangles(id).map { Triangle(it) } }
+        val adjacentTriangles: List<Triangle> by lazy { triangles.getAdjacentTriangles(id).map { newTriangle(it) } }
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -249,14 +271,31 @@ class Graph(val vertexIdsToPoints: FloatArray,
         }
 
         fun sharedEdge(other: Cell): LineSegment2F? {
-            borderEdges.forEach { edge1 ->
-                other.borderEdges.forEach { edge2 ->
-                    if (edge1.epsilonEquals(edge2)) {
-                        return edge1
+            val otherAdjacent = vertices.getAdjacentTriangles(other.id)
+            var first: Int? = null
+            var second: Int? = null
+            for (it in vertices.getAdjacentTriangles(id)) {
+                if (otherAdjacent.contains(it)) {
+                    if (first == null) {
+                        first = it
+                    } else {
+                        second = it
+                        break
                     }
                 }
             }
-            return null
+            if (second == null) {
+                return null
+            }
+            return LineSegment2F(triangles[first!!].center, triangles[second].center)
+//            borderEdges.forEach { edge1 ->
+//                other.borderEdges.forEach { edge2 ->
+//                    if (edge1.epsilonEquals(edge2)) {
+//                        return edge1
+//                    }
+//                }
+//            }
+//            return null
         }
 
         override fun equals(other: Any?): Boolean {
@@ -273,7 +312,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val size: Int by lazy { vertexIdsToPoints.size / 2 }
 
-        operator fun get(id: Int): Vertex = Vertex(id)
+        operator fun get(id: Int): Vertex = newVertex(id)
 
         operator fun get(x: Int, y: Int): Vertex {
             if (stride == null) throw UnsupportedOperationException()
@@ -299,14 +338,14 @@ class Graph(val vertexIdsToPoints: FloatArray,
             return vertexToTriangles[id]
         }
 
-        override fun iterator(): Iterator<Vertex> = (0..size - 1).map { Vertex(it) }.iterator()
+        override fun iterator(): Iterator<Vertex> = (0..size - 1).map { newVertex(it) }.iterator()
     }
 
     inner class Triangles internal constructor() : Iterable<Triangle> {
 
         val size: Int by lazy { triangleToCenters.size / 2 }
 
-        operator fun get(id: Int): Triangle = Triangle(id)
+        operator fun get(id: Int): Triangle = newTriangle(id)
 
         fun getCenter(id: Int): Point2F {
             val o = id * 2
@@ -323,7 +362,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
             return triangleToTriangles.slice(o..o + 2).filter { it >= 0 }.toList()
         }
 
-        override fun iterator(): Iterator<Triangle> = (0..size - 1).map { Triangle(it) }.iterator()
+        override fun iterator(): Iterator<Triangle> = (0..size - 1).asSequence().map { newTriangle(it) }.iterator()
     }
 
     fun getClosestPoint(point: Point2F, closePoints: Set<Int> = getClosePoints(point)): Int {

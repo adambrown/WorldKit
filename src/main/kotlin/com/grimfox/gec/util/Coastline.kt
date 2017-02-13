@@ -1,10 +1,14 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.command.BuildContinent.Parameters
-import com.grimfox.gec.extensions.*
-import com.grimfox.gec.model.*
+import com.grimfox.gec.extensions.call
+import com.grimfox.gec.extensions.join
+import com.grimfox.gec.extensions.value
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertices
+import com.grimfox.gec.model.IntArrayMatrix
+import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
@@ -14,17 +18,21 @@ import com.grimfox.gec.util.Utils.pow
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 
 object Coastline {
 
     const val BYTE_ZERO: Byte = 0
 
     fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, parameters: Parameters) {
-        val approximateAreaPerPoint = 1.0f / graph.vertices.size
-        val pointsPerRegion = Math.round(parameters.minRegionSize / approximateAreaPerPoint)
         val borderPoints = buildBorderPoints(graph)
         val water = extractWaterFromIds(graph, idMask)
         applyBorderConstraintsToWater(water, borderPoints, idMask)
+        refineCoastline(graph, random, idMask, water, borderPoints, parameters)
+    }
+
+    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, water: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, parameters: Parameters) {
+        val pointsPerRegion = Math.round(parameters.minRegionSize / (1.0f / graph.vertices.size))
         val offLimitPoints = getOffLimitPoints(graph, idMask, water, parameters.protectedInset, parameters.protectedRadius)
         erodeCoastline(graph, water, borderPoints, idMask, random, offLimitPoints, parameters.landPercent, parameters.smallIsland, parameters.largeIsland, parameters.minPerturbation, parameters.maxIterations, pointsPerRegion)
         forceClaimUnwantedLand(graph, idMask, forceGiveUpDisconnectedLand(graph, idMask))
@@ -65,7 +73,7 @@ object Coastline {
         futures.forEach { it.get() }
     }
 
-    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, executor: ExecutorService) : Matrix<Byte> {
+    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, executor: ExecutorService): Triple<ByteArrayMatrix, LinkedHashSet<Int>, LinkedHashSet<Int>> {
         val borderPointsFuture = executor.call { buildBorderPoints(maskGraph) }
         val landFuture = executor.call { extractLandFromIds(maskGraph, mask) }
         val land = landFuture.value
@@ -121,7 +129,8 @@ object Coastline {
         val newBorderPointsFuture = executor.call { buildBorderPoints(graph) }
         val waterFuture = executor.call { extractWaterFromIds(graph, newMask) }
         val water = waterFuture.value
-        applyBorderConstraintsToWater(water, newBorderPointsFuture.value, newMask)
+        val newBorderPoints = newBorderPointsFuture.value
+        applyBorderConstraintsToWater(water, newBorderPoints, newMask)
         val waterBodies = graph.getConnectedBodies(water)
         if (waterBodies.size > 1) {
             val bodyBorders = ArrayList<LineSegment2F>()
@@ -163,7 +172,7 @@ object Coastline {
                 }
             }
         }
-        return newMask
+        return Triple(newMask, water, borderPoints)
     }
 
     fun getCoastline(graph: Graph, idMask: Matrix<Byte>): ArrayList<Polygon2F> {
@@ -359,38 +368,42 @@ object Coastline {
         val desiredLandPointCount = Math.min(maxLandPointCount, Math.round(graph.vertices.size * landPercent))
         val largeIslandCount = Math.max(0, Math.min(Int.MAX_VALUE.toLong(), Math.round(largeIsland.toDouble() * graph.vertices.size)).toInt())
         val smallIslandCount = Math.max(0, Math.min(Int.MAX_VALUE.toLong(), Math.round(smallIsland.toDouble() * graph.vertices.size)).toInt())
-        var coastalPoints = buildCoastalPoints(graph, waterPoints)
-        var coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
-        ensureSufficientLandForPerturbation(graph, waterPoints, coastalPoints, coastalPointDegrees, borderPoints, idMask, random, desiredLandPointCount, minPerturbation, maxIterations)
-        removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
-        removeLakes(graph, waterPoints, borderPoints, idMask)
-        coastalPoints = buildCoastalPoints(graph, waterPoints)
-        coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
+        var coastalPoints = timeIt("buildCoastalPoints 1") { buildCoastalPoints(graph, waterPoints) }
+        var coastalPointDegrees = timeIt("buildCoastalPointDegreeSets") { buildCoastalPointDegreeSets(coastalPoints) }
+        timeIt("ensureSufficientLandForPerturbation") { ensureSufficientLandForPerturbation(graph, waterPoints, coastalPoints, coastalPointDegrees, borderPoints, idMask, random, desiredLandPointCount, minPerturbation, maxIterations) }
+        timeIt("removeIslands") { removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount) }
+        timeIt("removeLakes") { removeLakes(graph, waterPoints, borderPoints, idMask) }
+        coastalPoints = timeIt("buildCoastalPoints 2") { buildCoastalPoints(graph, waterPoints) }
+        coastalPointDegrees = timeIt("buildCoastalPointDegreeSets 2") { buildCoastalPointDegreeSets(coastalPoints) }
         var landPointCount = graph.vertices.size - waterPoints.size
         var pointCountToRemove = landPointCount - desiredLandPointCount
         var i = 0
-        while (pointCountToRemove > 0 && i < maxIterations) {
-            modifyCoastline(graph, waterPoints, coastalPoints, coastalPointDegrees, borderPoints, idMask, random, offLimitPoints, pointCountToRemove, pointsPerRegion)
-            removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
-            removeLakes(graph, waterPoints, borderPoints, idMask)
-            coastalPoints = buildCoastalPoints(graph, waterPoints)
-            coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
-            landPointCount = graph.vertices.size - waterPoints.size
-            pointCountToRemove = landPointCount - desiredLandPointCount
-            i++
+        timeIt("modify block") {
+            while (pointCountToRemove > 0 && i < maxIterations) {
+                modifyCoastline(graph, waterPoints, coastalPoints, coastalPointDegrees, borderPoints, idMask, random, offLimitPoints, pointCountToRemove, pointsPerRegion)
+                removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
+                removeLakes(graph, waterPoints, borderPoints, idMask)
+                coastalPoints = buildCoastalPoints(graph, waterPoints)
+                coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
+                landPointCount = graph.vertices.size - waterPoints.size
+                pointCountToRemove = landPointCount - desiredLandPointCount
+                i++
+            }
         }
-        i = 0
-        while (pointCountToRemove > 0 && i < maxIterations) {
-            reduceCoastline(graph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, offLimitPoints, pointCountToRemove, pointsPerRegion)
-            pointCountToRemove = landPointCount - desiredLandPointCount
-            removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
-            removeLakes(graph, waterPoints, borderPoints, idMask)
-            coastalPoints = buildCoastalPoints(graph, waterPoints)
-            coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
-            i++
+        timeIt("reduce block") {
+            i = 0
+            while (pointCountToRemove > 0 && i < maxIterations) {
+                reduceCoastline(graph, waterPoints, coastalPoints, coastalPointDegrees, idMask, random, offLimitPoints, pointCountToRemove, pointsPerRegion)
+                pointCountToRemove = landPointCount - desiredLandPointCount
+                removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
+                removeLakes(graph, waterPoints, borderPoints, idMask)
+                coastalPoints = buildCoastalPoints(graph, waterPoints)
+                coastalPointDegrees = buildCoastalPointDegreeSets(coastalPoints)
+                i++
+            }
         }
-        removeLakes(graph, waterPoints, borderPoints, idMask)
-        removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount)
+        timeIt("removeLakes 2") { removeLakes(graph, waterPoints, borderPoints, idMask) }
+        timeIt("removeIslands 2") { removeIslands(graph, waterPoints, idMask, smallIslandCount, largeIslandCount) }
     }
 
     private fun ensureSufficientLandForPerturbation(graph: Graph,
