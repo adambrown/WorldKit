@@ -1,5 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.SHRINK
@@ -105,7 +106,11 @@ fun Block.button(text: Text, style: ButtonStyle, onClick: () -> Unit = {}): Bloc
         onMouseClick { button, x, y, mods ->
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 task {
-                    onClick()
+                    try {
+                        onClick()
+                    } catch (t: Throwable) {
+                        LOG.error("Error executing button task.", t)
+                    }
                 }
             }
         }

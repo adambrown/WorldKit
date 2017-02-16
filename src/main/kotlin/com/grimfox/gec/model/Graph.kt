@@ -60,7 +60,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
             return LineSegment2F(tri1.center, tri2.center).intersectsOrTouches(LineSegment2F(other.tri1.center, other.tri2.center))
         }
 
-        override fun equals(other: Any?): Boolean{
+        override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other?.javaClass != javaClass) return false
             other as CellEdge
@@ -71,9 +71,11 @@ class Graph(val vertexIdsToPoints: FloatArray,
         }
 
         private val hashCode by lazy {
-            val p1hc = tri1.id.hashCode()
-            val p2hc = tri2.id.hashCode()
-            31 * Math.min(p1hc, p2hc) + Math.max(p1hc, p2hc)
+            val id1 = Math.min(tri1.id, tri2.id)
+            val id2 = Math.max(tri1.id, tri2.id)
+            val p1hc = id1.hashCode()
+            val p2hc = id2.hashCode()
+            31 * p1hc + p2hc
         }
 
         override fun hashCode(): Int = hashCode
@@ -270,32 +272,49 @@ class Graph(val vertexIdsToPoints: FloatArray,
             Math.abs((sum1 - sum2) / 2)
         }
 
-        fun sharedEdge(other: Cell): LineSegment2F? {
-            val otherAdjacent = vertices.getAdjacentTriangles(other.id)
-            var first: Int? = null
-            var second: Int? = null
-            for (it in vertices.getAdjacentTriangles(id)) {
-                if (otherAdjacent.contains(it)) {
-                    if (first == null) {
-                        first = it
-                    } else {
-                        second = it
+        fun sharedEdge(other: Cell, useTriangles: Boolean): LineSegment2F? {
+            if (useTriangles) {
+                val adjacent = vertices.getAdjacentTriangles(id)
+                val otherAdjacent = vertices.getAdjacentTriangles(other.id)
+                var first: Int? = null
+                var second: Int? = null
+                var lastWasVert: Boolean = false
+                for (vert in adjacent) {
+                    if (otherAdjacent.contains(vert)) {
+                        lastWasVert = true
+                        if (first == null) {
+                            first = vert
+                            continue
+                        } else {
+                            second = vert
+                            break
+                        }
+                    } else if (lastWasVert) {
                         break
                     }
+                    lastWasVert = false
                 }
-            }
-            if (second == null) {
+                if (second == null && lastWasVert) {
+                    val vert = adjacent.last()
+                    if (otherAdjacent.contains(vert)) {
+                        second = first
+                        first = vert
+                    }
+                }
+                if (second == null) {
+                    return null
+                }
+                return LineSegment2F(triangles[first!!].center, triangles[second].center)
+            } else {
+                borderEdges.forEach { edge1 ->
+                    other.borderEdges.forEach { edge2 ->
+                        if (edge1.epsilonEquals(edge2)) {
+                            return edge1
+                        }
+                    }
+                }
                 return null
             }
-            return LineSegment2F(triangles[first!!].center, triangles[second].center)
-//            borderEdges.forEach { edge1 ->
-//                other.borderEdges.forEach { edge2 ->
-//                    if (edge1.epsilonEquals(edge2)) {
-//                        return edge1
-//                    }
-//                }
-//            }
-//            return null
         }
 
         override fun equals(other: Any?): Boolean {
@@ -494,8 +513,8 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null): ArrayList<Polygon2F> {
-        val edges = findBorderEdges(ids, mask, negate)
+    fun findBorder(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null, useTriangles: Boolean): ArrayList<Polygon2F> {
+        val edges = findBorderEdges(ids, mask, negate, useTriangles)
         if (edges.isEmpty()) {
             return arrayListOf()
         }
@@ -507,18 +526,18 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borders
     }
 
-    fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false): List<LineSegment2F> {
+    fun findBorderEdges(ids: LinkedHashSet<Int>, mask: LinkedHashSet<Int>? = null, negate: Boolean = false, useTriangles: Boolean): List<LineSegment2F> {
         val borderIds = ArrayList<LineSegment2F>()
         ids.forEach { id ->
             vertices.getAdjacentVertices(id).forEach { adjacentId ->
                 if (!ids.contains(adjacentId)) {
                     if (mask == null) {
-                        addBorderEdge(borderIds, id, adjacentId)
+                        addBorderEdge(borderIds, id, adjacentId, useTriangles)
                     } else {
                         if (!negate && mask.contains(adjacentId)) {
-                            addBorderEdge(borderIds, id, adjacentId)
+                            addBorderEdge(borderIds, id, adjacentId, useTriangles)
                         } else if (negate && !mask.contains(adjacentId)) {
-                            addBorderEdge(borderIds, id, adjacentId)
+                            addBorderEdge(borderIds, id, adjacentId, useTriangles)
                         }
                     }
                 }
@@ -527,12 +546,12 @@ class Graph(val vertexIdsToPoints: FloatArray,
         return borderIds
     }
 
-    private fun addBorderEdge(borderIds: ArrayList<LineSegment2F>, id: Int, adjacentId: Int) {
+    private fun addBorderEdge(borderEdges: ArrayList<LineSegment2F>, id: Int, adjacentId: Int, useTriangles: Boolean) {
         val cell1 = vertices[id].cell
         val cell2 = vertices[adjacentId].cell
-        val edge = cell1.sharedEdge(cell2)
+        val edge = cell1.sharedEdge(cell2, useTriangles)
         if (edge != null) {
-            borderIds.add(edge)
+            borderEdges.add(edge)
         }
     }
 }

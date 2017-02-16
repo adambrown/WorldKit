@@ -3,7 +3,9 @@ package com.grimfox.gec
 import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
+import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.opengl.loadTexture2D
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
@@ -415,6 +417,7 @@ object MainUi {
                                         height = -2.0f
                                         block {
                                             hSpacer(MEDIUM_SPACER_SIZE)
+                                            val currentState = ref<Triple<ParameterSet, Graph, Matrix<Byte>>?>(null)
                                             block {
                                                 hSizing = GROW
                                                 layout = HORIZONTAL
@@ -495,17 +498,6 @@ object MainUi {
                                                     var backLabel = NO_BLOCK
                                                     var forwardLabel = NO_BLOCK
                                                     button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
-//                                                        meshViewport.setTexture(BuildContinent().generateLandmass(ParameterSet(
-//                                                                seed = seed.value,
-//                                                                regionCount = regions.value,
-//                                                                stride = stride.value,
-//                                                                islandDesire = islands.value,
-//                                                                regionPoints = startPoints.value,
-//                                                                initialReduction = reduction.value,
-//                                                                connectedness = connectedness.value,
-//                                                                regionSize = regionSize.value,
-//                                                                maxRegionTries = iterations.value * 10,
-//                                                                maxIslandTries = iterations.value * 100)))
                                                         val parameters = ParameterSet(
                                                                 seed = seed.value,
                                                                 regionCount = regions.value,
@@ -517,7 +509,9 @@ object MainUi {
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
                                                                 maxIslandTries = iterations.value * 100)
-                                                        meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                        val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                        meshViewport.setGraph(resultPair)
+                                                        currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
                                                         imageModeOn.value = true
                                                         val historyLast = historyCurrent.value
                                                         if (historyLast != null) {
@@ -552,7 +546,9 @@ object MainUi {
                                                                 regionSize = regionSize.value,
                                                                 maxRegionTries = iterations.value * 10,
                                                                 maxIslandTries = iterations.value * 100)
-                                                        meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                        val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                        meshViewport.setGraph(resultPair)
+                                                        currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
                                                         imageModeOn.value = true
                                                         val historyLast = historyCurrent.value
                                                         if (historyLast != null) {
@@ -594,7 +590,9 @@ object MainUi {
                                                                 historyForwardQueue.push(historyLast.copy())
                                                             }
                                                             syncParameterValues(parameters)
-                                                            meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                            meshViewport.setGraph(resultPair)
+                                                            currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
                                                             imageModeOn.value = true
                                                             historyCurrent.value = parameters.copy()
                                                         }
@@ -614,7 +612,9 @@ object MainUi {
                                                                 historyBackQueue.push(historyLast.copy())
                                                             }
                                                             syncParameterValues(parameters)
-                                                            meshViewport.setGraph(BuildContinent().generateRegions(parameters.copy(), executor))
+                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                            meshViewport.setGraph(resultPair)
+                                                            currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
                                                             imageModeOn.value = true
                                                             historyCurrent.value = parameters.copy()
                                                         }
@@ -627,6 +627,15 @@ object MainUi {
                                                     forwardLabel.isMouseAware = false
                                                     backButton.isVisible = false
                                                     forwardButton.isVisible = false
+                                                }
+                                                vButtonRow(LARGE_ROW_HEIGHT) {
+                                                    button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        val currentStateValue = currentState.value
+                                                        if (currentStateValue != null) {
+                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
+                                                            imageModeOn.value = false
+                                                        }
+                                                    }
                                                 }
                                             }
                                             hSpacer(MEDIUM_SPACER_SIZE)

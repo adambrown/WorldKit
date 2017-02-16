@@ -49,7 +49,7 @@ object Regions {
         while (tries < parameters.maxRegionTries) {
             val graph = generateGraph(parameters.stride, random, 0.8)
             val (interiorVertices, islandCount) = findInteriorVertices(graph, random, parameters, islandDesire, parameters.maxIslandTries)
-            val possibleRegions = pickStartRegions(graph, interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
+            val possibleRegions = pickStartRegions(interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
             var bestValue = -Float.MAX_VALUE
             var bestValueId = -1
             var fixerValue = -Float.MAX_VALUE
@@ -64,7 +64,7 @@ object Regions {
                     var sumY = 0.0f
                     val points = region.ids.map {
                         val cell = interiorVertices[it]!!.cell
-                        val connectedness = calculateConnectedness(graph, interiorVertices, region, cell)
+                        val connectedness = calculateConnectedness(interiorVertices, region, cell)
                         if (region.ids.size > 1 && connectedness < minConnectedness) {
                             minConnectedness = connectedness
                         }
@@ -181,22 +181,22 @@ object Regions {
         }
     }
 
-    private fun calculateConnectedness(graph: Graph, interiorVertices: HashMap<Int, Vertex>, region: Region, cell: Cell): Float {
+    private fun calculateConnectedness(interiorVertices: HashMap<Int, Vertex>, region: Region, cell: Cell): Float {
         val sharedEdges = LinkedHashSet(region.ids.filter { cell.id != it }.map {
-            cell.sharedEdge(interiorVertices[it]!!.cell)
+            cell.sharedEdge(interiorVertices[it]!!.cell, useTriangles = true)
         }.filterNotNull())
         return getConnectedEdgeSegments(sharedEdges).map { it.map { it.length }.sum() }.min() ?: 0.0f
     }
 
-    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCellSets: LinkedHashSet<LinkedHashSet<Int>>): ArrayList<ArrayList<Region>> {
+    private fun pickStartRegions(interiorVertices: HashMap<Int, Vertex>, startCellSets: LinkedHashSet<LinkedHashSet<Int>>): ArrayList<ArrayList<Region>> {
         val possibilities = LinkedHashSet<LinkedHashSet<Region>>()
         startCellSets.forEach {
-            possibilities.add(pickStartRegions(graph, interiorVertices, it))
+            possibilities.add(pickStartRegions(interiorVertices, it))
         }
         return ArrayList(possibilities.map { ArrayList(it) })
     }
 
-    private fun pickStartRegions(graph: Graph, interiorVertices: HashMap<Int, Vertex>, startCells: LinkedHashSet<Int>): LinkedHashSet<Region> {
+    private fun pickStartRegions(interiorVertices: HashMap<Int, Vertex>, startCells: LinkedHashSet<Int>): LinkedHashSet<Region> {
         val canPick = interiorVertices.map { it.key }.toHashSet()
         canPick.removeAll(startCells)
         val regionQueue = PriorityQueue<Region>(startCells.size) { r1: Region, r2: Region ->
@@ -208,7 +208,7 @@ object Regions {
         while (canPick.isNotEmpty() && regionQueue.isNotEmpty()) {
             val smallestRegion = regionQueue.remove()
             val candidates = smallestRegion.ids.flatMap { interiorVertices[it]!!.adjacentVertices.map { it.id } }.toSet().filter { canPick.contains(it) }.sortedByDescending {
-                calculateConnectedness(graph, interiorVertices, smallestRegion, interiorVertices[it]!!.cell)
+                calculateConnectedness(interiorVertices, smallestRegion, interiorVertices[it]!!.cell)
             }
             if (candidates.isNotEmpty()) {
                 val picked = candidates.first()

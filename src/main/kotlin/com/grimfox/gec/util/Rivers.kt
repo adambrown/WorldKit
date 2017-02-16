@@ -1,15 +1,16 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.model.*
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Vertices
+import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.TreeNode
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.Triangulate.buildGraph
 import com.grimfox.gec.util.Utils.findConcavityWeights
-import com.grimfox.gec.util.drawing.*
-import com.grimfox.gec.util.geometry.Geometry
-import com.grimfox.gec.util.geometry.Geometry.debug
+import com.grimfox.gec.util.drawing.draw
+import com.grimfox.gec.util.drawing.drawCell
+import com.grimfox.gec.util.drawing.drawEdge
 import com.grimfox.gec.util.geometry.Geometry.debugCount
-import com.grimfox.gec.util.geometry.Geometry.debugResolution
 import com.grimfox.gec.util.geometry.GeometryException
 import java.awt.Color
 import java.lang.Math.*
@@ -72,8 +73,8 @@ object Rivers {
                         break
                     }
                 }
-                val regionBorder = graph.findBorder(region).first()
-                val regionInlandBorders = graph.findBorder(region, water, true)
+                val regionBorder = graph.findBorder(region, useTriangles = false).first()
+                val regionInlandBorders = graph.findBorder(region, water, true, useTriangles = false)
                 val fakeInteriorBorderPoints: LinkedHashSet<Int>
                 val furthestFromBorder: Int
                 val interiorBorderPoints = findBorderPoints(vertices, water, region)
@@ -155,7 +156,7 @@ object Rivers {
                     terrainSlope = buildTerrainSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, region, regions.size)
                     buildRiverSlopeWeights(vertices, interiorBorderPoints, coastalBorderPoints, furthestFromBorder, furthestFromCoast, region, regions.size)
                 }
-                val regionCoastBorders = graph.findBorder(region, water, false)
+                val regionCoastBorders = graph.findBorder(region, water, false, useTriangles = false)
                 val localRiverMouths = ArrayList<Int>()
                 regionCoastBorders.flatMap { it.points }.forEach {
                     val index = coastPoints[it]
@@ -412,7 +413,7 @@ object Rivers {
     private fun findRiverMouthCandidates(graph: Graph, vertices: PointSet2F, bodies: List<LinkedHashSet<Int>>, beach: LinkedHashSet<Int>): Pair<ArrayList<ArrayList<Int>>, HashMap<Int, Float>> {
         val coastlines = ArrayList<ArrayList<Int>>()
         bodies.forEach {
-            val coastlinePolygon = graph.findBorder(it).first()
+            val coastlinePolygon = graph.findBorder(it, useTriangles = false).first()
             val coastlineIndices = ArrayList<Int>()
             var lastIndex = -1
             coastlinePolygon.points.forEach {
@@ -718,8 +719,8 @@ object Rivers {
                                   regionId: Int,
                                   riverSlope: Map<Int, Float>,
                                   terrainSlope: Map<Int, Float>) {
-        val borderWithCoast = graph.findBorder(regionForBorders)
-        val borderWithoutCoast = graph.findBorder(regionForBorders, water, true)
+        val borderWithCoast = graph.findBorder(regionForBorders, useTriangles = false)
+        val borderWithoutCoast = graph.findBorder(regionForBorders, water, true, useTriangles = false)
         val vertices = graph.vertices
         val candidateRiverNodes = sortCandidateRiverNodes(coastPoints, riverCandidates, localRiverMouths, regionId)
         var landlocked = false
@@ -874,8 +875,8 @@ object Rivers {
     }
 
     private fun detectIsolatedChunks(graph: Graph, water: LinkedHashSet<Int>, region: LinkedHashSet<Int>): ArrayList<Triple<LinkedHashSet<Int>, LinkedHashSet<Int>, Boolean>> {
-        val borders = graph.findBorder(region, water, true)
-        val coasts = graph.findBorder(region, water, false)
+        val borders = graph.findBorder(region, water, true, useTriangles = false)
+        val coasts = graph.findBorder(region, water, false, useTriangles = false)
         val borderPoints = graph.findBorderIds(region, water, true)
         val landlocked = coasts.isEmpty() || (coasts.size == 1 && coasts.first().edges.isEmpty())
         val usefulPoints = LinkedHashSet<Int>()
@@ -899,7 +900,7 @@ object Rivers {
 
         val limitedSizeBodies = ArrayList<LinkedHashSet<Int>>()
         if (connectedBodies.size == 1 && !landlocked) {
-            val nonBorderCoast = graph.findBorder(connectedBodies.first(), water, false)
+            val nonBorderCoast = graph.findBorder(connectedBodies.first(), water, false, useTriangles = false)
             if (nonBorderCoast.isNotEmpty()) {
                 return arrayListOf(Triple(region, water, false))
             } else {
@@ -966,7 +967,7 @@ object Rivers {
         while (unconnectedToWater.isNotEmpty()) {
             val toAdd = ArrayList<LinkedHashSet<Int>>()
             for (unconnected in unconnectedToWater) {
-                val coasts = graph.findBorder(unconnected, pseudoWater, false)
+                val coasts = graph.findBorder(unconnected, pseudoWater, false, useTriangles = false)
                 if (!coasts.isEmpty()) {
                     toAdd.add(unconnected)
                 }

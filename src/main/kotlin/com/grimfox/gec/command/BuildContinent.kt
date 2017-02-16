@@ -296,30 +296,19 @@ class BuildContinent : Runnable {
         }
     }
 
-    fun generateLandmass(parameterSet: ParameterSet = ParameterSet()): BufferedImage {
-        val executor = Executors.newWorkStealingPool()
+    fun generateLandmass(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, executor: ExecutorService): BufferedImage {
         val startTime = System.currentTimeMillis()
         var time = startTime
-        LOG.info("generating landmass")
+        LOG.info("generating mesh")
         val outputWidth = 4096
         val random = Random(parameterSet.seed)
-        var (graph, regionMask) = buildRegions(parameterSet)
-        var nextTime = System.currentTimeMillis()
-        println("regions built in ${nextTime - time}")
-        time = nextTime
-        parameterSet.parameters.forEachIndexed { i, parameters ->
-            parameterSet.currentIteration = i
-            val localGraph = generateGraph(parameters.stride, random, 0.8)
-            val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
-            regionMask = mask
-            refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
-            graph = localGraph
-        }
-        nextTime = System.currentTimeMillis()
-        println("coastline refined in ${nextTime - time}")
-        time = nextTime
+//        val graph = generateGraph(256, random, 0.8)
+//        val (regionMask, water, borderPoints) = applyMask(graph, inputGraph, inputMask, executor)
+//        refineCoastline(graph, random, regionMask, water, borderPoints, Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f))
+        val graph = inputGraph
+        val regionMask = inputMask
         val rivers = buildRivers(graph, regionMask, random)
-        nextTime = System.currentTimeMillis()
+        var nextTime = System.currentTimeMillis()
         LOG.info("rivers built in ${nextTime - time}")
         time = nextTime
         val borders = getBorders(graph, regionMask)
@@ -334,6 +323,14 @@ class BuildContinent : Runnable {
             val riverGraph = buildRiverGraph(riverSet)
             val riverVertexLookup = RiverVertexLookup(riverGraph)
             try {
+//                draw(debugResolution, "debug-rivers$i", "output", Color(160, 200, 255)) {
+//                    drawRivers(graph, regionMask, riverSet, coastline, border)
+//                }
+//                draw(debugResolution, "debug-graph$i", "output", Color.WHITE) {
+//                    drawGraph(riverGraph)
+//                    graphics.color = Color.BLACK
+//                    drawVertexIds(riverGraph)
+//                }
                 if (exceptions.isNotEmpty()) {
                     throw exceptions.first()
                 }
@@ -442,7 +439,6 @@ class BuildContinent : Runnable {
         buildUnderwaterPoints(executor, coastPoints, heightMap, 8)
         nextTime = System.currentTimeMillis()
         LOG.info("underwater generated in ${nextTime - time}")
-        executor.shutdownNow()
         return writeHeightData(heightMap)
     }
 
@@ -1390,7 +1386,7 @@ class BuildContinent : Runnable {
             val childCell = childVertex.cell
             val childEdge: LineSegment2F?
             try {
-                childEdge = cell.sharedEdge(childCell)!!
+                childEdge = cell.sharedEdge(childCell, useTriangles = false)!!
             } catch (e: Exception) {
                 draw(debugResolution, "debug-${String.format("%05d", test ?: 0)}-cells$body", "debug", Color.WHITE) {
                     graphics.color = Color.BLACK
