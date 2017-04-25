@@ -11,37 +11,78 @@ class Graph(val vertexIdsToPoints: FloatArray,
             val triangleToCenters: FloatArray,
             val triangleToVertices: IntArray,
             val triangleToTriangles: IntArray,
-            val stride: Int? = null) {
+            val stride: Int? = null,
+            cacheVertices: Boolean = true,
+            cacheTriangles: Boolean = true) {
 
     var useVirtualConnections = false
     var virtualConnections = HashMap<Int, LinkedHashSet<Int>>()
     val vertices = Vertices()
     val triangles = Triangles()
 
-    private val vertexCache: Array<Vertex?> = arrayOfNulls(vertices.size)
-
-    private val triangleCache: Array<Triangle?> = arrayOfNulls(triangles.size)
+    private val vertexFactory = if (cacheVertices) CachingVertexFactory() else DumbVertexFactory()
+    private val triangleFactory = if (cacheTriangles) CachingTriangleFactory() else DumbTriangleFactory()
 
     companion object {
         internal val bounds = Bounds2F(Point2F(0.0f, 0.0f), Point2F(1.0f, 1.0f))
     }
 
-    private fun newVertex(id: Int): Vertex {
-        var vertex = vertexCache[id]
-        if (vertex == null) {
-            vertex = Vertex(id)
-            vertexCache[id] = vertex
+    private interface VertexFactory {
+        fun newVertex(id: Int): Vertex
+    }
+
+    private interface TriangleFactory {
+        fun newTriangle(id: Int): Triangle
+    }
+
+    private inner class CachingVertexFactory: VertexFactory {
+
+        private val vertexCache: Array<Vertex?> = arrayOfNulls(vertices.size)
+
+        override fun newVertex(id: Int): Vertex {
+            var vertex = vertexCache[id]
+            if (vertex == null) {
+                vertex = Vertex(id)
+                vertexCache[id] = vertex
+            }
+            return vertex
         }
-        return vertex
+    }
+
+    private inner class DumbVertexFactory: VertexFactory {
+
+        override fun newVertex(id: Int): Vertex {
+            return Vertex(id)
+        }
+    }
+
+    private inner class CachingTriangleFactory: TriangleFactory {
+
+        private val triangleCache: Array<Triangle?> = arrayOfNulls(triangles.size)
+
+        override fun newTriangle(id: Int): Triangle {
+            var triangle = triangleCache[id]
+            if (triangle == null) {
+                triangle = Triangle(id)
+                triangleCache[id] = triangle
+            }
+            return triangle
+        }
+    }
+
+    private inner class DumbTriangleFactory: TriangleFactory {
+
+        override fun newTriangle(id: Int): Triangle {
+            return Triangle(id)
+        }
+    }
+
+    private fun newVertex(id: Int): Vertex {
+        return vertexFactory.newVertex(id)
     }
 
     private fun newTriangle(id: Int): Triangle {
-        var triangle = triangleCache[id]
-        if (triangle == null) {
-            triangle = Triangle(id)
-            triangleCache[id] = triangle
-        }
-        return triangle
+        return triangleFactory.newTriangle(id)
     }
 
     inner class CellEdge(val tri1: Triangle, val tri2: Triangle) {
@@ -357,7 +398,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
             return vertexToTriangles[id]
         }
 
-        override fun iterator(): Iterator<Vertex> = (0..size - 1).map { newVertex(it) }.iterator()
+        override fun iterator(): Iterator<Vertex> = (0..size - 1).asSequence().map { newVertex(it) }.iterator()
     }
 
     inner class Triangles internal constructor() : Iterable<Triangle> {
@@ -420,6 +461,57 @@ class Graph(val vertexIdsToPoints: FloatArray,
         } else {
             return nextPoints
         }
+    }
+
+    fun getClosePoints(vertexId: Int, expansions: Int = 3, includeLower: Boolean = true): Set<Int> {
+        if (stride == null) throw UnsupportedOperationException()
+        val nearPoints = LinkedHashSet<Int>()
+        nearPoints.add(vertexId)
+        var nextPoints = LinkedHashSet<Int>(nearPoints)
+        for (i in 0..expansions - 1) {
+            val newPoints = LinkedHashSet<Int>()
+            nextPoints.forEach {
+                newPoints.addAll(vertices.getAdjacentVertices(it))
+            }
+            newPoints.removeAll(nearPoints)
+            nearPoints.addAll(newPoints)
+            nextPoints = newPoints
+        }
+        if (includeLower) {
+            return nearPoints
+        } else {
+            return nextPoints
+        }
+    }
+
+    fun getClosePointSets(vertexId: Int, vararg importantExpansions: Int): List<Set<Int>> {
+        val expansions = ArrayList(importantExpansions.toList())
+        expansions.sort()
+        if (stride == null) throw UnsupportedOperationException()
+        val nearPoints = LinkedHashSet<Int>()
+        nearPoints.add(vertexId)
+        var nextPoints = LinkedHashSet<Int>(nearPoints)
+        val savedPoints = LinkedHashSet<Int>()
+        val expansionSets = ArrayList<Set<Int>>(expansions.size)
+        for (i in 0..expansions.last() - 1) {
+            if (i == expansions.first()) {
+                expansions.removeAt(0)
+                val currentLevel = LinkedHashSet<Int>(nearPoints)
+                currentLevel.removeAll(savedPoints)
+                savedPoints.addAll(currentLevel)
+                expansionSets.add(currentLevel)
+            }
+            val newPoints = LinkedHashSet<Int>()
+            nextPoints.forEach {
+                newPoints.addAll(vertices.getAdjacentVertices(it))
+            }
+            newPoints.removeAll(nearPoints)
+            nearPoints.addAll(newPoints)
+            nextPoints = newPoints
+        }
+        nearPoints.removeAll(savedPoints)
+        expansionSets.add(nearPoints)
+        return expansionSets
     }
 
     fun getPointsWithinRadius(point: Point2F, radius: Float): Set<Int> {

@@ -632,7 +632,8 @@ object MainUi {
                                                     button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
                                                         val currentStateValue = currentState.value
                                                         if (currentStateValue != null) {
-                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
+                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
+//                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
                                                             imageModeOn.value = false
                                                         }
                                                     }

@@ -9,13 +9,13 @@ import java.util.*
 
 object Graphs {
 
-    fun generateGraph(stride: Int, random: Random, constraint: Double): Graph {
+    fun generateGraph(stride: Int, random: Random, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         val polygon = Polygon(stride * stride)
         generateSemiUniformPointsD(stride, 1.0, random, constraint) { i, x, y ->
             polygon.add(Vertex(x, y))
         }
         val mesh = polygon.triangulate()
-        return buildGraph(mesh, stride)
+        return buildGraph(mesh, stride, null, cacheVertices, cacheTriangles)
     }
 
     fun buildGraph(width: Float, points: List<Point2F>, stride: Int? = null): Graph {
@@ -29,7 +29,7 @@ object Graphs {
         return buildGraph(mesh, stride, width)
     }
 
-    private fun buildGraph(mesh: Mesh, stride: Int? = null, width: Float? = null): Graph {
+    private fun buildGraph(mesh: Mesh, stride: Int? = null, width: Float? = null, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         mesh.renumber()
         val points: List<Point> = mesh.vertices
         val triangles: List<Triangle> = mesh.triangles
@@ -154,6 +154,6 @@ object Graphs {
             vertexToTriangles.add(adjacentTriangles)
             vertexToVertices.add(adjacentPoints)
         }
-        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride)
+        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, cacheVertices, cacheTriangles)
     }
 }

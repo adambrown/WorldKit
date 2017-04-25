@@ -2,6 +2,9 @@ package com.grimfox.gec.command
 
 //import java.util.concurrent.ThreadPoolExecutor
 import com.grimfox.gec.Main
+import com.grimfox.gec.extensions.call
+import com.grimfox.gec.extensions.join
+import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertex
 import com.grimfox.gec.model.geometry.*
@@ -14,6 +17,7 @@ import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.Rivers.RiverNode
 import com.grimfox.gec.util.Rivers.buildRiverGraph
 import com.grimfox.gec.util.Rivers.buildRivers
+import com.grimfox.gec.util.WaterFlows.generateWaterFlows
 import com.grimfox.gec.util.drawing.*
 import com.grimfox.gec.util.geometry.*
 import com.grimfox.gec.util.geometry.Geometry.debug
@@ -36,6 +40,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.atomic.AtomicLong
 import javax.imageio.ImageIO
 
 @Command(name = "build-continent", description = "Builds a continent.")
@@ -142,8 +147,8 @@ class BuildContinent : Runnable {
                     if (exceptions.isNotEmpty()) {
                         throw exceptions.first()
                     }
-                    val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
-                    val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows, test)
+                    val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f, executor)
+                    val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows, test, executor)
 //                    draw(outputWidth, "test-new-${String.format("%05d", test)}-rivers$i", "output", Color(160, 200, 255)) {
 //                        drawRivers(graph, regionMask, riverSet, coastline, border)
 //                    }
@@ -296,6 +301,10 @@ class BuildContinent : Runnable {
         }
     }
 
+    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, executor: ExecutorService): BufferedImage {
+        return generateWaterFlows(Random(parameterSet.seed), 512, inputGraph, inputMask, executor, 4096)
+    }
+
     fun generateLandmass(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, executor: ExecutorService): BufferedImage {
         val startTime = System.currentTimeMillis()
         var time = startTime
@@ -334,8 +343,8 @@ class BuildContinent : Runnable {
                 if (exceptions.isNotEmpty()) {
                     throw exceptions.first()
                 }
-                val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f)
-                val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows)
+                val riverFlows = calculateRiverFlows(riverVertexLookup, coastline, riverSet, 1600000000.0f, 0.39f, executor)
+                val riverSplines = calculateRiverSegments(i, riverVertexLookup, coastline, coastMultigon, random, riverSet, riverFlows, executor = executor)
                 val reverseRiverMap = HashMap<Int, RiverNode>()
                 riverSet.forEach {
                     it.forEach { node ->
@@ -368,8 +377,8 @@ class BuildContinent : Runnable {
                     }
                 }
 
-                val renderedCells = buildCoastalMeshes(riverGraph, cellsToRiverSegments, crestElevations, coastline, coastMultigon, reverseRiverMap, globalVertices, globalTriangles)
-                buildInlandMeshes(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, globalVertices, globalTriangles)
+                val renderedCells = timeIt("buildCoastalMeshes") { buildCoastalMeshes(riverGraph, cellsToRiverSegments, crestElevations, coastline, coastMultigon, reverseRiverMap, globalVertices, globalTriangles) }
+                timeIt("buildInlandMeshes") { buildInlandMeshes(riverGraph, cellsToRiverSegments, crestElevations, renderedCells, globalVertices, globalTriangles) }
 
             } catch (e: GeometryException) {
                 e.test = parameterSet.seed
@@ -702,18 +711,18 @@ class BuildContinent : Runnable {
 
     private fun buildCoastalMeshes(riverGraph: Graph, cellsToRiverSegments: HashMap<Int, ArrayList<RiverSegment>>, crestElevations: HashMap<Int, Float>, coastline: Polygon2F, coastMultigon: Multigon2F, reverseRiverMap: HashMap<Int, RiverNode>, globalVertices: PointSet2F, globalTriangles: ArrayList<Int>): Set<Int> {
         val coastCells = ArrayList<Int>()
-        riverGraph.vertices.forEach { vertex ->
+        timeIt("coastCells") { riverGraph.vertices.forEach { vertex ->
             if (cellIntersectsCoast(coastMultigon, vertex)) {
                 coastCells.add(vertex.id)
             }
-        }
-        val riverPoints = PointSet2F(riverGraph.vertices.map { it.point })
+        } }
+        val riverPoints = timeIt("riverPoints") { PointSet2F(riverGraph.vertices.map { it.point }) }
         riverPoints.retainAll(coastline.points)
-        val (coastalPolygons, unconnectedPolygons) = buildBasicCoastalCellPolygons(riverGraph, cellsToRiverSegments, riverPoints, coastMultigon, coastline, coastCells)
-        val (riverPolygons, adjacencyPatches, inclusionPatches) = reviseCoastalCellPolygonsForRiverAndCoast(riverGraph, cellsToRiverSegments, coastalPolygons, unconnectedPolygons)
-        val smoothedCoastalCellPolys = smoothCoastline(riverGraph, cellsToRiverSegments, coastalPolygons, adjacencyPatches, inclusionPatches)
-        val (edgeSkeletons, riverSkeletons) = buildCoastalCellSkeletons(riverGraph, cellsToRiverSegments, crestElevations, riverPolygons, coastalPolygons, adjacencyPatches, inclusionPatches, smoothedCoastalCellPolys)
-        buildCoastalTriangles(reverseRiverMap, edgeSkeletons, riverSkeletons, smoothedCoastalCellPolys, globalVertices, globalTriangles)
+        val (coastalPolygons, unconnectedPolygons) = timeIt("buildBasicCoastalCellPolygons") { buildBasicCoastalCellPolygons(riverGraph, cellsToRiverSegments, riverPoints, coastMultigon, coastline, coastCells) }
+        val (riverPolygons, adjacencyPatches, inclusionPatches) = timeIt("reviseCoastalCellPolygonsForRiverAndCoast") { reviseCoastalCellPolygonsForRiverAndCoast(riverGraph, cellsToRiverSegments, coastalPolygons, unconnectedPolygons) }
+        val smoothedCoastalCellPolys = timeIt("smoothCoastline") { smoothCoastline(riverGraph, cellsToRiverSegments, coastalPolygons, adjacencyPatches, inclusionPatches) }
+        val (edgeSkeletons, riverSkeletons) = timeIt("buildCoastalCellSkeletons") { buildCoastalCellSkeletons(riverGraph, cellsToRiverSegments, crestElevations, riverPolygons, coastalPolygons, adjacencyPatches, inclusionPatches, smoothedCoastalCellPolys) }
+        timeIt("buildCoastalTriangles") { buildCoastalTriangles(reverseRiverMap, edgeSkeletons, riverSkeletons, smoothedCoastalCellPolys, globalVertices, globalTriangles) }
         return coastCells.toSet()
     }
 
@@ -723,30 +732,49 @@ class BuildContinent : Runnable {
                                       smoothedCoastalCellPolys: HashMap<Int, Polygon2F>,
                                       globalVertexSet: PointSet2F,
                                       globalTriangles: ArrayList<Int>) {
-        smoothedCoastalCellPolys.forEach {
-            val edgeSkeleton = edgeSkeletons[it.key]
-            val riverSkeleton = riverSkeletons[it.key] ?: arrayListOf()
-            val maxTerrainSlope = reverseRiverMap[it.key]?.maxTerrainSlope ?: 0.0f
-            if (edgeSkeleton != null) {
-                try {
-                    val (vertices, triangles) = buildMesh(edgeSkeleton, riverSkeleton, globalVertexSet)
-                    spliceZeroHeightTriangles(vertices, triangles, maxTerrainSlope)
-                    globalMapTriangles(globalVertexSet, globalTriangles, vertices, triangles)
-                } catch (e: GeometryException) {
-                    throw e.with {
-                        id = it.key
-                        data.add("val test = {")
-                        data.add("val edgeSkeleton = ${printList(edgeSkeleton)}")
-                        data.add("val riverSkeleton = ${printList(riverSkeleton)}")
-                        val testGlobalVertices = PointSet2F(0.0001f)
-                        testGlobalVertices.addAll(edgeSkeleton.flatMap { listOf(globalVertexSet[globalVertexSet[it.a]]!!, globalVertexSet[globalVertexSet[it.a]]!!) } + riverSkeleton.flatMap { listOf(globalVertexSet[globalVertexSet[it.a]]!!, globalVertexSet[globalVertexSet[it.a]]!!) })
-                        data.add("val globalVertices = $testGlobalVertices")
-                        data.add("buildMesh(edgeSkeleton, riverSkeleton, globalVertices)")
-                        data.add("}")
-                    }
+        val accumulator1 = AtomicLong(0)
+        val accumulator2 = AtomicLong(0)
+        val accumulator3 = AtomicLong(0)
+        smoothedCoastalCellPolys.map {
+            val key = it.key
+            val edgeSkeleton = edgeSkeletons[key]
+            if (edgeSkeleton != null) Pair(key, Triple(edgeSkeleton, riverSkeletons[it.key] ?: arrayListOf(), reverseRiverMap[it.key]?.maxTerrainSlope ?: 0.0f)) else null
+        }.filterNotNull().map {
+            val key = it.first
+            val edgeSkeleton = ArrayList(it.second.first)
+            val riverSkeleton = ArrayList(it.second.second)
+            val maxTerrainSlope = it.second.third
+            globalMapEdges(globalVertexSet, edgeSkeleton)
+            globalMapEdges(globalVertexSet, riverSkeleton)
+            closeEdge(edgeSkeleton)
+            globalMapEdges(globalVertexSet, edgeSkeleton)
+            Pair(key, Triple(edgeSkeleton, riverSkeleton, maxTerrainSlope))
+        }.forEach {
+            val key = it.first
+            val edgeSkeleton = it.second.first
+            val riverSkeleton = it.second.second
+            val maxTerrainSlope = it.second.third
+            try {
+                val (vertices, triangles) = timeIt(accumulator1) { buildMesh(edgeSkeleton, riverSkeleton, globalVertexSet) }
+                timeIt(accumulator2) { spliceZeroHeightTriangles(vertices, triangles, maxTerrainSlope) }
+                timeIt(accumulator3) { globalMapTriangles(globalVertexSet, globalTriangles, vertices, triangles) }
+            } catch (e: GeometryException) {
+                throw e.with {
+                    id = key
+                    data.add("val test = {")
+                    data.add("val edgeSkeleton = ${printList(edgeSkeleton)}")
+                    data.add("val riverSkeleton = ${printList(riverSkeleton)}")
+                    val testGlobalVertices = PointSet2F(0.0001f)
+                    testGlobalVertices.addAll(edgeSkeleton.flatMap { listOf(globalVertexSet[globalVertexSet[it.a]]!!, globalVertexSet[globalVertexSet[it.a]]!!) } + riverSkeleton.flatMap { listOf(globalVertexSet[globalVertexSet[it.a]]!!, globalVertexSet[globalVertexSet[it.a]]!!) })
+                    data.add("val globalVertices = $testGlobalVertices")
+                    data.add("buildMesh(edgeSkeleton, riverSkeleton, globalVertices)")
+                    data.add("}")
                 }
             }
         }
+        println("buildMesh: ${accumulator1.get() / 1000000.0}")
+        println("spliceZeroHeightTriangles: ${accumulator2.get() / 1000000.0}")
+        println("globalMapTriangles: ${accumulator3.get() / 1000000.0}")
     }
 
     private fun buildInlandTriangles(edgeSkeletons: HashMap<Int, ArrayList<LineSegment3F>>,
@@ -1297,35 +1325,42 @@ class BuildContinent : Runnable {
         return false
     }
 
-    private fun calculateRiverSegments(body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, random: Random, rivers: ArrayList<TreeNode<RiverNode>>, flows: FloatArray, test: Int? = null): ArrayList<TreeNode<RiverSegment>> {
-        val trees = ArrayList<TreeNode<RiverSegment>>()
-        rivers.forEach { outlet ->
-            trees.add(calculateRiverSplines(body, graph, coastline, coastMultigon, null, outlet, flows, test))
-        }
+    private fun calculateRiverSegments(body: Int, graph: RiverVertexLookup, coastline: Polygon2F, coastMultigon: Multigon2F, random: Random, rivers: ArrayList<TreeNode<RiverNode>>, flows: FloatArray, test: Int? = null, executor: ExecutorService): ArrayList<TreeNode<RiverSegment>> {
+        val treeFutures = ArrayList<Future<TreeNode<RiverSegment>>>(rivers.size)
+        (0..rivers.size - 1)
+                .map { rivers[it] }
+                .mapTo(treeFutures) { executor.call { calculateRiverSplines(body, graph, coastline, coastMultigon, null, it, flows, test) } }
+        val trees = ArrayList<TreeNode<RiverSegment>>(rivers.size)
+        treeFutures.mapTo(trees) { it.value }
         var direction = -1.0f
+        val splineFutures = ArrayList<Future<Unit>>(trees.size)
         trees.forEach { tree ->
-            tree.forEach { segment ->
-                val profile = segment.profile
-                val spline = segment.spline.subdivided(profile.spacing.nextValue(random), 3)
-                if (spline.points.size > 2) {
-                    for (i in 1..spline.points.size - 2) {
-                        val modifyPoint = spline.points[i]
-                        direction = -direction
-                        val power = random.nextFloat()
-                        val deviation = max(0.0f, min(profile.deviation.valueAt(power), 1.0f))
-                        val magnitude = profile.strength.valueAt(power)
-                        val originalVector = Vector2F(modifyPoint.p, modifyPoint.cp2)
-                        val deviantVector = originalVector.getPerpendicular() * (deviation * direction)
-                        val newUnitVector = ((originalVector * (1.0f - deviation)) + deviantVector).getUnit()
-                        val newVector1 = newUnitVector * (originalVector.length * magnitude)
-                        val newVector2 = -newUnitVector * (Vector2F(modifyPoint.p, modifyPoint.cp1).length * magnitude)
-                        modifyPoint.cp1 = modifyPoint.p + newVector2
-                        modifyPoint.cp2 = modifyPoint.p + newVector1
-                    }
-                }
-                segment.spline = spline
-            }
+            splineFutures.add(
+                    executor.call {
+                        tree.forEach { segment ->
+                            val profile = segment.profile
+                            val spline = segment.spline.subdivided(profile.spacing.nextValue(random), 3)
+                            if (spline.points.size > 2) {
+                                for (i in 1..spline.points.size - 2) {
+                                    val modifyPoint = spline.points[i]
+                                    direction = -direction
+                                    val power = random.nextFloat()
+                                    val deviation = max(0.0f, min(profile.deviation.valueAt(power), 1.0f))
+                                    val magnitude = profile.strength.valueAt(power)
+                                    val originalVector = Vector2F(modifyPoint.p, modifyPoint.cp2)
+                                    val deviantVector = originalVector.getPerpendicular() * (deviation * direction)
+                                    val newUnitVector = ((originalVector * (1.0f - deviation)) + deviantVector).getUnit()
+                                    val newVector1 = newUnitVector * (originalVector.length * magnitude)
+                                    val newVector2 = -newUnitVector * (Vector2F(modifyPoint.p, modifyPoint.cp1).length * magnitude)
+                                    modifyPoint.cp1 = modifyPoint.p + newVector2
+                                    modifyPoint.cp2 = modifyPoint.p + newVector1
+                                }
+                            }
+                            segment.spline = spline
+                        }
+                    })
         }
+        splineFutures.forEach(Future<Unit>::join)
         return trees
     }
 
@@ -1572,12 +1607,14 @@ class BuildContinent : Runnable {
         return Triple(Junction(vertexId, junction, totalFlow, outputVector, junctionElevation), Spline2F(mutableListOf(sp1, sp3), false), Spline2F(mutableListOf(sp2, sp3), false))
     }
 
-    private fun calculateRiverFlows(graph: RiverVertexLookup, coastline: Polygon2F, rivers: ArrayList<TreeNode<RiverNode>>, simulationSizeM2: Float, landPercent: Float): FloatArray {
+    private fun calculateRiverFlows(graph: RiverVertexLookup, coastline: Polygon2F, rivers: ArrayList<TreeNode<RiverNode>>, simulationSizeM2: Float, landPercent: Float, executor: ExecutorService): FloatArray {
         val standardArea = (simulationSizeM2 * landPercent) / graph.riverGraph.vertices.size.toFloat()
         val flows = FloatArray(graph.riverGraph.vertices.size)
+        val futures = ArrayList<Future<Double>>()
         rivers.forEach {
-            calculateRiverFlow(graph, coastline, it, simulationSizeM2, standardArea, flows)
+            futures.add(executor.call { calculateRiverFlow(graph, coastline, it, simulationSizeM2, standardArea, flows) })
         }
+        futures.forEach(Future<Double>::join)
         return flows
     }
 

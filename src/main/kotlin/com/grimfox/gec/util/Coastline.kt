@@ -166,6 +166,7 @@ object Coastline {
                             newMask[it] = 0
                         }
                         ocean.addAll(lake)
+                        water.addAll(lake)
                         break
                     }
                 }
@@ -437,7 +438,7 @@ object Coastline {
     }
 
     private fun buildBorderPoints(graph: Graph): LinkedHashSet<Int> {
-        return LinkedHashSet(graph.vertices.filter { it.cell.isBorder }.map { it.id })
+        return LinkedHashSet(graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
     }
 
     private fun buildCoastalPoints(graph: Graph, waterPoints: LinkedHashSet<Int>): HashMap<Int, Int> {

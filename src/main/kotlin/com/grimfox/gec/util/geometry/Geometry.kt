@@ -1,6 +1,8 @@
 package com.grimfox.gec.util.geometry
 
+import com.grimfox.gec.extensions.join
 import com.grimfox.gec.model.ArrayListMatrix
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.drawing.*
@@ -1160,7 +1162,7 @@ fun isJunction(polygons: ArrayList<ArrayList<Pair<Int, Int>>>, polygon: ArrayLis
     return false
 }
 
-private fun globalMapEdges(globalVertexSet: PointSet2F, edgeSkeleton: ArrayList<LineSegment3F>) {
+fun globalMapEdges(globalVertexSet: PointSet2F, edgeSkeleton: ArrayList<LineSegment3F>) {
     edgeSkeleton.forEach {
         globalVertexSet.add(it.a)
         globalVertexSet.add(it.b)
@@ -1283,7 +1285,7 @@ private fun unTwistEdges(skeleton: ArrayList<LineSegment3F>, secondaryCleanup: B
     }
 }
 
-private fun closeEdge(edges: ArrayList<LineSegment3F>) {
+fun closeEdge(edges: ArrayList<LineSegment3F>) {
     try {
         if (edges.first().a.epsilonEquals(edges.last().b)) {
             return
