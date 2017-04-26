@@ -301,8 +301,10 @@ class BuildContinent : Runnable {
         }
     }
 
-    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, executor: ExecutorService): BufferedImage {
-        return generateWaterFlows(Random(parameterSet.seed), 512, inputGraph, inputMask, executor, 4096)
+    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphBordersSmall: LinkedHashSet<Int>, flowGraphLarge: Graph, flowGraphBordersLarge: LinkedHashSet<Int>, executor: ExecutorService): BufferedImage {
+        return timeIt("generated water flow in") {
+            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphBordersSmall, flowGraphLarge, flowGraphBordersLarge, executor, 4096)
+        }
     }
 
     fun generateLandmass(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, executor: ExecutorService): BufferedImage {

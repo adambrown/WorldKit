@@ -201,6 +201,34 @@ inline fun <reified T> timeIt(message: String?, accumulator: AtomicLong?, callba
     }
 }
 
+class StopWatch(var message: String? = null, var accumulator: AtomicLong? = null) {
+    var time = 0L
+
+    fun start(): StopWatch {
+        time = System.nanoTime()
+        return this
+    }
+
+    fun start(message: String?): StopWatch {
+        this.message = message
+        time = System.nanoTime()
+        return this
+    }
+
+    fun stop(): Long {
+        val totalNano = System.nanoTime() - time
+        if (message != null) {
+            println("$message: ${totalNano / 1000000.0}")
+        }
+        accumulator?.addAndGet(totalNano)
+        return totalNano
+    }
+}
+
+fun timer(message: String? = null, accumulator: AtomicLong? = null): StopWatch {
+    return StopWatch(message, accumulator)
+}
+
 object Utils {
 
     val LOG = LoggerFactory.getLogger(Main::class.java)

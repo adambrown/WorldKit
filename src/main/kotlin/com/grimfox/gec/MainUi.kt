@@ -15,9 +15,7 @@ import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.clamp
-import com.grimfox.gec.util.mRef
-import com.grimfox.gec.util.ref
+import com.grimfox.gec.util.*
 import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
@@ -39,8 +37,15 @@ object MainUi {
         for (i in 1..2) {
             task { BuildContinent().generateRegions(ParameterSet(seed = i.toLong()), executor) }
         }
-
         val random = Random()
+
+        val cachedGraph1024 = Graphs.generateGraph(1024, Random(0), 0.8)
+        val cachedGraphBorders1024 = LinkedHashSet(cachedGraph1024.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
+
+        val cachedGraph512 = Graphs.generateGraph(512, Random(0), 0.8)
+        val cachedGraphBorders512 = LinkedHashSet(cachedGraph512.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
+
+
         val DEFAULT_HEIGHT_SCALE = 130.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
         val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
@@ -632,7 +637,7 @@ object MainUi {
                                                     button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
                                                         val currentStateValue = currentState.value
                                                         if (currentStateValue != null) {
-                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
+                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph512, cachedGraphBorders512, cachedGraph1024, cachedGraphBorders1024, executor))
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
                                                             imageModeOn.value = false
                                                         }
