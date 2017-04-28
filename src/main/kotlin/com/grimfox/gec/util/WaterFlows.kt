@@ -24,6 +24,7 @@ object WaterFlows {
     private val M = 0.5
     private val DT = 250000.0f
     private val DISTANCE_SCALE = 50000.0f
+    private val SIMPLEX_SCALE = 96.0f
 
     private val HEIGHT_INCREMENT = 30.0 / 1023.0
     private val VARIANCE_FACTOR_LOW = 0.5
@@ -107,7 +108,6 @@ object WaterFlows {
         applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.25f)
         return writeHeightMap(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
 //        return writeHeightMap(midMapsFuture.value.first)
-//        return writeNoise(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
     }
 
     private fun bootstrapErosion(executor: ExecutorService, graph: Graph, inputGraph: Graph, inputMask: Matrix<Byte>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
@@ -151,7 +151,7 @@ object WaterFlows {
         val upliftMap = ByteArrayMatrix(graph.stride!!) { -128 }
         val upliftMapFutures = regions.mapIndexed { i, region ->
             executor.call {
-                calculateUplift3(vertices, region, regionBeaches[i], regionBorders[i], upliftMap)
+                calculateUplift2(vertices, region, regionBeaches[i], regionBorders[i], upliftMap)
             }
         }
         upliftMapFutures.forEach { it.join() }
@@ -381,7 +381,7 @@ object WaterFlows {
                     val vertex = vertices[landId]
                     val area = vertex.cell.area * areaScale
                     val point = vertex.point
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * 128, point.y * 128, uplift, 0.0f, area)
+                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, uplift, 0.0f, area)
                     nodeIndex[landId] = node
                 }
             }
@@ -423,7 +423,7 @@ object WaterFlows {
                     val vertex = vertices[landId]
                     val area = vertex.cell.area * areaScale
                     val point = vertex.point
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * 128, point.y * 128, if (isExternal) 0.0f else MIN_U, 0.0f, area)
+                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, if (isExternal) 0.0f else MIN_U, 0.0f, area)
                     nodeIndex[landId] = node
                 }
             }
@@ -570,106 +570,6 @@ object WaterFlows {
         var currentIds = HashSet(border)
         var nextIds = HashSet<Int>(border.size)
         var currentUplift = 127.toByte()
-        for (i in 0..11) {
-            currentIds.forEach {
-                if (remaining.contains(it)) {
-                    remaining.remove(it)
-                    upliftMap[it] = currentUplift
-                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                            nextIds.add(adjacentId)
-                        }
-                    }
-                }
-            }
-            val temp = currentIds
-            currentIds = nextIds
-            nextIds = temp
-            nextIds.clear()
-            currentUplift = (currentUplift - if (i % 2 == 0) 13 else 14).toByte()
-        }
-        currentIds.clear()
-        currentIds.addAll(beach)
-        nextIds.clear()
-        currentUplift = -126
-        for (i in 1..33) {
-            currentIds.forEach {
-                if (remaining.contains(it)) {
-                    remaining.remove(it)
-                    upliftMap[it] = currentUplift
-                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                            nextIds.add(adjacentId)
-                        }
-                    }
-                }
-            }
-            val temp = currentIds
-            currentIds = nextIds
-            nextIds = temp
-            nextIds.clear()
-            if (i < 33) {
-                currentUplift = (currentUplift + if (i % 2 == 0) 2 else 3).toByte()
-            }
-        }
-        remaining.forEach { upliftMap[it] = currentUplift }
-    }
-
-    private fun calculateUplift2(vertices: Graph.Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
-        val remaining = HashSet(region)
-        var currentIds = HashSet(border)
-        var nextIds = HashSet<Int>(border.size)
-        var currentUplift = 127.toByte()
-        for (i in 0..5) {
-            currentIds.forEach {
-                if (remaining.contains(it)) {
-                    remaining.remove(it)
-                    upliftMap[it] = currentUplift
-                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                            nextIds.add(adjacentId)
-                        }
-                    }
-                }
-            }
-            val temp = currentIds
-            currentIds = nextIds
-            nextIds = temp
-            nextIds.clear()
-            currentUplift = (currentUplift - 27).toByte()
-        }
-        currentIds.clear()
-        currentIds.addAll(beach)
-        nextIds.clear()
-        currentUplift = -126
-        for (i in 1..16) {
-            currentIds.forEach {
-                if (remaining.contains(it)) {
-                    remaining.remove(it)
-                    upliftMap[it] = currentUplift
-                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                            nextIds.add(adjacentId)
-                        }
-                    }
-                }
-            }
-            val temp = currentIds
-            currentIds = nextIds
-            nextIds = temp
-            nextIds.clear()
-            if (i < 16) {
-                currentUplift = (currentUplift + if (i % 5 == 0) 6 else 5).toByte()
-            }
-        }
-        remaining.forEach { upliftMap[it] = currentUplift }
-    }
-
-    private fun calculateUplift3(vertices: Graph.Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
-        val remaining = HashSet(region)
-        var currentIds = HashSet(border)
-        var nextIds = HashSet<Int>(border.size)
-        var currentUplift = 127.toByte()
         for (i in 0..2) {
             currentIds.forEach {
                 if (remaining.contains(it)) {
@@ -712,6 +612,62 @@ object WaterFlows {
                 currentUplift = (currentUplift + if (i % 3 == 0) 11 else 10).toByte()
             }
         }
+        remaining.forEach { upliftMap[it] = currentUplift }
+    }
+
+    private fun calculateUplift2(vertices: Graph.Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
+        val remaining = HashSet(region)
+        var currentIds = HashSet(border)
+        var nextIds = HashSet<Int>(border.size)
+        var currentUplift = (-40).toByte()
+        for (i in 0..5) {
+            currentIds.forEachIndexed { even, it ->
+                if (remaining.contains(it)) {
+                    remaining.remove(it)
+                    upliftMap[it] = (currentUplift + if (even % 2 == 0) 0 else 80).toByte()
+                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
+                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
+                            nextIds.add(adjacentId)
+                        }
+                    }
+                }
+            }
+            val temp = currentIds
+            currentIds = nextIds
+            nextIds = temp
+            nextIds.clear()
+            if (i == 0) {
+                currentUplift = 60
+            }
+            if (i == 2) {
+                currentUplift = (currentUplift - 81).toByte()
+            }
+        }
+        currentIds.clear()
+        currentIds.addAll(beach)
+        nextIds.clear()
+        currentUplift = -126
+        for (i in 0..9) {
+            currentIds.forEach {
+                if (remaining.contains(it)) {
+                    remaining.remove(it)
+                    upliftMap[it] = currentUplift
+                    vertices.getAdjacentVertices(it).forEach { adjacentId ->
+                        if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
+                            nextIds.add(adjacentId)
+                        }
+                    }
+                }
+            }
+            val temp = currentIds
+            currentIds = nextIds
+            nextIds = temp
+            nextIds.clear()
+            if (i == 1) {
+                currentUplift = (currentUplift + 15).toByte()
+            }
+        }
+        currentUplift = (currentUplift + 25).toByte()
         remaining.forEach { upliftMap[it] = currentUplift }
     }
 
@@ -833,19 +789,6 @@ object WaterFlows {
                     val sample = Math.round((heightValue / max) * 55535.0f) + 9999
                     raster.setSample(x, y, 0, sample)
                 }
-            }
-        }
-        return output
-    }
-
-    fun writeNoise(heightMap: Matrix<Float>): BufferedImage {
-        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
-        val raster = output.raster
-        for (y in (0..heightMap.width - 1)) {
-            for (x in (0..heightMap.width - 1)) {
-                val heightValue = noise(x.toFloat() / 32.0f, y.toFloat() / 32.0f, 0.0f)
-                val sample = Math.round(((heightValue + 1) / 2.0f) * 55535.0f) + 9999
-                raster.setSample(x, y, 0, sample)
             }
         }
         return output
