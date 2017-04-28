@@ -39,12 +39,11 @@ object MainUi {
         }
         val random = Random()
 
-        val cachedGraph1024 = Graphs.generateGraph(1024, Random(0), 0.8)
-        val cachedGraphBorders1024 = LinkedHashSet(cachedGraph1024.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
+        val cachedGraph256 = Graphs.generateGraph(256, Random(0), 0.8)
 
         val cachedGraph512 = Graphs.generateGraph(512, Random(0), 0.8)
-        val cachedGraphBorders512 = LinkedHashSet(cachedGraph512.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
 
+        val cachedGraph1024 = Graphs.generateGraph(1024, Random(0), 0.8)
 
         val DEFAULT_HEIGHT_SCALE = 130.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
@@ -637,7 +636,7 @@ object MainUi {
                                                     button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
                                                         val currentStateValue = currentState.value
                                                         if (currentStateValue != null) {
-                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph512, cachedGraphBorders512, cachedGraph1024, cachedGraphBorders1024, executor))
+                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph256, cachedGraph512, cachedGraph1024, executor))
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
                                                             imageModeOn.value = false
                                                         }

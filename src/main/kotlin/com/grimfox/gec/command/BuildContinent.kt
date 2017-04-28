@@ -301,9 +301,9 @@ class BuildContinent : Runnable {
         }
     }
 
-    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphBordersSmall: LinkedHashSet<Int>, flowGraphLarge: Graph, flowGraphBordersLarge: LinkedHashSet<Int>, executor: ExecutorService): BufferedImage {
+    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService): BufferedImage {
         return timeIt("generated water flow in") {
-            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphBordersSmall, flowGraphLarge, flowGraphBordersLarge, executor, 4096)
+            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, executor, 4096)
         }
     }
 
