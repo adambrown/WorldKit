@@ -9,6 +9,15 @@ in VertexData {
 
 layout(location = 0) out vec4 colorOut;
 
+const ivec2 xx = ivec2(-1, -1);
+const ivec2 yx = ivec2(0, -1);
+const ivec2 zx = ivec2(1, -1);
+const ivec2 xy = ivec2(-1, 0);
+const ivec2 zy = ivec2(1, 0);
+const ivec2 xz = ivec2(-1, 1);
+const ivec2 yz = ivec2(0, 1);
+const ivec2 zz = ivec2(1, 1);
+
 const ivec3 off = ivec3(-1, 0, 1);
 
 float distance2(vec2 p1, vec2 p2) {
@@ -17,15 +26,15 @@ float distance2(vec2 p1, vec2 p2) {
 }
 
 void main() {
-    vec2 northWestPixel = textureOffset(graphTexture, VertexIn.uv, off.xx).rg;
-    vec2 northPixel =     textureOffset(graphTexture, VertexIn.uv, off.yx).rg;
-    vec2 northEastPixel = textureOffset(graphTexture, VertexIn.uv, off.zx).rg;
-    vec2 westPixel =      textureOffset(graphTexture, VertexIn.uv, off.xy).rg;
+    vec2 northWestPixel = textureOffset(graphTexture, VertexIn.uv, xx).rg;
+    vec2 northPixel =     textureOffset(graphTexture, VertexIn.uv, yx).rg;
+    vec2 northEastPixel = textureOffset(graphTexture, VertexIn.uv, zx).rg;
+    vec2 westPixel =      textureOffset(graphTexture, VertexIn.uv, xy).rg;
     vec2 centerPixel =    texture(graphTexture, VertexIn.uv).rg;
-    vec2 eastPixel =      textureOffset(graphTexture, VertexIn.uv, off.zy).rg;
-    vec2 southWestPixel = textureOffset(graphTexture, VertexIn.uv, off.xz).rg;
-    vec2 southPixel =     textureOffset(graphTexture, VertexIn.uv, off.yz).rg;
-    vec2 southEastPixel = textureOffset(graphTexture, VertexIn.uv, off.zz).rg;
+    vec2 eastPixel =      textureOffset(graphTexture, VertexIn.uv, zy).rg;
+    vec2 southWestPixel = textureOffset(graphTexture, VertexIn.uv, xz).rg;
+    vec2 southPixel =     textureOffset(graphTexture, VertexIn.uv, yz).rg;
+    vec2 southEastPixel = textureOffset(graphTexture, VertexIn.uv, zz).rg;
 
     float northWestDist2 = distance2(VertexIn.uv, northWestPixel);
     float northDist2 =     distance2(VertexIn.uv, northPixel);
@@ -75,8 +84,22 @@ void main() {
     int id;
     if (quadrant == off.yy) {
         id = int(round(texture(maskTexture, VertexIn.uv).r * 16.0f));
-    } else {
-        id = int(round(textureOffset(maskTexture, VertexIn.uv, quadrant).r * 16.0f));
+    } else if (quadrant == xx) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, xx).r * 16.0f));
+    } else if (quadrant == yx) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, yx).r * 16.0f));
+    } else if (quadrant == zx) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, zx).r * 16.0f));
+    } else if (quadrant == xy) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, xy).r * 16.0f));
+    } else if (quadrant == zy) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, zy).r * 16.0f));
+    } else if (quadrant == xz) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, xz).r * 16.0f));
+    } else if (quadrant == yz) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, yz).r * 16.0f));
+    } else if (quadrant == zz) {
+        id = int(round(textureOffset(maskTexture, VertexIn.uv, zz).r * 16.0f));
     }
 
     switch (id) {
