@@ -221,7 +221,7 @@ private fun drawDropDown(vg: Long, text: String, x: Float, y: Float, w: Float, h
     nvgText(vg, x + w - h * 0.5f, y + h * 0.5f, ICON_CHEVRON_RIGHT, NULL)
 }
 
-private fun drawLabel(vg: Long, text: String, x: Float, y: Float, w: Float, h: Float) {
+private fun drawLabel(vg: Long, text: String, x: Float, y: Float, h: Float) {
     nvgFontSize(vg, 18.0f)
     nvgFontFace(vg, "sans")
     nvgFillColor(vg, rgba(255, 255, 255, 128, colorA))
@@ -280,7 +280,7 @@ private fun drawEditBoxNum(
     nvgText(vg, x + w - uw - h * 0.5f, y + h * 0.5f, text, NULL)
 }
 
-private fun drawCheckBox(vg: Long, text: String, x: Float, y: Float, w: Float, h: Float) {
+private fun drawCheckBox(vg: Long, text: String, x: Float, y: Float, h: Float) {
     val bg = paintA
 
     nvgFontSize(vg, 18.0f)
@@ -355,7 +355,7 @@ private fun drawButton(vg: Long, preicon: ByteBuffer?, text: String, x: Float, y
     }
 }
 
-fun drawButton(vg: Long, text: String, x: Float, y: Float, unused: Float, h: Float, color: NVGColor, font: Int) {
+fun drawButton(vg: Long, text: String, x: Float, y: Float, h: Float, color: NVGColor, font: Int) {
     twr(stackPush()) { stack ->
         val bg = paintA
         val cornerRadius = 4.0f
@@ -887,8 +887,8 @@ private val pts = FloatArray(4 * 2)
 private val joins = intArrayOf(NVG_MITER, NVG_ROUND, NVG_BEVEL)
 private val caps = intArrayOf(NVG_BUTT, NVG_ROUND, NVG_SQUARE)
 
-private fun drawLines(vg: Long, x: Float, y: Float, w: Float, h: Float, t: Float) {
-    var i: Int
+private fun drawLines(vg: Long, x: Float, y: Float, w: Float, t: Float) {
+    var i: Int = 0
     var j: Int
     val pad = 5.0f
     val s = w / 9.0f - pad * 2
@@ -896,7 +896,6 @@ private fun drawLines(vg: Long, x: Float, y: Float, w: Float, h: Float, t: Float
     nvgSave(vg)
     drawLinesPoints(pts, s, t)
 
-    i = 0
     while (i < 3) {
         j = 0
         while (j < 3) {
@@ -1011,9 +1010,9 @@ fun freeDemoData(vg: Long, data: DemoData) {
     memFree(ICON_SEARCH)
 }
 
-private fun drawParagraph(vg: Long, x: Float, y: Float, width: Float, height: Float, mx: Float, my: Float) {
-    var y = y
-    val px: Float
+private fun drawParagraph(vg: Long, x: Float, y: Float, width: Float, mx: Float, my: Float) {
+    var currentY = y
+    val px: Float = ((bounds.get(2) + bounds.get(0)) / 2).toInt().toFloat()
     var a: Float
     var gx = 0.0f
     var gy = 0.0f
@@ -1036,25 +1035,25 @@ private fun drawParagraph(vg: Long, x: Float, y: Float, width: Float, height: Fl
     while (nrows != 0) {
         for (i in 0..nrows - 1) {
             val row = rows.get(i)
-            val hit = mx > x && mx < x + width && my >= y && my < y + lineh.get(0)
+            val hit = mx > x && mx < x + width && my >= currentY && my < currentY + lineh.get(0)
 
             nvgBeginPath(vg)
             nvgFillColor(vg, rgba(255, 255, 255, if (hit) 64 else 16, colorA))
-            nvgRect(vg, x, y, row.width(), lineh.get(0))
+            nvgRect(vg, x, currentY, row.width(), lineh.get(0))
             nvgFill(vg)
 
             nvgFillColor(vg, rgba(255, 255, 255, 255, colorA))
-            nnvgText(vg, x, y, row.start(), row.end())
+            nnvgText(vg, x, currentY, row.start(), row.end())
 
             if (hit) {
-                drawCaret(vg, row, lineh.get(0), x, y, mx)
+                drawCaret(vg, row, lineh.get(0), x, currentY, mx)
 
                 gutter = lnum + 1
                 gx = x - 10
-                gy = y + lineh.get(0) / 2
+                gy = currentY + lineh.get(0) / 2
             }
             lnum++
-            y += lineh.get(0)
+            currentY += lineh.get(0)
         }
         // Keep going...
         start = rows.get(nrows - 1).next()
@@ -1064,13 +1063,13 @@ private fun drawParagraph(vg: Long, x: Float, y: Float, width: Float, height: Fl
     if (gutter != 0)
         drawGutter(vg, gutter, gx, gy, bounds)
 
-    y += 20.0f
+    currentY += 20.0f
 
     nvgFontSize(vg, 13.0f)
     nvgTextAlign(vg, NVG_ALIGN_LEFT or NVG_ALIGN_TOP)
     nvgTextLineHeight(vg, 1.2f)
 
-    nvgTextBoxBounds(vg, x, y, 150f, hoverText, NULL, bounds)
+    nvgTextBoxBounds(vg, x, currentY, 150f, hoverText, NULL, bounds)
 
     // Fade the tooltip out when close to it.
     gx = abs((mx - (bounds.get(0) + bounds.get(2)) * 0.5f) / (bounds.get(0) - bounds.get(2)))
@@ -1082,14 +1081,13 @@ private fun drawParagraph(vg: Long, x: Float, y: Float, width: Float, height: Fl
     nvgBeginPath(vg)
     nvgFillColor(vg, rgba(220, 220, 220, 255, colorA))
     nvgRoundedRect(vg, bounds.get(0) - 2, bounds.get(1) - 2, ((bounds.get(2) - bounds.get(0)).toInt() + 4).toFloat(), ((bounds.get(3) - bounds.get(1)).toInt() + 4).toFloat(), 3f)
-    px = ((bounds.get(2) + bounds.get(0)) / 2).toInt().toFloat()
     nvgMoveTo(vg, px, bounds.get(1) - 10)
     nvgLineTo(vg, px + 7, bounds.get(1) + 1)
     nvgLineTo(vg, px - 7, bounds.get(1) + 1)
     nvgFill(vg)
 
     nvgFillColor(vg, rgba(0, 0, 0, 220, colorA))
-    nvgTextBox(vg, x, y, 150f, hoverText, NULL)
+    nvgTextBox(vg, x, currentY, 150f, hoverText, NULL)
 
     nvgRestore(vg)
 }
@@ -1136,22 +1134,21 @@ private fun drawGutter(vg: Long, gutter: Int, gx: Float, gy: Float, bounds: Floa
 }
 
 private fun drawWidths(vg: Long, x: Float, y: Float, width: Float) {
-    var y = y
-    var i: Int
+    var currentY = y
+    var i: Int = 0
 
     nvgSave(vg)
 
     nvgStrokeColor(vg, rgba(0, 0, 0, 255, colorA))
 
-    i = 0
     while (i < 20) {
         val w = (i + 0.5f) * 0.1f
         nvgStrokeWidth(vg, w)
         nvgBeginPath(vg)
-        nvgMoveTo(vg, x, y)
-        nvgLineTo(vg, x + width, y + width * 0.3f)
+        nvgMoveTo(vg, x, currentY)
+        nvgLineTo(vg, x + width, currentY + width * 0.3f)
         nvgStroke(vg)
-        y += 10f
+        currentY += 10f
         i++
     }
 
@@ -1235,12 +1232,12 @@ fun renderDemo(
     val popy: Float
 
     drawEyes(vg, width - 250, 50f, 150f, 100f, mx, my, t)
-    drawParagraph(vg, width - 450, 50f, 150f, 100f, mx, my)
+    drawParagraph(vg, width - 450, 50f, 150f, mx, my)
     drawGraph(vg, 0f, height / 2, width, height / 2, t)
     drawColorwheel(vg, width - 300, height - 300, 250.0f, 250.0f, t)
 
     // Line joints
-    drawLines(vg, 120f, height - 50, 600f, 50f, t)
+    drawLines(vg, 120f, height - 50, 600f, t)
 
     // Line caps
     drawWidths(vg, 10f, 50f, 30f)
@@ -1267,18 +1264,18 @@ fun renderDemo(
     y += 45f
 
     // Form
-    drawLabel(vg, "Login", x, y, 280f, 20f)
+    drawLabel(vg, "Login", x, y, 20f)
     y += 25f
     drawEditBox(vg, "Email", x, y, 280f, 28f)
     y += 35f
     drawEditBox(vg, "Password", x, y, 280f, 28f)
     y += 38f
-    drawCheckBox(vg, "Remember me", x, y, 140f, 28f)
+    drawCheckBox(vg, "Remember me", x, y, 28f)
     drawButton(vg, ICON_LOGIN, "Sign in", x + 138, y, 140f, 28f, rgba(0, 96, 128, 255, colorA))
     y += 45f
 
     // Slider
-    drawLabel(vg, "Diameter", x, y, 280f, 20f)
+    drawLabel(vg, "Diameter", x, y, 20f)
     y += 25f
     drawEditBoxNum(vg, "123.00", "px", x + 180, y, 100f, 28f)
     drawSlider(vg, 0.4f, x, y, 170f, 28f)

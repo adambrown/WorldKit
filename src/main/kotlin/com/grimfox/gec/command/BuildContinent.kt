@@ -135,11 +135,8 @@ class BuildContinent : Runnable {
             val borders = getBorders(graph, regionMask)
             val globalVertices = PointSet2F(0.0001f)
             val globalTriangles = ArrayList<Int>(2000000)
-            rivers.forEachIndexed { i, body ->
-                val coastline = body.first
+            rivers.forEachIndexed { i, (coastline, riverSet, exceptions) ->
                 val coastMultigon = Multigon2F(coastline, 20)
-                val riverSet = body.second
-                val exceptions = body.third
                 val border = borders[i]
                 val riverGraph = buildRiverGraph(riverSet)
                 val riverVertexLookup = RiverVertexLookup(riverGraph)
@@ -217,7 +214,7 @@ class BuildContinent : Runnable {
                         }
                     }
                     draw(debugResolution, "debug-${String.format("%05d", test)}-rivers$i", "debug", Color(160, 200, 255)) {
-                        drawRivers(graph, regionMask, riverSet, coastline, border)
+                        drawRivers(riverSet, coastline, border)
                     }
                     draw(debugResolution, "debug-${String.format("%05d", test)}-graph$i", "debug", Color.WHITE) {
                         drawGraph(riverGraph)
@@ -325,11 +322,8 @@ class BuildContinent : Runnable {
         val borders = getBorders(graph, regionMask)
         val globalVertices = PointSet2F(0.0001f)
         val globalTriangles = ArrayList<Int>(2000000)
-        rivers.forEachIndexed { i, body ->
-            val coastline = body.first
+        rivers.forEachIndexed { i, (coastline, riverSet, exceptions) ->
             val coastMultigon = Multigon2F(coastline, 20)
-            val riverSet = body.second
-            val exceptions = body.third
             val border = borders[i]
             val riverGraph = buildRiverGraph(riverSet)
             val riverVertexLookup = RiverVertexLookup(riverGraph)
@@ -393,7 +387,7 @@ class BuildContinent : Runnable {
                     }
                 }
                 draw(debugResolution, "debug-${String.format("%020d", parameterSet.seed)}-rivers$i", "debug", Color(160, 200, 255)) {
-                    drawRivers(graph, regionMask, riverSet, coastline, border)
+                    drawRivers(riverSet, coastline, border)
                 }
                 draw(debugResolution, "debug-${String.format("%020d", parameterSet.seed)}-graph$i", "debug", Color.WHITE) {
                     drawGraph(riverGraph)
@@ -486,9 +480,9 @@ class BuildContinent : Runnable {
         val nothing = -Float.MAX_VALUE
         val widthF = heightMap.width.toFloat()
         val futures = ArrayList<Future<*>>(threadCount)
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (j in it..heightMap.size.toInt() - 1 step threadCount) {
                     val height = heightMap[j]
                     if (height == nothing) {
                         val waterPoint = Point2F((j % heightMap.width) / widthF, (j / heightMap.width) / widthF)
@@ -500,7 +494,7 @@ class BuildContinent : Runnable {
                         }
                     }
                 }
-            })
+            }
         }
         futures.forEach { it.get() }
     }
@@ -511,9 +505,9 @@ class BuildContinent : Runnable {
         val hmw = heightMap.width
         val hmsw = heightMapSmall.width
         val hmswm1 = hmsw - 1
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (j in it..heightMap.size.toInt() - 1 step threadCount) {
                     val xf = ((j % hmw) / widthF) * hmsw
                     val yf = ((j / hmw) / widthF) * hmsw
                     val xi = xf.toInt()
@@ -534,7 +528,7 @@ class BuildContinent : Runnable {
                     val bot = bot1 * ixr + bot2 * xr
                     heightMap[j] = top * iyr + bot * yr
                 }
-            })
+            }
         }
         futures.forEach { it.get() }
     }
@@ -545,9 +539,9 @@ class BuildContinent : Runnable {
         val hmw = heightMap.width
         val hmsw = heightMapScaled.width
         val hmswm1 = hmsw - 1
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (j in it..heightMap.size.toInt() - 1 step threadCount) {
                     val height = heightMap[j]
                     if (height == nothing) {
                         val xi = j % hmw
@@ -561,7 +555,7 @@ class BuildContinent : Runnable {
                                 heightMapScaled[xi, yi] * 0.195346f
                     }
                 }
-            })
+            }
         }
         futures.forEach { it.get() }
     }
@@ -573,9 +567,9 @@ class BuildContinent : Runnable {
         val hmw = heightMap.width
         val hmsw = heightMapSmall.width
         val hmswm1 = hmsw - 1
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (j in i..heightMap.size.toInt() - 1 step threadCount) {
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (j in it..heightMap.size.toInt() - 1 step threadCount) {
                     val height = heightMap[j]
                     if (height == nothing) {
                         var sum = 0.0f
@@ -596,7 +590,7 @@ class BuildContinent : Runnable {
                         heightMap[j] = sum / denom
                     }
                 }
-            })
+            }
         }
         futures.forEach { it.get() }
     }
@@ -606,7 +600,7 @@ class BuildContinent : Runnable {
         if (f < 0.0f) {
             f = -f
         }
-        if (f >= 0.0f && f <= 1.0f) {
+        if (f in 0.0f..1.0f) {
             return 0.66666666666666666f + 0.5f * (f * f * f) - f * f
         } else if (f > 1.0f && f <= 2.0f) {
             return (0.16666666666666666 * pow(2.0 - f, 3.0)).toFloat()
@@ -640,7 +634,7 @@ class BuildContinent : Runnable {
             riverGraph.vertices.forEachIndexed { i, vertex ->
                 riverPointsToVerticesTemp.putIfAbsent(riverPoints.addOrGetIndex(vertex.point), i)
             }
-            riverPoints.forEachIndexed { i, point ->
+            riverPoints.forEachIndexed { i, _ ->
                 riverPointsToVertices.add(riverPointsToVerticesTemp[i]!!)
             }
         }

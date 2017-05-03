@@ -2,10 +2,8 @@ package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.util.drawing.draw
-import com.grimfox.gec.util.drawing.drawPoint
-import java.awt.Color
 import java.util.*
+import kotlin.Comparator
 
 object Triangulate {
 
@@ -99,22 +97,22 @@ object Triangulate {
         for (i in 0..points.size - 1) {
             vertexToTrianglesTemp.add(ArrayList(5))
         }
-        triangles.forEachIndexed { i, triangle ->
-            val vertex = findCircleCenter(points[pointIndex[triangle.a]], points[pointIndex[triangle.b]], points[pointIndex[triangle.c]])
+        triangles.forEachIndexed { i, (a, b, c, ab, bc, ac) ->
+            val vertex = findCircleCenter(points[pointIndex[a]], points[pointIndex[b]], points[pointIndex[c]])
             var o = i * 2
             triangleToCenters[o++] = vertex.x / width
             triangleToCenters[o] = vertex.y / width
             o = i * 3
-            triangleToTriangles[o++] = triangle.ab
-            triangleToTriangles[o++] = triangle.bc
-            triangleToTriangles[o] = triangle.ac
+            triangleToTriangles[o++] = ab
+            triangleToTriangles[o++] = bc
+            triangleToTriangles[o] = ac
             o = i * 3
-            triangleToVertices[o++] = triangle.a
-            triangleToVertices[o++] = triangle.b
-            triangleToVertices[o] = triangle.c
-            vertexToTrianglesTemp[triangle.a].add(i)
-            vertexToTrianglesTemp[triangle.b].add(i)
-            vertexToTrianglesTemp[triangle.c].add(i)
+            triangleToVertices[o++] = a
+            triangleToVertices[o++] = b
+            triangleToVertices[o] = c
+            vertexToTrianglesTemp[a].add(i)
+            vertexToTrianglesTemp[b].add(i)
+            vertexToTrianglesTemp[c].add(i)
         }
         val vertexToTriangles = ArrayList<List<Int>>(points.size)
         val vertexToVertices = ArrayList<List<Int>>(points.size)
@@ -259,17 +257,17 @@ object Triangulate {
         return midCircle
     }
 
-    private fun ArrayList<PointWrapper>.sort() = this.sort { p1, p2 ->
-        if (p1.d2 == p2.d2) {
-            if (p1.p.x == p2.p.x) {
-                p1.p.y.compareTo(p2.p.y)
+    private fun ArrayList<PointWrapper>.sort() = this.sortWith(Comparator<PointWrapper> { (p1, _, p1D2), (p2, _, p2D2) ->
+        if (p1D2 == p2D2) {
+            if (p1.x == p2.x) {
+                p1.y.compareTo(p2.y)
             } else {
-                p1.p.x.compareTo(p2.p.x)
+                p1.x.compareTo(p2.x)
             }
         } else {
-            p1.d2.compareTo(p2.d2)
+            p1D2.compareTo(p2D2)
         }
-    }
+    })
 
     private fun buildPointIndex(points: ArrayList<PointWrapper>): IntArray {
         val pointIndex = IntArray(points.size)
@@ -472,13 +470,7 @@ object Triangulate {
     }
 
     private fun findVisibleEdges(hull: ArrayList<PointWrapper>, point: PointWrapper): ArrayList<Int> {
-        var visibleEdge = -1
-        for (i in 0..hull.size - 1) {
-            if (VisibilityTest(point, hull[i]).isVisible(hull[i].e)) {
-                visibleEdge = i
-                break
-            }
-        }
+        val visibleEdge = (0..hull.size - 1).firstOrNull { VisibilityTest(point, hull[it]).isVisible(hull[it].e) } ?: -1
         val visibleEdges = ArrayList<Int>()
         if (visibleEdge == -1) {
             return ArrayList()
@@ -495,13 +487,7 @@ object Triangulate {
             }
         }
         visibleEdges.add(visibleEdge)
-        for (i in visibleEdge + 1..hull.size - 1) {
-            if (VisibilityTest(point, hull[i]).isVisible(hull[i].e)) {
-                visibleEdges.add(i)
-            } else {
-                break
-            }
-        }
+        visibleEdges += (visibleEdge + 1..hull.size - 1).takeWhile { VisibilityTest(point, hull[it]).isVisible(hull[it].e) }
         return visibleEdges
     }
 
@@ -562,11 +548,7 @@ object Triangulate {
         }
         val sinA = Math.abs(v1x * v2y - v1y * v2x)
         val sinD = Math.abs(v3x * v4y - v3y * v4x)
-        if (cosA * sinD + sinA * cosD < 0) {
-            return true
-        } else {
-            return false
-        }
+        return cosA * sinD + sinA * cosD < 0
     }
 
     private fun flipTriangles(points: ArrayList<PointWrapper>, pointIndex: IntArray, triangles: ArrayList<Triangle>): LinkedHashSet<Int> {

@@ -68,6 +68,7 @@ object Main {
 
         private fun getCommandsFromPackages(packages: List<String>) = Reflections(ConfigurationBuilder().forPackages(*packages.toTypedArray())).getTypesAnnotatedWith(Command::class.java).filter { packages.contains(it.`package`.name) }
 
+        @Suppress("unchecked_cast")
         private fun toRunnableClass(command: Class<*>): Class<Runnable>? {
             command.getAnnotation(Command::class.java) ?: return null
             if (Runnable::class.java.isAssignableFrom(command)) {

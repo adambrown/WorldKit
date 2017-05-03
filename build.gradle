@@ -1,7 +1,7 @@
 
 buildscript {
 
-    ext.triangle_version = '1.5.0'
+    ext.triangle_version = '1.6.0'
     ext.airline_version = '0.7'
     ext.reflections_version = '0.9.10'
     ext.jackson_version = '2.7.5'
@@ -28,7 +28,7 @@ plugins {
     id 'nebula.dependency-lock' version '4.3.2'
     id 'nebula.maven-publish' version '4.9.1'
     id 'nebula.nebula-release' version '4.0.1'
-    id 'nebula.kotlin' version '1.0.6'
+    id 'nebula.kotlin' version '1.1.2'
 }
 
 group = 'com.grimfox'

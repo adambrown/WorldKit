@@ -171,7 +171,7 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
         val dot = a * dx1 + b * dy1
         val length2 = dx1 * dx1 + dy1 * dy1
         var interpolation = -1.0f
-        if (length2 !== 0.0f) {
+        if (length2 != 0.0f) {
             interpolation = dot / length2
         }
 

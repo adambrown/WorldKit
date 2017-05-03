@@ -57,7 +57,7 @@ object ExampleGL3 {
             throw RuntimeException()
         }
 
-        glfwSetKeyCallback(window) { windowHandle, keyCode, scancode, action, mods ->
+        glfwSetKeyCallback(window) { windowHandle, keyCode, _, action, _ ->
             if (keyCode == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
                 glfwSetWindowShouldClose(windowHandle, true)
             if (keyCode == GLFW_KEY_SPACE && action == GLFW_PRESS)

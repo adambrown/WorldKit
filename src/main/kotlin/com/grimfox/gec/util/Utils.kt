@@ -19,6 +19,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.Comparator
 
 interface Reference<out T> {
 
@@ -119,7 +120,7 @@ fun loadResource(resource: String, bufferSize: Int): ByteBuffer {
                     val bytes = rbc.read(buffer)
                     if (bytes == -1)
                         break
-                    if (buffer!!.remaining() === 0)
+                    if (buffer!!.remaining() == 0)
                         buffer = resizeBuffer(buffer!!, buffer!!.capacity() * 2)
                 }
             }
@@ -231,7 +232,7 @@ fun timer(message: String? = null, accumulator: AtomicLong? = null): StopWatch {
 
 object Utils {
 
-    val LOG = LoggerFactory.getLogger(Main::class.java)
+    val LOG = LoggerFactory.getLogger(Main::class.java)!!
 
     fun Int.pow(exponent: Int): Int {
         val value = BigInteger.valueOf(this.toLong()).pow(exponent)
@@ -243,14 +244,6 @@ object Utils {
         val value = BigInteger.valueOf(this).pow(exponent)
         if (value > BigInteger.valueOf(Long.MAX_VALUE)) throw IllegalStateException("Value too large for long: $value")
         return value.toLong()
-    }
-
-    fun BigInteger.pow(exponent: Int): BigInteger {
-        var value = BigInteger.valueOf(1)
-        for (i in 1..exponent) {
-            value *= this
-        }
-        return value
     }
 
     fun ByteBuffer.disposeDirect() {
@@ -285,11 +278,7 @@ object Utils {
     }
 
     fun FileChannel.mapChunks(mode: FileChannel.MapMode, offset: Int, chunkSize: Int, chunkCount: Int): MutableList<ByteBuffer> {
-        val chunks = ArrayList<ByteBuffer>()
-        for (i in 0..(chunkCount - 1)) {
-            chunks.add(map(mode, offset + (i * chunkSize.toLong()), chunkSize.toLong()).order(ByteOrder.LITTLE_ENDIAN))
-        }
-        return chunks
+        return (0..(chunkCount - 1)).mapTo(ArrayList<ByteBuffer>()) { map(mode, offset + (it * chunkSize.toLong()), chunkSize.toLong()).order(ByteOrder.LITTLE_ENDIAN) }
     }
 
     fun FileChannel.imageSizeAsExp2(bytesPerPixel: Int, metaBytes: Int): Int {
@@ -393,7 +382,7 @@ object Utils {
                         yDistAdjust = -pointWrapOffset
                     }
                 }
-                if (oy >= 0 && oy < gridStride && ox >= 0 && ox < gridStride) {
+                if (oy in 0..(gridStride - 1) && ox >= 0 && ox < gridStride) {
                     val index = oy * gridStride + ox
                     val other = points[ox, oy]
                     val distance = point.distance2(Point2F(other.x * outputWidth + xDistAdjust, other.y * outputWidth + yDistAdjust))
@@ -401,9 +390,9 @@ object Utils {
                 }
             }
         }
-        closestPoints.sort { p1, p2 ->
+        closestPoints.sortWith(Comparator<Pair<Int, Float>> { p1, p2 ->
             p1.second.compareTo(p2.second)
-        }
+        })
         return closestPoints
     }
 
@@ -496,7 +485,7 @@ object Utils {
             for (xOff in -3..3) {
                 val ox = x + xOff
                 val oy = y + yOff
-                if (oy >= 0 && oy < stride && ox >= 0 && ox < stride) {
+                if (oy in 0..(stride - 1) && ox >= 0 && ox < stride) {
                     if (oy < y || (oy == y && ox < x)) {
                         if (point.distance2(points[oy * stride + ox]) < minDistance) {
                             return false

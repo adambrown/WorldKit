@@ -7,7 +7,7 @@ class Multigon2F(val polygons: MutableList<Polygon2F>, val polySize: Int) {
     constructor(polygon: Polygon2F, segments: Int): this(polygon.split(segments), segments)
 
     fun intersects(edge: LineSegment2F): Boolean {
-        polygons.forEachIndexed { i, polygon ->
+        polygons.forEachIndexed { _, polygon ->
             if (polygon.doesEdgeIntersect(edge).first) {
                 return true
             }

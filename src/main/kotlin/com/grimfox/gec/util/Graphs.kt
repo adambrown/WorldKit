@@ -11,7 +11,7 @@ object Graphs {
 
     fun generateGraph(stride: Int, random: Random, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         val polygon = Polygon(stride * stride)
-        generateSemiUniformPointsD(stride, 1.0, random, constraint) { i, x, y ->
+        generateSemiUniformPointsD(stride, 1.0, random, constraint) { _, x, y ->
             polygon.add(Vertex(x, y))
         }
         val mesh = polygon.triangulate()

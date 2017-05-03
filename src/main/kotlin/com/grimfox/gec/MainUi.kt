@@ -218,7 +218,7 @@ object MainUi {
                     }
 
                 }
-                currentProject.listener { old, new ->
+                currentProject.listener { _, new ->
                     updateTitle(titleText, new)
                     doesActiveProjectExist.value = new != null
                     if (new != null) {
@@ -456,10 +456,10 @@ object MainUi {
                                                     }
                                                 }
                                                 onUpdateParamsFun()
-                                                regions.listener { old, new ->
+                                                regions.listener { _, _ ->
                                                     onUpdateParamsFun()
                                                 }
-                                                islands.listener { old, new ->
+                                                islands.listener { _, _ ->
                                                     onUpdateParamsFun()
                                                 }
                                                 vLongInputRow(seed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
@@ -485,7 +485,7 @@ object MainUi {
                                                 unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value})
                                                 unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value})
-                                                allowUnsafe.listener { old, new ->
+                                                allowUnsafe.listener { _, new ->
                                                     if (!new) {
                                                         onUpdateParamsFun()
                                                     }
@@ -676,12 +676,12 @@ object MainUi {
                                                     hAlign = CENTER))
                                 })
                                 var lastX = 0.0f
-                                onMouseDown { button, x, y, mods ->
+                                onMouseDown { button, x, _, _ ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         lastX = x.toFloat()
                                     }
                                 }
-                                onMouseDrag { button, x, y, mods ->
+                                onMouseDrag { button, x, _, _ ->
                                     if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                                         val delta = x - lastX
                                         val adjustedDelta = Math.max(350.0f, Math.min(root.width * 0.75f, leftPanel.width + delta)) - leftPanel.width

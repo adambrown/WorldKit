@@ -802,7 +802,7 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
             }
         }
         var isActivating = false
-        onMouseDown { button, x, y, mods ->
+        onMouseDown { button, x, _, mods ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                 if (isActive) {
                     if (mods and GLFW.GLFW_MOD_SHIFT != 0) {
@@ -826,22 +826,22 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
                 }
             }
         }
-        onMouseUp { button, x, y, mods ->
+        onMouseUp { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
                 isActivating = false
             }
         }
-        onMouseRelease { button, x, y, mods ->
+        onMouseRelease { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
                 isActivating = false
             }
         }
-        onMouseDrag { button, x, y, mods ->
+        onMouseDrag { button, x, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive && !isActivating) {
                 caret.selection = caret.getPosition(x - selectRefBlock.x) - caret.position
             }
         }
-        onMouseDownOverOther { button, x, y, mods ->
+        onMouseDownOverOther { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive) {
                 completeFun()
             }
@@ -943,7 +943,7 @@ fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Tex
 
 fun <T> Block.vSliderWithValueRow(value: MonitoredReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     val dynamicText = DynamicTextReference(value.value.toString(), valueSize, textStyle)
-    value.listener { old, new ->
+    value.listener { _, new ->
         dynamicText.reference.value = new.toString()
     }
     return block {
@@ -1050,16 +1050,16 @@ fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
     return block {
         layout = ABSOLUTE
         shape = ShapeMeshViewport3D(meshViewport)
-        onMouseDown { button, x, y, mods ->
+        onMouseDown { button, x, y, _ ->
             meshViewport.onMouseDown(button, x, y)
         }
-        onMouseRelease { button, x, y, mods ->
+        onMouseRelease { button, _, _, _ ->
             meshViewport.onMouseRelease(button)
         }
-        onMouseDrag { button, x, y, mods ->
+        onMouseDrag { _, x, y, _ ->
             meshViewport.onMouseDrag(x, y)
         }
-        onScroll { x, y ->
+        onScroll { _, y ->
             meshViewport.onScroll(y)
         }
     }

@@ -195,7 +195,7 @@ object Rivers {
                 }
             }
         }
-        rivers.forEachIndexed { i, regionRivers ->
+        rivers.forEach { regionRivers ->
             val landlockedRivers = removeLandlockedRivers(coastPoints, inlandRiverMouths, regionRivers)
             landlockedRivers.forEach { landlockedRiverMouth ->
                 val possibleConnectingRivers = getPossibleConnectingRivers(coastPoints, rivers, inlandRiverMouths, landlockedRiverMouth.value.region, true)

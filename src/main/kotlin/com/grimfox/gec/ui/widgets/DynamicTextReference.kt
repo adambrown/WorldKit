@@ -13,7 +13,7 @@ import java.util.*
 class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle: TextStyle) {
 
     private val buffer = ByteBuffer.allocateDirect(sizeLimit + 1)
-    val reference = ref("").listener { old, new ->
+    val reference = ref("").listener { _, new ->
         val newValue = if (new.length <= sizeLimit) {
             new
         } else {
@@ -42,7 +42,7 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
     private var lastScale = 1.0f
 
     init {
-        dynamicText.reference.listener { old, new ->
+        dynamicText.reference.listener { _, new ->
             if (position > new.length) {
                 position = new.length
             }
@@ -141,7 +141,7 @@ fun integerTextInputKeyboardHandler(caret: Caret, cursorShape: ShapeCursor, comp
                     cursorShape.timeOffset = System.currentTimeMillis()
                 }
             },
-            onKey = { key, scanCode, action, mods ->
+            onKey = { key, _, action, mods ->
                 if (action == GLFW_REPEAT || action == GLFW_PRESS) {
                     val ctrl = GLFW_MOD_CONTROL and mods != 0
                     val shift = GLFW_MOD_SHIFT and mods != 0

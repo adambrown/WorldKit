@@ -101,14 +101,14 @@ internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
             }
         }
         var minScaleFactor = 1.0
-        screens.forEach { screenIdentity, screenSpec ->
+        screens.forEach { _, screenSpec ->
             if (screenSpec.scaleFactor < minScaleFactor) {
                 minScaleFactor = screenSpec.scaleFactor
             }
         }
         if (minScaleFactor < 1.0) {
             val correctionFactor = 1.0 / minScaleFactor
-            screens.forEach { screenIdentity, screenSpec ->
+            screens.forEach { _, screenSpec ->
                 screenSpec.scaleFactor *= correctionFactor
                 screenSpec.scaleFactor = clamp(Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
             }

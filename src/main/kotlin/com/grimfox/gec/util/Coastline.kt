@@ -18,6 +18,7 @@ import com.grimfox.gec.util.Utils.pow
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
+import kotlin.collections.LinkedHashSet
 
 object Coastline {
 
@@ -125,7 +126,16 @@ object Coastline {
             })
         }
         futures.forEach { it.join() }
-        val newBorderPointsFuture: Future<LinkedHashSet<Int>> = if (graphBorders == null) executor.call { buildBorderPoints(graph) } else executor.call { graphBorders!! }
+        val newBorderPointsFuture = if (graphBorders == null) {
+            executor.call {
+                buildBorderPoints(graph)
+            }
+        } else {
+            executor.call {
+                val notNull: LinkedHashSet<Int> = graphBorders
+                notNull
+            }
+        }
         val waterFuture = executor.call { extractWaterFromIds(graph, newMask) }
         val water = waterFuture.value
         val newBorderPoints = newBorderPointsFuture.value

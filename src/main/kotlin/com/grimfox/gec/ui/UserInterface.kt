@@ -603,8 +603,8 @@ private class WindowContext(
         var ignoreInput: Boolean = false,
 
         var currentMonitor: MonitorSpec = NO_MONITOR,
-        var mouseClickHandler: (Int, Int, Int, Boolean, Int) -> Unit = { button, x, y, isDown, mods -> },
-        var scrollHandler: (Double, Double) -> Unit = { x, y -> },
+        var mouseClickHandler: (Int, Int, Int, Boolean, Int) -> Unit = { _, _, _, _, _ -> },
+        var scrollHandler: (Double, Double) -> Unit = { _, _ -> },
         var maximizeHandler: () -> Unit = {},
         var minimizeHandler: () -> Unit = {},
         var restoreHandler: () -> Unit = {},
@@ -752,7 +752,7 @@ private class WindowContext(
                     if (hasMoved) {
                         val lastCurrentWidth = currentWidth
                         val lastCurrentHeight = currentHeight
-                        monitors.forEachIndexed { i, monitorSpec ->
+                        monitors.forEachIndexed { _, monitorSpec ->
                             if (mouseX >= monitorSpec.mouseSpaceX1 && mouseX <= monitorSpec.mouseSpaceX2 && mouseY >= monitorSpec.mouseSpaceY1 && mouseY <= monitorSpec.mouseSpaceY2) {
                                 adjustForCurrentMonitor(monitorSpec, this)
                             }
@@ -857,31 +857,28 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
     val (screens, warpLines) = getScreensAndWarpLines()
     val (monitors, currentMonitor) = getMonitorInfo(screens)
-    var windowId = NULL
-    twr(stackPush()) { stack ->
-        glfwDefaultWindowHints()
-        glfwWindowHint(GLFW_RED_BITS, currentMonitor.redBits)
-        glfwWindowHint(GLFW_GREEN_BITS, currentMonitor.greenBits)
-        glfwWindowHint(GLFW_BLUE_BITS, currentMonitor.blueBits)
-        glfwWindowHint(GLFW_REFRESH_RATE, currentMonitor.refreshRate)
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-        glfwWindowHint(GLFW_MAXIMIZED, GLFW_FALSE)
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE)
-        glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE)
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
-        glfwWindowHint(GLFW_SAMPLES, 4)
-        if (Platform.get() === Platform.MACOSX) {
-            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
-        }
-        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
-        LOG.info("Creating window with width: $width, height: $height")
-        windowId = glfwCreateWindow(width, height, "WorldKit", NULL, NULL)
-        if (windowId == NULL) throw RuntimeException("Failed to create the GLFW window")
-        glfwSetWindowPos(windowId, windowState?.x ?: (currentMonitor.centerX - width / 2 + 1), windowState?.y ?: (currentMonitor.centerY - height / 2 + 1))
+    glfwDefaultWindowHints()
+    glfwWindowHint(GLFW_RED_BITS, currentMonitor.redBits)
+    glfwWindowHint(GLFW_GREEN_BITS, currentMonitor.greenBits)
+    glfwWindowHint(GLFW_BLUE_BITS, currentMonitor.blueBits)
+    glfwWindowHint(GLFW_REFRESH_RATE, currentMonitor.refreshRate)
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
+    glfwWindowHint(GLFW_MAXIMIZED, GLFW_FALSE)
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE)
+    glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE)
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
+    glfwWindowHint(GLFW_SAMPLES, 4)
+    if (Platform.get() === Platform.MACOSX) {
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
     }
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE)
+    LOG.info("Creating window with width: $width, height: $height")
+    val windowId = glfwCreateWindow(width, height, "WorldKit", NULL, NULL)
+    if (windowId == NULL) throw RuntimeException("Failed to create the GLFW window")
+    glfwSetWindowPos(windowId, windowState?.x ?: (currentMonitor.centerX - width / 2 + 1), windowState?.y ?: (currentMonitor.centerY - height / 2 + 1))
     glfwMakeContextCurrent(windowId)
     Configuration.DEBUG.set(true)
     val errorStream = object : PrintStream(System.err) {
@@ -934,7 +931,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     }
     glfwSwapInterval(1)
     val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, warpLines = warpLines, width = width, height = height)
-    glfwSetScrollCallback(window.id) { windowId, xOffset, yOffset ->
+    glfwSetScrollCallback(window.id) { _, xOffset, yOffset ->
         if (!window.ignoreInput) {
             try {
                 window.scrollX += xOffset.toFloat()
@@ -948,12 +945,12 @@ private fun createWindow(windowState: WindowState?): WindowContext {
             }
         }
     }
-    glfwSetCharCallback(window.id) { windowId, codePoint ->
+    glfwSetCharCallback(window.id) { _, codePoint ->
         if (!window.ignoreInput) {
             window.keyboardHandler?.onChar?.invoke(codePoint)
         }
     }
-    glfwSetKeyCallback(window.id) { windowId, key, scanCode, action, mods ->
+    glfwSetKeyCallback(window.id) { _, key, scanCode, action, mods ->
         if (!window.ignoreInput) {
             try {
                 window.keyboardHandler?.onKey?.invoke(key, scanCode, action, mods)
@@ -1107,7 +1104,7 @@ private fun initializeWindowState(window: WindowContext, windowState: WindowStat
         window.currentHeight = y.get(0)
         window.width = window.currentWidth
         window.height = window.currentHeight
-        window.monitors.forEachIndexed { i, monitorSpec ->
+        window.monitors.forEach { monitorSpec ->
             if (window.mouseX >= monitorSpec.mouseSpaceX1 && window.mouseX <= monitorSpec.mouseSpaceX2 && window.mouseY >= monitorSpec.mouseSpaceY1 && window.mouseY <= monitorSpec.mouseSpaceY2) {
                 adjustForCurrentMonitor(monitorSpec, window)
             }

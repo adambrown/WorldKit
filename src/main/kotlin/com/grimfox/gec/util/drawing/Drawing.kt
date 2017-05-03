@@ -174,7 +174,7 @@ fun Image.drawSlopes(graph: Graph, slopes: Map<Int, Float>) {
     }
 }
 
-fun Image.drawRivers(graph: Graph, mask: Matrix<Byte>, rivers: Collection<TreeNode<RiverNode>>, coastline: Polygon2F, borders: Collection<Polygon2F>) {
+fun Image.drawRivers(rivers: Collection<TreeNode<RiverNode>>, coastline: Polygon2F, borders: Collection<Polygon2F>) {
     graphics.stroke = BasicStroke(1.5f)
 
     graphics.color = Color(180, 255, 160)

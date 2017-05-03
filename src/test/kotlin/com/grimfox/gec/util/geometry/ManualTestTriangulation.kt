@@ -26,43 +26,51 @@ object ManualTestTriangulation {
     }
 
     private fun testTriangulation() {
-        for (i in 1..20000) {
-            val random = Random(i.toLong())
-            val graph = timeIt {
-                val randomPoints = ArrayList<Point2F>(49)
-                Utils.generateSemiUniformPointsF(7, 1.0f, random, 0.8f) { i, x, y -> randomPoints.add(Point2F(x, y)) }
-                Triangulate.buildGraph(1.0f, randomPoints, 7)
-            }
-        }
+        (1..20000)
+                .asSequence()
+                .map { Random(it.toLong()) }
+                .forEach {
+                    timeIt {
+                        val randomPoints = ArrayList<Point2F>(49)
+                        Utils.generateSemiUniformPointsF(7, 1.0f, it, 0.8f) { _, x, y -> randomPoints.add(Point2F(x, y)) }
+                        Triangulate.buildGraph(1.0f, randomPoints, 7)
+                    }
+                }
         println("warm-up average: ${accumulatedTime.get() / 20000.0}")
         accumulatedTime.set(0.0)
-        for (i in 20001..40000) {
-            val random = Random(i.toLong())
-            val graph = timeIt {
-                val randomPoints = ArrayList<Point2F>(49)
-                Utils.generateSemiUniformPointsF(7, 1.0f, random, 0.8f) { i, x, y -> randomPoints.add(Point2F(x, y)) }
-                Triangulate.buildGraph(1.0f, randomPoints, 7)
-            }
-        }
+        (20001..40000)
+                .asSequence()
+                .map { Random(it.toLong()) }
+                .forEach {
+                    timeIt {
+                        val randomPoints = ArrayList<Point2F>(49)
+                        Utils.generateSemiUniformPointsF(7, 1.0f, it, 0.8f) { _, x, y -> randomPoints.add(Point2F(x, y)) }
+                        Triangulate.buildGraph(1.0f, randomPoints, 7)
+                    }
+                }
         println("hot average: ${accumulatedTime.get() / 20000.0}")
         accumulatedTime.set(0.0)
     }
 
     private fun testGraphs() {
-        for (i in 1..20000) {
-            val random = Random(i.toLong())
-            val graph = timeIt {
-                Graphs.generateGraph(7, random, 0.8)
-            }
-        }
+        (1..20000)
+                .asSequence()
+                .map { Random(it.toLong()) }
+                .forEach {
+                    timeIt {
+                        Graphs.generateGraph(7, it, 0.8)
+                    }
+                }
         println("warm-up average: ${accumulatedTime.get() / 20000.0}")
         accumulatedTime.set(0.0)
-        for (i in 20001..40000) {
-            val random = Random(i.toLong())
-            val graph = timeIt {
-                Graphs.generateGraph(7, random, 0.8)
-            }
-        }
+        (20001..40000)
+                .asSequence()
+                .map { Random(it.toLong()) }
+                .forEach {
+                    timeIt {
+                        Graphs.generateGraph(7, it, 0.8)
+                    }
+                }
         println("hot average: ${accumulatedTime.get() / 20000.0}")
         accumulatedTime.set(0.0)
     }
