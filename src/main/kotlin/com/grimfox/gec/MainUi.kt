@@ -45,21 +45,23 @@ object MainUi {
 
         val cachedGraph1024 = Graphs.generateGraph(1024, Random(0), 0.8)
 
-        val DEFAULT_HEIGHT_SCALE = 130.0f
+        val DEFAULT_HEIGHT_SCALE = 70.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
         val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
+        val HEIGHT_SCALE_CONST = DEFAULT_HEIGHT_SCALE * 0.968746f
+        val HEIGHT_SCALE_MULTIPLIER = DEFAULT_HEIGHT_SCALE * 32.00223
         val heightScaleFunction = { scale: Float ->
             Math.min(MAX_HEIGHT_SCALE, Math.max(MIN_HEIGHT_SCALE, if (scale <= 0.5f) {
-                scale * 260
+                scale * (2 * DEFAULT_HEIGHT_SCALE)
             } else {
-                (125.937 + (4160.29 * Math.pow(scale - 0.46874918, 2.0))).toFloat()
+                (HEIGHT_SCALE_CONST + (HEIGHT_SCALE_MULTIPLIER * Math.pow(scale - 0.46874918, 2.0))).toFloat()
             }))
         }
         val heightScaleFunctionInverse = { value: Float ->
-            Math.min(1.0f, Math.max(0.0f, if (value <= 130) {
-                value / 260
+            Math.min(1.0f, Math.max(0.0f, if (value <= DEFAULT_HEIGHT_SCALE) {
+                value / (2 * DEFAULT_HEIGHT_SCALE)
             } else {
-                (Math.sqrt((value - 125.937) / 4160.29) + 0.46874918).toFloat()
+                (Math.sqrt((value - HEIGHT_SCALE_CONST) / HEIGHT_SCALE_MULTIPLIER) + 0.46874918).toFloat()
             }))
         }
         fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {

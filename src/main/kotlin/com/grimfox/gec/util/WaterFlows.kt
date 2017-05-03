@@ -773,20 +773,22 @@ object WaterFlows {
     fun writeHeightMap(heightMap: Matrix<Float>): BufferedImage {
         val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
         val raster = output.raster
-        var max = 0.0f
+        var maxLandValue = 0.0f
         for (i in 0..heightMap.size.toInt() - 1) {
             val height = heightMap[i]
-            if (height > max) {
-                max = height
+            if (height > maxLandValue) {
+                maxLandValue = height
             }
         }
+        val waterLine = 0.30f
+        val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         for (y in (0..heightMap.width - 1)) {
             for (x in (0..heightMap.width - 1)) {
                 val heightValue = heightMap[x, y]
                 if (heightValue < 0.0f) {
                     raster.setSample(x, y, 0, 0)
                 } else {
-                    val sample = Math.round((heightValue / max) * 55535.0f) + 9999
+                    val sample = (((heightValue * landFactor) + waterLine) * 65535).toInt()
                     raster.setSample(x, y, 0, sample)
                 }
             }
