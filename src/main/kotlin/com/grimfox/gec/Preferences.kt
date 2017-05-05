@@ -1,9 +1,16 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.extensions.call
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.ui.JSON
+import com.grimfox.gec.util.Graphs
+import com.grimfox.gec.util.timeIt
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 
 private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)
 
@@ -18,12 +25,18 @@ val OFFLINE_HELP_INDEX_FILE = File(OFFLINE_HELP_DIR, "index.html")
 val PREFERENCES_FILE = File(CONFIG_DIR, "preferences.json")
 val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects.json")
 val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state.json")
+val CACHED_GRAPH_256_FILE = File(CACHE_DIR, "cached-graph-256.graph")
+val CACHED_GRAPH_512_FILE = File(CACHE_DIR, "cached-graph-512.graph")
+val CACHED_GRAPH_1024_FILE = File(CACHE_DIR, "cached-graph-1024.graph")
 
 data class Preferences(
         var rememberWindowState: Boolean = true,
         var projectDir: File = DEFAULT_PROJECTS_DIR,
         var tempDir: File = DEFAULT_TEMP_DIR,
-        var windowState: WindowState? = null
+        var windowState: WindowState? = null,
+        var cachedGraph256: Future<Graph>? = null,
+        var cachedGraph512: Future<Graph>? = null,
+        var cachedGraph1024: Future<Graph>? = null
 )
 
 data class WindowState(
@@ -34,7 +47,7 @@ data class WindowState(
         var isMaximized: Boolean
 )
 
-fun loadPreferences(): Preferences {
+fun loadPreferences(executor: ExecutorService): Preferences {
     ensureDirectoryExists(WORLD_KIT_DIR)
     ensureDirectoryExists(WORLD_KIT_DATA_DIR)
     ensureDirectoryExists(CONFIG_DIR)
@@ -67,6 +80,64 @@ fun loadPreferences(): Preferences {
         tempDir.deleteRecursively()
     }))
     ensureDirectoryExists(preferences.projectDir)
+
+    preferences.cachedGraph256 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_256_FILE.exists() && CACHED_GRAPH_256_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 256 file.")
+                graph = Graphs.generateGraph(256, Random(0), 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_256_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(256, Random(0), 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_256_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
+        }
+        graph
+    }
+
+    preferences.cachedGraph512 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_512_FILE.exists() && CACHED_GRAPH_512_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 512 file.")
+                graph = Graphs.generateGraph(512, Random(0), 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(512, Random(0), 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+        }
+        graph
+    }
+
+    preferences.cachedGraph1024 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_1024_FILE.exists() && CACHED_GRAPH_1024_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 1024 file.")
+                graph = Graphs.generateGraph(1024, Random(0), 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_1024_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(1024, Random(0), 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_1024_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
+        }
+        graph
+    }
+
     return preferences
 }
 
@@ -78,7 +149,7 @@ fun savePreferences(preferences: Preferences) {
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)
         PREFERENCES_FILE.outputStream().buffered().use {
-            JSON.writeValue(it, preferences.copy(windowState = null))
+            JSON.writeValue(it, preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null))
         }
         ensureDirectoryExists(preferences.tempDir)
         val tempDir = preferences.tempDir

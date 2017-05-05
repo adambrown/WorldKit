@@ -18,7 +18,6 @@ import com.grimfox.gec.util.Utils.pow
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
-import kotlin.collections.LinkedHashSet
 
 object Coastline {
 
@@ -73,7 +72,7 @@ object Coastline {
         futures.forEach { it.get() }
     }
 
-    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, executor: ExecutorService, graphBorders: LinkedHashSet<Int>? = null): Triple<ByteArrayMatrix, LinkedHashSet<Int>, LinkedHashSet<Int>> {
+    fun applyMask(graph: Graph, maskGraph: Graph, mask: Matrix<Byte>, executor: ExecutorService): Triple<ByteArrayMatrix, LinkedHashSet<Int>, LinkedHashSet<Int>> {
         val borderPointsFuture = executor.call { buildBorderPoints(maskGraph) }
         val landFuture = executor.call { extractLandFromIds(maskGraph, mask) }
         val land = landFuture.value
@@ -126,16 +125,7 @@ object Coastline {
             })
         }
         futures.forEach { it.join() }
-        val newBorderPointsFuture = if (graphBorders == null) {
-            executor.call {
-                buildBorderPoints(graph)
-            }
-        } else {
-            executor.call {
-                val notNull: LinkedHashSet<Int> = graphBorders
-                notNull
-            }
-        }
+        val newBorderPointsFuture = executor.call { buildBorderPoints(graph) }
         val waterFuture = executor.call { extractWaterFromIds(graph, newMask) }
         val water = waterFuture.value
         val newBorderPoints = newBorderPointsFuture.value

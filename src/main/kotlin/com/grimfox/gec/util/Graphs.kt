@@ -4,10 +4,154 @@ import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Utils.generateSemiUniformPointsD
 import com.grimfox.triangle.Mesh
-import com.grimfox.triangle.geometry.*
+import com.grimfox.triangle.geometry.Point
+import com.grimfox.triangle.geometry.Polygon
+import com.grimfox.triangle.geometry.Triangle
+import com.grimfox.triangle.geometry.Vertex
+import java.io.*
 import java.util.*
 
 object Graphs {
+
+    fun serialize(graph: Graph, outputStream: OutputStream) {
+        if (outputStream is BufferedOutputStream) {
+            DataOutputStream(outputStream)
+        } else {
+            DataOutputStream(outputStream.buffered())
+        }.use { output ->
+            writeFloatArray(graph.vertexIdsToPoints, output)
+            writeListListInt(graph.vertexToVertices, output)
+            writeListListInt(graph.vertexToTriangles, output)
+            writeFloatArray(graph.triangleToCenters, output)
+            writeIntArray(graph.triangleToVertices, output)
+            writeIntArray(graph.triangleToTriangles, output)
+            writeNullablePositiveInt(graph.stride, output)
+            val areas = FloatArray(graph.vertices.size)
+            val borders = BooleanArray(graph.vertices.size)
+            graph.vertices.forEach {
+                val cell = it.cell
+                areas[it.id] = cell.area
+                borders[it.id] = cell.isBorder
+            }
+            writeNullableFloatArray(areas, output)
+            writeNullableBooleanArray(borders, output)
+        }
+    }
+
+    fun deserialize(inputStream: InputStream): Graph {
+        val input = inputStream as? DataInputStream ?: if (inputStream is BufferedInputStream) {
+            DataInputStream(inputStream)
+        } else {
+            DataInputStream(inputStream.buffered())
+        }
+        return input.use { input ->
+            val vertexIdsToPoints = readFloatArray(input)
+            val vertexToVertices = readListListInt(input)
+            val vertexToTriangles = readListListInt(input)
+            val triangleToCenters = readFloatArray(input)
+            val triangleToVertices = readIntArray(input)
+            val triangleToTriangles = readIntArray(input)
+            val stride = readNullablePositiveInt(input)
+            val areas = readNullableFloatArray(input)
+            val borders = readNullableBooleanArray(input)
+            Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, areas, borders, false, false)
+        }
+    }
+
+    private fun writeFloatArray(array: FloatArray, output: DataOutputStream) {
+        output.writeInt(array.size)
+        array.forEach {
+            output.writeFloat(it)
+        }
+    }
+
+    private fun writeListListInt(list: List<List<Int>>, output: DataOutputStream) {
+        output.writeInt(list.size)
+        list.forEach {
+            output.writeInt(it.size)
+            it.forEach {
+                output.writeInt(it)
+            }
+        }
+    }
+
+    private fun writeIntArray(array: IntArray, output: DataOutputStream) {
+        output.writeInt(array.size)
+        array.forEach {
+            output.writeInt(it)
+        }
+    }
+
+    private fun writeNullablePositiveInt(i: Int?, output: DataOutputStream) {
+        output.writeInt(i ?: -1)
+    }
+
+    private fun writeNullableFloatArray(array: FloatArray?, output: DataOutputStream) {
+        output.writeInt(array?.size ?: -1)
+        array?.forEach {
+            output.writeFloat(it)
+        }
+    }
+
+    private fun writeNullableBooleanArray(array: BooleanArray?, output: DataOutputStream) {
+        output.writeInt(array?.size ?: -1)
+        array?.forEach {
+            output.writeBoolean(it)
+        }
+    }
+
+    private fun readFloatArray(input: DataInputStream): FloatArray {
+        val array = FloatArray(input.readInt())
+        for (i in 0..array.size - 1) {
+            array[i] = input.readFloat()
+        }
+        return array
+    }
+
+    private fun readListListInt(input: DataInputStream): List<List<Int>> {
+        val outerListSize = input.readInt()
+        val outerList = ArrayList<List<Int>>(outerListSize)
+        for (i in 0..outerListSize - 1) {
+            val innerListSize = input.readInt()
+            val innerList = ArrayList<Int>(innerListSize)
+            outerList.add(innerList)
+            for (j in 0..innerListSize - 1) {
+                innerList.add(input.readInt())
+            }
+        }
+        return outerList
+    }
+
+    private fun readIntArray(input: DataInputStream): IntArray {
+        val array = IntArray(input.readInt())
+        for (i in 0..array.size - 1) {
+            array[i] = input.readInt()
+        }
+        return array
+    }
+
+    private fun readNullablePositiveInt(input: DataInputStream): Int? {
+        val raw: Int = input.readInt()
+        return if (raw < 0) null else raw
+    }
+
+    private fun readNullableFloatArray(input: DataInputStream): FloatArray? {
+        val size = readNullablePositiveInt(input) ?: return null
+        val array = FloatArray(size)
+        for (i in 0..size - 1) {
+            array[i] = input.readFloat()
+        }
+        return array
+    }
+
+    private fun readNullableBooleanArray(input: DataInputStream): BooleanArray? {
+        val size = readNullablePositiveInt(input) ?: return null
+        val array = BooleanArray(size)
+        for (i in 0..size - 1) {
+            array[i] = input.readBoolean()
+        }
+        return array
+    }
 
     fun generateGraph(stride: Int, random: Random, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         val polygon = Polygon(stride * stride)
@@ -154,6 +298,6 @@ object Graphs {
             vertexToTriangles.add(adjacentTriangles)
             vertexToVertices.add(adjacentPoints)
         }
-        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, cacheVertices, cacheTriangles)
+        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, null, null, cacheVertices, cacheTriangles)
     }
 }

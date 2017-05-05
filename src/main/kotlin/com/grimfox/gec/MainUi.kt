@@ -3,6 +3,7 @@ package com.grimfox.gec
 import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
+import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.Matrix
@@ -32,18 +33,18 @@ import java.util.concurrent.Executors
 object MainUi {
 
     @JvmStatic fun main(vararg args: String) {
-        val preferences = loadPreferences()
         val executor = Executors.newWorkStealingPool()
+        val preferences = loadPreferences(executor)
         for (i in 1..2) {
             task { BuildContinent().generateRegions(ParameterSet(seed = i.toLong()), executor) }
         }
         val random = Random()
 
-        val cachedGraph256 = Graphs.generateGraph(256, Random(0), 0.8)
+        val cachedGraph256 = preferences.cachedGraph256!!
 
-        val cachedGraph512 = Graphs.generateGraph(512, Random(0), 0.8)
+        val cachedGraph512 = preferences.cachedGraph512!!
 
-        val cachedGraph1024 = Graphs.generateGraph(1024, Random(0), 0.8)
+        val cachedGraph1024 = preferences.cachedGraph1024!!
 
         val DEFAULT_HEIGHT_SCALE = 70.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
@@ -638,7 +639,7 @@ object MainUi {
                                                     button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
                                                         val currentStateValue = currentState.value
                                                         if (currentStateValue != null) {
-                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph256, cachedGraph512, cachedGraph1024, executor))
+                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor))
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
                                                             imageModeOn.value = false
                                                         }

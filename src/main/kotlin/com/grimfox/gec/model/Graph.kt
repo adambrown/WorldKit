@@ -12,8 +12,12 @@ class Graph(val vertexIdsToPoints: FloatArray,
             val triangleToVertices: IntArray,
             val triangleToTriangles: IntArray,
             val stride: Int? = null,
+            val areas: FloatArray? = null,
+            val borders: BooleanArray? = null,
             cacheVertices: Boolean = true,
-            cacheTriangles: Boolean = true) {
+            cacheTriangles: Boolean = true,
+            cacheAreas: Boolean = areas != null,
+            cacheBorders: Boolean = borders != null) {
 
     var useVirtualConnections = false
     var virtualConnections = HashMap<Int, LinkedHashSet<Int>>()
@@ -22,17 +26,35 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
     private val vertexFactory = if (cacheVertices) CachingVertexFactory() else DumbVertexFactory()
     private val triangleFactory = if (cacheTriangles) CachingTriangleFactory() else DumbTriangleFactory()
+    private val areaFactory = if (cacheAreas) CachingAreaFactory() else DumbAreaFactory()
+    private val borderFactory = if (cacheBorders) CachingBorderFactory() else DumbBorderFactory()
 
     companion object {
         internal val bounds = Bounds2F(Point2F(0.0f, 0.0f), Point2F(1.0f, 1.0f))
     }
 
     private interface VertexFactory {
+
         fun newVertex(id: Int): Vertex
     }
 
     private interface TriangleFactory {
+
         fun newTriangle(id: Int): Triangle
+    }
+
+    private interface AreaFactory {
+
+        fun getArea(cell: Cell): Float
+
+        fun getArea(id: Int): Float
+    }
+
+    private interface BorderFactory {
+
+        fun isBorder(cell: Cell): Boolean
+
+        fun isBorder(id: Int): Boolean
     }
 
     private inner class CachingVertexFactory: VertexFactory {
@@ -74,6 +96,65 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         override fun newTriangle(id: Int): Triangle {
             return Triangle(id)
+        }
+    }
+
+    private inner class CachingAreaFactory: AreaFactory {
+
+        val areas: FloatArray = this@Graph.areas!!
+
+        override fun getArea(cell: Cell): Float {
+            return areas[cell.id]
+        }
+
+        override fun getArea(id: Int): Float {
+            return areas[id]
+        }
+    }
+
+    private inner class DumbAreaFactory: AreaFactory {
+
+        override fun getArea(cell: Cell): Float {
+            val border = cell.border
+            var sum1 = 0.0f
+            var sum2 = 0.0f
+            for (i in 1..border.size) {
+                val p1 = border[i - 1]
+                val p2 = border[i % border.size]
+                sum1 += p1.x * p2.y
+                sum2 += p1.y * p2.x
+            }
+            return Math.abs((sum1 - sum2) / 2)
+        }
+
+        override fun getArea(id: Int): Float {
+            return getArea(vertexFactory.newVertex(id).cell)
+        }
+    }
+
+    private inner class CachingBorderFactory: BorderFactory {
+
+        val borders: BooleanArray = this@Graph.borders!!
+
+        override fun isBorder(cell: Cell): Boolean {
+            return borders[cell.id]
+        }
+
+        override fun isBorder(id: Int): Boolean {
+            return borders[id]
+        }
+    }
+
+    private inner class DumbBorderFactory: BorderFactory {
+
+        override fun isBorder(cell: Cell): Boolean {
+            if (!cell.isClosedRaw) return true
+            cell.borderRaw.forEach { if (it.x < 0.0f || it.x >= 1.0f || it.y < 0.0f || it.y >= 1.0f) return true }
+            return false
+        }
+
+        override fun isBorder(id: Int): Boolean {
+            return isBorder(vertexFactory.newVertex(id).cell)
         }
     }
 
@@ -174,9 +255,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         val graph = this@Graph
 
-        private val borderRaw: List<Point2F> by lazy { vertex.adjacentTriangles.map { it.center } }
+        internal val borderRaw: List<Point2F> by lazy { vertex.adjacentTriangles.map { it.center } }
 
-        private val isClosedRaw: Boolean by lazy { vertex.adjacentTriangles.size > 2 && vertex.adjacentTriangles.first().adjacentTriangles.contains(vertex.adjacentTriangles.last()) }
+        internal val isClosedRaw: Boolean by lazy { vertex.adjacentTriangles.size > 2 && vertex.adjacentTriangles.first().adjacentTriangles.contains(vertex.adjacentTriangles.last()) }
 
         private val borderEdgesRaw: List<CellEdge> by lazy {
             val edges = ArrayList<CellEdge>()
@@ -295,23 +376,9 @@ class Graph(val vertexIdsToPoints: FloatArray,
             borderEdges.map { it.a }
         }
 
-        val isBorder: Boolean by lazy {
-            if (!isClosedRaw) return@lazy true
-            borderRaw.forEach { if (it.x < 0.0f || it.x >= 1.0f || it.y < 0.0f || it.y >= 1.0f) return@lazy true }
-            false
-        }
+        val isBorder: Boolean by lazy { borderFactory.isBorder(this) }
 
-        val area: Float by lazy {
-            var sum1 = 0.0f
-            var sum2 = 0.0f
-            for (i in 1..border.size) {
-                val p1 = border[i - 1]
-                val p2 = border[i % border.size]
-                sum1 += p1.x * p2.y
-                sum2 += p1.y * p2.x
-            }
-            Math.abs((sum1 - sum2) / 2)
-        }
+        val area: Float by lazy { areaFactory.getArea(this) }
 
         fun sharedEdge(other: Cell, useTriangles: Boolean): LineSegment2F? {
             if (useTriangles) {
@@ -396,6 +463,14 @@ class Graph(val vertexIdsToPoints: FloatArray,
 
         fun getAdjacentTriangles(id: Int): List<Int> {
             return vertexToTriangles[id]
+        }
+
+        fun isBorder(id: Int): Boolean {
+            return borderFactory.isBorder(id)
+        }
+
+        fun getArea(id: Int): Float {
+            return areaFactory.getArea(id)
         }
 
         override fun iterator(): Iterator<Vertex> = (0..size - 1).asSequence().map { newVertex(it) }.iterator()
