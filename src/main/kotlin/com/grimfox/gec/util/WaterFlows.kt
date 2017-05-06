@@ -8,6 +8,7 @@ import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.ByteArrayMatrix
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Point3F
 import com.grimfox.gec.util.geometry.renderTriangle
 import org.joml.SimplexNoise.noise
@@ -107,12 +108,13 @@ object WaterFlows {
             applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, upliftMap, nodes, 0.5f)
             performMidErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers)
         }
-        val (heightMap, upliftMap) = midMapsFuture.value
-        val (nodeIndex, nodes, rivers) = highNodesFuture.value
-        applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.25f)
-        return writeHeightMap(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
+//        val (heightMap, upliftMap) = midMapsFuture.value
+//        val (nodeIndex, nodes, rivers) = highNodesFuture.value
+//        applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.25f)
+//        return writeHeightMap(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
 //        return writeHeightMap(midMapsFuture.value.first)
 //        return writeNoise2(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
+        return writeNoise3(executor, midMapsFuture.value.first, Graphs.generateGraph(64, random, 0.95))
 
     }
 
@@ -735,9 +737,9 @@ object WaterFlows {
     fun renderTrianglesAndUplift(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMap: Matrix<Float>, upliftMap: Matrix<Float>, threadCount: Int) {
         val futures = ArrayList<Future<*>>(threadCount)
         val triangles = graph.triangles
-        for (i in 0..threadCount - 1) {
-            futures.add(executor.submit {
-                for (t in i..triangles.size - 1 step threadCount) {
+        (0..threadCount - 1).mapTo(futures) {
+            executor.submit {
+                for (t in it..triangles.size - 1 step threadCount) {
                     val triangle = triangles[t]
                     val va = triangle.a
                     val vb = triangle.b
@@ -767,7 +769,7 @@ object WaterFlows {
                         }
                     }
                 }
-            })
+            }
         }
         futures.forEach(Future<*>::join)
     }
@@ -911,5 +913,57 @@ object WaterFlows {
         }
         return output
     }
+
+    fun writeNoise3(executor: ExecutorService, heightMap: Matrix<Float>, graph: Graph): BufferedImage {
+        val coeff1 = -1.0
+        val coeff2 = 0.0
+        val coeff3 = 0.0
+        val vertices = graph.vertices
+        val widthF = heightMap.width.toFloat()
+        val widthI = heightMap.width
+        val futures = ArrayList<Future<Pair<Float, Float>>>(threadCount)
+        (0..threadCount - 1).mapTo(futures) {
+            executor.call {
+                var max = -Float.MAX_VALUE
+                var min = Float.MAX_VALUE
+                for (i in it..(heightMap.size - 1).toInt() step threadCount) {
+                    val point = Point2F(((i % widthI) + 0.5f) / widthF, ((i / widthI) + 0.5f) / widthF)
+                    val point3d = Point3F(point.x, point.y, 0.0f)
+                    val closePoints = graph.getClosePoints(point, 3).map {
+                        val other = vertices.getPoint(it)
+                        val other3d = Point3F(other.x, other.y, (noise(other.x * 64, other.y * 64) + 1) /  30.0f)
+                        point3d.distance2(other3d)
+                    }.sorted()
+                    val dist1 = closePoints[0].toDouble()
+                    val dist2 = closePoints[1].toDouble()
+                    val dist3 = closePoints[2].toDouble()
+                    val height = ((dist1 * coeff1) + (dist2 * coeff2) + (dist3 * coeff3)).toFloat()
+                    if (height > max) {
+                        max = height
+                    }
+                    if (height < min) {
+                        min = height
+                    }
+                    heightMap[i] = height
+                }
+                Pair(min, max)
+            }
+        }
+        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
+        val raster = output.raster
+        val extremes = futures.map { it.value }
+        val min = extremes.map { it.first }.min()!!
+        val max = extremes.map { it.second }.max()!!
+        val delta = max - min
+        for (y in (0..heightMap.width - 1)) {
+            for (x in (0..heightMap.width - 1)) {
+                val height = (heightMap[x, y] - min) / delta
+                val sample = Math.round(height * 65534.0f)
+                raster.setSample(x, y, 0, sample)
+            }
+        }
+        return output
+    }
+
 
 }
