@@ -1,17 +1,11 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.extensions.call
-import com.grimfox.gec.extensions.join
-import com.grimfox.gec.extensions.value
-import com.grimfox.gec.model.FloatArrayMatrix
-import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Graph.Vertices
-import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.ByteArrayMatrix
-import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.model.geometry.Point3F
+import com.grimfox.gec.extensions.*
+import com.grimfox.gec.model.*
+import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.util.geometry.renderTriangle
-import org.joml.SimplexNoise.noise
+import org.joml.SimplexNoise.*
 import java.awt.image.BufferedImage
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -19,8 +13,16 @@ import java.util.concurrent.Future
 
 object WaterFlows {
 
-    private val NOISE_8_OCTAVE_CONSTANT = 0.50196078431f
+    private val noiseGraph64 = Graphs.generateGraph(64, Random(123), 0.98)
+    private val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
 
+    init {
+        val vertices = noiseGraph64.vertices
+        for (i in 0..vertices.size - 1) {
+            val point = vertices.getPoint(i)
+            noisePoints64[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 31, point.y * 31)) / 64.0f)
+        }
+    }
 
     private val MIN_U = 0.000004f
     private val MAX_U = 0.0005f
@@ -69,6 +71,22 @@ object WaterFlows {
         Math.tan(angle).toFloat()
     }
 
+    private val SCALE = 30000.0
+    private val SD = 270.0
+    private val MEAN =  512.0
+    private val T0 = -2.0 * SD * SD
+    private val T1 = SCALE * (1.0 / Math.sqrt(Math.PI * -T0))
+    private val VARIANCE_FACTOR_ROLLING_HILLS = 0.05f
+    private val HEIGHT_VARIANCE_ROLLING_HILLS = FloatArray(1024 * 256) { i ->
+        val height = i / 256
+        val variance = i % 256
+        val base = T1 * Math.pow(Math.E, (((height - MEAN) * (height - MEAN)) / T0))
+        val baseVariance = (base * VARIANCE_FACTOR_ROLLING_HILLS)
+        val varianceMod = ((variance / 255.0) * baseVariance * 2.0) - baseVariance
+        val angle = Math.toRadians(base + varianceMod)
+        Math.tan(angle).toFloat()
+    }
+
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
     class WaterNode(val id: Int,
@@ -92,33 +110,60 @@ object WaterFlows {
     class Pass(val passKey: PassKey, val id1: Int, val id2: Int, val height: Float)
 
     fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, outputWidth: Int): BufferedImage {
-        val smallMapsFuture = executor.call {
-            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, inputGraph, inputMask, DISTANCE_SCALE, random)
-            solveInitialLakes(executor, flowGraphSmall, nodeIndex, nodes, rivers)
+        val randomSeed1 = random.nextLong()
+        val randomSeed2 = random.nextLong()
+        val smallMapsFutureCoastalMountains = executor.call {
+            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, inputGraph, inputMask, DISTANCE_SCALE, Random(randomSeed1), DELTA_U, MIN_U, HEIGHT_VARIANCE_FIXED, 1.0f, K, calculateUpliftCoastalMountains)
+            solveInitialLakes(executor, flowGraphSmall, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_LOW, 1.0f, K)
         }
-        val midNodesFuture = executor.call {
+        val smallMapsFutureRollingHills = executor.call {
+            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, inputGraph, inputMask, DISTANCE_SCALE, Random(randomSeed2), DELTA_U * 0.15f, MIN_U * 0.15f, HEIGHT_VARIANCE_FIXED, 1.0f, K, calculateUpliftRollingHills)
+            solveInitialLakes(executor, flowGraphSmall, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_ROLLING_HILLS, 11.0f, K * 8.0f)
+        }
+        val midNodesFutureCoastalMountains = executor.call {
             prepareGraphNodes(executor, flowGraphMedium, inputGraph, inputMask, DISTANCE_SCALE)
         }
-        val highNodesFuture = executor.call {
+        val midNodesFutureRollingHills = executor.call {
+            prepareGraphNodes(executor, flowGraphMedium, inputGraph, inputMask, DISTANCE_SCALE)
+        }
+        val highNodesFutureCoastalMountains = executor.call {
             prepareGraphNodes(executor, flowGraphLarge, inputGraph, inputMask, DISTANCE_SCALE)
         }
-        val midMapsFuture = executor.call {
-            val (heightMap, upliftMap) = smallMapsFuture.value
-            val (nodeIndex, nodes, rivers) = midNodesFuture.value
-            applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, upliftMap, nodes, 0.5f)
-            performMidErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers)
+        val highNodesFutureRollingHills = executor.call {
+            prepareGraphNodes(executor, flowGraphLarge, inputGraph, inputMask, DISTANCE_SCALE)
         }
-//        val (heightMap, upliftMap) = midMapsFuture.value
-//        val (nodeIndex, nodes, rivers) = highNodesFuture.value
-//        applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.25f)
-//        return writeHeightMap(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
-//        return writeHeightMap(midMapsFuture.value.first)
+        val midMapsFutureCoastalMountains = executor.call {
+            val (heightMap, upliftMap) = smallMapsFutureCoastalMountains.value
+            val (nodeIndex, nodes, rivers) = midNodesFutureCoastalMountains.value
+            applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, upliftMap, nodes, 0.5f)
+            performMidErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_MID, 1.0f, K)
+        }
+        val midMapsFutureRollingHills = executor.call {
+            val (heightMap, upliftMap) = smallMapsFutureRollingHills.value
+            val (nodeIndex, nodes, rivers) = midNodesFutureRollingHills.value
+            applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, upliftMap, nodes, 0.4f)
+            performMidErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_ROLLING_HILLS, 11.0f, K * 4.0f)
+        }
+        val highMapsFutureCoastalMountains = executor.call {
+            val (heightMap, upliftMap) = midMapsFutureCoastalMountains.value
+            val (nodeIndex, nodes, rivers) = highNodesFutureCoastalMountains.value
+            applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.4f)
+            performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_HIGH, HEIGHT_VARIANCE_FIXED, 1.0f, K, outputWidth)
+        }
+        val highMapsFutureRollingHills = executor.call {
+            val (heightMap, upliftMap) = midMapsFutureRollingHills.value
+            val (nodeIndex, nodes, rivers) = highNodesFutureRollingHills.value
+            applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, upliftMap, nodes, 0.4f)
+            performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, HEIGHT_VARIANCE_ROLLING_HILLS, HEIGHT_VARIANCE_ROLLING_HILLS, 11.0f, K * 2.5f, outputWidth)
+        }
+//        return writeHeightMap(highMapsFutureRollingHills.value)
+        return writeDualMap(highMapsFutureCoastalMountains.value, highMapsFutureRollingHills.value)
+//        return writeNoise(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
 //        return writeNoise2(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
-        return writeNoise3(executor, midMapsFuture.value.first, Graphs.generateGraph(64, random, 0.95))
-
+//        return writeNoise3(executor, smallMapsFuture.value.first)
     }
 
-    private fun bootstrapErosion(executor: ExecutorService, graph: Graph, inputGraph: Graph, inputMask: Matrix<Byte>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
+    private fun bootstrapErosion(executor: ExecutorService, graph: Graph, inputGraph: Graph, inputMask: Matrix<Byte>, distanceScale: Float, random: Random, deltaUplift: Float, minUplift: Float, varianceTable: FloatArray, heightMultiplier: Float, k: Float, upliftFunction: (Vertices, LinkedHashSet<Int>, LinkedHashSet<Int>, LinkedHashSet<Int>, Matrix<Byte>) -> Unit): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
         val vertices = graph.vertices
         val land = ArrayList<Int>(vertices.size)
         val water = LinkedHashSet<Int>(vertices.size)
@@ -146,12 +191,12 @@ object WaterFlows {
                 LinkedHashSet(region.filter { beach.contains(it) })
             }
         }
-        val regionBeaches = regionBeachFutures.map { it.value }
         val regionBorderFutures = regions.map { region ->
             executor.call {
                 LinkedHashSet(region.filter { isBorderPoint(vertices, water, region, it) })
             }
         }
+        val regionBeaches = regionBeachFutures.map { it.value }
         val regionBorders = regionBorderFutures.map { it.value }
         regionBeaches.forEachIndexed { i, regionBeach ->
             regionBeach.removeAll(regionBorders[i])
@@ -159,12 +204,12 @@ object WaterFlows {
         val upliftMap = ByteArrayMatrix(graph.stride!!) { -128 }
         val upliftMapFutures = regions.mapIndexed { i, region ->
             executor.call {
-                calculateUplift2(vertices, region, regionBeaches[i], regionBorders[i], upliftMap)
+                upliftFunction(vertices, region, regionBeaches[i], regionBorders[i], upliftMap)
             }
         }
         upliftMapFutures.forEach { it.join() }
 
-        val (nodeIndex, nodes) = createWaterNodes(executor, vertices, land, beach, upliftMap, distanceScale)
+        val (nodeIndex, nodes) = createWaterNodes(executor, vertices, land, beach, upliftMap, distanceScale, deltaUplift, minUplift)
         val rivers = ArrayList<WaterNode>()
         beach.forEach { id ->
             rivers.add(nodeIndex[id]!!)
@@ -179,12 +224,11 @@ object WaterFlows {
             next.clear()
             nextOrder.forEach { id ->
                 val node = nodeIndex[id]!!
-                node.adjacents.forEach { pair ->
-                    val otherNode = pair.first
+                node.adjacents.forEach { (otherNode, second) ->
                     if (!used.contains(otherNode.id)) {
                         otherNode.parent.children.remove(otherNode)
                         otherNode.parent = node
-                        otherNode.distanceToParent = pair.second
+                        otherNode.distanceToParent = second
                         node.children.add(otherNode)
                         next.add(otherNode.id)
                         used.add(otherNode.id)
@@ -194,11 +238,11 @@ object WaterFlows {
             }
         }
         computeAreas(executor, rivers)
-        computeHeights(executor, DT * 0.34f, rivers, HEIGHT_VARIANCE_FIXED)
+        computeHeights(executor, DT * 0.34f, rivers, varianceTable, heightMultiplier, k)
         return Triple(nodeIndex, nodes, rivers)
     }
 
-    private fun solveInitialLakes(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>): Pair<FloatArrayMatrix, FloatArrayMatrix> {
+    private fun solveInitialLakes(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, varianceTable: FloatArray, heightMultiplier: Float, k: Float): Pair<FloatArrayMatrix, FloatArrayMatrix> {
         var deltaTime = DT * 12
         val lakes = ArrayList<WaterNode>()
         val localLakePool = Array<ArrayList<WaterNode>>(threadCount) { ArrayList() }
@@ -214,7 +258,7 @@ object WaterFlows {
             prepareNodesAndLakes(executor, lakes, localLakePool, nodes, rivers)
             computeLakeConnections(graph.vertices, lakes, nodeIndex, passes, rivers)
             computeAreas(executor, rivers)
-            computeHeights(executor, deltaTime, rivers, HEIGHT_VARIANCE_LOW)
+            computeHeights(executor, deltaTime, rivers, varianceTable, heightMultiplier, k)
         }
         val heightMap = FloatArrayMatrix(1024) { -1.0f }
         val upliftMap = FloatArrayMatrix(512) { 0.0f }
@@ -222,7 +266,7 @@ object WaterFlows {
         return Pair(heightMap, upliftMap)
     }
 
-    private fun performMidErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>): Pair<FloatArrayMatrix, FloatArrayMatrix> {
+    private fun performMidErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, varianceTable: FloatArray, heightMultiplier: Float, k: Float): Pair<FloatArrayMatrix, FloatArrayMatrix> {
         val deltaTime = DT
         val lakes = ArrayList<WaterNode>()
         val localLakePool = Array<ArrayList<WaterNode>>(threadCount) { ArrayList() }
@@ -233,7 +277,7 @@ object WaterFlows {
             prepareNodesAndLakes(executor, lakes, localLakePool, nodes, rivers)
             computeLakeConnections(graph.vertices, lakes, nodeIndex, passes, rivers)
             computeAreas(executor, rivers)
-            computeHeights(executor, deltaTime, rivers, HEIGHT_VARIANCE_MID)
+            computeHeights(executor, deltaTime, rivers, varianceTable, heightMultiplier, k)
         }
         val heightMap = FloatArrayMatrix(2048) { -1.0f }
         val upliftMap = FloatArrayMatrix(1024) { 0.0f }
@@ -241,7 +285,7 @@ object WaterFlows {
         return Pair(heightMap, upliftMap)
     }
 
-    private fun performHighErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, outputWidth: Int): Matrix<Float> {
+    private fun performHighErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, varianceTable1: FloatArray, varianceTable2: FloatArray, heightMultiplier: Float, k: Float, outputWidth: Int): Matrix<Float> {
         val deltaTime = DT
         val lakes = ArrayList<WaterNode>()
         val localLakePool = Array<ArrayList<WaterNode>>(threadCount) { ArrayList() }
@@ -253,9 +297,9 @@ object WaterFlows {
             computeLakeConnections(graph.vertices, lakes, nodeIndex, passes, rivers)
             computeAreas(executor, rivers)
             if (i < 3) {
-                computeHeights(executor, deltaTime, rivers, HEIGHT_VARIANCE_HIGH)
+                computeHeights(executor, deltaTime, rivers, varianceTable1, heightMultiplier, k)
             } else {
-                computeHeights(executor, deltaTime, rivers, HEIGHT_VARIANCE_FIXED)
+                computeHeights(executor, deltaTime, rivers, varianceTable2, heightMultiplier, k)
             }
         }
         val heightMap = FloatArrayMatrix(outputWidth) { -1.0f }
@@ -322,46 +366,33 @@ object WaterFlows {
     }
 
     private fun prepareNodesAndLakes(executor: ExecutorService, lakes: ArrayList<WaterNode>, localLakePool: Array<ArrayList<WaterNode>>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>) {
-        val nodeFutures = (0..threadCount - 1).map { i ->
-            executor.call {
-                val localLakes = localLakePool[i]
-                localLakes.clear()
-                for (id in i..nodes.size - 1 step threadCount) {
-                    val node = nodes[id]
-                    node.lake = -1
-                    if (!node.isExternal) {
-                        var minHeight = node.height
-                        var minNode = node
-                        var distToMin = 0.0f
-                        node.adjacents.forEach { pair ->
-                            val otherNode = pair.first
-                            if (otherNode.height < minHeight) {
-                                minNode = otherNode
-                                distToMin = pair.second
-                                minHeight = otherNode.height
-                            }
-                        }
-                        if (minNode != node.parent) {
-                            synchronized(node.parent.children) {
-                                node.parent.children.remove(node)
-                            }
-                            node.parent = minNode
-                            node.distanceToParent = distToMin
-                            if (minNode != node) {
-                                synchronized(minNode.children) {
-                                    minNode.children.add(node)
-                                }
-                            }
-                        }
-                        if (minNode == node) {
-                            localLakes.add(node)
-                        }
+        for (id in 0..nodes.size - 1) {
+            val node = nodes[id]
+            node.lake = -1
+            if (!node.isExternal) {
+                var minHeight = node.height
+                var minNode = node
+                var distToMin = 0.0f
+                node.adjacents.forEach { (otherNode, dist) ->
+                    if (otherNode.height < minHeight) {
+                        minNode = otherNode
+                        distToMin = dist
+                        minHeight = otherNode.height
                     }
                 }
-                localLakes
+                if (minNode != node.parent) {
+                    node.parent.children.remove(node)
+                    node.parent = minNode
+                    node.distanceToParent = distToMin
+                    if (minNode != node) {
+                        minNode.children.add(node)
+                    }
+                }
+                if (minNode == node) {
+                    lakes.add(node)
+                }
             }
         }
-        nodeFutures.forEach { lakes.addAll(it.value) }
         val futures = ArrayList<Future<*>>()
         rivers.forEachIndexed { id, waterNode ->
             futures.add(executor.call { recurseSetLake(id, waterNode) })
@@ -372,7 +403,7 @@ object WaterFlows {
         futures.forEach { it.join() }
     }
 
-    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: ArrayList<Int>, riverMouths: LinkedHashSet<Int>, upliftMap: ByteArrayMatrix, distanceScale: Float): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
+    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: ArrayList<Int>, riverMouths: LinkedHashSet<Int>, upliftMap: ByteArrayMatrix, distanceScale: Float, deltaUplift: Float, minUplift: Float): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
         val areaScale = distanceScale * distanceScale
         val nodeIndex = arrayOfNulls<WaterNode>(vertices.size)
         val nodeFutures = (0..threadCount - 1).map { i ->
@@ -383,7 +414,7 @@ object WaterFlows {
                     val uplift: Float = if (tempLift == 0) {
                         0.0f
                     } else {
-                        (tempLift / 256.0f) * DELTA_U + MIN_U
+                        (tempLift / 256.0f) * deltaUplift + minUplift
                     }
                     val isExternal = riverMouths.contains(landId)
                     val area = vertices.getArea(landId) * areaScale
@@ -491,10 +522,10 @@ object WaterFlows {
         areaFutures.forEach { it.join() }
     }
 
-    private fun computeHeights(executor: ExecutorService, deltaTime: Float, rivers: ArrayList<WaterNode>, varianceTable: FloatArray) {
+    private fun computeHeights(executor: ExecutorService, deltaTime: Float, rivers: ArrayList<WaterNode>, varianceTable: FloatArray, heightMultiplier: Float, k: Float) {
         val heightFutures = rivers.map { river ->
             executor.call {
-                recurseHeights(river, deltaTime, varianceTable)
+                recurseHeights(river, deltaTime, varianceTable, heightMultiplier, k)
             }
         }
         heightFutures.forEach { it.join() }
@@ -549,27 +580,27 @@ object WaterFlows {
         }
     }
 
-    private fun recurseHeights(node: WaterNode, deltaTime: Float, varianceTable: FloatArray) {
+    private fun recurseHeights(node: WaterNode, deltaTime: Float, varianceTable: FloatArray, heightMultiplier: Float, k: Float) {
         if (node.isExternal) {
-            node.children.forEach { recurseHeights(it, deltaTime, varianceTable) }
+            node.children.forEach { recurseHeights(it, deltaTime, varianceTable, heightMultiplier, k) }
         } else {
             val parent = node.parent
             val parentHeight = parent.height
-            val flow = K * Math.pow(node.drainageArea.toDouble(), M)
+            val flow = k * Math.pow(node.drainageArea.toDouble(), M)
             val erosion = flow / node.distanceToParent
             val denominator = 1.0 + (erosion * deltaTime)
             val numerator = node.height + (deltaTime * (node.uplift + (erosion * parentHeight)))
             node.height = (numerator / denominator).toFloat()
             val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
-            val talus = varianceTable[(Math.min(1023, Math.max(0, Math.round(node.height))) * 256) + Math.round((variance + 1) * 128)]
+            val talus = varianceTable[(Math.min(1023, Math.max(0, Math.round(node.height * heightMultiplier))) * 256) + Math.round((variance + 1) * 128)]
             if ((node.height - parent.height) / node.distanceToParent > talus) {
                 node.height = (node.distanceToParent * talus) + parent.height
             }
-            node.children.forEach { recurseHeights(it, deltaTime, varianceTable) }
+            node.children.forEach { recurseHeights(it, deltaTime, varianceTable, heightMultiplier, k) }
         }
     }
 
-    private fun calculateUplift(vertices: Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
+    private val calculateUplift = { vertices: Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte> ->
         val remaining = HashSet(region)
         var currentIds = HashSet(border)
         var nextIds = HashSet<Int>(border.size)
@@ -619,7 +650,7 @@ object WaterFlows {
         remaining.forEach { upliftMap[it] = currentUplift }
     }
 
-    private fun calculateUplift2(vertices: Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
+    private val calculateUpliftCoastalMountains = { vertices: Vertices, region: LinkedHashSet<Int>, beach: LinkedHashSet<Int>, border: LinkedHashSet<Int>, upliftMap: Matrix<Byte> ->
         val remaining = HashSet(region)
         var currentIds = HashSet(border)
         var nextIds = HashSet<Int>(border.size)
@@ -673,6 +704,37 @@ object WaterFlows {
         }
         currentUplift = (currentUplift + 25).toByte()
         remaining.forEach { upliftMap[it] = currentUplift }
+    }
+
+    private val calculateUpliftRollingHills = { vertices: Vertices, region: LinkedHashSet<Int>, _: LinkedHashSet<Int>, _: LinkedHashSet<Int>, upliftMap: Matrix<Byte> ->
+        var max = -Float.MAX_VALUE
+        var min = Float.MAX_VALUE
+        val rawUplifts = FloatArray(vertices.size) { i ->
+            if (region.contains(i)) {
+                val point = vertices.getPoint(i)
+                val point3d = Point3F(point.x, point.y, 0.0f)
+                val closePoints = noiseGraph64.getClosePoints(point, 3).map {
+                    point3d.distance2(noisePoints64[it]!!)
+                }.sorted()
+                val height = -closePoints[0]
+                if (height > max) {
+                    max = height
+                }
+                if (height < min) {
+                    min = height
+                }
+                height
+            } else {
+                -1.0f
+            }
+        }
+        val delta = max - min
+        for (i in (0..upliftMap.size.toInt() - 1)) {
+            if (region.contains(i)) {
+                val height = (rawUplifts[i] - min) / delta
+                upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
+            }
+        }
     }
 
     private fun extractBeachFromGraphAndWater(vertices: Vertices, water: LinkedHashSet<Int>) =
@@ -777,13 +839,8 @@ object WaterFlows {
     fun writeHeightMap(heightMap: Matrix<Float>): BufferedImage {
         val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
         val raster = output.raster
-        var maxLandValue = 0.0f
-        for (i in 0..heightMap.size.toInt() - 1) {
-            val height = heightMap[i]
-            if (height > maxLandValue) {
-                maxLandValue = height
-            }
-        }
+        val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.max() ?: 0.0f
+        println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         for (y in (0..heightMap.width - 1)) {
@@ -800,21 +857,31 @@ object WaterFlows {
         return output
     }
 
-    fun writeNoise(heightMap: Matrix<Float>): BufferedImage {
-        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
+    fun writeDualMap(mountainMap: Matrix<Float>, hillMap: Matrix<Float>): BufferedImage {
+        val output = BufferedImage(mountainMap.width, mountainMap.width, BufferedImage.TYPE_USHORT_GRAY)
         val raster = output.raster
-        for (y in (0..heightMap.width - 1)) {
-            for (x in (0..heightMap.width - 1)) {
-                var magnitude = NOISE_8_OCTAVE_CONSTANT
-                var divisor = 512.0f
-                var sum = 0.0f
-                for (i in 0..7) {
-                    sum += ((noise(x.toFloat() / divisor, y.toFloat() / divisor, 0.0f) + 1) / 2.0f) * magnitude
-                    magnitude /= 2.0f
-                    divisor /= 2.0f
+        val maxLandValue = (0..mountainMap.size.toInt() - 1).asSequence().map { mountainMap[it] }.max() ?: 0.0f
+        println("maxLandValue = $maxLandValue")
+        val waterLine = 0.30f
+        val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
+        for (y in (0..mountainMap.width - 1)) {
+            for (x in (0..mountainMap.width - 1)) {
+                val heightValue = mountainMap[x, y]
+                if (heightValue < 0.0f) {
+                    raster.setSample(x, y, 0, 0)
+                } else {
+                    val heightValue2 = hillMap[x, y]
+                    var noise = noise(x / 512.0f, y / 512.0f)
+                    val sign = Math.signum(noise)
+                    noise = 1 - Math.abs(noise)
+                    noise *= noise * noise * noise
+                    noise = 1 - noise
+                    noise *= sign
+                    val weight = (noise + 1.0f) / 2.0f
+                    val interpolated = (heightValue * weight) + (heightValue2 * (1.0f - weight))
+                    val sample = (((interpolated * landFactor) + waterLine) * 65535).toInt()
+                    raster.setSample(x, y, 0, sample)
                 }
-                val sample = Math.round(sum * 55535.0f) + 9999
-                raster.setSample(x, y, 0, sample)
             }
         }
         return output
@@ -914,56 +981,47 @@ object WaterFlows {
         return output
     }
 
-    fun writeNoise3(executor: ExecutorService, heightMap: Matrix<Float>, graph: Graph): BufferedImage {
-        val coeff1 = -1.0
-        val coeff2 = 0.0
-        val coeff3 = 0.0
-        val vertices = graph.vertices
-        val widthF = heightMap.width.toFloat()
-        val widthI = heightMap.width
-        val futures = ArrayList<Future<Pair<Float, Float>>>(threadCount)
-        (0..threadCount - 1).mapTo(futures) {
-            executor.call {
-                var max = -Float.MAX_VALUE
-                var min = Float.MAX_VALUE
-                for (i in it..(heightMap.size - 1).toInt() step threadCount) {
-                    val point = Point2F(((i % widthI) + 0.5f) / widthF, ((i / widthI) + 0.5f) / widthF)
-                    val point3d = Point3F(point.x, point.y, 0.0f)
-                    val closePoints = graph.getClosePoints(point, 3).map {
-                        val other = vertices.getPoint(it)
-                        val other3d = Point3F(other.x, other.y, (noise(other.x * 64, other.y * 64) + 1) /  30.0f)
-                        point3d.distance2(other3d)
-                    }.sorted()
-                    val dist1 = closePoints[0].toDouble()
-                    val dist2 = closePoints[1].toDouble()
-                    val dist3 = closePoints[2].toDouble()
-                    val height = ((dist1 * coeff1) + (dist2 * coeff2) + (dist3 * coeff3)).toFloat()
-                    if (height > max) {
-                        max = height
+    fun writeNoise3(executor: ExecutorService, heightMap: Matrix<Float>): BufferedImage {
+        return timeIt("generated noise in") {
+            val widthF = heightMap.width.toFloat()
+            val widthI = heightMap.width
+            val futures = ArrayList<Future<Pair<Float, Float>>>(threadCount)
+            (0..threadCount - 1).mapTo(futures) {
+                executor.call {
+                    var max = -Float.MAX_VALUE
+                    var min = Float.MAX_VALUE
+                    for (i in it..(heightMap.size - 1).toInt() step threadCount) {
+                        val point = Point2F(((i % widthI) + 0.5f) / widthF, ((i / widthI) + 0.5f) / widthF)
+                        val point3d = Point3F(point.x, point.y, 0.0f)
+                        val closePoints = noiseGraph64.getClosePoints(point, 3).map {
+                            point3d.distance2(noisePoints64[it]!!)
+                        }.sorted()
+                        val height = -closePoints[0]
+                        if (height > max) {
+                            max = height
+                        }
+                        if (height < min) {
+                            min = height
+                        }
+                        heightMap[i] = height
                     }
-                    if (height < min) {
-                        min = height
-                    }
-                    heightMap[i] = height
+                    Pair(min, max)
                 }
-                Pair(min, max)
             }
-        }
-        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
-        val raster = output.raster
-        val extremes = futures.map { it.value }
-        val min = extremes.map { it.first }.min()!!
-        val max = extremes.map { it.second }.max()!!
-        val delta = max - min
-        for (y in (0..heightMap.width - 1)) {
-            for (x in (0..heightMap.width - 1)) {
-                val height = (heightMap[x, y] - min) / delta
-                val sample = Math.round(height * 65534.0f)
-                raster.setSample(x, y, 0, sample)
+            val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
+            val raster = output.raster
+            val extremes = futures.map { it.value }
+            val min = extremes.map { it.first }.min()!!
+            val max = extremes.map { it.second }.max()!!
+            val delta = max - min
+            for (y in (0..heightMap.width - 1)) {
+                for (x in (0..heightMap.width - 1)) {
+                    val height = (heightMap[x, y] - min) / delta
+                    val sample = Math.round(height * 65534.0f)
+                    raster.setSample(x, y, 0, sample)
+                }
             }
+            output
         }
-        return output
     }
-
-
 }

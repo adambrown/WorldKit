@@ -8,8 +8,7 @@ import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.Reference
 import org.joml.*
 import org.lwjgl.BufferUtils
-import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
-import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT
+import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
@@ -17,8 +16,7 @@ import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
 import java.awt.image.BufferedImage
-import java.lang.Math.round
-import java.lang.Math.sqrt
+import java.lang.Math.*
 
 class MeshViewport3D(
         val resetView: MutableReference<Boolean>,
@@ -190,7 +188,7 @@ class MeshViewport3D(
                 listOf(positionAttributeImage, uvAttributeImage),
                 listOf(mvpMatrixUniformImage, graphTextureUniform, maskTextureUniform))
 
-        heightMap = HexGrid(2560.0f, 2048, positionAttribute, uvAttribute, true)
+        heightMap = HexGrid(2560.0f, 1024, positionAttribute, uvAttribute, true)
 
         waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
