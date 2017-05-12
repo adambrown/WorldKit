@@ -46,9 +46,18 @@ object Biomes {
         return tan(angle).toFloat()
     }
 
+    class RegionData(
+            val land: List<Int>,
+            val water: LinkedHashSet<Int>,
+            val beach: LinkedHashSet<Int>,
+            val regions: List<LinkedHashSet<Int>>,
+            val regionBeaches: List<LinkedHashSet<Int>>,
+            val regionBorders: List<LinkedHashSet<Int>>,
+            val borderPairs: LinkedHashMap<Int, Pair<Int, Int>>)
+
     interface UpliftFunction {
 
-        fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>)
+        fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>)
     }
 
     class ErosionSettings(
@@ -139,7 +148,7 @@ object Biomes {
 
     private class CoastalMountainsUplift : UpliftFunction {
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
+        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
             val remaining = HashSet(region)
             var currentIds = HashSet(borders)
             var nextIds = HashSet<Int>(borders.size)
@@ -197,8 +206,8 @@ object Biomes {
     }
 
     val ROLLING_HILLS_BIOME = Biome(
-            minUplift = 0.0000006f,
-            deltaUplift = 0.0000744f,
+            minUplift = 0.00000065f,
+            deltaUplift = 0.0000765f,
             upliftFunction = RollingHillsUplift(),
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
@@ -266,7 +275,7 @@ object Biomes {
 
     private class RollingHillsUplift : UpliftFunction {
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>) {
+        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
             var max = -Float.MAX_VALUE
             var min = Float.MAX_VALUE
             val rawUplifts = FloatArray(vertices.size) { i ->
@@ -290,7 +299,16 @@ object Biomes {
             }
             val delta = max - min
             for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (region.contains(i)) {
+                if (borders.contains(i)) {
+                    val biome = biomeMask[i]
+                    val borderPair = regionData.borderPairs[i]
+                    if (borderPair != null && vertices.getAdjacentVertices(i).all { biomeMask[it] == biome}) {
+                        upliftMap[i] = (-108).toByte()
+                    } else {
+                        val height = (rawUplifts[i] - min) / delta
+                        upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
+                    }
+                } else if (region.contains(i)) {
                     val height = (rawUplifts[i] - min) / delta
                     upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
                 }

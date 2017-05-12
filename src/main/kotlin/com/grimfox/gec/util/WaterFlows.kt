@@ -4,6 +4,7 @@ import com.grimfox.gec.biomes.Biomes
 import com.grimfox.gec.biomes.Biomes.Biome
 import com.grimfox.gec.biomes.Biomes.ErosionLevel
 import com.grimfox.gec.biomes.Biomes.ErosionSettings
+import com.grimfox.gec.biomes.Biomes.RegionData
 import com.grimfox.gec.extensions.*
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
@@ -31,13 +32,6 @@ object WaterFlows {
     private val DISTANCE_SCALE = 50000.0f
     private val SIMPLEX_SCALE = 96.0f
     private val threadCount = Runtime.getRuntime().availableProcessors()
-
-    private class RegionData(val land: List<Int>,
-                             val water: LinkedHashSet<Int>,
-                             val beach: LinkedHashSet<Int>,
-                             val regions: List<LinkedHashSet<Int>>,
-                             val regionBeaches: List<LinkedHashSet<Int>>,
-                             val regionBorders: List<LinkedHashSet<Int>>)
 
     class WaterNode(val id: Int,
                     val isExternal: Boolean,
@@ -141,10 +135,41 @@ object WaterFlows {
         }
         val regionBeaches = regionBeachFutures.map { it.value }
         val regionBorders = regionBorderFutures.map { it.value }
+        val borderPairs = LinkedHashMap<Int, Pair<Int, Int>>()
+        regionBorders.forEachIndexed { i, regionBorder ->
+            regionBorder.forEach { id ->
+                if (!borderPairs.containsKey(id)) {
+                    var isBorderPair = false
+                    var mate = -1
+                    val adjacentsToPair = ArrayList<Int>()
+                    vertices.getAdjacentVertices(id).forEach { adjacentId ->
+                        for ((j, otherRegionBorder) in regionBorders.withIndex()) {
+                            if (i != j && otherRegionBorder.contains(adjacentId)) {
+                                if (isBorderPair && mate != j) {
+                                    isBorderPair = false
+                                    break
+                                } else {
+                                    isBorderPair = true
+                                    mate = j
+                                    adjacentsToPair.add(adjacentId)
+                                }
+                            }
+                        }
+                    }
+                    if (isBorderPair) {
+                        val pair = Pair(Math.min(i, mate), Math.max(i, mate))
+                        borderPairs[id] = pair
+                        adjacentsToPair.forEach { adjacentId ->
+                            borderPairs[adjacentId] = pair
+                        }
+                    }
+                }
+            }
+        }
         regionBeaches.forEachIndexed { i, regionBeach ->
             regionBeach.removeAll(regionBorders[i])
         }
-        return RegionData(land, water, beach, regions, regionBeaches, regionBorders)
+        return RegionData(land, water, beach, regions, regionBeaches, regionBorders, borderPairs)
     }
 
     private fun bootstrapErosion(executor: ExecutorService, graph: Graph, regionData: RegionData, biomes: List<Biome>, biomeMask: Matrix<Byte>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
@@ -159,7 +184,7 @@ object WaterFlows {
                 val upliftMap = ByteArrayMatrix(graph.stride!!) { -128 }
                 val upliftMapFutures = regions.mapIndexed { i, region ->
                     executor.call {
-                        biome.upliftFunction.buildUpliftMap(vertices, region, regionBeaches[i], regionBorders[i], upliftMap)
+                        biome.upliftFunction.buildUpliftMap(vertices, region, regionBeaches[i], regionBorders[i], upliftMap, regionData, biomeMask)
                     }
                 }
                 upliftMapFutures.forEach { it.join() }
@@ -167,7 +192,6 @@ object WaterFlows {
             }
         }
         val biomeUpliftMaps: List<ByteArrayMatrix> = biomeUpliftMapFutures.map { it.value }
-
         val (nodeIndex, nodes) = createWaterNodes(executor, vertices, land, beach, biomes, biomeMask, biomeUpliftMaps, distanceScale)
         val rivers = ArrayList<WaterNode>()
         beach.forEach { id ->
