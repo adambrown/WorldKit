@@ -72,20 +72,24 @@ object Biomes {
             val upliftFunction: UpliftFunction)
 
     class Biome(
-            val bootstrapSettings: ErosionBootstrap,
+            val minUplift: Float,
+            val deltaUplift: Float,
+            val upliftFunction: UpliftFunction,
+            val bootstrapSettings: ErosionSettings,
             val erosionLowSettings: ErosionLevel,
             val erosionMidSettings: ErosionLevel,
             val erosionHighSettings: ErosionLevel)
 
     val COASTAL_MOUNTAINS_BIOME = Biome(
-            bootstrapSettings = ErosionBootstrap(
-                    minUplift = 0.000004f,
-                    deltaUplift = 0.00049600005f,
-                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
+            minUplift = 0.000004f,
+            deltaUplift = 0.00049600005f,
+            upliftFunction = CoastalMountainsUplift(),
+            bootstrapSettings = ErosionSettings(
+                    iterations = 1,
                     deltaTime = 85000.0f,
+                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
                     heightMultiplier = 1.0f,
-                    erosionPower = 0.000000561f,
-                    upliftFunction = CoastalMountainsUplift()),
+                    erosionPower = 0.000000561f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
@@ -193,14 +197,15 @@ object Biomes {
     }
 
     val ROLLING_HILLS_BIOME = Biome(
-            bootstrapSettings = ErosionBootstrap(
-                    minUplift = 0.0000006f,
-                    deltaUplift = 0.0000744f,
-                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
+            minUplift = 0.0000006f,
+            deltaUplift = 0.0000744f,
+            upliftFunction = RollingHillsUplift(),
+            bootstrapSettings = ErosionSettings(
+                    iterations = 1,
                     deltaTime = 85000.0f,
+                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
                     heightMultiplier = 1.0f,
-                    erosionPower = 0.000000561f,
-                    upliftFunction = RollingHillsUplift()),
+                    erosionPower = 0.000000561f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
