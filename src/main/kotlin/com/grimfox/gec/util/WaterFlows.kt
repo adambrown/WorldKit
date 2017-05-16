@@ -8,7 +8,8 @@ import com.grimfox.gec.biomes.Biomes.RegionData
 import com.grimfox.gec.extensions.*
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.*
-import com.grimfox.gec.model.geometry.*
+import com.grimfox.gec.model.geometry.ByteArrayMatrix
+import com.grimfox.gec.model.geometry.Point3F
 import com.grimfox.gec.util.geometry.renderTriangle
 import org.joml.SimplexNoise.*
 import java.awt.image.BufferedImage
@@ -56,7 +57,8 @@ object WaterFlows {
 
     fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, outputWidth: Int): BufferedImage {
         val randomSeed = random.nextLong()
-        val biomes = arrayListOf(Biomes.COASTAL_MOUNTAINS_BIOME, Biomes.ROLLING_HILLS_BIOME)
+        val biomes = arrayListOf(Biomes.COASTAL_MOUNTAINS_BIOME, Biomes.MOUNTAINS_BIOME, Biomes.FOOTHILLS_BIOME, Biomes.ROLLING_HILLS_BIOME, Biomes.PLAINS_BIOME, Biomes.PLATEAU_BIOME)
+//        val biomes = arrayListOf(Biomes.PLAINS_BIOME)
         val smallMapsFuture = executor.call {
             val regionData = buildRegionData(executor, flowGraphSmall, inputGraph, inputMask)
             val biomeMask = calculateBiomes(executor, flowGraphSmall, regionData, biomes)
@@ -84,8 +86,6 @@ object WaterFlows {
             performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 5, erosionSettings, outputWidth)
         }
         return writeHeightMap(highMapsFuture.value.first)
-//        return writeNoise2(performHighErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, outputWidth))
-//        return writeNoise3(executor, smallMapsFuture.value.first)
     }
 
     private fun calculateBiomes(executor: ExecutorService, graph: Graph, regionData: RegionData, biomes: List<Biome>): Matrix<Byte> {
@@ -689,173 +689,5 @@ object WaterFlows {
             }
         }
         return output
-    }
-
-    fun writeDualMap(mountainMap: Matrix<Float>, hillMap: Matrix<Float>): BufferedImage {
-        val output = BufferedImage(mountainMap.width, mountainMap.width, BufferedImage.TYPE_USHORT_GRAY)
-        val raster = output.raster
-        val maxLandValue = (0..mountainMap.size.toInt() - 1).asSequence().map { mountainMap[it] }.max() ?: 0.0f
-        println("maxLandValue = $maxLandValue")
-        val waterLine = 0.30f
-        val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        for (y in (0..mountainMap.width - 1)) {
-            for (x in (0..mountainMap.width - 1)) {
-                val heightValue = mountainMap[x, y]
-                if (heightValue < 0.0f) {
-                    raster.setSample(x, y, 0, 0)
-                } else {
-                    val heightValue2 = hillMap[x, y]
-                    var noise = noise(x / 512.0f, y / 512.0f)
-                    val sign = Math.signum(noise)
-                    noise = 1 - Math.abs(noise)
-                    noise *= noise * noise * noise
-                    noise = 1 - noise
-                    noise *= sign
-                    val weight = (noise + 1.0f) / 2.0f
-                    val interpolated = (heightValue * weight) + (heightValue2 * (1.0f - weight))
-                    val sample = (((interpolated * landFactor) + waterLine) * 65535).toInt()
-                    raster.setSample(x, y, 0, sample)
-                }
-            }
-        }
-        return output
-    }
-
-    fun writeNoise2(heightMap: Matrix<Float>): BufferedImage {
-//        val targetFirst = 0.001f
-//        var seed = 3.1985903E-6f
-//        var increment = 1.328289f
-//        var last = seed
-//        var current = seed
-//        var keepGoing = true
-//        var direction = false
-//        while (keepGoing) {
-//            for (i in 0..7) {
-//                val next = (last + current) * increment
-//                last = current
-//                current = next
-//            }
-//            if (current < targetFirst) {
-//                while (current < targetFirst) {
-//                    seed = Math.nextUp(seed)
-//                    last = seed
-//                    current = seed
-//                    for (i in 0..7) {
-//                        val next = (last + current) * increment
-//                        last = current
-//                        current = next
-//                    }
-//                }
-//                seed = Math.nextDown(seed)
-//            } else if (current > targetFirst) {
-//                while (current > targetFirst) {
-//                    seed = Math.nextDown(seed)
-//                    last = seed
-//                    current = seed
-//                    for (i in 0..7) {
-//                        val next = (last + current) * increment
-//                        last = current
-//                        current = next
-//                    }
-//                }
-//            }
-//            last = seed
-//            current = seed
-//            for (i in 0..7) {
-//                println("pre-seed${i + 1}: $current")
-//                val next = (last + current) * increment
-//                last = current
-//                current = next
-//            }
-//            println("divisor: $increment, seed1: $last, seed2: $current")
-//            current = targetFirst
-//            val octaveArray = FloatArray(10)
-//            octaveArray[0] = current
-//            for (i in 1..9) {
-//                val next = (last + current) * increment
-//                last = current
-//                current = next
-//                octaveArray[i] = current
-//            }
-//            val sum = octaveArray.sum()
-//            println(octaveArray.toList().reversed())
-//            println(sum)
-//            if (sum > 1.0f) {
-//                direction = true
-//                increment = Math.nextDown(increment)
-//            } else if (sum < 1.0f) {
-//                if (direction) {
-//                    keepGoing = false
-//                } else {
-//                    direction = false
-//                    increment = Math.nextUp(increment)
-//                }
-//            }
-//        }
-
-//        val octaves = floatArrayOf(0.062919f, 0.125481f, 0.499078f, 0.250249f, 0.031549f, 0.015819f, 0.007932f, 0.003978f, 0.001995f, 0.001f)
-//        val octaves = floatArrayOf(0.499078f, 0.250249f, 0.125481f, 0.062919f, 0.031549f, 0.015819f, 0.007932f, 0.003978f, 0.001995f, 0.001f)
-        val octaves = floatArrayOf(0.3f, 0.25f, 0.2f, 0.15f, 0.03f, 0.025f, 0.02f, 0.015f, 0.006f, 0.004f)
-//        println(octaves.sum())
-        val divisors = floatArrayOf(127.0f, 67.0f, 257.0f, 509.0f, 31.0f, 17.0f, 7.0f, 5.0f, 2.0f, 1.0f)
-        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
-        val raster = output.raster
-        for (y in (0..heightMap.width - 1)) {
-            for (x in (0..heightMap.width - 1)) {
-                var sum = 0.0f
-                for (i in 0..7) {
-                    val magnitude = octaves[i]
-                    val divisor = divisors[i]
-                    sum += ((noise(x.toFloat() / divisor, y.toFloat() / divisor, 0.0f) + 1) / 2.0f) * magnitude
-                }
-                val sample = Math.round(sum * 55535.0f) + 9999
-                raster.setSample(x, y, 0, sample)
-            }
-        }
-        return output
-    }
-
-    fun writeNoise3(executor: ExecutorService, heightMap: Matrix<Float>): BufferedImage {
-        return timeIt("generated noise in") {
-            val widthF = heightMap.width.toFloat()
-            val widthI = heightMap.width
-            val futures = ArrayList<Future<Pair<Float, Float>>>(threadCount)
-            (0..threadCount - 1).mapTo(futures) {
-                executor.call {
-                    var max = -Float.MAX_VALUE
-                    var min = Float.MAX_VALUE
-                    for (i in it..(heightMap.size - 1).toInt() step threadCount) {
-                        val point = Point2F(((i % widthI) + 0.5f) / widthF, ((i / widthI) + 0.5f) / widthF)
-                        val point3d = Point3F(point.x, point.y, 0.0f)
-                        val closePoints = noiseGraph64.getClosePoints(point, 3).map {
-                            point3d.distance2(noisePoints64[it]!!)
-                        }.sorted()
-                        val height = -closePoints[0]
-                        if (height > max) {
-                            max = height
-                        }
-                        if (height < min) {
-                            min = height
-                        }
-                        heightMap[i] = height
-                    }
-                    Pair(min, max)
-                }
-            }
-            val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
-            val raster = output.raster
-            val extremes = futures.map { it.value }
-            val min = extremes.map { it.first }.min()!!
-            val max = extremes.map { it.second }.max()!!
-            val delta = max - min
-            for (y in (0..heightMap.width - 1)) {
-                for (x in (0..heightMap.width - 1)) {
-                    val height = (heightMap[x, y] - min) / delta
-                    val sample = Math.round(height * 65534.0f)
-                    raster.setSample(x, y, 0, sample)
-                }
-            }
-            output
-        }
     }
 }
