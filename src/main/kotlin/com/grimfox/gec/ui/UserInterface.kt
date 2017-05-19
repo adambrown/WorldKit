@@ -52,6 +52,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
         }
         ui.show()
         while (!ui.shouldClose()) {
+            TextureBuilder.onDrawFrame()
             ui.handleFrameInput()
             val needsRefresh = ui.handleDragAndResize()
             if (needsRefresh) {
