@@ -1,7 +1,5 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.model.FloatArrayMatrix
-import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.util.MutableReference
@@ -9,19 +7,69 @@ import com.grimfox.gec.util.mRef
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL12.*
+import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.opengl.GL13
+import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
 import org.lwjgl.system.MemoryUtil
+import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 
 object TextureBuilder {
 
-    private val NULL_MATRIX: Matrix<Float> = FloatArrayMatrix(0)
-    private val renderQueue = ConcurrentLinkedQueue<Pair<Pair<FloatArray, IntArray>, Triple<CountDownLatch, MutableReference<Matrix<Float>>, MutableReference<Throwable?>>>>()
+    private val deadTextureQueue = ConcurrentLinkedQueue<Int>()
+
+    class TextureId(val id: Int) {
+
+        @Volatile private var free: Boolean = false
+
+        fun free() {
+            if (!free) {
+                synchronized(this) {
+                    if (!free) {
+                        free = true
+                        deadTextureQueue.add(id)
+                    }
+                }
+            }
+        }
+
+        @Suppress("unused")
+        fun finalize() {
+            free()
+        }
+    }
+
+    private class RenderValueCollector<T : Any>(val retriever: (TextureRenderer) -> T) {
+        lateinit var value: T
+
+        fun retrieve(renderer: TextureRenderer) {
+            value = retriever(renderer)
+        }
+    }
+
+    private class ExtractValueCollector<T : Any>(val retriever: () -> T) {
+        lateinit var value: T
+
+        fun retrieve() {
+            value = retriever()
+        }
+    }
+
+    private class RawValueCollector<T : Any>(val retriever: () -> T) {
+        lateinit var value: T
+
+        fun retrieve() {
+            value = retriever()
+        }
+    }
+
+    private val renderQueue = ConcurrentLinkedQueue<Pair<Pair<FloatArray, IntArray>, Triple<CountDownLatch, RenderValueCollector<*>, MutableReference<Throwable?>>>>()
+    private val extractQueue = ConcurrentLinkedQueue<Triple<CountDownLatch, ExtractValueCollector<*>, MutableReference<Throwable?>>>()
+    private val rawQueue = ConcurrentLinkedQueue<Triple<CountDownLatch, RawValueCollector<*>, MutableReference<Throwable?>>>()
     private val mvpMatrixUniformDynamicGeometry = ShaderUniform("modelViewProjectionMatrix")
     private val positionAttributeDynamicGeometry = ShaderAttribute("position")
     private val mvpMatrix = Matrix4f()
@@ -44,11 +92,10 @@ object TextureBuilder {
         textureRenderer = TextureRenderer(4096, 4096)
     }
 
-    fun renderTriangles(input: Pair<FloatArray, IntArray>): Matrix<Float> {
+    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, collector: RenderValueCollector<T>): T {
         val latch = CountDownLatch(1)
-        val returnReference = mRef(NULL_MATRIX)
         val throwableReference = mRef(null as Throwable?)
-        val result = Triple(latch, returnReference, throwableReference)
+        val result = Triple(latch, collector, throwableReference)
         renderQueue.add(input to result)
         while (latch.count > 0) {
             latch.await()
@@ -57,41 +104,222 @@ object TextureBuilder {
         if (throwable != null) {
             throw throwable
         }
-        val returnValue = returnReference.value
-        if (returnValue === NULL_MATRIX) {
-            throw RuntimeException("Failed to render triangles.")
-        }
-        return returnValue
+        return collector.value
     }
 
-    fun renderTriangles(vertices: FloatArray, indices: IntArray): Matrix<Float> {
-        return renderTriangles(vertices to indices)
+    fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>): FloatArray {
+        return renderTrianglesInternal(input, RenderValueCollector { it.readRedTextureFloat() })
+    }
+
+    fun renderTrianglesRedFloat(vertices: FloatArray, indices: IntArray): FloatArray {
+        return renderTrianglesRedFloat(vertices to indices)
+    }
+
+    fun renderTrianglesRedShort(input: Pair<FloatArray, IntArray>): ShortArray {
+        return renderTrianglesInternal(input, RenderValueCollector { it.readRedTextureShort() })
+    }
+
+    fun renderTrianglesRedShort(vertices: FloatArray, indices: IntArray): ShortArray {
+        return renderTrianglesRedShort(vertices to indices)
+    }
+
+    fun renderTrianglesRedByte(input: Pair<FloatArray, IntArray>): ByteBuffer {
+        return renderTrianglesInternal(input, RenderValueCollector { it.readRedTextureByte() })
+    }
+
+    fun renderTrianglesRedByte(vertices: FloatArray, indices: IntArray): ByteBuffer {
+        return renderTrianglesRedByte(vertices to indices)
+    }
+
+    fun renderTrianglesRgbaByte(input: Pair<FloatArray, IntArray>): ByteBuffer {
+        return renderTrianglesInternal(input, RenderValueCollector { it.readRgbaTextureByte() })
+    }
+
+    fun renderTrianglesRgbaByte(vertices: FloatArray, indices: IntArray): ByteBuffer {
+        return renderTrianglesRgbaByte(vertices to indices)
+    }
+
+
+    fun renderTrianglesTexRedFloat(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesInternal(input, RenderValueCollector { it.newRedTextureFloat(minFilter, magFilter) })
+    }
+
+    fun renderTrianglesTexRedFloat(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesTexRedFloat(vertices to indices, minFilter, magFilter)
+    }
+
+    fun renderTrianglesTexRedShort(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesInternal(input, RenderValueCollector { it.newRedTextureShort(minFilter, magFilter) })
+    }
+
+    fun renderTrianglesTexRedShort(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesTexRedShort(vertices to indices, minFilter, magFilter)
+    }
+
+    fun renderTrianglesTexRedByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesInternal(input, RenderValueCollector { it.newRedTextureByte(minFilter, magFilter) })
+    }
+
+    fun renderTrianglesTexRedByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesTexRedByte(vertices to indices, minFilter, magFilter)
+    }
+
+    fun renderTrianglesTexRgbaByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesInternal(input, RenderValueCollector { it.newRgbaTextureByte(minFilter, magFilter) })
+    }
+
+    fun renderTrianglesTexRgbaByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
+        return renderTrianglesTexRgbaByte(vertices to indices, minFilter, magFilter)
+    }
+
+    private fun <T : Any> extractTextureInternal(collector: ExtractValueCollector<T>): T {
+        val latch = CountDownLatch(1)
+        val throwableReference = mRef(null as Throwable?)
+        extractQueue.add(Triple(latch, collector, throwableReference))
+        while (latch.count > 0) {
+            latch.await()
+        }
+        val throwable = throwableReference.value
+        if (throwable != null) {
+            throw throwable
+        }
+        return collector.value
+    }
+
+    fun extractTextureRedFloat(textureId: TextureId, width: Int): FloatArray {
+        return extractTextureInternal(ExtractValueCollector {
+            val matrix = FloatArray(width * width)
+            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, matrix)
+            matrix
+        })
+    }
+
+    fun extractTextureRedShort(textureId: TextureId, width: Int): ShortArray {
+        return extractTextureInternal(ExtractValueCollector {
+            val matrix = ShortArray(width * width)
+            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_SHORT, matrix)
+            matrix
+        })
+    }
+
+    fun extractTextureRedByte(textureId: TextureId, width: Int): ByteBuffer {
+        return extractTextureInternal(ExtractValueCollector {
+            val matrix = BufferUtils.createByteBuffer(width * width)
+            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_BYTE, matrix)
+            matrix
+        })
+    }
+
+    fun extractTextureRgbaByte(textureId: TextureId, width: Int): ByteBuffer {
+        return extractTextureInternal(ExtractValueCollector {
+            val matrix = BufferUtils.createByteBuffer(width * width)
+            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, matrix)
+            matrix
+        })
+    }
+
+    private fun <T : Any> buildTextureInternal(collector: RawValueCollector<T>): T {
+        val latch = CountDownLatch(1)
+        val throwableReference = mRef(null as Throwable?)
+        rawQueue.add(Triple(latch, collector, throwableReference))
+        while (latch.count > 0) {
+            latch.await()
+        }
+        val throwable = throwableReference.value
+        if (throwable != null) {
+            throw throwable
+        }
+        return collector.value
+    }
+
+    fun buildTextureRedFloat(data: FloatArray, width: Int, minFilter: Int, magFilter: Int): TextureId {
+        return extractTextureInternal(ExtractValueCollector {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, width, 0, GL_RED, GL_FLOAT, data)
+            glBindTexture(GL_TEXTURE_2D, 0)
+            TextureId(newTexId)
+        })
+    }
+
+    fun buildTextureRedShort(data: ShortArray, width: Int, minFilter: Int, magFilter: Int): TextureId {
+        return extractTextureInternal(ExtractValueCollector {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 2)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, width, width, 0, GL_RED, GL_UNSIGNED_SHORT, data)
+            glBindTexture(GL_TEXTURE_2D, 0)
+            TextureId(newTexId)
+        })
     }
 
     fun onDrawFrame() {
-        var poll = renderQueue.poll()
-        while (poll != null) {
+        var pollDeadTex = deadTextureQueue.poll()
+        val deadTexIds = ArrayList<Int>()
+        while (pollDeadTex != null) {
+            deadTexIds.add(pollDeadTex)
+            pollDeadTex = deadTextureQueue.poll()
+        }
+        if (deadTexIds.isNotEmpty()) {
+            glDeleteTextures(deadTexIds.toIntArray())
+        }
+        var pollRender = renderQueue.poll()
+        while (pollRender != null) {
             try {
                 mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 2.0f)
-
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
+                glDisable(GL_MULTISAMPLE)
                 glEnable(GL_DEPTH_TEST)
                 glDisable(GL_SCISSOR_TEST)
                 glDisable(GL13.GL_MULTISAMPLE)
-
                 textureRenderer.bind()
                 glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-                drawTriangles(poll.first)
-                poll.second.second.value = textureRenderer.readTexture()
+                drawTriangles(pollRender.first)
+                pollRender.second.second.retrieve(textureRenderer)
                 textureRenderer.unbind()
             } catch (t: Throwable) {
-                poll.second.third.value = t
+                pollRender.second.third.value = t
             } finally {
-                poll.second.first.countDown()
+                pollRender.second.first.countDown()
             }
-            poll = renderQueue.poll()
+            pollRender = renderQueue.poll()
+        }
+        var pollExtract = extractQueue.poll()
+        while (pollExtract != null) {
+            try {
+                pollExtract.second.retrieve()
+            } catch (t: Throwable) {
+                pollExtract.third.value = t
+            } finally {
+                pollExtract.first.countDown()
+            }
+            pollExtract = extractQueue.poll()
+        }
+        var pollRaw = rawQueue.poll()
+        while (pollRaw != null) {
+            try {
+                pollRaw.second.retrieve()
+            } catch (t: Throwable) {
+                pollRaw.third.value = t
+            } finally {
+                pollRaw.first.countDown()
+            }
+            pollRaw = rawQueue.poll()
         }
     }
 
@@ -114,14 +342,13 @@ object TextureBuilder {
             glBindRenderbuffer(GL_RENDERBUFFER, depthBufferId)
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height)
 
-            glEnable(GL_TEXTURE_2D)
             renderTextureId = glGenTextures()
             glBindTexture(GL_TEXTURE_2D, renderTextureId)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, width, height, 0, GL_RED, GL_UNSIGNED_SHORT, MemoryUtil.NULL)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, MemoryUtil.NULL)
 
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBufferId)
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId, 0)
@@ -143,13 +370,87 @@ object TextureBuilder {
             glBindFramebuffer(GL_FRAMEBUFFER, 0)
         }
 
-        fun readTexture(): Matrix<Float> {
-            val matrix = FloatArrayMatrix(width)
-            glReadBuffer(GL_COLOR_ATTACHMENT0)
-            glReadPixels(0, 0, width, height, GL_RED, GL_FLOAT, matrix.array)
+        fun readRedTextureFloat(): FloatArray {
+            val matrix = FloatArray(width * height)
+            glBindTexture(GL_TEXTURE_2D, renderTextureId)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, matrix)
             return matrix
         }
 
+        fun newRedTextureFloat(minFilter: Int, magFilter: Int): TextureId {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, MemoryUtil.NULL)
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
+            return TextureId(newTexId)
+        }
+
+        fun readRedTextureShort(): ShortArray {
+            val matrix = ShortArray(width * height)
+            glBindTexture(GL_TEXTURE_2D, renderTextureId)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_SHORT, matrix)
+            return matrix
+        }
+
+        fun newRedTextureShort(minFilter: Int, magFilter: Int): TextureId {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_SHORT, MemoryUtil.NULL)
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
+            return TextureId(newTexId)
+        }
+
+        fun readRedTextureByte(): ByteBuffer {
+            val matrix = BufferUtils.createByteBuffer(width * height)
+            glBindTexture(GL_TEXTURE_2D, renderTextureId)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_BYTE, matrix)
+            return matrix
+        }
+
+        fun newRedTextureByte(minFilter: Int, magFilter: Int): TextureId {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, MemoryUtil.NULL)
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
+            return TextureId(newTexId)
+        }
+
+        fun readRgbaTextureByte(): ByteBuffer {
+            val matrix = BufferUtils.createByteBuffer(width * height)
+            glBindTexture(GL_TEXTURE_2D, renderTextureId)
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, matrix)
+            return matrix
+        }
+
+        fun newRgbaTextureByte(minFilter: Int, magFilter: Int): TextureId {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, MemoryUtil.NULL)
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
+            return TextureId(newTexId)
+        }
+
+        @Suppress("unused")
         fun finalize() {
             glDeleteFramebuffers(fboId)
             glDeleteRenderbuffers(depthBufferId)
@@ -157,7 +458,7 @@ object TextureBuilder {
         }
     }
 
-    private class DynamicHeightGeometry(positionAttribute: ShaderAttribute, heightMapVertexData: FloatArray, heightMapIndexData: IntArray, var vertexCount: Int = heightMapIndexData.size) {
+    private class DynamicHeightGeometry(positionAttribute: ShaderAttribute, heightMapVertexData: FloatArray, heightMapIndexData: IntArray) {
 
         var vao = 0
         var vbo = 0
@@ -211,6 +512,7 @@ object TextureBuilder {
             }
         }
 
+        @Suppress("unused")
         fun finalize() {
             glDeleteBuffers(vbo)
             glDeleteBuffers(ibo)

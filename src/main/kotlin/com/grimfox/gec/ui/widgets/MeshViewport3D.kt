@@ -1,22 +1,22 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.Reference
 import org.joml.*
 import org.lwjgl.BufferUtils
-import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
+import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
-import java.awt.image.BufferedImage
-import java.lang.Math.*
+import java.lang.Math.round
+import java.lang.Math.sqrt
 
 class MeshViewport3D(
         val resetView: MutableReference<Boolean>,
@@ -84,9 +84,7 @@ class MeshViewport3D(
     private val heightScaleUniformWater = ShaderUniform("heightScale")
 
     private val mvpMatrixUniformImage = ShaderUniform("modelViewProjectionMatrix")
-//    private val imageTextureUniform = ShaderUniform("imageTexture")
-    private val graphTextureUniform = ShaderUniform("graphTexture")
-    private val maskTextureUniform = ShaderUniform("maskTexture")
+    private val regionTextureUniform = ShaderUniform("regionTexture")
 
     private val positionAttribute = ShaderAttribute("position")
     private val uvAttribute = ShaderAttribute("uv")
@@ -97,20 +95,13 @@ class MeshViewport3D(
     private val positionAttributeImage = ShaderAttribute("position")
     private val uvAttributeImage = ShaderAttribute("uv")
 
+    private val textureLock = Object()
     private var hasTexture = false
-    private var textureId = -1
+    private var textureId: TextureId? = null
     private var textureResolution = 0
-    private var textureToLoad: BufferedImage? = null
-    private var textureIdToDelete: Int? = null
-    private var textureMagFilter: Int = GL_LINEAR
 
-    private var hasGraph = false
-    private var graphTextureId = -1
-    private var maskTextureId = -1
-    private var graphTextureIdToDelete: Int? = null
-    private var maskTextureIdToDelete: Int? = null
-    private var graphToLoad: Graph? = null
-    private var maskToLoad: Matrix<Byte>? = null
+    private var hasRegions = false
+    private var regionTextureId: TextureId? = null
 
     private val background = NVGColor.create().set(30, 30, 30)
 
@@ -166,12 +157,8 @@ class MeshViewport3D(
         val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
         val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
 
-        val imageVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/image-plane.vert"))
-        val imageFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/image-plane.frag"))
-
-//        val (texId, texWidth) = loadTexture2D(GL_NEAREST, GL_LINEAR, "/textures/height-map.png", false, true)
-//        textureId = texId
-//        textureResolution = texWidth
+        val imageVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/regions.vert"))
+        val imageFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/regions.frag"))
 
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
@@ -186,7 +173,7 @@ class MeshViewport3D(
         imagePlaneProgram = createAndLinkProgram(
                 listOf(imageVertexShader, imageFragmentShader),
                 listOf(positionAttributeImage, uvAttributeImage),
-                listOf(mvpMatrixUniformImage, graphTextureUniform, maskTextureUniform))
+                listOf(mvpMatrixUniformImage, regionTextureUniform))
 
         heightMap = HexGrid(2560.0f, 1024, positionAttribute, uvAttribute, true)
 
@@ -199,34 +186,18 @@ class MeshViewport3D(
         modelMatrix.translate(translation)
     }
 
-    fun setTexture(bufferedImage: BufferedImage, magFilter: Int = GL_LINEAR) {
-        synchronized(hasTexture) {
-            if (hasTexture) {
-                hasTexture = false
-                textureIdToDelete = textureId
-                textureId = -1
-                textureResolution = 0
-            }
-            textureToLoad = bufferedImage
-            textureMagFilter = magFilter
+    fun setTexture(newTexture: TextureId, resolution: Int) {
+        synchronized(textureLock) {
+            hasTexture = true
+            textureId = newTexture
+            textureResolution = resolution
         }
     }
 
-    fun setGraph(pair: Pair<Graph, Matrix<Byte>>) {
-        setGraph(pair.first, pair.second)
-    }
-
-    fun setGraph(graph: Graph, mask: Matrix<Byte>) {
-        synchronized(hasTexture) {
-            if (hasGraph) {
-                hasGraph = false
-                graphTextureIdToDelete = graphTextureId
-                maskTextureIdToDelete = maskTextureId
-                graphTextureId = -1
-                maskTextureId = -1
-            }
-            graphToLoad = graph
-            maskToLoad = mask
+    fun setRegions(textureId: TextureId) {
+        synchronized(textureLock) {
+            hasRegions = true
+            regionTextureId = textureId
         }
     }
 
@@ -296,10 +267,8 @@ class MeshViewport3D(
         if (width < 1 || height < 1) {
             return
         }
-        synchronized(hasTexture) {
-            handleNewHeightMapLoad()
-            handleNewGraphLoad()
-            if (hasGraph) {
+        synchronized(textureLock) {
+            if (hasRegions) {
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
@@ -360,9 +329,7 @@ class MeshViewport3D(
         if (width < 1 || height < 1) {
             return
         }
-        synchronized(hasTexture) {
-            handleNewHeightMapLoad()
-            handleNewGraphLoad()
+        synchronized(textureLock) {
             if (hasTexture) {
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
@@ -470,44 +437,6 @@ class MeshViewport3D(
         }
     }
 
-    private fun handleNewHeightMapLoad() {
-        val texToLoad = textureToLoad
-        if (texToLoad != null) {
-            val texToDelete = textureIdToDelete
-            if (texToDelete != null) {
-                glDeleteTextures(texToDelete)
-                textureIdToDelete = null
-            }
-            val (texId, texWidth) = loadTexture2D(GL_NEAREST, textureMagFilter, texToLoad, false, true)
-            textureId = texId
-            textureResolution = texWidth
-            hasTexture = true
-            textureToLoad = null
-        }
-    }
-
-    private fun handleNewGraphLoad() {
-        val graphToLoadInternal = graphToLoad
-        val maskToLoadInternal = maskToLoad
-        if (graphToLoadInternal != null && maskToLoadInternal != null) {
-            var texToDelete = graphTextureIdToDelete
-            if (texToDelete != null) {
-                glDeleteTextures(texToDelete)
-                graphTextureIdToDelete = null
-            }
-            texToDelete = maskTextureIdToDelete
-            if (texToDelete != null) {
-                glDeleteTextures(texToDelete)
-            }
-            val (graphTexId) = loadGraphPointsAsTexture(graphToLoadInternal)
-            graphTextureId = graphTexId
-            val (maskTexId) = loadRegionMaskAsTexture(maskToLoadInternal)
-            maskTextureId = maskTexId
-            hasGraph = true
-            graphToLoad = null
-        }
-    }
-
     private fun drawHeightMap() {
         glUseProgram(heightMapProgram)
         glUniformMatrix4fv(mvMatrixUniform.location, false, mvMatrix.get(0, floatBuffer))
@@ -528,7 +457,7 @@ class MeshViewport3D(
         glUniform1f(uvScaleUniform.location, heightMap.width / textureResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, textureId)
+        glBindTexture(GL_TEXTURE_2D, textureId?.id ?: -1)
         heightMap.render()
     }
 
@@ -550,12 +479,9 @@ class MeshViewport3D(
     private fun drawImagePlane() {
         glUseProgram(imagePlaneProgram)
         glUniformMatrix4fv(mvpMatrixUniformImage.location, false, mvpMatrix.get(0, floatBuffer))
-        glUniform1i(graphTextureUniform.location, 0)
+        glUniform1i(regionTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, graphTextureId)
-        glUniform1i(maskTextureUniform.location, 1)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, maskTextureId)
+        glBindTexture(GL_TEXTURE_2D, regionTextureId?.id ?: -1)
         imagePlane.render()
     }
 
@@ -621,6 +547,7 @@ class MeshViewport3D(
             }
         }
 
+        @Suppress("unused")
         fun finalize() {
             glDeleteVertexArrays(vao)
         }
@@ -836,6 +763,7 @@ class MeshViewport3D(
             }
         }
 
+        @Suppress("unused")
         fun finalize() {
             glDeleteVertexArrays(vao)
         }

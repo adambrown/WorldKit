@@ -8,15 +8,23 @@ import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.opengl.loadTexture2D
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.LOG
+import com.grimfox.gec.ui.layout
+import com.grimfox.gec.ui.set
+import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.*
+import com.grimfox.gec.util.Rendering.renderRegionBorders
+import com.grimfox.gec.util.Rendering.renderRegions
+import com.grimfox.gec.util.clamp
+import com.grimfox.gec.util.mRef
+import com.grimfox.gec.util.ref
 import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
@@ -29,8 +37,37 @@ import java.net.URISyntaxException
 import java.net.URL
 import java.util.*
 import java.util.concurrent.Executors
+import java.util.concurrent.locks.ReentrantLock
 
 object MainUi {
+
+    private val threadCount = Runtime.getRuntime().availableProcessors()
+
+    private class CurrentState(val parameters: ParameterSet,
+                               val graph: Graph,
+                               val regionMask: Matrix<Byte>,
+                               val regionTextureId: TextureId,
+                               val regionBorderTextureId: TextureId) {
+
+        @Volatile private var free: Boolean = false
+
+        fun free() {
+            if (!free) {
+                synchronized(this) {
+                    if (!free) {
+                        free = true
+                        regionTextureId.free()
+                        regionBorderTextureId.free()
+                    }
+                }
+            }
+        }
+
+        @Suppress("unused")
+        fun finalize() {
+            free()
+        }
+    }
 
     @JvmStatic fun main(vararg args: String) {
         val executor = Executors.newWorkStealingPool()
@@ -424,7 +461,7 @@ object MainUi {
                                         height = -2.0f
                                         block {
                                             hSpacer(MEDIUM_SPACER_SIZE)
-                                            val currentState = ref<Triple<ParameterSet, Graph, Matrix<Byte>>?>(null)
+                                            val currentState = ref<CurrentState?>(null)
                                             block {
                                                 hSizing = GROW
                                                 layout = HORIZONTAL
@@ -499,77 +536,148 @@ object MainUi {
 //                                                vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
 //                                                vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                                 vSpacer(MEDIUM_ROW_HEIGHT)
+
+                                                val generateLock = ReentrantLock()
+                                                var generating = false
+
+                                                var generateButton = NO_BLOCK
+                                                var generateLabel = NO_BLOCK
+                                                var generateRandomButton = NO_BLOCK
+                                                var generateRandomLabel = NO_BLOCK
+                                                var buildButton = NO_BLOCK
+                                                var buildLabel = NO_BLOCK
+
+                                                var backButton = NO_BLOCK
+                                                var forwardButton = NO_BLOCK
+                                                var backLabel = NO_BLOCK
+                                                var forwardLabel = NO_BLOCK
+
+                                                fun disableGenerateButtons() {
+                                                    generateButton.isVisible = false
+                                                    generateLabel.isVisible = true
+                                                    generateRandomButton.isVisible = false
+                                                    generateRandomLabel.isVisible = true
+                                                    buildButton.isVisible = false
+                                                    buildLabel.isVisible = true
+                                                    backButton.isVisible = false
+                                                    backLabel.isVisible = true
+                                                    forwardButton.isVisible = false
+                                                    forwardLabel.isVisible = true
+                                                }
+
+                                                fun enableGenerateButtons() {
+                                                    generateLabel.isVisible = false
+                                                    generateButton.isVisible = true
+                                                    generateRandomLabel.isVisible = false
+                                                    generateRandomButton.isVisible = true
+                                                    buildLabel.isVisible = false
+                                                    buildButton.isVisible = true
+                                                    backButton.isVisible = historyBackQueue.size != 0
+                                                    backLabel.isVisible = historyBackQueue.size == 0
+                                                    forwardButton.isVisible = historyForwardQueue.size != 0
+                                                    forwardLabel.isVisible = historyForwardQueue.size == 0
+                                                }
+
+                                                fun doGeneration(doWork: () -> Unit) {
+                                                    if (generateLock.tryLock()) {
+                                                        try {
+                                                            if (!generating) {
+                                                                generating = true
+                                                                try {
+                                                                    disableGenerateButtons()
+                                                                    try {
+                                                                        doWork()
+                                                                    } finally {
+                                                                        enableGenerateButtons()
+                                                                    }
+                                                                } finally {
+                                                                    generating = false
+                                                                }
+                                                            }
+                                                        } finally {
+                                                            generateLock.unlock()
+                                                        }
+                                                    }
+                                                }
+
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
-                                                    var backButton = NO_BLOCK
-                                                    var forwardButton = NO_BLOCK
-                                                    var backLabel = NO_BLOCK
-                                                    var forwardLabel = NO_BLOCK
-                                                    button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        val parameters = ParameterSet(
-                                                                seed = seed.value,
-                                                                regionCount = regions.value,
-                                                                stride = stride.value,
-                                                                islandDesire =  islands.value,
-                                                                regionPoints = startPoints.value,
-                                                                initialReduction = reduction.value,
-                                                                connectedness = connectedness.value,
-                                                                regionSize = regionSize.value,
-                                                                maxRegionTries = iterations.value * 10,
-                                                                maxIslandTries = iterations.value * 100)
-                                                        val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                        meshViewport.setGraph(resultPair)
-                                                        currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
-                                                        imageModeOn.value = true
-                                                        val historyLast = historyCurrent.value
-                                                        if (historyLast != null) {
-                                                            if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                                                historyBackQueue.push(historyLast.copy())
+
+                                                    generateButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        doGeneration {
+                                                            val parameters = ParameterSet(
+                                                                    seed = seed.value,
+                                                                    regionCount = regions.value,
+                                                                    stride = stride.value,
+                                                                    islandDesire = islands.value,
+                                                                    regionPoints = startPoints.value,
+                                                                    initialReduction = reduction.value,
+                                                                    connectedness = connectedness.value,
+                                                                    regionSize = regionSize.value,
+                                                                    maxRegionTries = iterations.value * 10,
+                                                                    maxIslandTries = iterations.value * 100)
+                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                            val regionTextureId = renderRegions(resultPair.first, resultPair.second)
+                                                            meshViewport.setRegions(regionTextureId)
+                                                            val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
+                                                            val lastState = currentState.value
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                            lastState?.free()
+                                                            imageModeOn.value = true
+                                                            val historyLast = historyCurrent.value
+                                                            if (historyLast != null) {
+                                                                if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
+                                                                    historyBackQueue.push(historyLast.copy())
+                                                                }
                                                             }
+                                                            historyForwardQueue.clear()
+                                                            historyCurrent.value = parameters.copy()
                                                         }
-                                                        historyForwardQueue.clear()
-                                                        historyCurrent.value = parameters.copy()
-                                                        backButton.isVisible = historyBackQueue.size != 0
-                                                        backLabel.isVisible = historyBackQueue.size == 0
-                                                        forwardButton.isVisible = historyForwardQueue.size != 0
-                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
                                                     }
+                                                    generateLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
+                                                    generateLabel.isMouseAware = false
+                                                    generateLabel.isVisible = false
                                                     hSpacer(SMALL_SPACER_SIZE)
-                                                    button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        val randomSeed = random.nextLong()
-                                                        val randomString = randomSeed.toString()
-                                                        if (randomString.length > 18) {
-                                                            seed.value = randomString.substring(0, 18).toLong()
-                                                        } else {
-                                                            seed.value = randomSeed
-                                                        }
-                                                        val parameters = ParameterSet(
-                                                                seed = seed.value,
-                                                                regionCount = regions.value,
-                                                                stride = stride.value,
-                                                                islandDesire =  islands.value,
-                                                                regionPoints = startPoints.value,
-                                                                initialReduction = reduction.value,
-                                                                connectedness = connectedness.value,
-                                                                regionSize = regionSize.value,
-                                                                maxRegionTries = iterations.value * 10,
-                                                                maxIslandTries = iterations.value * 100)
-                                                        val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                        meshViewport.setGraph(resultPair)
-                                                        currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
-                                                        imageModeOn.value = true
-                                                        val historyLast = historyCurrent.value
-                                                        if (historyLast != null) {
-                                                            if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                                                historyBackQueue.push(historyLast.copy())
+                                                    generateRandomButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        doGeneration {
+                                                            val randomSeed = random.nextLong()
+                                                            val randomString = randomSeed.toString()
+                                                            if (randomString.length > 18) {
+                                                                seed.value = randomString.substring(0, 18).toLong()
+                                                            } else {
+                                                                seed.value = randomSeed
                                                             }
+                                                            val parameters = ParameterSet(
+                                                                    seed = seed.value,
+                                                                    regionCount = regions.value,
+                                                                    stride = stride.value,
+                                                                    islandDesire = islands.value,
+                                                                    regionPoints = startPoints.value,
+                                                                    initialReduction = reduction.value,
+                                                                    connectedness = connectedness.value,
+                                                                    regionSize = regionSize.value,
+                                                                    maxRegionTries = iterations.value * 10,
+                                                                    maxIslandTries = iterations.value * 100)
+                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                            val regionTextureId = renderRegions(resultPair.first, resultPair.second)
+                                                            meshViewport.setRegions(regionTextureId)
+                                                            val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
+                                                            val lastState = currentState.value
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                            lastState?.free()
+                                                            imageModeOn.value = true
+                                                            val historyLast = historyCurrent.value
+                                                            if (historyLast != null) {
+                                                                if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
+                                                                    historyBackQueue.push(historyLast.copy())
+                                                                }
+                                                            }
+                                                            historyForwardQueue.clear()
+                                                            historyCurrent.value = parameters.copy()
                                                         }
-                                                        historyForwardQueue.clear()
-                                                        historyCurrent.value = parameters.copy()
-                                                        backButton.isVisible = historyBackQueue.size != 0
-                                                        backLabel.isVisible = historyBackQueue.size == 0
-                                                        forwardButton.isVisible = historyForwardQueue.size != 0
-                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
                                                     }
+                                                    generateRandomLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
+                                                    generateRandomLabel.isMouseAware = false
+                                                    generateRandomLabel.isVisible = false
                                                     hSpacer(SMALL_SPACER_SIZE)
                                                     fun syncParameterValues(parameters: ParameterSet) {
                                                         val randomSeed = parameters.seed
@@ -590,45 +698,49 @@ object MainUi {
                                                         iterations.value = parameters.maxIslandTries / 100
                                                     }
                                                     backButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        val parameters = historyBackQueue.pop()
-                                                        if (parameters != null) {
-                                                            val historyLast = historyCurrent.value
-                                                            if (historyLast != null) {
-                                                                historyForwardQueue.push(historyLast.copy())
+                                                        doGeneration {
+                                                            val parameters = historyBackQueue.pop()
+                                                            if (parameters != null) {
+                                                                val historyLast = historyCurrent.value
+                                                                if (historyLast != null) {
+                                                                    historyForwardQueue.push(historyLast.copy())
+                                                                }
+                                                                syncParameterValues(parameters)
+                                                                val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                                val regionTextureId = renderRegions(resultPair.first, resultPair.second)
+                                                                meshViewport.setRegions(regionTextureId)
+                                                                val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
+                                                                val lastState = currentState.value
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                                lastState?.free()
+                                                                imageModeOn.value = true
+                                                                historyCurrent.value = parameters.copy()
                                                             }
-                                                            syncParameterValues(parameters)
-                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                            meshViewport.setGraph(resultPair)
-                                                            currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
-                                                            imageModeOn.value = true
-                                                            historyCurrent.value = parameters.copy()
                                                         }
-                                                        backButton.isVisible = historyBackQueue.size != 0
-                                                        backLabel.isVisible = historyBackQueue.size == 0
-                                                        forwardButton.isVisible = historyForwardQueue.size != 0
-                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
                                                     }
                                                     backLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
                                                     backLabel.isMouseAware = false
                                                     hSpacer(SMALL_SPACER_SIZE)
                                                     forwardButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        val parameters = historyForwardQueue.pop()
-                                                        if (parameters != null) {
-                                                            val historyLast = historyCurrent.value
-                                                            if (historyLast != null) {
-                                                                historyBackQueue.push(historyLast.copy())
+                                                        doGeneration {
+                                                            val parameters = historyForwardQueue.pop()
+                                                            if (parameters != null) {
+                                                                val historyLast = historyCurrent.value
+                                                                if (historyLast != null) {
+                                                                    historyBackQueue.push(historyLast.copy())
+                                                                }
+                                                                syncParameterValues(parameters)
+                                                                val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
+                                                                val regionTextureId = renderRegions(resultPair.first, resultPair.second)
+                                                                meshViewport.setRegions(regionTextureId)
+                                                                val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
+                                                                val lastState = currentState.value
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                                lastState?.free()
+                                                                imageModeOn.value = true
+                                                                historyCurrent.value = parameters.copy()
                                                             }
-                                                            syncParameterValues(parameters)
-                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                            meshViewport.setGraph(resultPair)
-                                                            currentState.value = Triple(parameters.copy(), resultPair.first, resultPair.second)
-                                                            imageModeOn.value = true
-                                                            historyCurrent.value = parameters.copy()
                                                         }
-                                                        backButton.isVisible = historyBackQueue.size != 0
-                                                        backLabel.isVisible = historyBackQueue.size == 0
-                                                        forwardButton.isVisible = historyForwardQueue.size != 0
-                                                        forwardLabel.isVisible = historyForwardQueue.size == 0
                                                     }
                                                     forwardLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
                                                     forwardLabel.isMouseAware = false
@@ -636,14 +748,19 @@ object MainUi {
                                                     forwardButton.isVisible = false
                                                 }
                                                 vButtonRow(LARGE_ROW_HEIGHT) {
-                                                    button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
-                                                        val currentStateValue = currentState.value
-                                                        if (currentStateValue != null) {
-                                                            meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.first, currentStateValue.second, currentStateValue.third, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor))
+                                                    buildButton = button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
+                                                        doGeneration {
+                                                            val currentStateValue = currentState.value
+                                                            if (currentStateValue != null) {
+                                                                meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.parameters, currentStateValue.graph, currentStateValue.regionMask, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, currentStateValue.regionTextureId, currentStateValue.regionBorderTextureId, executor), 4096)
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
-                                                            imageModeOn.value = false
+                                                                imageModeOn.value = false
+                                                            }
                                                         }
                                                     }
+                                                    buildLabel = button(text("Build mesh"), DISABLED_TEXT_BUTTON_STYLE) {}
+                                                    buildLabel.isMouseAware = false
+                                                    buildLabel.isVisible = false
                                                 }
                                             }
                                             hSpacer(MEDIUM_SPACER_SIZE)

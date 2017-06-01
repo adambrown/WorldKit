@@ -5,14 +5,20 @@ import com.grimfox.gec.biomes.Biomes.Biome
 import com.grimfox.gec.biomes.Biomes.ErosionLevel
 import com.grimfox.gec.biomes.Biomes.ErosionSettings
 import com.grimfox.gec.biomes.Biomes.RegionData
-import com.grimfox.gec.extensions.*
-import com.grimfox.gec.model.*
-import com.grimfox.gec.model.Graph.*
-import com.grimfox.gec.model.geometry.*
-import com.grimfox.gec.ui.widgets.TextureBuilder
+import com.grimfox.gec.extensions.call
+import com.grimfox.gec.extensions.join
+import com.grimfox.gec.extensions.value
+import com.grimfox.gec.model.FloatArrayMatrix
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.Graph.Vertices
+import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.ByteArrayMatrix
+import com.grimfox.gec.model.geometry.Point3F
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.gec.util.geometry.renderTriangle
-import org.joml.SimplexNoise.*
-import java.awt.image.BufferedImage
+import org.joml.SimplexNoise.noise
+import org.lwjgl.opengl.GL11.GL_LINEAR
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
@@ -55,7 +61,7 @@ object WaterFlows {
 
     class Pass(val passKey: PassKey, val id1: Int, val id2: Int, val height: Float)
 
-    fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, outputWidth: Int): BufferedImage {
+    fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, regionTextureId: TextureId, regionBorderTextureId: TextureId, executor: ExecutorService, outputWidth: Int): TextureId {
         val randomSeed = random.nextLong()
         val biomes = arrayListOf(Biomes.COASTAL_MOUNTAINS_BIOME, Biomes.MOUNTAINS_BIOME, Biomes.FOOTHILLS_BIOME, Biomes.ROLLING_HILLS_BIOME, Biomes.PLAINS_BIOME, Biomes.PLATEAU_BIOME)
 //        val biomes = arrayListOf(Biomes.PLAINS_BIOME)
@@ -100,10 +106,10 @@ object WaterFlows {
 //        }
 //        return writeHeightMap(heightMap)
 
-//        val heightMap = timeIt("rendered region borders in") {
+//        return timeIt("rendered region borders in") {
 //            renderRegionBorders(executor, inputGraph, inputMask, threadCount)
 //        }
-//        return writeHeightMap(heightMap)
+//        return regionBorderTextureId
     }
 
     private fun calculateBiomes(executor: ExecutorService, graph: Graph, regionData: RegionData, biomes: List<Biome>): Matrix<Byte> {
@@ -688,172 +694,23 @@ object WaterFlows {
         futures.forEach(Future<*>::join)
     }
 
-    fun writeHeightMap(heightMap: Matrix<Float>): BufferedImage {
-        val output = BufferedImage(heightMap.width, heightMap.width, BufferedImage.TYPE_USHORT_GRAY)
-        val raster = output.raster
+    fun writeHeightMap(heightMap: Matrix<Float>): TextureId {
+        val width = heightMap.width
+        val output = ShortArray(width * width)
         val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.max() ?: 0.0f
         println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        for (y in (0..heightMap.width - 1)) {
-            for (x in (0..heightMap.width - 1)) {
+        for (y in (0..width - 1)) {
+            for (x in (0..width - 1)) {
                 val heightValue = heightMap[x, y]
                 if (heightValue < 0.0f) {
-                    raster.setSample(x, y, 0, 0)
+                    output[y * width + x] = 0
                 } else {
-                    val sample = (((heightValue * landFactor) + waterLine) * 65535).toInt()
-                    raster.setSample(x, y, 0, sample)
+                    output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
                 }
             }
         }
-        return output
-    }
-
-    fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): Matrix<Float> {
-        val vertices = graph.vertices
-        val regions = ArrayList<LinkedHashSet<Int>>(16)
-        for (i in 0..vertices.size - 1) {
-            val maskValue = regionMask[i]
-            if (maskValue >= 1) {
-                val regionId = maskValue - 1
-                if (regions.size < maskValue) {
-                    for (j in 0..regionId - regions.size) {
-                        regions.add(LinkedHashSet<Int>())
-                    }
-                }
-                regions[regionId].add(i)
-            }
-        }
-        val borderEdgeFutures = (0..regions.size - 1).map { i ->
-            executor.call {
-                val region = regions[i]
-                val mask = LinkedHashSet<Int>()
-                for (j in (i + 1..regions.size - 1)) {
-                    mask.addAll(regions[j])
-                }
-                graph.findBorderEdges(region, mask, false, true)
-            }
-        }
-        val borderEdges = borderEdgeFutures.flatMap { it.value }
-        val vertexData = FloatArray(borderEdges.size * 60)
-        val indexData = IntArray(borderEdges.size * 60)
-        val futures = ArrayList<Future<*>>(threadCount)
-        (0..threadCount - 1).mapTo(futures) {
-            executor.submit {
-                for (i in it..borderEdges.size - 1 step threadCount) {
-                    var vertexOffset = i * 60
-                    var vertexIndex = i * 20
-                    fun buildVertex(x: Float, y: Float, z: Float): Int {
-                        vertexData[vertexOffset++] = x
-                        vertexData[vertexOffset++] = y
-                        vertexData[vertexOffset++] = z
-                        return vertexIndex++
-                    }
-                    val edge = borderEdges[i]
-                    val spoke4 = Vector2F(edge).getUnit()
-                    val perpendicular = spoke4.getPerpendicular()
-                    val spoke2 = (spoke4 + perpendicular).getUnit()
-                    val spoke1 = (perpendicular + spoke2).getUnit()
-                    val spoke3 = (spoke4 + spoke2).getUnit()
-                    val spoke5 = spoke1.getPerpendicular()
-                    val spoke6 = spoke2.getPerpendicular()
-                    val spoke7 = spoke3.getPerpendicular()
-                    val p1 = buildVertex(edge.a.x, edge.a.y, 1.0f)
-                    val p2 = buildVertex(edge.b.x, edge.b.y, 1.0f)
-                    val p32d = edge.b + perpendicular
-                    val p3 = buildVertex(p32d.x, p32d.y, 0.0f)
-                    val p42d = edge.a + perpendicular
-                    val p4 = buildVertex(p42d.x, p42d.y, 0.0f)
-                    val p52d = edge.a - perpendicular
-                    val p5 = buildVertex(p52d.x, p52d.y, 0.0f)
-                    val p62d = edge.b - perpendicular
-                    val p6 = buildVertex(p62d.x, p62d.y, 0.0f)
-                    val p72d = edge.a + spoke7
-                    val p7 = buildVertex(p72d.x, p72d.y, 0.0f)
-                    val p82d = edge.a + spoke6
-                    val p8 = buildVertex(p82d.x, p82d.y, 0.0f)
-                    val p92d = edge.a + spoke5
-                    val p9 = buildVertex(p92d.x, p92d.y, 0.0f)
-                    val p102d = edge.a - spoke4
-                    val p10 = buildVertex(p102d.x, p102d.y, 0.0f)
-                    val p112d = edge.a - spoke3
-                    val p11 = buildVertex(p112d.x, p112d.y, 0.0f)
-                    val p122d = edge.a - spoke2
-                    val p12 = buildVertex(p122d.x, p122d.y, 0.0f)
-                    val p132d = edge.a - spoke1
-                    val p13 = buildVertex(p132d.x, p132d.y, 0.0f)
-                    val p142d = edge.b - spoke7
-                    val p14 = buildVertex(p142d.x, p142d.y, 0.0f)
-                    val p152d = edge.b - spoke6
-                    val p15 = buildVertex(p152d.x, p152d.y, 0.0f)
-                    val p162d = edge.b - spoke5
-                    val p16 = buildVertex(p162d.x, p162d.y, 0.0f)
-                    val p172d = edge.b + spoke4
-                    val p17 = buildVertex(p172d.x, p172d.y, 0.0f)
-                    val p182d = edge.b + spoke3
-                    val p18 = buildVertex(p182d.x, p182d.y, 0.0f)
-                    val p192d = edge.b + spoke2
-                    val p19 = buildVertex(p192d.x, p192d.y, 0.0f)
-                    val p202d = edge.b + spoke1
-                    val p20 = buildVertex(p202d.x, p202d.y, 0.0f)
-
-                    var indexOffset = i * 60
-                    fun buildTriangle(v1: Int, v2: Int, v3: Int) {
-                        indexData[indexOffset++] = v1
-                        indexData[indexOffset++] = v3
-                        indexData[indexOffset++] = v2
-                    }
-
-                    buildTriangle(p1, p2, p3)
-                    buildTriangle(p3, p4, p1)
-                    buildTriangle(p1, p5, p6)
-                    buildTriangle(p6, p2, p1)
-
-                    buildTriangle(p1, p4, p7)
-                    buildTriangle(p7, p8, p1)
-                    buildTriangle(p1, p8, p9)
-                    buildTriangle(p9, p10, p1)
-                    buildTriangle(p1, p10, p11)
-                    buildTriangle(p11, p12, p1)
-                    buildTriangle(p1, p12, p13)
-                    buildTriangle(p13, p5, p1)
-
-                    buildTriangle(p2, p6, p14)
-                    buildTriangle(p14, p15, p2)
-                    buildTriangle(p2, p15, p16)
-                    buildTriangle(p16, p17, p2)
-                    buildTriangle(p2, p17, p18)
-                    buildTriangle(p18, p19, p2)
-                    buildTriangle(p2, p19, p20)
-                    buildTriangle(p20, p3, p2)
-                }
-            }
-        }
-        return TextureBuilder.renderTriangles(vertexData, indexData)
-    }
-
-    fun renderRegions(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, output: Matrix<Float>, threadCount: Int) {
-        val futures = ArrayList<Future<*>>(threadCount)
-        val vertices = graph.vertices
-        (0..threadCount - 1).mapTo(futures) {
-            executor.submit {
-                for (id in it..vertices.size - 1 step threadCount) {
-                    val region = regionMask[id].toFloat()
-                    val vertex = vertices[id]
-                    val cell = vertex.cell
-                    val a = vertex.point
-                    val pa = Point3F(a.x, a.y, region)
-                    val border = cell.borderEdges
-                    border.forEach { edge ->
-                        val b = edge.a
-                        val pb = Point3F(b.x, b.y, region)
-                        val c = edge.b
-                        val pc = Point3F(c.x, c.y, region)
-                        renderTriangle(pa, pc, pb, output)
-                    }
-                }
-            }
-        }
-        futures.forEach(Future<*>::join)
+        return buildTextureRedShort(output, width, GL_LINEAR, GL_LINEAR)
     }
 }

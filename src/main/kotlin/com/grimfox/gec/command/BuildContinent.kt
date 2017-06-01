@@ -9,6 +9,7 @@ import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertex
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.Coastline.applyMask
 import com.grimfox.gec.util.Coastline.getBorders
 import com.grimfox.gec.util.Coastline.refineCoastline
@@ -298,9 +299,9 @@ class BuildContinent : Runnable {
         }
     }
 
-    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService): BufferedImage {
+    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, regionTextureId: TextureId, regionBorderTextureId: TextureId, executor: ExecutorService): TextureId {
         return timeIt("generated water flow in") {
-            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, executor, 4096)
+            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, regionTextureId, regionBorderTextureId, executor, 4096)
         }
     }
 

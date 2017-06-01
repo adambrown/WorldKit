@@ -1182,8 +1182,8 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                 screen = screens.entries.first().value
             }
             if (screen != null) {
-                val avgDpi = (dpiX + dpiY) / 2.0
-                screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
+//                val avgDpi = (dpiX + dpiY) / 2.0
+//                screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
                 monitors.add(MonitorSpec(
                         id = monitorId,
                         dpiX = dpiX,
