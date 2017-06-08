@@ -87,9 +87,10 @@ class BuildContinent : Runnable {
             var maxIslandTries: Int = 500,
             var islandDesire: Int = 1,
             var parameters: ArrayList<Parameters> = arrayListOf(
-//                    Parameters(30, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.0f),
+                    Parameters(24, 0.40f, 0.1f, 8, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    Parameters(32, 0.40f, 0.2f, 6, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
 //                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f)
-                    Parameters(64, 0.35f, 0.05f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    Parameters(64, 0.40f, 0.1f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
                     Parameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
@@ -299,9 +300,9 @@ class BuildContinent : Runnable {
         }
     }
 
-    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, regionTextureId: TextureId, regionBorderTextureId: TextureId, executor: ExecutorService): TextureId {
+    fun generateWaterFlows(parameterSet: ParameterSet, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, regionTextureId: TextureId, executor: ExecutorService): TextureId {
         return timeIt("generated water flow in") {
-            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, regionTextureId, regionBorderTextureId, executor, 4096)
+            generateWaterFlows(Random(parameterSet.seed), inputGraph, inputMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, regionTextureId, executor, 4096)
         }
     }
 

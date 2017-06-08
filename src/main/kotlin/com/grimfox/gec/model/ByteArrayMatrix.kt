@@ -1,6 +1,5 @@
-package com.grimfox.gec.model.geometry
+package com.grimfox.gec.model
 
-import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.util.Utils.pow
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 

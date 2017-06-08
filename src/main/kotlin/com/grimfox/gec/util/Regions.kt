@@ -1,12 +1,11 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.command.BuildContinent.ParameterSet
-import com.grimfox.gec.model.ArrayListMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertex
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.ByteArrayMatrix
+import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.util.Graphs.generateGraph

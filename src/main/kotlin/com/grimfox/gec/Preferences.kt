@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)
@@ -46,6 +47,10 @@ data class WindowState(
         var height: Int,
         var isMaximized: Boolean
 )
+
+val threadCount = Runtime.getRuntime().availableProcessors()
+val executor: ExecutorService = Executors.newWorkStealingPool()
+val preferences = loadPreferences(executor)
 
 fun loadPreferences(executor: ExecutorService): Preferences {
     ensureDirectoryExists(WORLD_KIT_DIR)

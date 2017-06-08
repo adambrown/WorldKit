@@ -9,7 +9,7 @@ import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.IntArrayMatrix
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.ByteArrayMatrix
+import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F

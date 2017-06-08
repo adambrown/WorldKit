@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.*
+import com.grimfox.gec.biomes.Biomes
+import com.grimfox.gec.extensions.call
 import com.grimfox.gec.extensions.twr
 import com.grimfox.gec.opengl.loadImagePixels
 import com.grimfox.gec.ui.widgets.*
@@ -51,6 +53,8 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
             ui.root.handleScroll(x, y)
         }
         ui.show()
+        TextureBuilder.init()
+        executor.call { Biomes.init() }
         while (!ui.shouldClose()) {
             TextureBuilder.onDrawFrame()
             ui.handleFrameInput()

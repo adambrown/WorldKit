@@ -1,6 +1,7 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
+import com.grimfox.gec.biomes.Biomes
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
 import com.grimfox.gec.extensions.value
@@ -20,7 +21,6 @@ import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.mRef
@@ -36,18 +36,14 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.URL
 import java.util.*
-import java.util.concurrent.Executors
 import java.util.concurrent.locks.ReentrantLock
 
 object MainUi {
 
-    private val threadCount = Runtime.getRuntime().availableProcessors()
-
     private class CurrentState(val parameters: ParameterSet,
                                val graph: Graph,
                                val regionMask: Matrix<Byte>,
-                               val regionTextureId: TextureId,
-                               val regionBorderTextureId: TextureId) {
+                               val regionTextureId: TextureId) {
 
         @Volatile private var free: Boolean = false
 
@@ -57,7 +53,6 @@ object MainUi {
                     if (!free) {
                         free = true
                         regionTextureId.free()
-                        regionBorderTextureId.free()
                     }
                 }
             }
@@ -70,8 +65,9 @@ object MainUi {
     }
 
     @JvmStatic fun main(vararg args: String) {
-        val executor = Executors.newWorkStealingPool()
-        val preferences = loadPreferences(executor)
+        val executor = executor
+        val preferences = preferences
+
         for (i in 1..2) {
             task { BuildContinent().generateRegions(ParameterSet(seed = i.toLong()), executor) }
         }
@@ -618,9 +614,8 @@ object MainUi {
                                                             val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
                                                             val regionTextureId = renderRegions(resultPair.first, resultPair.second)
                                                             meshViewport.setRegions(regionTextureId)
-                                                            val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
                                                             val lastState = currentState.value
-                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
                                                             lastState?.free()
                                                             imageModeOn.value = true
                                                             val historyLast = historyCurrent.value
@@ -660,9 +655,8 @@ object MainUi {
                                                             val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
                                                             val regionTextureId = renderRegions(resultPair.first, resultPair.second)
                                                             meshViewport.setRegions(regionTextureId)
-                                                            val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
                                                             val lastState = currentState.value
-                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
                                                             lastState?.free()
                                                             imageModeOn.value = true
                                                             val historyLast = historyCurrent.value
@@ -709,9 +703,8 @@ object MainUi {
                                                                 val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
                                                                 val regionTextureId = renderRegions(resultPair.first, resultPair.second)
                                                                 meshViewport.setRegions(regionTextureId)
-                                                                val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
                                                                 val lastState = currentState.value
-                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
                                                                 lastState?.free()
                                                                 imageModeOn.value = true
                                                                 historyCurrent.value = parameters.copy()
@@ -733,9 +726,8 @@ object MainUi {
                                                                 val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
                                                                 val regionTextureId = renderRegions(resultPair.first, resultPair.second)
                                                                 meshViewport.setRegions(regionTextureId)
-                                                                val regionBorderTextureId = renderRegionBorders(executor, resultPair.first, resultPair.second, threadCount)
                                                                 val lastState = currentState.value
-                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId, regionBorderTextureId)
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
                                                                 lastState?.free()
                                                                 imageModeOn.value = true
                                                                 historyCurrent.value = parameters.copy()
@@ -752,7 +744,7 @@ object MainUi {
                                                         doGeneration {
                                                             val currentStateValue = currentState.value
                                                             if (currentStateValue != null) {
-                                                                meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.parameters, currentStateValue.graph, currentStateValue.regionMask, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, currentStateValue.regionTextureId, currentStateValue.regionBorderTextureId, executor), 4096)
+                                                                meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.parameters, currentStateValue.graph, currentStateValue.regionMask, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, currentStateValue.regionTextureId, executor), 4096)
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
                                                                 imageModeOn.value = false
                                                             }

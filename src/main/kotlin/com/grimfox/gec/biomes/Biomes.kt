@@ -1,14 +1,49 @@
 package com.grimfox.gec.biomes
 
-import com.grimfox.gec.model.Graph.*
+import com.grimfox.gec.CACHE_DIR
+import com.grimfox.gec.executor
+import com.grimfox.gec.extensions.call
+import com.grimfox.gec.extensions.join
+import com.grimfox.gec.extensions.value
+import com.grimfox.gec.model.FloatArrayMatrix
+import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Point3F
+import com.grimfox.gec.opengl.*
+import com.grimfox.gec.threadCount
+import com.grimfox.gec.ui.widgets.TextureBuilder
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.gec.util.Graphs
-import org.joml.SimplexNoise.*
+import org.joml.Matrix4f
+import org.joml.SimplexNoise.noise
+import org.lwjgl.BufferUtils
+import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL13.*
+import org.lwjgl.opengl.GL20
+import org.lwjgl.opengl.GL20.*
+import java.awt.image.BufferedImage
+import java.io.File
 import java.lang.Math.*
+import java.nio.ByteOrder
+import java.nio.ShortBuffer
 import java.util.*
+import java.util.concurrent.Future
+import javax.imageio.ImageIO
 
 object Biomes {
+
+    fun init() {
+
+    }
+
+    interface UpliftShader {
+
+        val positionAttribute: ShaderAttribute
+
+        fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId)
+    }
 
     private val TALUS_ANGLES_NO_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.0)
 
@@ -30,9 +65,9 @@ object Biomes {
 
     private val TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT = buildNormalTalusAngles(600.0, 310.0, 512.0, 0.005)
 
-    private val TALUS_ANGLES_NEVADA = buildNevadaTalusAngles()
+    private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
 
-    private fun buildNevadaTalusAngles(): FloatArray {
+    private fun buildPlateauTalusAngles(): FloatArray {
         val profiles = arrayOf(
                 arrayOf(240 to 30.0,
                         520 to 89.0,
@@ -131,12 +166,8 @@ object Biomes {
 
     class RegionData(
             val land: List<Int>,
-            val water: LinkedHashSet<Int>,
             val beach: LinkedHashSet<Int>,
-            val regions: List<LinkedHashSet<Int>>,
-            val regionBeaches: List<LinkedHashSet<Int>>,
-            val regionBorders: List<LinkedHashSet<Int>>,
-            val borderPairs: LinkedHashMap<Int, Pair<Int, Int>>)
+            val regions: List<LinkedHashSet<Int>>)
 
     interface UpliftFunction {
 
@@ -154,34 +185,321 @@ object Biomes {
             val upliftMultiplier: Float,
             val erosionSettings: List<ErosionSettings>)
 
-    class ErosionBootstrap(
-            val minUplift: Float,
-            val deltaUplift: Float,
-            val talusAngles: FloatArray,
-            val deltaTime: Float,
-            val heightMultiplier: Float,
-            val erosionPower: Float,
-            val upliftFunction: UpliftFunction)
-
     class Biome(
             val minUplift: Float,
             val deltaUplift: Float,
-            val upliftFunction: UpliftFunction,
             val bootstrapSettings: ErosionSettings,
             val erosionLowSettings: ErosionLevel,
             val erosionMidSettings: ErosionLevel,
-            val erosionHighSettings: ErosionLevel)
+            val erosionHighSettings: ErosionLevel,
+            val upliftShader: UpliftShader)
+
+    private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): Future<TextureId> {
+        return executor.call {
+            loadTextureSync(name, noiseBuilder, width)
+        }
+    }
+
+    private fun loadTextureSync(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): TextureId {
+        val data = writeNoiseTextureIfNotExists(name, noiseBuilder, width)
+        return buildTextureRedShort(data, width, GL_LINEAR, GL_LINEAR)
+    }
+
+    private fun writeNoiseTextureIfNotExists(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): ShortBuffer {
+        val file = File(CACHE_DIR, "$name.tex")
+        val size = width * width
+        val size2 = size * 2
+        if (!file.exists()) {
+            val data = BufferUtils.createByteBuffer(size * 2).order(ByteOrder.nativeOrder())
+            val shortData = data.asShortBuffer()
+            noiseBuilder(width, shortData)
+            val output = BufferedImage(width, width, BufferedImage.TYPE_USHORT_GRAY)
+            val raster = output.raster
+            for (i in 0..size - 1) {
+                raster.setSample(i % raster.width, i / raster.width, 0, shortData[i].toInt() and 0xFFFF)
+            }
+            ImageIO.write(output, "png", File(CACHE_DIR, "$name.png"))
+            file.outputStream().channel.use {
+                var written = 0
+                while (written < size2) {
+                    written += it.write(data)
+                }
+            }
+            data.flip()
+            return shortData
+        } else {
+            val data = BufferUtils.createByteBuffer(size * 2).order(ByteOrder.nativeOrder())
+            val shortData = data.asShortBuffer()
+            file.inputStream().channel.use {
+                var read = 0
+                while (read < size2) {
+                    read += it.read(data)
+                }
+            }
+            data.flip()
+            return shortData
+        }
+    }
+
+    private fun levels(height: Double, inMin: Double, gamma: Double, inMax: Double): Short {
+        return 65535.coerceAtMost(0.coerceAtLeast((pow((height - inMin) / (inMax - inMin), gamma) * 65535).toInt())).toShort()
+    }
+
+    private val rollingHillsNoise = { width: Int, buffer: ShortBuffer ->
+        val noiseGraph64 = Graphs.generateGraph(64, Random(6874475222), 0.98)
+        val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
+        val vertices = noiseGraph64.vertices
+        for (i in 0..vertices.size - 1) {
+            val point = vertices.getPoint(i)
+            noisePoints64[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 31, point.y * 31)) / 64.0f)
+        }
+        var max = -Float.MAX_VALUE
+        var min = Float.MAX_VALUE
+        val floatMatrix = FloatArrayMatrix(width)
+        val futures = (0..threadCount - 1).map { thread ->
+            executor.call {
+                for (i in thread..floatMatrix.size.toInt() - 1 step threadCount) {
+                    val point = Point2F(((i / width) + 0.5f) / width, ((i % width) + 0.5f) / width)
+                    val point3d = Point3F(point.x, point.y, 0.0f)
+                    val closePoints = noiseGraph64.getClosePoints(point, 3).map {
+                        point3d.distance2(noisePoints64[it]!!)
+                    }.sorted()
+                    val height = -closePoints[0]
+                    if (height > max) {
+                        max = height
+                    }
+                    if (height < min) {
+                        min = height
+                    }
+                    floatMatrix[i] = height
+                }
+            }
+        }
+        futures.forEach(Future<Unit>::join)
+        val delta = max - min
+        for (y in 0..width - 1) {
+            for (x in 0..width - 1) {
+                val height = (floatMatrix[x, y] - min) / delta
+                buffer.put(y * width + x, levels(height.toDouble(), 0.35, 1.85, 1.0))
+            }
+        }
+    }
+
+    private val foothillsNoise = { width: Int, buffer: ShortBuffer ->
+        val noiseGraph64 = Graphs.generateGraph(64, Random(253487348644), 0.98)
+        val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
+        val vertices = noiseGraph64.vertices
+        for (i in 0..vertices.size - 1) {
+            val point = vertices.getPoint(i)
+            noisePoints64[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 31, point.y * 31)) / 64.0f)
+        }
+        var max = -Float.MAX_VALUE
+        var min = Float.MAX_VALUE
+        val floatMatrix = FloatArrayMatrix(width)
+        val futures = (0..threadCount - 1).map { thread ->
+            executor.call {
+                for (i in thread..floatMatrix.size.toInt() - 1 step threadCount) {
+                    val point = Point2F(((i / width) + 0.5f) / width, ((i % width) + 0.5f) / width)
+                    val point3d = Point3F(point.x, point.y, 0.0f)
+                    val closePoints = noiseGraph64.getClosePoints(point, 3).map {
+                        point3d.distance2(noisePoints64[it]!!)
+                    }.sorted()
+                    val height = -closePoints[0] + closePoints[1]
+                    if (height > max) {
+                        max = height
+                    }
+                    if (height < min) {
+                        min = height
+                    }
+                    floatMatrix[i] = height
+                }
+            }
+        }
+        futures.forEach(Future<Unit>::join)
+        val delta = max - min
+        for (y in 0..width - 1) {
+            for (x in 0..width - 1) {
+                val height = (floatMatrix[x, y] - min) / delta
+                buffer.put(y * width + x, levels(height.toDouble(), 0.0, 0.4, 0.6))
+            }
+        }
+    }
+
+    private val mountainsNoise = { width: Int, buffer: ShortBuffer ->
+        val octaves = floatArrayOf(0.3f, 0.25f, 0.2f, 0.15f, 0.03f, 0.025f, 0.02f, 0.015f, 0.006f, 0.004f)
+        val multipliers = floatArrayOf(31.0f, 67.0f, 17.0f, 7.0f, 127.0f, 257.0f, 509.0f, 1021.0f, 2053.0f, 4093.0f)
+        val noiseGraph128 = Graphs.generateGraph(128, Random(136420669786), 0.98)
+        val noisePoints128 = arrayOfNulls<Point3F>(noiseGraph128.vertices.size)
+        val noiseGraph128Vertices = noiseGraph128.vertices
+        for (i in 0..noiseGraph128Vertices.size - 1) {
+            val point = noiseGraph128Vertices.getPoint(i)
+            noisePoints128[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 127, point.y * 127)) / 128.0f)
+        }
+        val noiseGraph64 = Graphs.generateGraph(64, Random(7642367947869), 0.98)
+        val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
+        val noiseGraph64Vertices = noiseGraph64.vertices
+        for (i in 0..noiseGraph64Vertices.size - 1) {
+            val point = noiseGraph64Vertices.getPoint(i)
+            noisePoints64[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 31, point.y * 31)) / 64.0f)
+        }
+        val noiseGraph32 = Graphs.generateGraph(32, Random(458653243663), 0.98)
+        val noisePoints32 = arrayOfNulls<Point3F>(noiseGraph32.vertices.size)
+        val noiseGraph32Vertices = noiseGraph32.vertices
+        for (i in 0..noiseGraph32Vertices.size - 1) {
+            val point = noiseGraph32Vertices.getPoint(i)
+            noisePoints32[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 17, point.y * 17)) / 32.0f)
+        }
+        var max = -Float.MAX_VALUE
+        var min = Float.MAX_VALUE
+        val floatMatrix = FloatArrayMatrix(width)
+        val futures = (0..threadCount - 1).map { thread ->
+            executor.call {
+                for (i in thread..floatMatrix.size.toInt() - 1 step threadCount) {
+                    val point = Point2F(((i / width) + 0.5f) / width, ((i % width) + 0.5f) / width)
+                    val point3d = Point3F(point.x, point.y, 0.0f)
+                    val closePoints128 = noiseGraph128.getClosePoints(point, 3).map {
+                        point3d.distance2(noisePoints128[it]!!)
+                    }.sorted()
+                    val closePoints64 = noiseGraph64.getClosePoints(point, 3).map {
+                        point3d.distance2(noisePoints64[it]!!)
+                    }.sorted()
+                    val closePoints32 = noiseGraph32.getClosePoints(point, 3).map {
+                        point3d.distance2(noisePoints32[it]!!)
+                    }.sorted()
+                    val height128 = (-closePoints128[0] + closePoints128[1]) * 4.0f
+                    val height64 = (-closePoints64[0] + closePoints64[1]) * 2.0f
+                    val height32 = -closePoints32[0] + closePoints32[1]
+                    var sum = 0.0f
+                    for (o in 0..7) {
+                        val magnitude = octaves[o]
+                        val multiplier = multipliers[o]
+                        sum += ((noise(point.x * multiplier, point.y * multiplier, 0.0f) + 1) / 2.0f) * magnitude
+                    }
+                    val height = height128 + height64 + height32 + 0.001f * sum * sum
+                    if (height > max) {
+                        max = height
+                    }
+                    if (height < min) {
+                        min = height
+                    }
+                    floatMatrix[i] = height
+                }
+            }
+        }
+        futures.forEach(Future<Unit>::join)
+        val delta = max - min
+        for (y in 0..width - 1) {
+            for (x in 0..width - 1) {
+                val height = (floatMatrix[x, y] - min) / delta
+                buffer.put(y * width + x, levels(height.toDouble(), 0.02, 0.7, 0.52))
+            }
+        }
+    }
+
+    private val plainsNoise = { width: Int, buffer: ShortBuffer ->
+        val noiseGraph32 = Graphs.generateGraph(32, Random(458653243663), 0.98)
+        val noisePoints32 = arrayOfNulls<Point3F>(noiseGraph32.vertices.size)
+        val noiseGraph32Vertices = noiseGraph32.vertices
+        for (i in 0..noiseGraph32Vertices.size - 1) {
+            val point = noiseGraph32Vertices.getPoint(i)
+            noisePoints32[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 17, point.y * 17)) / 32.0f)
+        }
+        val noiseGraph16 = Graphs.generateGraph(16, Random(3766796523564), 0.98)
+        val noisePoints16 = arrayOfNulls<Point3F>(noiseGraph16.vertices.size)
+        val noiseGraph16Vertices = noiseGraph16.vertices
+        for (i in 0..noiseGraph16Vertices.size - 1) {
+            val point = noiseGraph16Vertices.getPoint(i)
+            noisePoints16[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 7, point.y * 7)) / 16.0f)
+        }
+        var max = -Float.MAX_VALUE
+        var min = Float.MAX_VALUE
+        val floatMatrix = FloatArrayMatrix(width)
+        val futures = (0..threadCount - 1).map { thread ->
+            executor.call {
+                for (i in thread..floatMatrix.size.toInt() - 1 step threadCount) {
+                    val point = Point2F(((i / width) + 0.5f) / width, ((i % width) + 0.5f) / width)
+                    val point3d = Point3F(point.x, point.y, 0.0f)
+                    val closePoints16 = noiseGraph16.getClosePoints(point, 3).map {
+                        val otherPoint = noisePoints16[it]!!
+                        point3d.distance2(Point3F(otherPoint.x, otherPoint.y, otherPoint.z * 0.3f))
+                    }.sorted()
+                    val closePoints32 = noiseGraph32.getClosePoints(point, 3).map {
+                        val otherPoint = noisePoints32[it]!!
+                        point3d.distance2(Point3F(otherPoint.x, otherPoint.y, otherPoint.z * 0.1f))
+                    }.sorted()
+                    val height = -closePoints16[0] - closePoints32[0] * 0.5f
+                    if (height > max) {
+                        max = height
+                    }
+                    if (height < min) {
+                        min = height
+                    }
+                    floatMatrix[i] = height
+                }
+            }
+        }
+        futures.forEach(Future<Unit>::join)
+        val delta = max - min
+        for (y in 0..width - 1) {
+            for (x in 0..width - 1) {
+                val height = (floatMatrix[x, y] - min) / delta
+                buffer.put(y * width + x, levels(height.toDouble(), 0.4, 2.4, 1.0))
+            }
+        }
+    }
+
+    private val rollingHillsNoiseTextureFuture = loadTexture("rolling-hills-noise", rollingHillsNoise, 1024)
+    private val foothillsNoiseTextureFuture = loadTexture("foothills-noise", foothillsNoise, 1024)
+    private val mountainsNoiseTextureFuture = loadTexture("mountains-noise", mountainsNoise, 1024)
+    private val plainsNoiseTextureFuture = loadTexture("plains-noise", plainsNoise, 1024)
+
+    private val coastalMountainsUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+        }
+    }
 
     val COASTAL_MOUNTAINS_BIOME = Biome(
             minUplift = 0.000004f,
-            deltaUplift = 0.00049600005f,
-            upliftFunction = CoastalMountainsUplift(),
+            deltaUplift = 0.00045f,
+            upliftShader = coastalMountainsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
                     talusAngles = TALUS_ANGLES_NO_VARIANCE,
                     heightMultiplier = 1.0f,
-                    erosionPower = 0.000000561f),
+                    erosionPower = 0.0000006f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
@@ -190,108 +508,92 @@ object Biomes {
                                     deltaTime = 3000000.0f,
                                     talusAngles = TALUS_ANGLES_HIGH_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f),
+                                    erosionPower = 0.0000006f),
                             ErosionSettings(
                                     iterations = 4,
                                     deltaTime = 75000.0f,
                                     talusAngles = TALUS_ANGLES_HIGH_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f),
+                                    erosionPower = 0.0000006f),
                             ErosionSettings(
                                     iterations = 45,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_HIGH_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f))),
+                                    erosionPower = 0.0000006f))),
             erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.5f,
+                    upliftMultiplier = 0.35f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_MEDIUM_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f))),
+                                    erosionPower = 0.0000006f))),
             erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    upliftMultiplier = 0.15f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 2,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_LOW_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f),
+                                    erosionPower = 0.0000006f),
                             ErosionSettings(
                                     iterations = 3,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_NO_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.000000561f)))
+                                    erosionPower = 0.0000006f)))
     )
 
-    private class CoastalMountainsUplift : UpliftFunction {
+    val rollingHillsNoiseTexture by lazy { rollingHillsNoiseTextureFuture.value }
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            val remaining = HashSet(region)
-            var currentIds = HashSet(borders)
-            var nextIds = HashSet<Int>(borders.size)
-            var currentUplift = (-40).toByte()
-            for (i in 0..5) {
-                currentIds.forEachIndexed { even, it ->
-                    if (remaining.contains(it)) {
-                        remaining.remove(it)
-                        upliftMap[it] = (currentUplift + if (even % 2 == 0) 0 else 80).toByte()
-                        vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                            if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                                nextIds.add(adjacentId)
-                            }
-                        }
-                    }
-                }
-                val temp = currentIds
-                currentIds = nextIds
-                nextIds = temp
-                nextIds.clear()
-                if (i == 0) {
-                    currentUplift = 60
-                }
-                if (i == 2) {
-                    currentUplift = (currentUplift - 81).toByte()
-                }
-            }
-            currentIds.clear()
-            currentIds.addAll(beaches)
-            nextIds.clear()
-            currentUplift = -126
-            for (i in 0..9) {
-                currentIds.forEach {
-                    if (remaining.contains(it)) {
-                        remaining.remove(it)
-                        upliftMap[it] = currentUplift
-                        vertices.getAdjacentVertices(it).forEach { adjacentId ->
-                            if (remaining.contains(adjacentId) && !currentIds.contains(adjacentId)) {
-                                nextIds.add(adjacentId)
-                            }
-                        }
-                    }
-                }
-                val temp = currentIds
-                currentIds = nextIds
-                nextIds = temp
-                nextIds.clear()
-                if (i == 1) {
-                    currentUplift = (currentUplift + 15).toByte()
-                }
-            }
-            currentUplift = (currentUplift + 25).toByte()
-            remaining.forEach { upliftMap[it] = currentUplift }
+    private val rollingHillsUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, rollingHillsNoiseTexture.id)
         }
     }
 
     val ROLLING_HILLS_BIOME = Biome(
-            minUplift = 0.00000065f,
-            deltaUplift = 0.0000765f,
-            upliftFunction = RollingHillsUplift(),
+            minUplift = 0.000001f,
+            deltaUplift = 0.000074f,
+            upliftShader = rollingHillsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -339,53 +641,54 @@ object Biomes {
                                     erosionPower = 0.0000014025f)))
     )
 
-    private class RollingHillsUplift : UpliftFunction {
+    val foothillsNoiseTexture by lazy { foothillsNoiseTextureFuture.value }
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            var max = -Float.MAX_VALUE
-            var min = Float.MAX_VALUE
-            val rawUplifts = FloatArray(vertices.size) { i ->
-                if (region.contains(i)) {
-                    val point = vertices.getPoint(i)
-                    val point3d = Point3F(point.x, point.y, 0.0f)
-                    val closePoints = noiseGraph64.getClosePoints(point, 3).map {
-                        point3d.distance2(noisePoints64[it]!!)
-                    }.sorted()
-                    val height = -closePoints[0]
-                    if (height > max) {
-                        max = height
-                    }
-                    if (height < min) {
-                        min = height
-                    }
-                    height
-                } else {
-                    -1.0f
-                }
-            }
-            val delta = max - min
-            for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (borders.contains(i)) {
-                    val biome = biomeMask[i]
-                    val borderPair = regionData.borderPairs[i]
-                    if (borderPair != null && vertices.getAdjacentVertices(i).all { biomeMask[it] == biome}) {
-                        upliftMap[i] = (-108).toByte()
-                    } else {
-                        val height = (rawUplifts[i] - min) / delta
-                        upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                    }
-                } else if (region.contains(i)) {
-                    val height = (rawUplifts[i] - min) / delta
-                    upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                }
-            }
+    private val foothillsUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, foothillsNoiseTexture.id)
         }
     }
 
+
     val FOOTHILLS_BIOME = Biome(
-            minUplift = 0.0000005f,
-            deltaUplift = 0.0005f,
-            upliftFunction = FoothillsUplift(),
+            minUplift = 0.0000001f,
+            deltaUplift = 0.0003f,
+            upliftShader = foothillsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -411,7 +714,7 @@ object Biomes {
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.000001f))),
             erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.5f,
+                    upliftMultiplier = 0.25f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 5,
@@ -421,50 +724,54 @@ object Biomes {
                                     erosionPower = 0.000001f)))
     )
 
-    private class FoothillsUplift : UpliftFunction {
+    val mountainsNoiseTexture by lazy { mountainsNoiseTextureFuture.value }
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            var max = -Float.MAX_VALUE
-            var min = Float.MAX_VALUE
-            val rawUplifts = FloatArray(vertices.size) { i ->
-                if (region.contains(i)) {
-                    val point = vertices.getPoint(i)
-                    val point3d = Point3F(point.x, point.y, 0.0f)
-                    val closePoints = noiseGraph64.getClosePoints(point, 3).map {
-                        point3d.distance2(noisePoints64[it]!!)
-                    }.sorted()
-                    val height = -closePoints[0] + closePoints[1]
-                    if (height > max) {
-                        max = height
-                    }
-                    if (height < min) {
-                        min = height
-                    }
-                    height
-                } else {
-                    -1.0f
-                }
-            }
-            val delta = max - min
-            for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (borders.contains(i)) {
-                    if (i % 3 == 0) {
-                        upliftMap[i] = (-86).toByte()
-                    } else {
-                        upliftMap[i] = (127).toByte()
-                    }
-                } else if (region.contains(i)) {
-                    val height = (rawUplifts[i] - min) / delta
-                    upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                }
-            }
+    private val mountainsUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
         }
     }
 
+
     val MOUNTAINS_BIOME = Biome(
-            minUplift = 0.000002f,
-            deltaUplift = 0.00045f,
-            upliftFunction = MountainsUplift(),
+            minUplift = 0.0000001f,
+            deltaUplift = 0.0004519f,
+            upliftShader = mountainsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -502,7 +809,7 @@ object Biomes {
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.000000561f))),
             erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    upliftMultiplier = 0.2f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 2,
@@ -518,70 +825,53 @@ object Biomes {
                                     erosionPower = 0.000000561f)))
     )
 
-    private class MountainsUplift : UpliftFunction {
+    val plainsNoiseTexture by lazy { plainsNoiseTextureFuture.value }
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            val octaves = floatArrayOf(0.3f, 0.25f, 0.2f, 0.15f, 0.03f, 0.025f, 0.02f, 0.015f, 0.006f, 0.004f)
-            val multipliers = floatArrayOf(31.0f, 67.0f, 17.0f, 7.0f, 127.0f, 257.0f, 509.0f, 1021.0f, 2053.0f, 4093.0f)
-            var max = -Float.MAX_VALUE
-            var min = Float.MAX_VALUE
-            val rawUplifts = FloatArray(vertices.size) { i ->
-                if (region.contains(i)) {
-                    val point = vertices.getPoint(i)
-                    val point3d = Point3F(point.x, point.y, 0.0f)
-                    val closePoints128 = noiseGraph128.getClosePoints(point, 3).map {
-                        point3d.distance2(noisePoints128[it]!!)
-                    }.sorted()
-                    val closePoints64 = noiseGraph64.getClosePoints(point, 3).map {
-                        point3d.distance2(noisePoints64[it]!!)
-                    }.sorted()
-                    val closePoints32 = noiseGraph32.getClosePoints(point, 3).map {
-                        point3d.distance2(noisePoints32[it]!!)
-                    }.sorted()
-                    val height128 = (-closePoints128[0] + closePoints128[1]) * 4.0f
-                    val height64 = (-closePoints64[0] + closePoints64[1]) * 2.0f
-                    val height32 = -closePoints32[0] + closePoints32[1]
-                    var sum = 0.0f
-                    for (o in 0..7) {
-                        val magnitude = octaves[o]
-                        val multiplier = multipliers[o]
-                        sum += ((noise(point.x * multiplier, point.y * multiplier, 0.0f) + 1) / 2.0f) * magnitude
-                    }
-                    val height = height128 + height64 + height32 + 0.001f * sum * sum
-                    if (height > max) {
-                        max = height
-                    }
-                    if (height < min) {
-                        min = height
-                    }
-                    height
-                } else {
-                    -1.0f
-                }
-            }
-            val delta = max - min
-            for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (borders.contains(i)) {
-                    val biome = biomeMask[i]
-                    val borderPair = regionData.borderPairs[i]
-                    if (borderPair != null && vertices.getAdjacentVertices(i).all { biomeMask[it] == biome}) {
-                        upliftMap[i] = (-120).toByte()
-                    } else {
-                        val height = (rawUplifts[i] - min) / delta
-                        upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                    }
-                } else if (region.contains(i)) {
-                    val height = (rawUplifts[i] - min) / delta
-                    upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                }
-            }
+    private val plainsUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plains-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plains-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, plainsNoiseTexture.id)
         }
     }
 
     val PLAINS_BIOME = Biome(
             minUplift = 0.0000015f,
             deltaUplift = 0.000008f,
-            upliftFunction = PlainsUplift(),
+            upliftShader = plainsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -629,58 +919,48 @@ object Biomes {
                                     erosionPower = 0.0000028f)))
     )
 
-    private class PlainsUplift : UpliftFunction {
+    private val plateauBiomeUpliftShader = object : UpliftShader {
 
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            var max = -Float.MAX_VALUE
-            var min = Float.MAX_VALUE
-            val rawUplifts = FloatArray(vertices.size) { i ->
-                if (region.contains(i)) {
-                    val point = vertices.getPoint(i)
-                    val point3d = Point3F(point.x, point.y, 0.0f)
-                    val closePoints16 = noiseGraph16.getClosePoints(point, 3).map {
-                        val otherPoint = noisePoints16[it]!!
-                        point3d.distance2(Point3F(otherPoint.x, otherPoint.y, otherPoint.z * 0.3f))
-                    }.sorted()
-                    val closePoints32 = noiseGraph32.getClosePoints(point, 3).map {
-                        val otherPoint = noisePoints32[it]!!
-                        point3d.distance2(Point3F(otherPoint.x, otherPoint.y, otherPoint.z * 0.1f))
-                    }.sorted()
-                    val height = -closePoints16[0] - closePoints32[0] * 0.5f
-                    if (height > max) {
-                        max = height
-                    }
-                    if (height < min) {
-                        min = height
-                    }
-                    height
-                } else {
-                    -1.0f
-                }
-            }
-            val delta = max - min
-            for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (borders.contains(i)) {
-                    val biome = biomeMask[i]
-                    val borderPair = regionData.borderPairs[i]
-                    if (borderPair != null && vertices.getAdjacentVertices(i).all { biomeMask[it] == biome}) {
-                        upliftMap[i] = (-126).toByte()
-                    } else {
-                        val height = (rawUplifts[i] - min) / delta
-                        upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                    }
-                } else if (region.contains(i)) {
-                    val height = (rawUplifts[i] - min) / delta
-                    upliftMap[i] = (Math.round(height * 253.0f) - 126).toByte()
-                }
-            }
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val regionBorderDistanceTextureUniform = ShaderUniform("regionBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.vert"))
+            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, regionBorderDistanceTextureUniform, coastDistanceTextureUniform))
+        }
+
+        override fun bind(regionMask: TextureId, biomeMask: TextureId, regionBorderMask: TextureId, coastBorderMask: TextureId, biomeBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(regionBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, regionBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
         }
     }
+
 
     val PLATEAU_BIOME = Biome(
             minUplift = 0.000001f,
             deltaUplift = 0.00001f,
-            upliftFunction = PlateauUplift(),
+            upliftShader = plateauBiomeUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -693,7 +973,7 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 50,
                                     deltaTime = 250000.0f,
-                                    talusAngles = TALUS_ANGLES_NEVADA,
+                                    talusAngles = TALUS_ANGLES_PLATEAU,
                                     heightMultiplier = 10.0f,
                                     erosionPower = 0.0000004f))),
             erosionMidSettings = ErosionLevel(
@@ -702,7 +982,7 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 25,
                                     deltaTime = 250000.0f,
-                                    talusAngles = TALUS_ANGLES_NEVADA,
+                                    talusAngles = TALUS_ANGLES_PLATEAU,
                                     heightMultiplier = 10.0f,
                                     erosionPower = 0.0000001f))),
             erosionHighSettings = ErosionLevel(
@@ -711,29 +991,8 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 5,
                                     deltaTime = 50000.0f,
-                                    talusAngles = TALUS_ANGLES_NEVADA,
+                                    talusAngles = TALUS_ANGLES_PLATEAU,
                                     heightMultiplier = 10.0f,
                                     erosionPower = 0.0000004f)))
     )
-
-    private class PlateauUplift : UpliftFunction {
-
-        override fun buildUpliftMap(vertices: Vertices, region: LinkedHashSet<Int>, beaches: LinkedHashSet<Int>, borders: LinkedHashSet<Int>, upliftMap: Matrix<Byte>, regionData: RegionData, biomeMask: Matrix<Byte>) {
-            for (i in (0..upliftMap.size.toInt() - 1)) {
-                if (beaches.contains(i)) {
-                    upliftMap[i] = (-126).toByte()
-                } else if (borders.contains(i)) {
-                    val biome = biomeMask[i]
-                    val borderPair = regionData.borderPairs[i]
-                    if (borderPair != null && vertices.getAdjacentVertices(i).all { biomeMask[it] == biome}) {
-                        upliftMap[i] = (-126).toByte()
-                    } else {
-                        upliftMap[i] = 127
-                    }
-                } else if (region.contains(i)) {
-                    upliftMap[i] = 127
-                }
-            }
-        }
-    }
 }
