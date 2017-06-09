@@ -870,7 +870,7 @@ object Biomes {
 
     val PLAINS_BIOME = Biome(
             minUplift = 0.0000015f,
-            deltaUplift = 0.000008f,
+            deltaUplift = 0.00001f,
             upliftShader = plainsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,

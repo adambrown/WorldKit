@@ -13,7 +13,7 @@ layout(location = 0) out vec4 colorOut;
 void main() {
     float regionBorderDistance = texture(regionBorderDistanceMask, VertexIn.uv).r;
     if (regionBorderDistance > 0.996) {
-        float height = ((regionBorderDistance - 0.996) * 3.4) + 0.000001;
+        float height = ((0.004 - (regionBorderDistance - 0.996)) * 3.4) + 0.000001;
         colorOut = vec4(height, height, height, 1.0);
     } else {
         float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
