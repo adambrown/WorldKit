@@ -3,6 +3,7 @@ package com.grimfox.gec.model
 import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.model.geometry.Polygon2F.Companion.fromUnsortedEdges
 import java.util.*
+import kotlin.collections.LinkedHashSet
 
 
 class Graph(val vertexIdsToPoints: FloatArray,
@@ -685,7 +686,7 @@ class Graph(val vertexIdsToPoints: FloatArray,
         if (edges.isEmpty()) {
             return arrayListOf()
         }
-        val edgeSegments = LineSegment2F.getConnectedEdgeSegments(edges)
+        val edgeSegments = LineSegment2F.getConnectedEdgeSegments(edges, 0.0f)
         val borders = ArrayList<Polygon2F>()
         edgeSegments.forEach {
             borders.add(fromUnsortedEdges(it, splices, true))

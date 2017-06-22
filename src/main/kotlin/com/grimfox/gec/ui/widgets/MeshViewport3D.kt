@@ -24,7 +24,7 @@ class MeshViewport3D(
         val perspectiveOn: Reference<Boolean>,
         val waterPlaneOn: Reference<Boolean>,
         val heightMapScaleFactor: Reference<Float>,
-        val imagePlaneOn: Reference<Boolean>) {
+        val imageMode: Reference<Int>) {
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -83,8 +83,11 @@ class MeshViewport3D(
     private val shininessUniformWater = ShaderUniform("shininess")
     private val heightScaleUniformWater = ShaderUniform("heightScale")
 
-    private val mvpMatrixUniformImage = ShaderUniform("modelViewProjectionMatrix")
+    private val mvpMatrixUniformRegion = ShaderUniform("modelViewProjectionMatrix")
     private val regionTextureUniform = ShaderUniform("regionTexture")
+
+    private val mvpMatrixUniformImage = ShaderUniform("modelViewProjectionMatrix")
+    private val imageTextureUniform = ShaderUniform("imageTexture")
 
     private val positionAttribute = ShaderAttribute("position")
     private val uvAttribute = ShaderAttribute("uv")
@@ -92,16 +95,22 @@ class MeshViewport3D(
     private val positionAttributeWater = ShaderAttribute("position")
     private val uvAttributeWater = ShaderAttribute("uv")
 
+    private val positionAttributeRegion = ShaderAttribute("position")
+    private val uvAttributeRegion = ShaderAttribute("uv")
+
     private val positionAttributeImage = ShaderAttribute("position")
     private val uvAttributeImage = ShaderAttribute("uv")
 
     private val textureLock = Object()
-    private var hasTexture = false
-    private var textureId: TextureId? = null
-    private var textureResolution = 0
+    private var hasHeightmap = false
+    private var heightmapId: TextureId? = null
+    private var heightMapResolution = 0
 
     private var hasRegions = false
     private var regionTextureId: TextureId? = null
+
+    private var hasImage = false
+    private var imageTextureId: TextureId? = null
 
     private val background = NVGColor.create().set(30, 30, 30)
 
@@ -109,6 +118,7 @@ class MeshViewport3D(
 
     private var heightMapProgram: Int = 0
     private var waterPlaneProgram: Int = 0
+    private var regionPlaneProgram: Int = 0
     private var imagePlaneProgram: Int = 0
 
     private var lastScroll = 0.0f
@@ -157,8 +167,11 @@ class MeshViewport3D(
         val waterVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/water-plane.vert"))
         val waterFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/water-plane.frag"))
 
-        val imageVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/regions.vert"))
-        val imageFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/regions.frag"))
+        val regionVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/regions.vert"))
+        val regionFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/regions.frag"))
+
+        val imagePlaneVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/image-plane.vert"))
+        val imagePlaneFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/image-plane.frag"))
 
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
@@ -170,27 +183,32 @@ class MeshViewport3D(
                 listOf(positionAttributeWater, uvAttributeWater),
                 listOf(mvpMatrixUniformWater, mvMatrixUniformWater, nMatrixUniformWater, lightDirectionUniformWater, colorUniformWater, ambientUniformWater, diffuseUniformWater, specularUniformWater, shininessUniformWater, heightScaleUniformWater))
 
+        regionPlaneProgram = createAndLinkProgram(
+                listOf(regionVertexShader, regionFragmentShader),
+                listOf(positionAttributeRegion, uvAttributeRegion),
+                listOf(mvpMatrixUniformRegion, regionTextureUniform))
+
         imagePlaneProgram = createAndLinkProgram(
-                listOf(imageVertexShader, imageFragmentShader),
+                listOf(imagePlaneVertexShader, imagePlaneFragmentShader),
                 listOf(positionAttributeImage, uvAttributeImage),
-                listOf(mvpMatrixUniformImage, regionTextureUniform))
+                listOf(mvpMatrixUniformImage, imageTextureUniform))
 
         heightMap = HexGrid(2560.0f, 1024, positionAttribute, uvAttribute, true)
 
         waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
-        imagePlane = ImagePlane(2600.0f, positionAttributeImage, uvAttributeImage)
+        imagePlane = ImagePlane(2600.0f, positionAttributeRegion, uvAttributeRegion)
 
         lightDirection.normalize()
 
         modelMatrix.translate(translation)
     }
 
-    fun setTexture(newTexture: TextureId, resolution: Int) {
+    fun setHeightmap(newTexture: TextureId, resolution: Int) {
         synchronized(textureLock) {
-            hasTexture = true
-            textureId = newTexture
-            textureResolution = resolution
+            hasHeightmap = true
+            heightmapId = newTexture
+            heightMapResolution = resolution
         }
     }
 
@@ -198,6 +216,13 @@ class MeshViewport3D(
         synchronized(textureLock) {
             hasRegions = true
             regionTextureId = textureId
+        }
+    }
+
+    fun setImage(textureId: TextureId) {
+        synchronized(textureLock) {
+            hasImage = true
+            imageTextureId = textureId
         }
     }
 
@@ -256,10 +281,73 @@ class MeshViewport3D(
     }
 
     fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
-        if (imagePlaneOn.value) {
+        if (imageMode.value == 0) {
+            onDrawFrameInternalRegion(xPosition, yPosition, width, height, rootHeight, scale)
+        } else if (imageMode.value == 1) {
             onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
         } else {
             onDrawFrameInternalHeightmap(xPosition, yPosition, width, height, rootHeight, scale)
+        }
+    }
+
+    private fun onDrawFrameInternalRegion(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+        if (width < 1 || height < 1) {
+            return
+        }
+        synchronized(textureLock) {
+            if (hasRegions) {
+                val adjustedWidth = round(width / scale)
+                val adjustedHeight = round(height / scale)
+                val adjustedX = round(xPosition / scale)
+                val adjustedY = round(yPosition / scale)
+
+                val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+                hotZoneX1 = adjustedX + marginWidth
+                hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
+                val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+                hotZoneY1 = adjustedY + marginHeight
+                hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
+
+                val flippedY = rootHeight - (yPosition + height)
+
+                val premulRatio = width / height.toFloat()
+                val orthoZoom = zoom * perspectiveToOrtho
+                projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
+
+                translation.set(defaultTranslation)
+                rotation.set(defaultRotation)
+                zoom = defaultZoom
+                modelMatrix.translation(translation).rotate(rotation)
+
+                deltaX = mouseX - lastMouseX
+                deltaY = mouseY - lastMouseY
+
+                lastMouseX = mouseX.toFloat()
+                lastMouseY = mouseY.toFloat()
+
+                deltaRotation.identity()
+
+                viewMatrix.mul(modelMatrix, mvMatrix)
+                projectionMatrix.mul(mvMatrix, mvpMatrix)
+
+                glDisable(GL_BLEND)
+                glDisable(GL_CULL_FACE)
+                glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
+                glEnable(GL_MULTISAMPLE)
+
+                glClearColor(background.r, background.g, background.b, background.a)
+                glScissor(xPosition, flippedY, width, height)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
+
+                drawRegionPlane()
+
+                glDisable(GL_SCISSOR_TEST)
+            }
         }
     }
 
@@ -268,7 +356,7 @@ class MeshViewport3D(
             return
         }
         synchronized(textureLock) {
-            if (hasRegions) {
+            if (hasImage) {
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
@@ -330,7 +418,7 @@ class MeshViewport3D(
             return
         }
         synchronized(textureLock) {
-            if (hasTexture) {
+            if (hasHeightmap) {
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
@@ -454,10 +542,10 @@ class MeshViewport3D(
         glUniform4f(specularUniform.location, 0.85f, 0.85f, 0.85f, 1.0f)
         glUniform1f(shininessUniform.location, 1.7f)
         glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value)
-        glUniform1f(uvScaleUniform.location, heightMap.width / textureResolution)
+        glUniform1f(uvScaleUniform.location, heightMap.width / heightMapResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, textureId?.id ?: -1)
+        glBindTexture(GL_TEXTURE_2D, heightmapId?.id ?: -1)
         heightMap.render()
     }
 
@@ -476,12 +564,21 @@ class MeshViewport3D(
         waterPlane.render()
     }
 
-    private fun drawImagePlane() {
-        glUseProgram(imagePlaneProgram)
-        glUniformMatrix4fv(mvpMatrixUniformImage.location, false, mvpMatrix.get(0, floatBuffer))
+    private fun drawRegionPlane() {
+        glUseProgram(regionPlaneProgram)
+        glUniformMatrix4fv(mvpMatrixUniformRegion.location, false, mvpMatrix.get(0, floatBuffer))
         glUniform1i(regionTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, regionTextureId?.id ?: -1)
+        imagePlane.render()
+    }
+
+    private fun drawImagePlane() {
+        glUseProgram(imagePlaneProgram)
+        glUniformMatrix4fv(mvpMatrixUniformImage.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform1i(imageTextureUniform.location, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, imageTextureId?.id ?: -1)
         imagePlane.render()
     }
 

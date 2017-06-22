@@ -6,7 +6,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
 
     companion object {
 
-        fun fromUnsortedEdges(edges: Collection<LineSegment2F>, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null, reusePoints: Boolean = false): Polygon2F {
+        fun fromUnsortedEdges(edges: Collection<LineSegment2F>, splices: ArrayList<Pair<LineSegment2F, Point2F>>? = null, reusePoints: Boolean = false, epsilon: Float = 0.000001f): Polygon2F {
             val polygons = ArrayList<Polygon2F>()
             val mutableEdges = ArrayList(edges)
             while (mutableEdges.isNotEmpty()) {
@@ -14,7 +14,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                 val seedEdge = mutableEdges.removeAt(0)
                 border.add(seedEdge.a)
                 splices?.forEach {
-                    if (it.first.epsilonEquals(seedEdge)) {
+                    if (it.first.epsilonEquals(seedEdge, epsilon)) {
                         border.add(it.second)
                     }
                 }
@@ -23,7 +23,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                 while (mutableEdges.isNotEmpty()) {
                     var nextEdge: LineSegment2F? = null
                     for (i in 0..mutableEdges.size - 1) {
-                        if (currentEdge.a.epsilonEquals(mutableEdges[i].b)) {
+                        if (currentEdge.a.epsilonEquals(mutableEdges[i].b, epsilon)) {
                             nextEdge = mutableEdges.removeAt(i)
                             break
                         }
@@ -34,7 +34,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                     splices?.forEach {
                         val finalNextEdge = nextEdge
                         if (finalNextEdge != null) {
-                            if (it.first.epsilonEquals(finalNextEdge)) {
+                            if (it.first.epsilonEquals(finalNextEdge, epsilon)) {
                                 border.add(0, it.second)
                             }
                         }
@@ -46,7 +46,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                 while (mutableEdges.isNotEmpty()) {
                     var nextEdge: LineSegment2F? = null
                     for (i in 0..mutableEdges.size - 1) {
-                        if (currentEdge.b.epsilonEquals(mutableEdges[i].a)) {
+                        if (currentEdge.b.epsilonEquals(mutableEdges[i].a, epsilon)) {
                             nextEdge = mutableEdges.removeAt(i)
                             break
                         }
@@ -57,7 +57,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                     splices?.forEach {
                         val finalNextEdge = nextEdge
                         if (finalNextEdge != null) {
-                            if (it.first.epsilonEquals(finalNextEdge)) {
+                            if (it.first.epsilonEquals(finalNextEdge, epsilon)) {
                                 border.add(it.second)
                             }
                         }
@@ -86,7 +86,7 @@ class Polygon2F(val points: List<Point2F>, val isClosed: Boolean) {
                     var tooMany = false
                     for ((j, mainPoint) in mainPoly.points.withIndex()) {
                         for ((k, otherPoint) in otherPoly.points.withIndex()) {
-                            if (mainPoint.epsilonEquals(otherPoint)) {
+                            if (mainPoint.epsilonEquals(otherPoint, epsilon)) {
                                 if (pointInCommon != null) {
                                     tooMany = true
                                 }

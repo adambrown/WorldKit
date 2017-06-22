@@ -1,11 +1,15 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.learning.rgba
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.mRef
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
+import org.lwjgl.nanovg.NVGColor
+import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
@@ -22,8 +26,10 @@ import java.util.concurrent.CountDownLatch
 
 object TextureBuilder {
 
-    fun init() {
+    private var nvg: Long = -1
 
+    fun init(nvg: Long) {
+        this.nvg = nvg
     }
 
     private val deadTextureQueue = ConcurrentLinkedQueue<Int>()
@@ -144,6 +150,109 @@ object TextureBuilder {
             textureRenderer.unbind()
             retVal
         })
+    }
+
+    private fun <T : Any> renderNvgInternal(collector: (TextureRenderer) -> T): T {
+        return doDeferredOpenglWork(ValueCollector { collector(textureRenderer) })
+    }
+
+    fun renderLandImage(landBodyPolygons: List<List<Point2F>>): TextureId {
+        return renderNvgInternal { textureRenderer ->
+            val width = textureRenderer.width
+            val height = textureRenderer.height
+
+            textureRenderer.bind()
+
+            nvgSave(nvg)
+            glViewport(0, 0, width, height)
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+            glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
+            nvgBeginFrame(nvg, width, height, 1.0f)
+
+            val color = NVGColor.create()
+            rgba(255, 255, 255, 255, color)
+            nvgFillColor(nvg, color)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it, true)
+                nvgFill(nvg)
+            }
+
+            nvgEndFrame(nvg)
+            nvgRestore(nvg)
+            val retVal = textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
+            textureRenderer.unbind()
+            retVal
+        }
+    }
+
+    fun renderMapImage(landBodyPolygons: List<List<Point2F>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+        return renderNvgInternal { textureRenderer ->
+            val width = textureRenderer.width
+            val height = textureRenderer.height
+
+            textureRenderer.bind()
+
+            nvgSave(nvg)
+            glViewport(0, 0, width, height)
+            glClearColor(0.34f, 0.35f, 0.9f, 1.0f)
+            glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
+            nvgBeginFrame(nvg, width, height, 1.0f)
+
+            val color = NVGColor.create()
+            rgba(110, 210, 115, 255, color)
+            nvgFillColor(nvg, color)
+            rgba(0, 0, 0, 255, color)
+            nvgStrokeWidth(nvg, 8.0f)
+            nvgStrokeColor(nvg, color)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it, true)
+                nvgFill(nvg)
+                nvgStroke(nvg)
+            }
+
+            rgba(40, 45, 245, 255, color)
+            nvgStrokeColor(nvg, color)
+            riverPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+
+            rgba(245, 45, 40, 255, color)
+            nvgStrokeColor(nvg, color)
+            mountainPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+
+            nvgEndFrame(nvg)
+            nvgRestore(nvg)
+            val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
+            textureRenderer.unbind()
+            retVal
+        }
+    }
+
+    fun drawShape(nvg: Long, points: List<Point2F>, isClosed: Boolean) {
+        nvgBeginPath(nvg)
+        drawLines(nvg, points, isClosed, true, 4096.0f)
+        if (isClosed) {
+            nvgClosePath(nvg)
+        }
+    }
+
+    private fun drawLines(nvg: Long, points: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean, multiplier: Float) {
+        for (i in if (isClosed) 1..points.size else 1..points.size - 1) {
+            val id = i % points.size
+            val lastId = i - 1
+            val lastPoint = points[lastId]
+            val point = points[id]
+            if (i == 1 && moveToFirst) {
+                nvgMoveTo(nvg, lastPoint.x * multiplier, (1.0f - lastPoint.y) * multiplier)
+                nvgLineTo(nvg, point.x * multiplier, (1.0f - point.y) * multiplier)
+            } else {
+                nvgLineTo(nvg, point.x * multiplier, (1.0f - point.y) * multiplier)
+            }
+        }
     }
 
     fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>): FloatArray {
@@ -387,7 +496,8 @@ object TextureBuilder {
 
             depthBufferId = glGenRenderbuffers()
             glBindRenderbuffer(GL_RENDERBUFFER, depthBufferId)
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthBufferId)
 
             renderTextureId = glGenTextures()
             glBindTexture(GL_TEXTURE_2D, renderTextureId)
@@ -396,8 +506,6 @@ object TextureBuilder {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, MemoryUtil.NULL)
-
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBufferId)
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId, 0)
 
             glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
@@ -437,7 +545,7 @@ object TextureBuilder {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_SHORT, MemoryUtil.NULL)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, width, height, 0, GL_RED, GL_UNSIGNED_SHORT, MemoryUtil.NULL)
             glReadBuffer(GL_COLOR_ATTACHMENT0)
             glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
             return TextureId(newTexId)
@@ -463,7 +571,7 @@ object TextureBuilder {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, MemoryUtil.NULL)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, MemoryUtil.NULL)
             glReadBuffer(GL_COLOR_ATTACHMENT0)
             glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
             return TextureId(newTexId)

@@ -6,19 +6,66 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
 
     companion object {
 
-        fun getConnectedEdgeSegments(edgeSet: Collection<LineSegment2F>): ArrayList<ArrayList<LineSegment2F>> {
+        fun getConnectedEdgeSegments(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.000001f): ArrayList<ArrayList<LineSegment2F>> {
             val segments = ArrayList<ArrayList<LineSegment2F>>()
             val unconnected = LinkedHashSet<LineSegment2F>(edgeSet)
             while (unconnected.isNotEmpty()) {
                 val seed = unconnected.first()
                 unconnected.remove(seed)
-                val segment = seed.getConnectedEdges(edgeSet)
+                val segment = seed.getConnectedEdges(edgeSet, epsilon)
                 unconnected.removeAll(segment)
                 segments.add(segment)
             }
             return segments
         }
+
+        fun getConnectedEdgeSegmentsAlt(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.000001f): ArrayList<ArrayList<LineSegment2F>> {
+            val segments = ArrayList<ArrayList<LineSegment2F>>()
+            val unconnected = LinkedHashSet<LineSegment2F>(edgeSet)
+            while (unconnected.isNotEmpty()) {
+                val seed = unconnected.first()
+                unconnected.remove(seed)
+                val segment = seed.getConnectedEdgesAlt(edgeSet, epsilon)
+                unconnected.removeAll(segment)
+                segments.add(segment)
+            }
+            for (i in segments.size - 1 downTo 0) {
+                val segment = segments[i]
+                if (Polygon2F.fromUnsortedEdges(segment).isClosed) {
+                    var doBreak = false
+                    for (j in 0..segments.size - 1) {
+                        if (i == j) {
+                            continue
+                        }
+                        val other = segments[j]
+                        for (m in 0..segment.size - 1) {
+                            val segmentEdge = segment[m]
+                            for (n in 0..other.size - 1) {
+                                val otherEdge = other[n]
+                                if (segmentEdge.a.epsilonEquals(otherEdge.a, epsilon)) {
+                                    for (k in 1..segment.size) {
+                                        val id = ((m - k) + segment.size) % segment.size
+                                        other.add(n, segment[id])
+                                    }
+                                    segments.removeAt(i)
+                                    doBreak = true
+                                    break
+                                }
+                            }
+                            if (doBreak) {
+                                break
+                            }
+                        }
+                        if (doBreak) {
+                            break
+                        }
+                    }
+                }
+            }
+            return segments
+        }
     }
+
 
     open val length2: Float by lazy {
         a.distance2(b)
@@ -219,26 +266,72 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
     }
 
     fun getConnectedEdges(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.000001f): ArrayList<LineSegment2F> {
+        val unconnected = LinkedHashSet(edgeSet)
         val connectedEdges = ArrayList<LineSegment2F>()
         connectedEdges.add(this)
         var nextEdges = LinkedHashSet<LineSegment2F>(connectedEdges)
         while (nextEdges.isNotEmpty()) {
             val newEdges = LinkedHashSet<LineSegment2F>()
             nextEdges.forEach { edge ->
-                edgeSet.forEach {
+                unconnected.forEach {
                     if (edge.a.epsilonEquals(it.a, epsilon)
                             || edge.a.epsilonEquals(it.b, epsilon)
                             || edge.b.epsilonEquals(it.a, epsilon)
                             || edge.b.epsilonEquals(it.b, epsilon)) {
-                        newEdges.add(it)
+                        if (!connectedEdges.contains(it)) {
+                            newEdges.add(it)
+                            connectedEdges.add(it)
+                        }
                     }
                 }
             }
-            newEdges.removeAll(connectedEdges)
-            connectedEdges.addAll(newEdges)
+            unconnected.removeAll(newEdges)
             nextEdges = newEdges
         }
         return connectedEdges
+    }
+
+    fun getConnectedEdgesAlt(edgeSet: Collection<LineSegment2F>, epsilon: Float = 0.000001f): ArrayList<LineSegment2F> {
+        val unconnected = ArrayList(edgeSet)
+        val connected = ArrayList<LineSegment2F>()
+        connected.add(this)
+        unconnected.remove(this)
+        while (true) {
+            var doBreak = false
+            for (i in unconnected.size - 1 downTo 0) {
+                doBreak = false
+                val currentEdge = unconnected[i]
+                for (j in 0..connected.size - 1) {
+                    val otherEdge = connected[j]
+                    if (currentEdge.a.epsilonEquals(otherEdge.a, epsilon)
+                            || currentEdge.a.epsilonEquals(otherEdge.b, epsilon)
+                            || currentEdge.b.epsilonEquals(otherEdge.a, epsilon)
+                            || currentEdge.b.epsilonEquals(otherEdge.b, epsilon)) {
+                        unconnected.removeAt(i)
+                        connected.add(currentEdge)
+                        doBreak = true
+                        break
+                    }
+                }
+                if (doBreak) {
+                    break
+                }
+            }
+            if (!doBreak) {
+                val unconPoints = unconnected.flatMap { listOf(it.a, it.b) }
+                val conPoints = connected.flatMap { listOf(it.a, it.b) }
+                var anyConnected = false
+                unconPoints.forEach { un ->
+                    conPoints.forEach { con ->
+                        if (un.epsilonEquals(con, epsilon)) {
+                            anyConnected = true
+                        }
+                    }
+                }
+                println(anyConnected)
+                return connected
+            }
+        }
     }
 
     override fun toString(): String {

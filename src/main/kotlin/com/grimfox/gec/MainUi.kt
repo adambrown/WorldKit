@@ -1,9 +1,9 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
-import com.grimfox.gec.biomes.Biomes
 import com.grimfox.gec.command.BuildContinent
 import com.grimfox.gec.command.BuildContinent.ParameterSet
+import com.grimfox.gec.command.BuildContinent.RegionSplines
 import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
@@ -20,8 +20,8 @@ import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.clamp
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
@@ -43,26 +43,7 @@ object MainUi {
     private class CurrentState(val parameters: ParameterSet,
                                val graph: Graph,
                                val regionMask: Matrix<Byte>,
-                               val regionTextureId: TextureId) {
-
-        @Volatile private var free: Boolean = false
-
-        fun free() {
-            if (!free) {
-                synchronized(this) {
-                    if (!free) {
-                        free = true
-                        regionTextureId.free()
-                    }
-                }
-            }
-        }
-
-        @Suppress("unused")
-        fun finalize() {
-            free()
-        }
-    }
+                               val regionSplines: RegionSplines)
 
     @JvmStatic fun main(vararg args: String) {
         val executor = executor
@@ -79,7 +60,7 @@ object MainUi {
 
         val cachedGraph1024 = preferences.cachedGraph1024!!
 
-        val DEFAULT_HEIGHT_SCALE = 70.0f
+        val DEFAULT_HEIGHT_SCALE = 50.0f
         val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
         val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
         val HEIGHT_SCALE_CONST = DEFAULT_HEIGHT_SCALE * 0.968746f
@@ -123,7 +104,7 @@ object MainUi {
         val perspectiveOn = ref(true)
         val rotateAroundCamera = ref(false)
         val resetView = mRef(false)
-        val imageModeOn = ref(false)
+        val imageMode = ref(2)
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
 
@@ -135,7 +116,7 @@ object MainUi {
         val errorMessageText = errorMessageDynamic.text
         val errorMessageReference = errorMessageDynamic.reference
 
-        val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageModeOn)
+        val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode)
 
         val uiLayout = layout { ui ->
             val uiLayout = this
@@ -465,6 +446,7 @@ object MainUi {
                                                 vSpacer(MEDIUM_SPACER_SIZE)
                                                 val allowUnsafe = ref(false)
                                                 val seed = ref(1L)
+                                                val mapScale = ref(4)
                                                 val regions = ref(8)
                                                 val islands = ref(1)
                                                 val stride = ref(7)
@@ -508,6 +490,7 @@ object MainUi {
                                                         }
                                                     }
                                                 }
+                                                vSliderWithValueRow(mapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map Scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
                                                 vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
                                                 vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Island strength:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
                                                 vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30))
@@ -602,6 +585,7 @@ object MainUi {
                                                         doGeneration {
                                                             val parameters = ParameterSet(
                                                                     seed = seed.value,
+                                                                    mapScale = mapScale.value,
                                                                     regionCount = regions.value,
                                                                     stride = stride.value,
                                                                     islandDesire = islands.value,
@@ -611,13 +595,13 @@ object MainUi {
                                                                     regionSize = regionSize.value,
                                                                     maxRegionTries = iterations.value * 10,
                                                                     maxIslandTries = iterations.value * 100)
-                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                            val regionTextureId = renderRegions(resultPair.first, resultPair.second)
-                                                            meshViewport.setRegions(regionTextureId)
-                                                            val lastState = currentState.value
-                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
-                                                            lastState?.free()
-                                                            imageModeOn.value = true
+                                                            val builder = BuildContinent()
+                                                            val resultPair = builder.generateRegions(parameters.copy(), executor)
+                                                            val regionSplines = builder.generateRegionSplines(random, resultPair, parameters.mapScale)
+                                                            val regionTextureId = renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
+                                                            meshViewport.setImage(regionTextureId)
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionSplines)
+                                                            imageMode.value = 1
                                                             val historyLast = historyCurrent.value
                                                             if (historyLast != null) {
                                                                 if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
@@ -643,6 +627,7 @@ object MainUi {
                                                             }
                                                             val parameters = ParameterSet(
                                                                     seed = seed.value,
+                                                                    mapScale = mapScale.value,
                                                                     regionCount = regions.value,
                                                                     stride = stride.value,
                                                                     islandDesire = islands.value,
@@ -652,13 +637,13 @@ object MainUi {
                                                                     regionSize = regionSize.value,
                                                                     maxRegionTries = iterations.value * 10,
                                                                     maxIslandTries = iterations.value * 100)
-                                                            val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                            val regionTextureId = renderRegions(resultPair.first, resultPair.second)
-                                                            meshViewport.setRegions(regionTextureId)
-                                                            val lastState = currentState.value
-                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
-                                                            lastState?.free()
-                                                            imageModeOn.value = true
+                                                            val builder = BuildContinent()
+                                                            val resultPair = builder.generateRegions(parameters.copy(), executor)
+                                                            val regionSplines = builder.generateRegionSplines(random, resultPair, parameters.mapScale)
+                                                            val regionTextureId = renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
+                                                            meshViewport.setImage(regionTextureId)
+                                                            currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionSplines)
+                                                            imageMode.value = 1
                                                             val historyLast = historyCurrent.value
                                                             if (historyLast != null) {
                                                                 if ((historyBackQueue.size == 0 || historyBackQueue.peek() != historyLast) && parameters != historyLast) {
@@ -681,6 +666,7 @@ object MainUi {
                                                         } else {
                                                             seed.value = randomSeed
                                                         }
+                                                        mapScale.value = parameters.mapScale
                                                         regions.value = parameters.regionCount
                                                         stride.value = parameters.stride
                                                         islands.value = parameters.islandDesire
@@ -700,13 +686,13 @@ object MainUi {
                                                                     historyForwardQueue.push(historyLast.copy())
                                                                 }
                                                                 syncParameterValues(parameters)
-                                                                val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                                val regionTextureId = renderRegions(resultPair.first, resultPair.second)
-                                                                meshViewport.setRegions(regionTextureId)
-                                                                val lastState = currentState.value
-                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
-                                                                lastState?.free()
-                                                                imageModeOn.value = true
+                                                                val builder = BuildContinent()
+                                                                val resultPair = builder.generateRegions(parameters.copy(), executor)
+                                                                val regionSplines = builder.generateRegionSplines(random, resultPair, parameters.mapScale)
+                                                                val regionTextureId = renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
+                                                                meshViewport.setImage(regionTextureId)
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionSplines)
+                                                                imageMode.value = 1
                                                                 historyCurrent.value = parameters.copy()
                                                             }
                                                         }
@@ -723,13 +709,13 @@ object MainUi {
                                                                     historyBackQueue.push(historyLast.copy())
                                                                 }
                                                                 syncParameterValues(parameters)
-                                                                val resultPair = BuildContinent().generateRegions(parameters.copy(), executor)
-                                                                val regionTextureId = renderRegions(resultPair.first, resultPair.second)
-                                                                meshViewport.setRegions(regionTextureId)
-                                                                val lastState = currentState.value
-                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionTextureId)
-                                                                lastState?.free()
-                                                                imageModeOn.value = true
+                                                                val builder = BuildContinent()
+                                                                val resultPair = builder.generateRegions(parameters.copy(), executor)
+                                                                val regionSplines = builder.generateRegionSplines(random, resultPair, parameters.mapScale)
+                                                                val regionTextureId = renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
+                                                                meshViewport.setImage(regionTextureId)
+                                                                currentState.value = CurrentState(parameters.copy(), resultPair.first, resultPair.second, regionSplines)
+                                                                imageMode.value = 1
                                                                 historyCurrent.value = parameters.copy()
                                                             }
                                                         }
@@ -744,9 +730,9 @@ object MainUi {
                                                         doGeneration {
                                                             val currentStateValue = currentState.value
                                                             if (currentStateValue != null) {
-                                                                meshViewport.setTexture(BuildContinent().generateWaterFlows(currentStateValue.parameters, currentStateValue.graph, currentStateValue.regionMask, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, currentStateValue.regionTextureId, executor), 4096)
+                                                                meshViewport.setHeightmap(BuildContinent().generateWaterFlows(currentStateValue.parameters, currentStateValue.graph, currentStateValue.regionMask, currentStateValue.regionSplines, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor), 4096)
 //                                                            meshViewport.setTexture(BuildContinent().generateLandmass(currentStateValue.first, currentStateValue.second, currentStateValue.third, executor))
-                                                                imageModeOn.value = false
+                                                                imageMode.value = 2
                                                             }
                                                         }
                                                     }

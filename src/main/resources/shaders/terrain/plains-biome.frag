@@ -1,6 +1,9 @@
 #version 330
 
-uniform sampler2D regionBorderDistanceMask;
+uniform float textureScale;
+uniform float borderDistanceScale;
+uniform sampler2D riverBorderDistanceMask;
+uniform sampler2D mountainBorderDistanceMask;
 uniform sampler2D coastDistanceMask;
 uniform sampler2D noiseMask1;
 
@@ -11,17 +14,28 @@ in VertexData {
 layout(location = 0) out vec4 colorOut;
 
 void main() {
-    float regionBorderDistance = texture(regionBorderDistanceMask, VertexIn.uv).r;
-    if (regionBorderDistance > 0.995) {
-        float height = ((0.005 - (regionBorderDistance - 0.995)) * 1.4) + 0.000000001;
+    float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
+    float minBorderDist = borderDistanceScale * 0.017;
+    float minBorderDistInverse = 1.0 - minBorderDist;
+    if (mountainBorderDistance > minBorderDistInverse) {
+        float multiplier = (mountainBorderDistance - minBorderDistInverse) * 25 + 0.001;
+        float height = texture(noiseMask1, VertexIn.uv * textureScale).r * multiplier;
         colorOut = vec4(height, height, height, 1.0);
     } else {
-        float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
-        if (coastDistance > 0.999) {
-            colorOut = vec4(0.01, 0.01, 0.01, 1.0);
-        } else {
-            float height = texture(noiseMask1, VertexIn.uv).r;
+        minBorderDist = borderDistanceScale * 0.007;
+        minBorderDistInverse = 1.0 - minBorderDist;
+        float riverBorderDistance = texture(riverBorderDistanceMask, VertexIn.uv).r;
+        if (riverBorderDistance > minBorderDistInverse) {
+            float height = (minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 0.001 + 0.000000001;
             colorOut = vec4(height, height, height, 1.0);
+        } else {
+            float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
+            if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
+                colorOut = vec4(0.00001, 0.00001, 0.00001, 1.0);
+            } else {
+                float height = texture(noiseMask1, VertexIn.uv * textureScale).r * 0.001;
+                colorOut = vec4(height, height, height, 1.0);
+            }
         }
     }
 }

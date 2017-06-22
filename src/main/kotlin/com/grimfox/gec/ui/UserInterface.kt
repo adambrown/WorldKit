@@ -53,7 +53,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
             ui.root.handleScroll(x, y)
         }
         ui.show()
-        TextureBuilder.init()
+        TextureBuilder.init(ui.nvg)
         executor.call { Biomes.init() }
         while (!ui.shouldClose()) {
             TextureBuilder.onDrawFrame()
@@ -1017,8 +1017,6 @@ private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boo
     val mouseIsInArea = y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
     return mouseIsInArea
 }
-
-private val HANDLE_MOUSE_LOCK = ReentrantLock(true)
 
 private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double, mods: Int) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {

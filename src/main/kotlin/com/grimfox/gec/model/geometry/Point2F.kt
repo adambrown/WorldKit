@@ -36,7 +36,7 @@ open class Point2F(val x: Float, val y: Float) {
     }
 
     fun epsilonEquals(other: Point2F, epsilon: Float = 0.000001f): Boolean {
-        return Math.abs(x - other.x) < epsilon && Math.abs(y - other.y) < epsilon
+        return Math.abs(x - other.x) <= epsilon && Math.abs(y - other.y) <= epsilon
     }
 
     override fun toString(): String {

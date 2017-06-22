@@ -5,18 +5,19 @@ import com.grimfox.gec.biomes.Biomes.Biome
 import com.grimfox.gec.biomes.Biomes.ErosionLevel
 import com.grimfox.gec.biomes.Biomes.ErosionSettings
 import com.grimfox.gec.biomes.Biomes.RegionData
+import com.grimfox.gec.command.BuildContinent.RegionSplines
 import com.grimfox.gec.extensions.call
 import com.grimfox.gec.extensions.join
 import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertices
-import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.model.geometry.Point3F
+import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedByte
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
-import com.grimfox.gec.util.Rendering.renderCoastalBorders
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.util.Rendering.renderEdges
 import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.geometry.renderTriangle
@@ -42,7 +43,6 @@ object WaterFlows {
         }
     }
 
-    private val DISTANCE_SCALE = 50000.0f
     private val SIMPLEX_SCALE = 96.0f
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
@@ -67,20 +67,30 @@ object WaterFlows {
 
     class Pass(val passKey: PassKey, val id1: Int, val id2: Int, val height: Float)
 
-    fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, regionTextureId: TextureId, executor: ExecutorService, outputWidth: Int): TextureId {
+    fun generateWaterFlows(random: Random, inputGraph: Graph, inputMask: Matrix<Byte>, regionSplines: RegionSplines, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, outputWidth: Int, mapScale: Int): TextureId {
+        val scale = ((mapScale * mapScale) / 400.0f).coerceIn(0.0f, 1.0f)
+        val distanceScale = scale * 990000 + 10000
+        val biomeScale = Math.round(scale * 18) + 10
+        val shaderTextureScale = ((mapScale / 20.0f).coerceIn(0.0f, 1.0f) * 0.75f) + 0.25f
+        val shaderBorderDistanceScale = ((1.0f - ((mapScale / 20.0f).coerceIn(0.0f, 1.0f))) * 0.5f) + 0.5f
+
         val randomSeeds = Array(4) { random.nextLong() }
         val biomes = arrayListOf(Biomes.COASTAL_MOUNTAINS_BIOME, Biomes.MOUNTAINS_BIOME, Biomes.FOOTHILLS_BIOME, Biomes.ROLLING_HILLS_BIOME, Biomes.PLAINS_BIOME, Biomes.PLATEAU_BIOME)
-//        val biomes = arrayListOf(Biomes.PLATEAU_BIOME)
+//        val biomes = arrayListOf(Biomes.MOUNTAINS_BIOME, Biomes.FOOTHILLS_BIOME)
 
         val biomeMasksFuture = executor.call {
-            val regionBorderTextureId = renderRegionBorders(executor, inputGraph, inputMask, threadCount)
+            val landMapTextureId = renderLandImage(regionSplines.coastPoints)
 
-            val coastalBorderTextureId = renderCoastalBorders(executor, inputGraph, inputMask, threadCount)
+            val riverBorderTextureId = renderEdges(executor, regionSplines.riverEdges, threadCount)
+
+            val mountainBorderTextureId = renderEdges(executor, regionSplines.mountainEdges, threadCount)
+
+            val coastalBorderTextureId = renderEdges(executor, regionSplines.coastEdges, threadCount)
 
             val biomeCount = biomes.size
             val biomeGraphSmallFuture = executor.call {
                 val innerRandom = Random(randomSeeds[0])
-                val graph = Graphs.generateGraph(14, innerRandom, 0.98)
+                val graph = Graphs.generateGraph(biomeScale, innerRandom, 0.98)
                 val mask = ByteArrayMatrix(graph.stride!!) { ((Math.abs(innerRandom.nextInt()) % biomeCount) + 1).toByte() }
                 graph to mask
             }
@@ -113,11 +123,7 @@ object WaterFlows {
                 val mask = ByteArrayMatrix(inputGraph.stride!!) { i ->
                     val vertex = vertices[i]
                     val point = vertex.point
-                    if (inputMask[i] < 1 || vertex.cell.isBorder) {
-                        0.toByte()
-                    } else {
-                        parentMask[parentGraph.getClosestPoint(point, parentGraph.getClosePoints(point, 2))]
-                    }
+                    parentMask[parentGraph.getClosestPoint(point, parentGraph.getClosePoints(point, 2))]
                 }
                 graph to mask
             }
@@ -139,7 +145,7 @@ object WaterFlows {
                 val biomeRegions = buildUpliftTriangles(biomeGraphFinalFuture.value.first, biomeGraphFinalFuture.value.second)
                 biomeRegions.forEachIndexed { i, (vertexData, indexData) ->
                     val biome = biomes[i]
-                    biome.upliftShader.bind(regionTextureId, biomeTextureId, regionBorderTextureId, coastalBorderTextureId, biomeBorderTextureId)
+                    biome.upliftShader.bind(shaderTextureScale, shaderBorderDistanceScale, landMapTextureId, coastalBorderTextureId, biomeTextureId, biomeBorderTextureId, riverBorderTextureId, mountainBorderTextureId)
                     dynamicGeometry2D.render(vertexData, indexData, biome.upliftShader.positionAttribute)
                 }
                 val retVal = textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
@@ -148,24 +154,27 @@ object WaterFlows {
             }
             val upliftMask = ByteBufferMatrix(4096, extractTextureRedByte(upliftTextureId, 4096))
 
-            regionBorderTextureId.free()
+            val landMask = ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096))
+
+            riverBorderTextureId.free()
+            mountainBorderTextureId.free()
             coastalBorderTextureId.free()
             biomeTextureId.free()
             biomeBorderTextureId.free()
             upliftTextureId.free()
-            biomeMask to upliftMask
+            Triple(biomeMask, upliftMask, landMask)
         }
 
         val smallMapsFuture = executor.call {
-            val regionData = buildRegionData(executor, flowGraphSmall, inputGraph, inputMask)
-            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionData, biomes, biomeMasksFuture.value.first, biomeMasksFuture.value.second, DISTANCE_SCALE, Random(randomSeeds[3]))
+            val regionData = buildRegionData(flowGraphSmall, biomeMasksFuture.value.third)
+            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionData, biomes, biomeMasksFuture.value.first, biomeMasksFuture.value.second, distanceScale, Random(randomSeeds[3]))
             performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 50, biomes.map { it.erosionLowSettings }, 1024)
         }
         val midNodesFuture = executor.call {
-            prepareGraphNodes(executor, flowGraphMedium, inputGraph, inputMask, DISTANCE_SCALE)
+            prepareGraphNodes(executor, flowGraphMedium, biomeMasksFuture.value.third, distanceScale)
         }
         val highNodesFuture = executor.call {
-            prepareGraphNodes(executor, flowGraphLarge, inputGraph, inputMask, DISTANCE_SCALE)
+            prepareGraphNodes(executor, flowGraphLarge, biomeMasksFuture.value.third, distanceScale)
         }
         val midMapsFuture = executor.call {
             val heightMap = smallMapsFuture.value
@@ -205,30 +214,128 @@ object WaterFlows {
 //        return regionBorderTextureId
     }
 
-    private fun buildRegionData(executor: ExecutorService, graph: Graph, inputGraph: Graph, inputMask: Matrix<Byte>): RegionData {
+    private fun buildOpenEdges(polygon: Polygon2F, smoothing: Float): List<Point2F> {
+        return buildEdges(getCurvePoints(polygon.points, false, 0.00035f, smoothing), false, true)
+    }
+
+    private fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Float): List<Point2F> {
+        val points = ArrayList<Point2F>()
+        if (polygons.size == 1) {
+            points.addAll(buildEdges(getCurvePoints(polygons.first().points, true, 0.00035f, smoothing), true, true))
+        } else {
+            polygons.forEachIndexed { i, it ->
+                points.addAll(buildEdges(getCurvePoints(it.points, false, 0.00035f, smoothing), false, i == 0))
+            }
+        }
+        return points
+    }
+
+    private fun buildEdges(inPoints: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean): List<Point2F> {
+        val outPoints = ArrayList<Point2F>()
+        val start = inPoints.first()
+        if (moveToFirst) {
+            outPoints.add(start)
+        }
+        for (i in if (isClosed) 1..inPoints.size else 1..inPoints.size - 1) {
+            val id = i % inPoints.size
+            val lastId = i - 1
+            val lastPoint = inPoints[lastId]
+            val point = inPoints[id]
+            if (i == 1 && moveToFirst) {
+                outPoints[0] = lastPoint
+            }
+            outPoints.add(point)
+        }
+        return outPoints
+    }
+
+    private fun getCurvePoints(points: List<Point2F>, isClosed: Boolean, segmentSize: Float, smoothing: Float): List<Point2F> {
+
+        val newPoints = ArrayList<Vector2F>()
+        val copyPoints = ArrayList(points)
+
+        val firstPoint = copyPoints.first()
+        if (isClosed) {
+            copyPoints.add(firstPoint)
+        }
+
+        newPoints.add(Vector2F(firstPoint.x, (1.0f - firstPoint.y)))
+        for (i in 1..copyPoints.size - 1) {
+
+            val lastPoint = copyPoints[i - 1]
+            val thisPoint = copyPoints[i]
+
+            val vector = thisPoint - lastPoint
+            val length = vector.length
+            if (length > segmentSize) {
+                val segments = Math.ceil(length / segmentSize.toDouble()).toInt()
+                val offset = vector / segments.toFloat()
+                for (s in 1..segments - 1) {
+                    val newPoint = lastPoint + (offset * s.toFloat())
+                    newPoints.add(Vector2F(newPoint.x, (1.0f - newPoint.y)))
+                }
+            }
+            newPoints.add(Vector2F(thisPoint.x, (1.0f - thisPoint.y)))
+        }
+
+        val newPoints2 = newPoints.mapTo(ArrayList<Vector2F>(newPoints.size)) { Vector2F(it.a, it.b) }
+        var output: MutableList<Vector2F> = newPoints2
+        var input: MutableList<Vector2F>
+        var size = newPoints.size
+        val smoothFactor = Math.round(smoothing * 20).coerceIn(0, 20) + 12
+        (1..smoothFactor).forEach { iteration ->
+            input = if (iteration % 2 == 0) {
+                output = newPoints
+                newPoints2
+            } else {
+                output = newPoints2
+                newPoints
+            }
+            if (iteration % 5 == 0) {
+                for (i in if (isClosed) size - 2 downTo 0 step 2 else size - 3 downTo 1 step 2) {
+                    input.removeAt(i)
+                    output.removeAt(i)
+                }
+                size = input.size
+            }
+            for (i in if (isClosed) 1..size else 1..size - 2) {
+                val initialPosition = input[i % size]
+                var affectingPoint = input[i - 1]
+                var x = affectingPoint.a
+                var y = affectingPoint.b
+                affectingPoint = input[(i + 1) % size]
+                x += affectingPoint.a
+                y += affectingPoint.b
+                x *= 0.325f
+                y *= 0.325f
+                x += initialPosition.a * 0.35f
+                y += initialPosition.b * 0.35f
+                val nextPosition = output[i % size]
+                nextPosition.a = x
+                nextPosition.b = y
+            }
+        }
+
+        return output.map { Point2F(it.a, 1.0f - it.b) }
+    }
+
+    private fun buildRegionData(graph: Graph, landMask: Matrix<Byte>): RegionData {
         val vertices = graph.vertices
         val land = ArrayList<Int>(vertices.size)
         val water = LinkedHashSet<Int>(vertices.size)
-        val regions = ArrayList<LinkedHashSet<Int>>(16)
+        val landMaskWidth = landMask.width
+        val landMaskWidthM1 = landMaskWidth - 1
         for (i in 0..vertices.size - 1) {
             val point = vertices.getPoint(i)
-            val closePoint = inputGraph.getClosestPoint(point, inputGraph.getClosePoints(point, 1))
-            val maskValue = inputMask[closePoint]
-            if (maskValue < 1) {
+            val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
+            if (landMask[index].toInt() and 0xFF < 128) {
                 water.add(i)
             } else {
                 land.add(i)
-                val regionId = maskValue - 1
-                if (regions.size < maskValue) {
-                    for (j in 0..regionId - regions.size) {
-                        regions.add(LinkedHashSet<Int>())
-                    }
-                }
-                regions[regionId].add(i)
             }
         }
         val beach = extractBeachFromGraphAndWater(vertices, water)
-        return RegionData(land, beach, regions)
+        return RegionData(land, beach)
     }
 
     private fun bootstrapErosion(executor: ExecutorService, graph: Graph, regionData: RegionData, biomes: List<Biome>, biomeMask: Matrix<Byte>, upliftMask: Matrix<Byte>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
@@ -302,15 +409,16 @@ object WaterFlows {
         return heightMap
     }
 
-    private fun prepareGraphNodes(executor: ExecutorService, graph: Graph, inputGraph: Graph, inputMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
+    private fun prepareGraphNodes(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
         val vertices = graph.vertices
         val land = ArrayList<Int>(vertices.size)
         val water = LinkedHashSet<Int>(vertices.size)
+        val landMaskWidth = landMask.width
+        val landMaskWidthM1 = landMaskWidth - 1
         for (i in 0..vertices.size - 1) {
             val point = vertices.getPoint(i)
-            val closePoint = inputGraph.getClosestPoint(point, inputGraph.getClosePoints(point, 1))
-            val maskValue = inputMask[closePoint]
-            if (maskValue < 1) {
+            val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
+            if (landMask[index].toInt() and 0xFF < 128) {
                 water.add(i)
             } else {
                 land.add(i)
