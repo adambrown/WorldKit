@@ -1148,15 +1148,22 @@ fun Block.icon(imageRef: Int, imageSize: Float, layoutSize: Float): Block {
     return icon(imageRef, imageSize, imageSize, layoutSize, layoutSize)
 }
 
-fun Block.meshViewport3D(meshViewport: MeshViewport3D): Block {
+fun Block.meshViewport3D(meshViewport: MeshViewport3D, ui: UserInterface): Block {
     return block {
         layout = ABSOLUTE
         shape = ShapeMeshViewport3D(meshViewport)
         onMouseDown { button, x, y, _ ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                ui.keyboardHandler = meshViewport.keyboardHandler
+            }
             meshViewport.onMouseDown(button, x, y)
         }
-        onMouseRelease { button, _, _, _ ->
-            meshViewport.onMouseRelease(button)
+        onMouseRelease { button, x, y, _ ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                ui.keyboardHandler = null
+            }
+            meshViewport.clearKeysPressed()
+            meshViewport.onMouseRelease(button, x, y)
         }
         onMouseDrag { _, x, y, _ ->
             meshViewport.onMouseDrag(x, y)

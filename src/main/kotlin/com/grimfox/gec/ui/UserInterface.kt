@@ -36,7 +36,6 @@ val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(NON_NULL)
 
 private val isMac = System.getProperty("os.name").toLowerCase().contains("mac")
-private val mouseFetcher = if (isMac) MacMouseFetcher() else WindowsMouseFetcher()
 private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsScreenInfoFetcher()
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
@@ -153,30 +152,27 @@ interface UserInterface {
 
     fun setCursor(cursor: Long)
 
+    fun disableCursor()
+
+    fun enableCursor()
+
     operator fun invoke(block: UserInterface.() -> Unit) {
         this.block()
     }
 }
 
 private fun getMousePosition(window: WindowContext): Pair<Int, Int> {
-    return mouseFetcher.getMousePosition(window.id, window.x, window.y, window.mouseX, window.mouseY, window.relativeMouseX, window.relativeMouseY, window.warpLines)
+    return getMousePosition(window.id, window.x, window.y)
 }
 
-internal interface MouseFetcher {
-    fun getMousePosition(windowId: Long, windowX: Int, windowY: Int, mouseX: Int, mouseY: Int, relativeMouseX: Double, relativeMouseY: Double, warpLines: List<WarpLine>): Pair<Int, Int>
-}
-
-internal class MacMouseFetcher : MouseFetcher {
-
-    override fun getMousePosition(windowId: Long, windowX: Int, windowY: Int, mouseX: Int, mouseY: Int, relativeMouseX: Double, relativeMouseY: Double, warpLines: List<WarpLine>): Pair<Int, Int> {
-        twr(stackPush()) { stack ->
-            val x = stack.mallocDouble(1)
-            val y = stack.mallocDouble(1)
-            glfwGetCursorPos(windowId, x, y)
-            val newMouseX = round(windowX + x[0]).toInt()
-            val newMouseY = round(windowY + y[0]).toInt()
-            return Pair(newMouseX, newMouseY)
-        }
+private fun getMousePosition(windowId: Long, windowX: Int, windowY: Int): Pair<Int, Int> {
+    twr(stackPush()) { stack ->
+        val x = stack.mallocDouble(1)
+        val y = stack.mallocDouble(1)
+        glfwGetCursorPos(windowId, x, y)
+        val newMouseX = round(windowX + x[0]).toInt()
+        val newMouseY = round(windowY + y[0]).toInt()
+        return Pair(newMouseX, newMouseY)
     }
 }
 
@@ -287,6 +283,14 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         } else {
             maximizeWindow()
         }
+    }
+
+    override fun disableCursor() {
+        window.disableCursor()
+    }
+
+    override fun enableCursor() {
+        window.enableCursor()
     }
 
     internal fun close() {
@@ -851,6 +855,14 @@ private class WindowContext(
             glfwTerminate()
             glfwSetErrorCallback(null).free()
         }
+    }
+
+    internal fun disableCursor() {
+        glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_DISABLED)
+    }
+
+    internal fun enableCursor() {
+        glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
     }
 }
 

@@ -5,6 +5,7 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import org.joml.*
 import org.lwjgl.BufferUtils
+import org.lwjgl.glfw.GLFW
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT
 import org.lwjgl.nanovg.NVGColor
@@ -15,6 +16,7 @@ import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
 import java.lang.Math.round
 import java.lang.Math.sqrt
+import java.util.*
 
 class MeshViewport3D(
         val resetView: MutableReference<Boolean>,
@@ -22,7 +24,12 @@ class MeshViewport3D(
         val perspectiveOn: Reference<Boolean>,
         val waterPlaneOn: Reference<Boolean>,
         val heightMapScaleFactor: Reference<Float>,
-        val imageMode: Reference<Int>) {
+        val imageMode: Reference<Int>,
+        val disableCursor: MutableReference<Boolean>) {
+
+    private val pressedKeys = Collections.synchronizedSet(LinkedHashSet<Int>())
+
+    private var eliminateMovement = false
 
     private val modelMatrix = Matrix4f()
     private val viewMatrix = Matrix4f()
@@ -41,12 +48,11 @@ class MeshViewport3D(
     private val maxZoom = 100.0f
     private val defaultZoom = 1.0f
 
-    private val defaultzoomIncrement = 0.05f
-    private var zoomIncrement = defaultzoomIncrement
+    private val defaultZoomIncrement = 0.05f
+    private var zoomIncrement = defaultZoomIncrement
     private var zoom = defaultZoom
 
     private val defaultTranslation = Vector3f(0.0f, 0.0f, -2073.58f)
-    private val translation = Vector3f(defaultTranslation)
     private val deltaTranslation = Vector3f()
     private val pivot = Vector3f(0.0f, 0.0f, 0.0f)
 
@@ -144,12 +150,15 @@ class MeshViewport3D(
     private var isRollOn = false
     private var isRotateOn = false
     private var isTranslateOn = false
+    private var isFlyModeOn = false
 
     private lateinit var heightMap: HexGrid
 
     private lateinit var waterPlane: HexGrid
 
     private lateinit var imagePlane: ImagePlane
+
+    val keyboardHandler: KeyboardHandler = viewportKeyboardHandler()
 
     fun init() {
 
@@ -201,7 +210,7 @@ class MeshViewport3D(
 
         lightDirection.normalize()
 
-        modelMatrix.translate(translation)
+        modelMatrix.translate(defaultTranslation)
     }
 
     fun setHeightmap(newTexture: Pair<TextureId, TextureId>, resolution: Int) {
@@ -229,7 +238,10 @@ class MeshViewport3D(
 
     fun onMouseDown(button: Int, x: Int, y: Int) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (x <= hotZoneX1 || x > hotZoneX2 || y <= hotZoneY1 || y > hotZoneY2) {
+            if (isTranslateOn) {
+                isTranslateOn = false
+                isFlyModeOn = true
+            } else if (x <= hotZoneX1 || x > hotZoneX2 || y <= hotZoneY1 || y > hotZoneY2) {
                 if (!isRollOn && !isRotateOn && !isTranslateOn) {
                     lastMouseX = x.toFloat()
                     lastMouseY = y.toFloat()
@@ -248,6 +260,10 @@ class MeshViewport3D(
                 lastMouseX = x.toFloat()
                 lastMouseY = y.toFloat()
                 isTranslateOn = true
+            } else if (isRollOn || isRotateOn) {
+                isRollOn = false
+                isRotateOn = false
+                isFlyModeOn = true
             }
         }
     }
@@ -257,12 +273,22 @@ class MeshViewport3D(
         mouseY = y
     }
 
-    fun onMouseRelease(button: Int) {
+    fun onMouseRelease(button: Int, x: Int, y: Int) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
             isRollOn = false
             isRotateOn = false
+            if (isFlyModeOn) {
+                isFlyModeOn = false
+                isTranslateOn = true
+                eliminateMovement = true
+            }
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
             isTranslateOn = false
+            if (isFlyModeOn) {
+                isFlyModeOn = false
+                isRotateOn = true
+                eliminateMovement = true
+            }
         }
     }
 
@@ -278,10 +304,72 @@ class MeshViewport3D(
             cameraPosition.mul(modelMatrix.invert(Matrix4f()))
             var scaledScroll = deltaScroll * 0.04f
             scaledScroll *= Math.max(cameraPosition.z, 50.0f)
-            translation.z += scaledScroll
             tempMatrix.translation(0.0f, 0.0f, scaledScroll)
             tempMatrix.mul(modelMatrix, modelMatrix)
         }
+    }
+
+    inner class LazyCameraPosition {
+        val value: Vector3f by lazy {
+            val cameraPosition = Vector4f(0.0f, 0.0f, 0.0f, 1.0f)
+            cameraPosition.mul(modelMatrix.invert(Matrix4f()))
+            Vector3f(cameraPosition.x, cameraPosition.y, cameraPosition.z)
+        }
+    }
+
+    fun checkKeysPressed() {
+        if (isFlyModeOn) {
+            if (!disableCursor.value) {
+                disableCursor.value = true
+            }
+            val lazyCamera = LazyCameraPosition()
+            if (pressedKeys.contains(GLFW.GLFW_KEY_W)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.04f
+                tempMatrix.translation(0.0f, 0.0f, increment)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_S)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.04f
+                tempMatrix.translation(0.0f, 0.0f, increment)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_A)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.03f
+                tempMatrix.translation(increment, 0.0f, 0.0f)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_D)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.03f
+                tempMatrix.translation(increment, 0.0f, 0.0f)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_Q)) {
+                deltaRotation.identity()
+                deltaRotation.rotate(0.0f, 0.0f, -0.02f)
+                modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_E)) {
+                deltaRotation.identity()
+                deltaRotation.rotate(0.0f, 0.0f, 0.02f)
+                modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_SPACE)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.02f
+                tempMatrix.translation(0.0f, increment, 0.0f)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+            if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_CONTROL)) {
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.02f
+                tempMatrix.translation(0.0f, increment, 0.0f)
+                tempMatrix.mul(modelMatrix, modelMatrix)
+            }
+        } else if (disableCursor.value) {
+            disableCursor.value = false
+        }
+    }
+
+    fun clearKeysPressed() {
+        pressedKeys.clear()
     }
 
     fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
@@ -320,9 +408,8 @@ class MeshViewport3D(
                 val orthoZoom = zoom * perspectiveToOrtho
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
 
-                translation.set(defaultTranslation)
                 zoom = defaultZoom
-                modelMatrix.translation(translation).rotate(defaultRotation)
+                modelMatrix.translation(defaultTranslation).rotate(defaultRotation)
 
                 deltaX = mouseX - lastMouseX
                 deltaY = mouseY - lastMouseY
@@ -380,9 +467,8 @@ class MeshViewport3D(
                 val orthoZoom = zoom * perspectiveToOrtho
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
 
-                translation.set(defaultTranslation)
                 zoom = defaultZoom
-                modelMatrix.translation(translation).rotate(defaultRotation)
+                modelMatrix.translation(defaultTranslation).rotate(defaultRotation)
 
                 deltaX = mouseX - lastMouseX
                 deltaY = mouseY - lastMouseY
@@ -421,6 +507,8 @@ class MeshViewport3D(
         }
         synchronized(textureLock) {
             if (hasHeightmap) {
+                val eliminateMovementNext = eliminateMovement && !disableCursor.value
+                checkKeysPressed()
                 val adjustedWidth = round(width / scale)
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
@@ -448,27 +536,38 @@ class MeshViewport3D(
                 val mouseDistanceMultiplier = (heightMap.width / (height))
 
                 if (doReset) {
-                    translation.set(defaultTranslation)
                     zoom = defaultZoom
-                    modelMatrix.translation(translation).rotate(defaultRotation)
+                    modelMatrix.translation(defaultTranslation).rotate(defaultRotation)
                 }
 
-                deltaX = mouseX - lastMouseX
-                deltaY = mouseY - lastMouseY
+                if (eliminateMovement) {
+                    deltaX = 0.0f
+                    deltaY = 0.0f
 
-                lastMouseX = mouseX.toFloat()
-                lastMouseY = mouseY.toFloat()
+                    lastMouseX = mouseX.toFloat()
+                    lastMouseY = mouseY.toFloat()
+
+                    if (eliminateMovementNext) {
+                        eliminateMovement = false
+                    }
+                } else {
+                    deltaX = mouseX - lastMouseX
+                    deltaY = mouseY - lastMouseY
+
+                    lastMouseX = mouseX.toFloat()
+                    lastMouseY = mouseY.toFloat()
+                }
 
                 if (isTranslateOn) {
-                    translation.x += deltaX * mouseDistanceMultiplier
-                    translation.y += deltaY * -mouseDistanceMultiplier
                     tempMatrix.translation(deltaX * mouseDistanceMultiplier, deltaY * -mouseDistanceMultiplier, 0.0f)
                     tempMatrix.mul(modelMatrix, modelMatrix)
                 }
 
                 val premulRatio = width / height.toFloat()
                 if (perspectiveOn) {
-                    val nearClip = Math.max(-translation.z - 1810.2f, 10.0f)
+                    val centerPosition = Vector4f(0.0f, 0.0f, 0.0f, 1.0f)
+                    centerPosition.mul(modelMatrix)
+                    val nearClip = Math.max(-centerPosition.z - 1810.2f, 10.0f)
                     val farClip = nearClip + 3620.4f
                     val fov = 0.632f * nearClip * zoom
                     val ratio = premulRatio * fov
@@ -479,9 +578,9 @@ class MeshViewport3D(
                 }
 
                 deltaRotation.identity()
-                if (isRotateOn) {
+                if (isRotateOn || isFlyModeOn) {
                     deltaRotation.rotate(deltaY * mouseSpeed, deltaX * mouseSpeed, 0.0f)
-                    if (rotateAroundCamera) {
+                    if (rotateAroundCamera || isFlyModeOn) {
                         modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.5f)
                     } else {
                         modelMatrix.getTranslation(deltaTranslation)
@@ -871,5 +970,68 @@ class MeshViewport3D(
         fun finalize() {
             glDeleteVertexArrays(vao)
         }
+    }
+
+    private fun viewportKeyboardHandler(): KeyboardHandler {
+        return KeyboardHandler(
+                onChar = {},
+                onKey = { key, _, action, _ ->
+                    if (action == GLFW.GLFW_PRESS) {
+                        when (key) {
+                            GLFW.GLFW_KEY_W -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_W)
+                            }
+                            GLFW.GLFW_KEY_A -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_A)
+                            }
+                            GLFW.GLFW_KEY_S -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_S)
+                            }
+                            GLFW.GLFW_KEY_D -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_D)
+                            }
+                            GLFW.GLFW_KEY_Q -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_Q)
+                            }
+                            GLFW.GLFW_KEY_E -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_E)
+                            }
+                            GLFW.GLFW_KEY_SPACE -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_SPACE)
+                            }
+                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_LEFT_CONTROL)
+                            }
+                        }
+                    }
+                    if (action == GLFW.GLFW_RELEASE) {
+                        when (key) {
+                            GLFW.GLFW_KEY_W -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_W)
+                            }
+                            GLFW.GLFW_KEY_A -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_A)
+                            }
+                            GLFW.GLFW_KEY_S -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_S)
+                            }
+                            GLFW.GLFW_KEY_D -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_D)
+                            }
+                            GLFW.GLFW_KEY_Q -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_Q)
+                            }
+                            GLFW.GLFW_KEY_E -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_E)
+                            }
+                            GLFW.GLFW_KEY_SPACE -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_SPACE)
+                            }
+                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_LEFT_CONTROL)
+                            }
+                        }
+                    }
+                })
     }
 }

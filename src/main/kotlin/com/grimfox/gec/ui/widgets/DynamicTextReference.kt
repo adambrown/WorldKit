@@ -134,7 +134,7 @@ fun integerTextInputKeyboardHandler(caret: Caret, cursorShape: ShapeCursor, comp
                     caret.selection = 0
                     caret.dynamicText.reference.value = caret.dynamicText.reference.value.removeRange(min, max)
                 }
-                if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint >= 0x30 && codePoint <= 0x39) || (caret.position == 0 && codePoint == 0x2d)) {
+                if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint in 0x30..0x39) || (caret.position == 0 && codePoint == 0x2d)) {
                     val currentString = ArrayList(caret.dynamicText.reference.value.toCharArray().toList())
                     currentString.add(caret.position++, codePoint.toChar())
                     caret.dynamicText.reference.value = String(currentString.toCharArray())

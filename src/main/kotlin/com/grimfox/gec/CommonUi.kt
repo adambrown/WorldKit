@@ -32,7 +32,8 @@ val perspectiveOn = ref(true)
 val rotateAroundCamera = ref(false)
 val resetView = mRef(false)
 val imageMode = ref(2)
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode)
+val disableCursor = ref(false)
+val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor)
 
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
     return { scale: Float ->

@@ -1,56 +1,9 @@
 package com.grimfox.gec.ui
 
-import com.grimfox.gec.util.twr
 import com.grimfox.gec.util.clamp
-import org.lwjgl.glfw.GLFW
-import org.lwjgl.system.MemoryStack.*
 import java.awt.*
 import java.util.ArrayList
 import java.util.LinkedHashMap
-
-
-internal class WindowsMouseFetcher : MouseFetcher {
-
-    override fun getMousePosition(windowId: Long, windowX: Int, windowY: Int, mouseX: Int, mouseY: Int, relativeMouseX: Double, relativeMouseY: Double, warpLines: List<WarpLine>): Pair<Int, Int> {
-        var returnX = mouseX
-        var returnY = mouseY
-        twr(stackPush()) { stack ->
-            val lastMouseX = mouseX
-            val lastMouseY = mouseY
-            val pointerLocation = MouseInfo.getPointerInfo()?.location
-            if (pointerLocation == null) {
-                val x = stack.mallocDouble(1)
-                val y = stack.mallocDouble(1)
-                GLFW.glfwGetCursorPos(windowId, x, y)
-                val newMouseX = Math.round(mouseX + (x[0] - relativeMouseX)).toInt()
-                val newMouseY = Math.round(mouseY + (y[0] - relativeMouseY)).toInt()
-                val (mouseWarpX, mouseWarpY) = getWarp(lastMouseX, lastMouseY, newMouseX, newMouseY, warpLines)
-                returnX = newMouseX + mouseWarpX
-                returnY = newMouseY + mouseWarpY
-            } else {
-                returnX = pointerLocation.x
-                returnY = pointerLocation.y
-            }
-        }
-        return Pair(returnX, returnY)
-    }
-
-    private fun getWarp(lastX: Int, lastY: Int, currentX: Int, currentY: Int, warpLines: List<WarpLine>): Pair<Int, Int> {
-        var x = 0
-        var y = 0
-        for ((x1, y1, x2, y2, warpX, warpY) in warpLines) {
-            if ((lastX <= x1 && currentX > x1) || (lastX >= x1 && currentX < x1) || (lastX <= x2 && currentX > x2) || (lastX >= x2 && currentX < x2)) {
-                val interpolate = (x1 - lastX.toDouble()) / (currentX - lastX.toDouble())
-                val yCrossing = lastY + ((currentY - lastY) * interpolate)
-                if ((yCrossing <= y1 && yCrossing >= y2) || (yCrossing >= y1 && yCrossing <= y2)) {
-                    x += Math.round(Math.signum(currentX.toDouble() - lastX) * warpX).toInt()
-                    y += Math.round(Math.signum(currentY.toDouble() - lastY) * warpY).toInt()
-                }
-            }
-        }
-        return Pair(x, y)
-    }
-}
 
 internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
 

@@ -16,6 +16,7 @@ import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.util.mRef
 import com.grimfox.gec.util.ref
 import nl.komponents.kovenant.task
+import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.awt.Desktop
@@ -48,6 +49,15 @@ object Main {
         val uiLayout = layout { ui ->
             val uiLayout = this
             ui {
+                disableCursor.listener { old, new ->
+                    if (old != new) {
+                        if (new) {
+                            ui.disableCursor()
+                        } else {
+                            ui.enableCursor()
+                        }
+                    }
+                }
                 background.set(45, 45, 48)
 
                 textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
@@ -356,7 +366,7 @@ object Main {
                                     yOffset = 1.0f
                                     width = -2.0f
                                     height = -2.0f
-                                    meshViewport3D(meshViewport)
+                                    meshViewport3D(meshViewport, ui)
                                     block {
                                         val toolbar = this
                                         vSizing = STATIC
