@@ -1,11 +1,8 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.learning.rgba
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.LOG
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.mRef
+import com.grimfox.gec.util.*
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.nanovg.NVGColor
@@ -183,6 +180,10 @@ object TextureBuilder {
             textureRenderer.unbind()
             retVal
         }
+    }
+
+    fun rgba(r: Int, g: Int, b: Int, a: Int, color: NVGColor): NVGColor {
+        return nvgRGBA(r.toByte(), g.toByte(), b.toByte(), a.toByte(), color)
     }
 
     fun renderMapImage(landBodyPolygons: List<List<Point2F>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {

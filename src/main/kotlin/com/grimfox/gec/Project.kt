@@ -1,13 +1,14 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
-import com.grimfox.gec.ui.FileDialogs
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.DropdownList
 import com.grimfox.gec.ui.widgets.DynamicTextReference
 import com.grimfox.gec.ui.widgets.ErrorDialog
+import com.grimfox.gec.util.FileDialogs.selectFile
+import com.grimfox.gec.util.FileDialogs.saveFileDialog
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.ref
 import org.slf4j.Logger
@@ -199,23 +200,18 @@ fun openProject(file: File,
 fun openProject(dialogLayer: Block,
                 preferences: Preferences,
                 ui: UserInterface): Project? {
-    ui.ignoreInput = true
-    dialogLayer.isVisible = true
-    try {
-        val file = selectFileDialog(preferences.projectDir, "wkp") ?: return null
-        val project = file.inputStream().buffered().use {
-            JSON.readValue(it, Project::class.java)
+    return selectFile(dialogLayer, true, ui, preferences.projectDir, "wkp") { file ->
+        if (file == null) {
+            null
+        } else {
+            val project = file.inputStream().buffered().use {
+                JSON.readValue(it, Project::class.java)
+            }
+            if (project != null) {
+                project.file = file
+            }
+            project
         }
-        if (project != null) {
-            project.file = file
-        }
-        return project
-    } catch (e: Exception) {
-        LOG.error("Unexpected error opening project.", e)
-        throw e
-    } finally {
-        dialogLayer.isVisible = false
-        ui.ignoreInput = false
     }
 }
 
@@ -231,22 +227,6 @@ fun updateTitle(titleText: DynamicTextReference, new: Project?) {
         "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
     }
     titleText.reference.value = "WorldKit - $showPath"
-}
-
-private fun saveFileDialog(defaultFolder: File, vararg filters: String): File? {
-    val saveFileName = FileDialogs.saveFile(filters.joinToString(","), defaultFolder.canonicalPath)
-    if (saveFileName != null && saveFileName.isNotBlank()) {
-        return File(saveFileName)
-    }
-    return null
-}
-
-private fun selectFileDialog(defaultFolder: File, vararg filters: String): File? {
-    val fileName = FileDialogs.selectFile(filters.joinToString(","), defaultFolder.canonicalPath)
-    if (fileName != null && fileName.isNotBlank()) {
-        return File(fileName)
-    }
-    return null
 }
 
 private fun <T> sync(codeBlock: () -> T): T {

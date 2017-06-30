@@ -1,6 +1,6 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.command.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.ParameterSet
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertex
@@ -28,7 +28,7 @@ object Regions {
     }
 
     fun buildRegions(parameters: ParameterSet): Pair<Graph, Matrix<Byte>> {
-        val random = Random(parameters.seed)
+        val random = Random(parameters.regionsSeed)
         val results = ArrayList<Triple<Graph, Matrix<Byte>, Int>>()
         for (i in 0..parameters.islandDesire) {
             results.add(buildRegions(random, parameters, i))

@@ -1,25 +1,19 @@
-package com.grimfox.gec.biomes
+package com.grimfox.gec.util
 
 import com.grimfox.gec.CACHE_DIR
 import com.grimfox.gec.executor
-import com.grimfox.gec.extensions.call
-import com.grimfox.gec.extensions.join
-import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.FloatArrayMatrix
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Point3F
-import com.grimfox.gec.opengl.*
 import com.grimfox.gec.threadCount
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
-import com.grimfox.gec.util.Graphs
 import org.joml.Matrix4f
 import org.joml.SimplexNoise.noise
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
-import org.lwjgl.opengl.GL20
 import org.lwjgl.opengl.GL20.*
 import java.awt.image.BufferedImage
 import java.io.File
@@ -467,8 +461,8 @@ object Biomes {
         init {
             try {
                 shaderProgram = TextureBuilder.buildShaderProgram {
-                    val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.vert"))
-                    val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.frag"))
+                    val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.vert"))
+                    val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.frag"))
                     createAndLinkProgram(
                             listOf(vertexShader, fragmentShader),
                             listOf(positionAttribute),
@@ -576,8 +570,8 @@ object Biomes {
         val noiseTexture1Uniform = ShaderUniform("noiseMask1")
 
         val shaderProgram = TextureBuilder.buildShaderProgram {
-            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.vert"))
-            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.frag"))
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.frag"))
             createAndLinkProgram(
                     listOf(vertexShader, fragmentShader),
                     listOf(positionAttribute),
@@ -678,8 +672,8 @@ object Biomes {
         val noiseTexture1Uniform = ShaderUniform("noiseMask1")
 
         val shaderProgram = TextureBuilder.buildShaderProgram {
-            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.vert"))
-            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.frag"))
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.frag"))
             createAndLinkProgram(
                     listOf(vertexShader, fragmentShader),
                     listOf(positionAttribute),
@@ -769,8 +763,8 @@ object Biomes {
         val noiseTexture1Uniform = ShaderUniform("noiseMask1")
 
         val shaderProgram = TextureBuilder.buildShaderProgram {
-            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.vert"))
-            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.frag"))
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.frag"))
             createAndLinkProgram(
                     listOf(vertexShader, fragmentShader),
                     listOf(positionAttribute),
@@ -877,8 +871,8 @@ object Biomes {
         val noiseTexture1Uniform = ShaderUniform("noiseMask1")
 
         val shaderProgram = TextureBuilder.buildShaderProgram {
-            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plains-biome.vert"))
-            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plains-biome.frag"))
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plains-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plains-biome.frag"))
             createAndLinkProgram(
                     listOf(vertexShader, fragmentShader),
                     listOf(positionAttribute),
@@ -975,8 +969,8 @@ object Biomes {
         val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
 
         val shaderProgram = TextureBuilder.buildShaderProgram {
-            val vertexShader = compileShader(GL20.GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.vert"))
-            val fragmentShader = compileShader(GL20.GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.frag"))
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.frag"))
             createAndLinkProgram(
                     listOf(vertexShader, fragmentShader),
                     listOf(positionAttribute),

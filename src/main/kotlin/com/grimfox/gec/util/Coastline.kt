@@ -1,9 +1,6 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.command.BuildContinent.Parameters
-import com.grimfox.gec.extensions.call
-import com.grimfox.gec.extensions.join
-import com.grimfox.gec.extensions.value
+import com.grimfox.gec.util.BuildContinent.Parameters
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertices

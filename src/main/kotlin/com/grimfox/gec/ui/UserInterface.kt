@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.*
-import com.grimfox.gec.biomes.Biomes
-import com.grimfox.gec.extensions.call
-import com.grimfox.gec.extensions.twr
-import com.grimfox.gec.opengl.loadImagePixels
+import com.grimfox.gec.util.Biomes
+import com.grimfox.gec.util.call
+import com.grimfox.gec.util.twr
+import com.grimfox.gec.util.loadImagePixels
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import org.lwjgl.BufferUtils
@@ -31,7 +31,6 @@ import java.lang.Thread.*
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
-import java.util.concurrent.locks.ReentrantLock
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(NON_NULL)
@@ -174,8 +173,8 @@ internal class MacMouseFetcher : MouseFetcher {
             val x = stack.mallocDouble(1)
             val y = stack.mallocDouble(1)
             glfwGetCursorPos(windowId, x, y)
-            val newMouseX = Math.round(windowX + x[0]).toInt()
-            val newMouseY = Math.round(windowY + y[0]).toInt()
+            val newMouseX = round(windowX + x[0]).toInt()
+            val newMouseY = round(windowY + y[0]).toInt()
             return Pair(newMouseX, newMouseY)
         }
     }

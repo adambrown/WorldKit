@@ -1,25 +1,17 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.Main
-import com.grimfox.gec.model.ClosestPoints
 import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.Point2F
 import org.lwjgl.BufferUtils
 import org.slf4j.LoggerFactory
 import java.io.InputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.channels.Channels
-import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.Comparator
 
 interface Reference<out T> {
 
@@ -277,63 +269,6 @@ object Utils {
         }
     }
 
-    fun FileChannel.mapChunks(mode: FileChannel.MapMode, offset: Int, chunkSize: Int, chunkCount: Int): MutableList<ByteBuffer> {
-        return (0..(chunkCount - 1)).mapTo(ArrayList<ByteBuffer>()) { map(mode, offset + (it * chunkSize.toLong()), chunkSize.toLong()).order(ByteOrder.LITTLE_ENDIAN) }
-    }
-
-    fun FileChannel.imageSizeAsExp2(bytesPerPixel: Int, metaBytes: Int): Int {
-        return exp2FromSize(Math.sqrt((size() - metaBytes) / bytesPerPixel.toDouble()).toInt())
-    }
-
-    fun exp2FromSize(size: Int): Int {
-        var count = 0
-        var currentDiv = size
-        while (currentDiv > 1) {
-            currentDiv /= 2
-            count++
-        }
-        return count
-    }
-
-    fun FileChannel.MapMode.toRandomAccessFileMode(): String {
-        return when (this) {
-            FileChannel.MapMode.READ_ONLY -> "r"
-            else -> "rw"
-        }
-    }
-
-    private val primitivesToWrappers = mapOf<Class<*>, Class<*>>(
-            Pair(Boolean::class.java, java.lang.Boolean::class.java),
-            Pair(Byte::class.java, java.lang.Byte::class.java),
-            Pair(Char::class.java, java.lang.Character::class.java),
-            Pair(Double::class.java, java.lang.Double::class.java),
-            Pair(Float::class.java, java.lang.Float::class.java),
-            Pair(Int::class.java, java.lang.Integer::class.java),
-            Pair(Long::class.java, java.lang.Long::class.java),
-            Pair(Short::class.java, java.lang.Short::class.java))
-
-    fun primitiveToWrapper(type: Class<*>): Class<*> {
-        if (type.isPrimitive) {
-            val possible = primitivesToWrappers[type]
-            if (possible != null) {
-                return possible
-            }
-        }
-        return type
-    }
-
-    fun FileChannel.writeInt(position: Long, value: Int) {
-        val buffer = ByteBuffer.wrap(ByteArray(4)).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.putInt(0, value)
-        write(buffer, position)
-    }
-
-    fun FileChannel.readInt(position: Long): Int {
-        val buffer = ByteBuffer.wrap(ByteArray(4)).order(ByteOrder.LITTLE_ENDIAN)
-        read(buffer, position)
-        return buffer.getInt(0)
-    }
-
     fun ByteBuffer.readUint24(position: Int): Int {
         return (get(position).toInt() and 0xFF) + ((get(position + 1).toInt() and 0xFF) shl 8) + ((get(position + 2).toInt() and 0xFF) shl 16)
     }
@@ -344,102 +279,6 @@ object Utils {
         put(position + 2, ((value ushr 16) and 0xFF).toByte())
     }
 
-    fun findClosestPoint(points: Matrix<Point2F>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point2F, outputWidth: Int, wrapEdges: Boolean): Int {
-        return findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 1)[0].first
-    }
-
-    fun findClosestPoints(points: Matrix<Point2F>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point2F, outputWidth: Int, wrapEdges: Boolean): ClosestPoints {
-        val closestPoints = findClosestPoints(points, x, y, gridStride, pointWrapOffset, point, outputWidth, wrapEdges, 3)
-        return ClosestPoints(closestPoints[0],
-                closestPoints[1],
-                closestPoints[2],
-                closestPoints[3],
-                closestPoints[4])
-    }
-
-    private fun findClosestPoints(points: Matrix<Point2F>, x: Int, y: Int, gridStride: Int, pointWrapOffset: Float, point: Point2F, outputWidth: Int, wrapEdges: Boolean, ringCount: Int): ArrayList<Pair<Int, Float>> {
-        val ringWidth = ringCount * 2 + 1
-        val closestPoints = ArrayList<Pair<Int, Float>>(ringWidth * ringWidth)
-        for (yOff in -ringCount..ringCount) {
-            for (xOff in -ringCount..ringCount) {
-                var ox = x + xOff
-                var oy = y + yOff
-                var xDistAdjust = 0.0f
-                var yDistAdjust = 0.0f
-                if (wrapEdges) {
-                    val ox1 = ox
-                    ox = (ox + gridStride) % gridStride
-                    if (ox1 > ox) {
-                        xDistAdjust = pointWrapOffset
-                    } else if (ox1 < ox) {
-                        xDistAdjust = -pointWrapOffset
-                    }
-                    val oy1 = oy
-                    oy = (oy + gridStride) % gridStride
-                    if (oy1 > oy) {
-                        yDistAdjust = pointWrapOffset
-                    } else if (oy1 < oy) {
-                        yDistAdjust = -pointWrapOffset
-                    }
-                }
-                if (oy in 0..(gridStride - 1) && ox >= 0 && ox < gridStride) {
-                    val index = oy * gridStride + ox
-                    val other = points[ox, oy]
-                    val distance = point.distance2(Point2F(other.x * outputWidth + xDistAdjust, other.y * outputWidth + yDistAdjust))
-                    closestPoints.add(Pair(index, distance))
-                }
-            }
-        }
-        closestPoints.sortWith(Comparator<Pair<Int, Float>> { p1, p2 ->
-            p1.second.compareTo(p2.second)
-        })
-        return closestPoints
-    }
-
-    fun buildEdgeMap(closestPoints: Matrix<ClosestPoints>): HashMap<Int, MutableSet<Int>> {
-        val edges = HashMap<Int, MutableSet<Int>>()
-        val end = closestPoints.width - 1
-        for (y in 0..end) {
-            for (x in 0..end) {
-                val points = closestPoints[x, y]
-                val p0 = points.p0?.first
-                val p1 = points.p1?.first
-                if (p0 != null && p1 != null) {
-                    val p0Cons = edges.getOrPut(p0, { LinkedHashSet() })
-                    p0Cons.add(p1)
-                    val p1Cons = edges.getOrPut(p1, { LinkedHashSet() })
-                    p1Cons.add(p0)
-                }
-            }
-        }
-        return edges
-    }
-
-    fun buildEdgeGraph(edges: HashMap<Int, MutableSet<Int>>, pointCount: Int): ArrayList<ArrayList<Int>> {
-        val edgeGraph = ArrayList<ArrayList<Int>>(pointCount)
-        for (i in 0..pointCount - 1) {
-            edgeGraph.add(i, ArrayList(edges[i]!!.toList().sorted()))
-        }
-        return edgeGraph
-    }
-
-    fun generateSemiUniformPoints(stride: Int, width: Float, random: Random, constraint: Float = 0.5f): ArrayList<Point2F> {
-        val realConstraint = Math.min(1.0f, Math.max(0.0f, constraint))
-        val gridSquare = width / stride
-        val quarterSquare = gridSquare * realConstraint
-        val margin = (gridSquare * (1.0f - realConstraint)) * 0.5f
-        val points = ArrayList<Point2F>()
-        for (y in 0..stride - 1) {
-            val oy = (y * gridSquare) + margin
-            for (x in 0..stride - 1) {
-                val px = (x * gridSquare) + margin + (random.nextFloat() * quarterSquare)
-                val py = oy + (random.nextFloat() * quarterSquare)
-                val point = Point2F(px, py)
-                points.add(point)
-            }
-        }
-        return points
-    }
 
     inline fun generateSemiUniformPointsD(stride: Int, width: Double, random: Random, constraint: Double = 0.5, callback: (i: Int, x: Double, y: Double) -> Unit) {
         val realConstraint = clamp(constraint, 0.0, 1.0)
@@ -457,46 +296,6 @@ object Utils {
 
     inline fun generateSemiUniformPointsF(stride: Int, width: Float, random: Random, constraint: Float = 0.5f, callback: (i: Int, x: Float, y: Float) -> Unit) {
         generateSemiUniformPointsD(stride, width.toDouble(), random, constraint.toDouble()) { i, x, y -> callback(i, x.toFloat(), y.toFloat()) }
-    }
-
-    fun generatePoints(stride: Int, width: Float, random: Random, minDist: Float = (width / stride) / 3.0f): ArrayList<Point2F> {
-        val gridSquare = width / stride
-        val minDistSquared = minDist * minDist
-        val points = ArrayList<Point2F>()
-        for (y in 0..stride - 1) {
-            val oy = y * gridSquare
-            for (x in 0..stride - 1) {
-                while (true) {
-                    val px = x * gridSquare + random.nextFloat() * gridSquare
-                    val py = oy + random.nextFloat() * gridSquare
-                    val point = Point2F(px, py)
-                    if (checkDistances(points, x, y, stride, minDistSquared, point)) {
-                        points.add(point)
-                        break
-                    }
-                }
-            }
-        }
-        return points
-    }
-
-    private fun checkDistances(points: List<Point2F>, x: Int, y: Int, stride: Int, minDistance: Float, point: Point2F): Boolean {
-        for (yOff in -3..3) {
-            for (xOff in -3..3) {
-                val ox = x + xOff
-                val oy = y + yOff
-                if (oy in 0..(stride - 1) && ox >= 0 && ox < stride) {
-                    if (oy < y || (oy == y && ox < x)) {
-                        if (point.distance2(points[oy * stride + ox]) < minDistance) {
-                            return false
-                        }
-                    } else {
-                        return true
-                    }
-                }
-            }
-        }
-        return true
     }
 
     fun <T, ML : MutableList<T>> ML.init(size: Int, init: (Int) -> T): ML {

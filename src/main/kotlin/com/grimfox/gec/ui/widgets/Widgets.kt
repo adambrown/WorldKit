@@ -1,6 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.extensions.twr
+import com.grimfox.gec.util.twr
 import com.grimfox.gec.ui.NO_COLOR
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.*

@@ -1,6 +1,5 @@
 package com.grimfox.gec
 
-import com.fasterxml.jackson.databind.ser.std.StdArraySerializers
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
@@ -10,20 +9,16 @@ import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.ui.widgets.toggle
+import com.grimfox.gec.util.FileDialogs.selectFile
+import com.grimfox.gec.util.FileDialogs.selectFolder
 import com.grimfox.gec.util.MonitoredReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
-import com.sun.java.swing.plaf.motif.MotifTextUI.createCaret
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
-import org.lwjgl.glfw.GLFW.GLFW_PRESS
 import org.lwjgl.nanovg.NVGColor
-import org.lwjgl.nanovg.NVGTextRow
-import org.lwjgl.nanovg.NanoVG.nvgTextGlyphPositions
 import java.io.File
 import java.math.BigDecimal
 import java.nio.ByteBuffer
-import java.util.*
 
 val textFont = ref(-1)
 val glyphFont = ref(-1)
@@ -33,6 +28,7 @@ val MEDIUM_SPACER_SIZE = 12.0f
 val LARGE_SPACER_SIZE = 24.0f
 val MEGA_SPACER_SIZE = 48.0f
 
+val HALF_ROW_HEIGHT = 10.0f
 val SMALL_ROW_HEIGHT = 20.0f
 val MEDIUM_ROW_HEIGHT = 26.0f
 val LARGE_ROW_HEIGHT = 32.0f
@@ -351,6 +347,8 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 vSizing = SHRINK,
                 padLeft = SMALL_SPACER_SIZE,
                 padRight = SMALL_SPACER_SIZE))
+
+val LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE.copy(textShapeTemplate = NORMAL_TEXT_BUTTON_STYLE.textShapeTemplate.copy(hAlign = HorizontalAlignment.LEFT))
 
 val DISABLED_TEXT_BUTTON_STYLE = ButtonStyle(
         normal = SHAPE_BUTTON_NORMAL,
@@ -883,27 +881,78 @@ fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, s
     }
 }
 
-private fun selectFolder(dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, currentFolder: File): File {
-    ui.ignoreInput = true
-    if (useDialogLayer) {
-        dialogLayer.isVisible = true
-    }
-    try {
-        return selectFolderDialog(currentFolder) ?: currentFolder
-    } finally {
-        if (useDialogLayer) {
-            dialogLayer.isVisible = false
+fun Block.vFileRow(file: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                block {
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = file.text
+                    isMouseAware = false
+                }
+                isMouseAware = false
+            }
+            hSpacer(MEDIUM_SPACER_SIZE)
+            val button = button(text("Select"), NORMAL_TEXT_BUTTON_STYLE) {
+                file.reference.value = selectFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { it }?.canonicalPath ?: file.reference.value
+            }
+            row.supplantEvents(button)
+            isMouseAware = false
         }
-        ui.ignoreInput = false
     }
 }
 
-private fun selectFolderDialog(defaultFolder: File): File? {
-    val folderName = FileDialogs.selectFolder(defaultFolder.canonicalPath)
-    if (folderName != null && folderName.isNotBlank()) {
-        return File(folderName)
+fun Block.vFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                block {
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = file.text
+                    isMouseAware = false
+                }
+                isMouseAware = false
+            }
+            hSpacer(MEDIUM_SPACER_SIZE)
+            val button = button(text("Select file"), NORMAL_TEXT_BUTTON_STYLE) {
+                file.reference.value = selectFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { it }?.canonicalPath ?: file.reference.value
+            }
+            row.supplantEvents(button)
+            isMouseAware = false
+        }
+        hSpacer(gap)
+        block {
+            layout = HORIZONTAL
+            hSizing = SHRINK
+            toggle(toggleValue)
+        }
     }
-    return null
 }
 
 fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float): Block {
@@ -991,6 +1040,59 @@ fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Float, label: Text
             isMouseAware = false
         }
     }
+}
+
+fun Block.vLabelRow(height: Float, label: Text): Block {
+    return block {
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block {
+            label(label)
+        }
+    }
+}
+
+fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onClick: () -> Unit = {}): Block {
+    return block {
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block {
+            hSizing = Sizing.RELATIVE
+            width = 10000.0f
+            hAlign = LEFT
+            val button = button(label, style, onClick)
+            button.hSizing = Sizing.RELATIVE
+            button.width = 10000.0f
+        }
+    }
+}
+
+fun Block.vExpandPanel(panelName: String, expanded: Boolean = false, panelBuilder: Block.() -> Unit) {
+    val panelNameOpen = "- $panelName"
+    val panelNameClosed = "+ $panelName"
+    val panelOpen = ref(expanded)
+    val panelTitle = DynamicTextReference(if (expanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
+    vExpandableButton(LARGE_ROW_HEIGHT, panelTitle.text, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
+        panelOpen.value = !panelOpen.value
+    }
+    val panelBlock = block {
+        hSizing = RELATIVE
+        vSizing = Sizing.SHRINK
+        layout = Layout.VERTICAL
+        panelBuilder()
+    }
+    panelOpen.listener { _, new ->
+        if (new) {
+            panelTitle.reference.value = panelNameOpen
+            panelBlock.isVisible = true
+        } else {
+            panelTitle.reference.value = panelNameClosed
+            panelBlock.isVisible = false
+        }
+    }
+    panelOpen.value = expanded
 }
 
 fun Block.vButtonRow(height: Float, buttons: Block.() -> Unit): Block {

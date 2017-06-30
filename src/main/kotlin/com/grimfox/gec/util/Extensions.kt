@@ -1,4 +1,4 @@
-package com.grimfox.gec.extensions
+package com.grimfox.gec.util
 
 import java.util.*
 import java.util.concurrent.ExecutorService

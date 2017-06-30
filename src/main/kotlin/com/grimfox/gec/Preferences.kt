@@ -1,10 +1,9 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.extensions.call
+import com.grimfox.gec.util.call
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.util.Graphs
-import com.grimfox.gec.util.timeIt
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File

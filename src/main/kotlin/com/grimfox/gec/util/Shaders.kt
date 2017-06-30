@@ -1,6 +1,5 @@
-package com.grimfox.gec.opengl
+package com.grimfox.gec.util
 
-import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11.GL_FALSE
 import org.lwjgl.opengl.GL20.*
 

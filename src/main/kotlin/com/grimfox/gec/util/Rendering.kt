@@ -1,17 +1,15 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.extensions.call
-import com.grimfox.gec.extensions.join
-import com.grimfox.gec.extensions.value
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Vector2F
-import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesTexRedByte
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesTexRedFloat
 import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL11.GL_NEAREST
 import java.util.ArrayList
 import java.util.LinkedHashSet
 import java.util.concurrent.ExecutorService
@@ -117,7 +115,7 @@ object Rendering {
         return renderEdges(executor, borderEdges, threadCount)
     }
 
-    fun renderEdges(executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int): TextureId {
+    fun renderEdges(executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int, minFilter: Int = GL_NEAREST, magFilter: Int = GL_NEAREST): TextureId {
         val vertexData = FloatArray(edges.size * 60)
         val indexData = IntArray(edges.size * 60)
         val futures = ArrayList<Future<*>>(threadCount)
@@ -213,6 +211,6 @@ object Rendering {
             }
         }
         futures.forEach { it.join() }
-        return TextureBuilder.renderTrianglesTexRedFloat(vertexData, indexData, GL11.GL_NEAREST, GL11.GL_NEAREST)
+        return renderTrianglesTexRedFloat(vertexData, indexData, minFilter, magFilter)
     }
 }

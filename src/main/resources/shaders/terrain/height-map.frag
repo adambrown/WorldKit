@@ -17,6 +17,7 @@ uniform float shininess;
 uniform float heightScale;
 uniform float uvScale;
 uniform sampler2D heightMapTexture;
+uniform sampler2D riverMapTexture;
 
 
 in VertexData {
@@ -76,7 +77,8 @@ void main() {
     vec4 lowColor;
     vec4 highColor;
     float interpolation;
-    if (unscaledHeight <= 0.05) {
+    float distanceToRiver = texture(riverMapTexture, VertexIn.uv).r;
+    if (unscaledHeight <= 0.05 || distanceToRiver > 0.99965) {
         lowColor = color1;
         highColor = color1;
         interpolation = 0.5;

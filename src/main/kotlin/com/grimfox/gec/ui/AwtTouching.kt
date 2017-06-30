@@ -1,6 +1,6 @@
 package com.grimfox.gec.ui
 
-import com.grimfox.gec.extensions.twr
+import com.grimfox.gec.util.twr
 import com.grimfox.gec.util.clamp
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.system.MemoryStack.*

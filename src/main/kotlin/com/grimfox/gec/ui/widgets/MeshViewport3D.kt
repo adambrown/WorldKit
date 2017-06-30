@@ -1,10 +1,8 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.opengl.*
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.*
 import org.joml.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
@@ -35,16 +33,16 @@ class MeshViewport3D(
     private val tempMatrix = Matrix4f()
 
     private val defaultRotation = Quaternionf().rotate(0.0f, 0.0f, 0.0f)
-    private val rotation = Quaternionf(defaultRotation)
     private val deltaRotation = Quaternionf()
 
     private val floatBuffer = BufferUtils.createFloatBuffer(16)
 
     private val minZoom = 0.02f
     private val maxZoom = 100.0f
-    private val defaultZoom = 3.836f
+    private val defaultZoom = 1.0f
 
-    private val zoomIncrement = 0.05f
+    private val defaultzoomIncrement = 0.05f
+    private var zoomIncrement = defaultzoomIncrement
     private var zoom = defaultZoom
 
     private val defaultTranslation = Vector3f(0.0f, 0.0f, -2073.58f)
@@ -52,7 +50,7 @@ class MeshViewport3D(
     private val deltaTranslation = Vector3f()
     private val pivot = Vector3f(0.0f, 0.0f, 0.0f)
 
-    private val perspectiveToOrtho = 340.0f
+    private val perspectiveToOrtho = 1302.0f
 
     private val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
     private val mvMatrixUniform = ShaderUniform("modelViewMatrix")
@@ -71,6 +69,7 @@ class MeshViewport3D(
     private val heightScaleUniform = ShaderUniform("heightScale")
     private val uvScaleUniform = ShaderUniform("uvScale")
     private val heightMapTextureUniform = ShaderUniform("heightMapTexture")
+    private val riverMapTextureUniform = ShaderUniform("riverMapTexture")
 
     private val mvpMatrixUniformWater = ShaderUniform("modelViewProjectionMatrix")
     private val mvMatrixUniformWater = ShaderUniform("modelViewMatrix")
@@ -104,6 +103,7 @@ class MeshViewport3D(
     private val textureLock = Object()
     private var hasHeightmap = false
     private var heightmapId: TextureId? = null
+    private var rivermapId: TextureId? = null
     private var heightMapResolution = 0
 
     private var hasRegions = false
@@ -176,7 +176,7 @@ class MeshViewport3D(
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
                 listOf(positionAttribute, uvAttribute),
-                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, color1Uniform, color2Uniform, color3Uniform, color4Uniform, color5Uniform, color6Uniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform))
+                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, color1Uniform, color2Uniform, color3Uniform, color4Uniform, color5Uniform, color6Uniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform, riverMapTextureUniform))
 
         waterPlaneProgram = createAndLinkProgram(
                 listOf(waterVertexShader, waterFragmentShader),
@@ -204,10 +204,11 @@ class MeshViewport3D(
         modelMatrix.translate(translation)
     }
 
-    fun setHeightmap(newTexture: TextureId, resolution: Int) {
+    fun setHeightmap(newTexture: Pair<TextureId, TextureId>, resolution: Int) {
         synchronized(textureLock) {
             hasHeightmap = true
-            heightmapId = newTexture
+            heightmapId = newTexture.first
+            rivermapId = newTexture.second
             heightMapResolution = resolution
         }
     }
@@ -273,7 +274,10 @@ class MeshViewport3D(
             zoom -= deltaScroll * (zoomIncrement * zoom)
             zoom = Math.max(minZoom, Math.min(maxZoom, zoom))
         } else {
-            val scaledScroll = deltaScroll * 76.0f
+            val cameraPosition = Vector4f(0.0f, 0.0f, 0.0f, 1.0f)
+            cameraPosition.mul(modelMatrix.invert(Matrix4f()))
+            var scaledScroll = deltaScroll * 0.04f
+            scaledScroll *= Math.max(cameraPosition.z, 50.0f)
             translation.z += scaledScroll
             tempMatrix.translation(0.0f, 0.0f, scaledScroll)
             tempMatrix.mul(modelMatrix, modelMatrix)
@@ -317,9 +321,8 @@ class MeshViewport3D(
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
 
                 translation.set(defaultTranslation)
-                rotation.set(defaultRotation)
                 zoom = defaultZoom
-                modelMatrix.translation(translation).rotate(rotation)
+                modelMatrix.translation(translation).rotate(defaultRotation)
 
                 deltaX = mouseX - lastMouseX
                 deltaY = mouseY - lastMouseY
@@ -378,9 +381,8 @@ class MeshViewport3D(
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
 
                 translation.set(defaultTranslation)
-                rotation.set(defaultRotation)
                 zoom = defaultZoom
-                modelMatrix.translation(translation).rotate(rotation)
+                modelMatrix.translation(translation).rotate(defaultRotation)
 
                 deltaX = mouseX - lastMouseX
                 deltaY = mouseY - lastMouseY
@@ -443,22 +445,12 @@ class MeshViewport3D(
                 val perspectiveOn = perspectiveOn.value
                 val rotateAroundCamera = rotateAroundCamera.value
 
-                val premulRatio = width / height.toFloat()
-                val ratio = premulRatio * zoom
-                if (perspectiveOn) {
-                    projectionMatrix.setFrustum(-ratio, ratio, -zoom, zoom, 6.0f, 6000.0f)
-                } else {
-                    val orthoZoom = zoom * perspectiveToOrtho
-                    projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
-                }
-
                 val mouseDistanceMultiplier = (heightMap.width / (height))
 
                 if (doReset) {
                     translation.set(defaultTranslation)
-                    rotation.set(defaultRotation)
                     zoom = defaultZoom
-                    modelMatrix.translation(translation).rotate(rotation)
+                    modelMatrix.translation(translation).rotate(defaultRotation)
                 }
 
                 deltaX = mouseX - lastMouseX
@@ -472,6 +464,18 @@ class MeshViewport3D(
                     translation.y += deltaY * -mouseDistanceMultiplier
                     tempMatrix.translation(deltaX * mouseDistanceMultiplier, deltaY * -mouseDistanceMultiplier, 0.0f)
                     tempMatrix.mul(modelMatrix, modelMatrix)
+                }
+
+                val premulRatio = width / height.toFloat()
+                if (perspectiveOn) {
+                    val nearClip = Math.max(-translation.z - 1810.2f, 10.0f)
+                    val farClip = nearClip + 3620.4f
+                    val fov = 0.632f * nearClip * zoom
+                    val ratio = premulRatio * fov
+                    projectionMatrix.setFrustum(-ratio, ratio, -fov, fov, nearClip, farClip)
+                } else {
+                    val orthoZoom = zoom * perspectiveToOrtho
+                    projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
                 }
 
                 deltaRotation.identity()
@@ -546,6 +550,9 @@ class MeshViewport3D(
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, heightmapId?.id ?: -1)
+        glUniform1i(riverMapTextureUniform.location, 1)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, rivermapId?.id ?: -1)
         heightMap.render()
     }
 

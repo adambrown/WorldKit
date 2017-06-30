@@ -1,9 +1,7 @@
-package com.grimfox.gec.opengl
+package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.util.clamp
-import com.grimfox.gec.util.getResourceStream
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
