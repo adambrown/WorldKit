@@ -50,6 +50,9 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
         ui.scrollHandler = { x, y ->
             ui.root.handleScroll(x, y)
         }
+        ui.dropHandler = { strings ->
+            ui.root.handleDrop(strings)
+        }
         ui.show()
         TextureBuilder.init(ui.nvg)
         executor.call { Biomes.init() }
@@ -133,6 +136,7 @@ interface UserInterface {
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
     var keyboardHandler: KeyboardHandler?
+    var dropHandler: (List<String>) -> Unit
 
     fun setWindowIcon(images: GLFWImage.Buffer)
 
@@ -155,6 +159,10 @@ interface UserInterface {
     fun disableCursor()
 
     fun enableCursor()
+
+    fun getClipboardString(): String
+
+    fun setClipboardString(string: String)
 
     operator fun invoke(block: UserInterface.() -> Unit) {
         this.block()
@@ -237,6 +245,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             window.keyboardHandler = value
         }
 
+    override var dropHandler: (List<String>) -> Unit
+        get() = window.dropHandler
+        set(value) {
+            window.dropHandler = value
+        }
+
     override fun setWindowIcon(images: GLFWImage.Buffer) {
         glfwSetWindowIcon(window.id, images)
     }
@@ -291,6 +305,14 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
 
     override fun enableCursor() {
         window.enableCursor()
+    }
+
+    override fun getClipboardString(): String {
+        return window.getClipboardString()
+    }
+
+    override fun setClipboardString(string: String) {
+        window.setClipboardString(string)
     }
 
     internal fun close() {
@@ -617,7 +639,9 @@ private class WindowContext(
         var minimizeHandler: () -> Unit = {},
         var restoreHandler: () -> Unit = {},
 
-        var keyboardHandler: KeyboardHandler? = null
+        var keyboardHandler: KeyboardHandler? = null,
+
+        var dropHandler: (List<String>) -> Unit = {}
 
 ) {
 
@@ -864,6 +888,14 @@ private class WindowContext(
     internal fun enableCursor() {
         glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
     }
+
+    fun getClipboardString(): String {
+        return glfwGetClipboardString(id)
+    }
+
+    fun setClipboardString(string: String) {
+        glfwSetClipboardString(id, string)
+    }
 }
 
 private fun createWindow(windowState: WindowState?): WindowContext {
@@ -978,13 +1010,13 @@ private fun createWindow(windowState: WindowState?): WindowContext {
             }
         }
     }
-    glfwSetMouseButtonCallback(window.id) { windowId, button, action, mods ->
+    glfwSetMouseButtonCallback(window.id) { id, button, action, mods ->
         if (!window.ignoreInput) {
             try {
                 twr(stackPush()) { stack ->
                     val cx = stack.mallocDouble(1)
                     val cy = stack.mallocDouble(1)
-                    glfwGetCursorPos(windowId, cx, cy)
+                    glfwGetCursorPos(id, cx, cy)
                     val x = cx.get(0)
                     val y = cy.get(0)
                     val scale = if (isMac) {
@@ -1009,6 +1041,10 @@ private fun createWindow(windowState: WindowState?): WindowContext {
                 throw t
             }
         }
+    }
+    glfwSetDropCallback(window.id) { _, count, address ->
+        val strings = (0..count - 1).mapTo(ArrayList<String>(count)) { GLFWDropCallback.getName(address, it) }
+        window.dropHandler.invoke(strings)
     }
     var windowSize = getWindowSize(windowId)
     if (windowSize.first != width && windowSize.second != height) {

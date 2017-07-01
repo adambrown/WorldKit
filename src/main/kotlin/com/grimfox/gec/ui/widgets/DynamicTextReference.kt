@@ -1,6 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.KeyboardHandler
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.nanovg.NVGGlyphPosition
@@ -122,7 +123,7 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
     private fun clampedGet(index: Int, caretPositions: List<Float>) = caretPositions[Math.min(caretPositions.size - 1, Math.max(0, index))]
 }
 
-fun integerTextInputKeyboardHandler(caret: Caret, cursorShape: ShapeCursor, complete: () -> Unit = {}): KeyboardHandler {
+fun integerTextInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape: ShapeCursor, complete: () -> Unit = {}): KeyboardHandler {
     return KeyboardHandler(
             onChar = { codePoint ->
                 if (caret.selection != 0) {
@@ -236,6 +237,57 @@ fun integerTextInputKeyboardHandler(caret: Caret, cursorShape: ShapeCursor, comp
                         }
                         GLFW_KEY_ENTER -> {
                             complete()
+                        }
+                        GLFW_KEY_C -> {
+                            if (ctrl) {
+                                if (caret.selection != 0) {
+                                    val p1 = caret.position
+                                    val p2 = p1 + caret.selection
+                                    val min = Math.min(p1, p2)
+                                    val max = Math.max(p1, p2)
+                                    ui.setClipboardString(caret.dynamicText.reference.value.substring(min, max))
+                                } else {
+                                    ui.setClipboardString(caret.dynamicText.reference.value)
+                                }
+                            }
+                        }
+                        GLFW_KEY_X -> {
+                            if (ctrl) {
+                                if (caret.selection != 0) {
+                                    val p1 = caret.position
+                                    val p2 = p1 + caret.selection
+                                    val min = Math.min(p1, p2)
+                                    val max = Math.max(p1, p2)
+                                    ui.setClipboardString(caret.dynamicText.reference.value.substring(min, max))
+                                    caret.position = min
+                                    caret.selection = 0
+                                    caret.dynamicText.reference.value = caret.dynamicText.reference.value.removeRange(min, max)
+                                } else {
+                                    ui.setClipboardString(caret.dynamicText.reference.value)
+                                    caret.dynamicText.reference.value = ""
+                                }
+                            }
+                        }
+                        GLFW_KEY_V -> {
+                            if (ctrl) {
+                                if (caret.selection != 0) {
+                                    val p1 = caret.position
+                                    val p2 = p1 + caret.selection
+                                    val min = Math.min(p1, p2)
+                                    val max = Math.max(p1, p2)
+                                    caret.position = min
+                                    caret.selection = 0
+                                    caret.dynamicText.reference.value = caret.dynamicText.reference.value.removeRange(min, max)
+                                }
+                                for (codePoint in ui.getClipboardString().codePoints()) {
+                                    if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint in 0x30..0x39) || (caret.position == 0 && codePoint == 0x2d)) {
+                                        val currentString = ArrayList(caret.dynamicText.reference.value.toCharArray().toList())
+                                        currentString.add(caret.position++, codePoint.toChar())
+                                        caret.dynamicText.reference.value = String(currentString.toCharArray())
+                                        cursorShape.timeOffset = System.currentTimeMillis()
+                                    }
+                                }
+                            }
                         }
                     }
                 }

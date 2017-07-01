@@ -768,6 +768,7 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
         val caretText = caret.dynamicText.text
         isMouseAware = false
         shape = SHAPE_TEXT_BOX_BACKGROUND_NORMAL
+        var keyboardHandler: KeyboardHandler? = null
         val completeFun = {
             isActive = false
             textBox.shape = if (mouseOver) SHAPE_TEXT_BOX_BACKGROUND_MOUSE_OVER else SHAPE_TEXT_BOX_BACKGROUND_NORMAL
@@ -782,9 +783,11 @@ private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: T
                 textValue.reference.value = reference.value.toString()
             }
             caret.position = textValue.reference.value.length
-            ui.keyboardHandler = null
+            if (ui.keyboardHandler === keyboardHandler) {
+                ui.keyboardHandler = null
+            }
         }
-        val keyboardHandler = integerTextInputKeyboardHandler(caret, cursorShape, completeFun)
+        keyboardHandler = integerTextInputKeyboardHandler(ui, caret, cursorShape, completeFun)
         onMouseOver {
             mouseOver = true
             if (!isActive) {
@@ -951,6 +954,11 @@ fun Block.vFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredR
             layout = HORIZONTAL
             hSizing = SHRINK
             toggle(toggleValue)
+        }
+        onDrop { strings ->
+            if (strings.isNotEmpty()) {
+                file.reference.value = strings.first()
+            }
         }
     }
 }

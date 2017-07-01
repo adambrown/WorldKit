@@ -623,6 +623,7 @@ abstract class Block {
     abstract var onMouseClick: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
     abstract var onMouseDrag: (Block.(button: Int, x: Int, y: Int, mods: Int) -> Unit)?
     abstract var onScroll: (Block.(x: Double, y: Double) -> Unit)?
+    abstract var onDrop: (Block.(strings: List<String>) -> Unit)?
     abstract var onTick: (Block.(mouseX: Int, mouseY: Int) -> Unit)?
     abstract var inputOverride: Block?
     protected abstract var mouseOver: Block?
@@ -713,6 +714,19 @@ abstract class Block {
             }
         } else {
             root.handleScroll(scrollX, scrollY)
+        }
+    }
+
+    fun handleDrop(strings: List<String>) {
+        if (this === root) {
+            reprocess = false
+            val mouseOver = mouseOver
+            val dropFun = mouseOver?.onDrop
+            if (mouseOver != null && dropFun != null) {
+                mouseOver.dropFun(strings)
+            }
+        } else {
+            root.handleDrop(strings)
         }
     }
 
@@ -877,6 +891,10 @@ abstract class Block {
         this.onScroll = onScroll
     }
 
+    fun onDrop(onDrop: Block.(List<String>) -> Unit) {
+        this.onDrop = onDrop
+    }
+
     operator fun invoke(builder: Block.() -> Unit): Block {
         this.builder()
         return this
@@ -1023,6 +1041,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = null
         set(value) {
         }
+    override var onDrop: (Block.(List<String>) -> Unit)?
+        get() = null
+        set(value) {
+        }
     override var onTick: (Block.(Int, Int) -> Unit)?
         get() = null
         set(value) {
@@ -1083,6 +1105,7 @@ private class DefaultBlock(
         override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)? = null,
         override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)? = null,
         override var onScroll: (Block.(Double, Double) -> Unit)? = null,
+        override var onDrop: (Block.(List<String>) -> Unit)? = null,
         override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
 
     override var inputOverride: Block?
