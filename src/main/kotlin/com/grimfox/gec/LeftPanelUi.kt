@@ -1,25 +1,17 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.util.Biomes
-import com.grimfox.gec.util.Biomes.Biome
-import com.grimfox.gec.util.BuildContinent.ParameterSet
-import com.grimfox.gec.util.BuildContinent.RegionSplines
-import com.grimfox.gec.util.BuildContinent.buildBiomeMaps
-import com.grimfox.gec.util.BuildContinent.generateRegionSplines
-import com.grimfox.gec.util.BuildContinent.generateRegions
-import com.grimfox.gec.util.BuildContinent.generateWaterFlows
-import com.grimfox.gec.util.value
 import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
-import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
-import com.grimfox.gec.util.Graphs
-import com.grimfox.gec.util.Rendering
-import com.grimfox.gec.util.ref
+import com.grimfox.gec.util.*
+import com.grimfox.gec.util.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.buildBiomeMaps
+import com.grimfox.gec.util.BuildContinent.generateRegionSplines
+import com.grimfox.gec.util.BuildContinent.generateRegions
+import com.grimfox.gec.util.BuildContinent.generateWaterFlows
 import org.lwjgl.glfw.GLFW
 import java.io.File
 import java.util.*
@@ -27,16 +19,14 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 
 
-private class CurrentState(var parameters: ParameterSet? = null,
-                           var regionGraph: Graph? = null,
-                           var regionMask: Matrix<Byte>? = null,
-                           var regionSplines: RegionSplines? = null,
-                           var biomeGraph: Graph? = null,
-                           var biomeMask: Matrix<Byte>? = null,
-                           var biomes: List<Biome>? = null,
-                           var heightMapTexture: TextureId? = null,
-                           var riverMapTexture: TextureId? = null,
-                           var meshScale: Int? = null)
+private val biomeValues = linkedMapOf(
+        "Mountains" to 0,
+        "Coastal mountains" to 1,
+        "Foothills" to 2,
+        "Rolling hills" to 3,
+        "Plateaus" to 4,
+        "Plains" to 5
+)
 
 private val cachedGraph256 = preferences.cachedGraph256!!
 
@@ -112,23 +102,17 @@ fun Block.leftPanel(ui: UserInterface, uiLayout: UiLayout, dialogLayer: Block): 
     }
 }
 
-private val currentState = CurrentState()
 private val shrinkGroup = hShrinkGroup()
 private val regionFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useRegionFile = ref(false)
 private val useBiomeFile = ref(false)
-private val mountainsOn = ref(true)
-private val coastalMountainsOn = ref(true)
-private val foothillsOn = ref(true)
-private val rollingHillsOn = ref(true)
-private val plateausOn = ref(true)
-private val plainsOn = ref(true)
 private val allowUnsafe = ref(false)
 private val regionsSeed = ref(1L)
 private val biomesSeed = ref(1L)
 private val regionsMapScale = ref(4)
 private val biomesMapScale = ref(4)
+private val biomeCount = ref(1)
 private val regions = ref(8)
 private val islands = ref(1)
 private val stride = ref(7)
@@ -184,6 +168,9 @@ private var backBiomesButton = NO_BLOCK
 private var forwardBiomesButton = NO_BLOCK
 private var backBiomesLabel = NO_BLOCK
 private var forwardBiomesLabel = NO_BLOCK
+
+private val biomes = ref(emptyList<Int>())
+private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
 
 private enum class DisplayMode { REGIONS, MAP, BIOMES, MESH }
 
@@ -328,33 +315,11 @@ private fun buildRegionsFun(parameters: ParameterSet) {
 }
 
 private fun buildBiomesFun(parameters: ParameterSet) {
-    val biomes = ArrayList<Biome>(6)
-    if (parameters.mountainsOn) {
-        biomes.add(Biomes.MOUNTAINS_BIOME)
-    }
-    if (parameters.coastalMountainsOn) {
-        biomes.add(Biomes.COASTAL_MOUNTAINS_BIOME)
-    }
-    if (parameters.foothillsOn) {
-        biomes.add(Biomes.FOOTHILLS_BIOME)
-    }
-    if (parameters.rollingHillsOn) {
-        biomes.add(Biomes.ROLLING_HILLS_BIOME)
-    }
-    if (parameters.plateausOn) {
-        biomes.add(Biomes.PLATEAU_BIOME)
-    }
-    if (parameters.plainsOn) {
-        biomes.add(Biomes.PLAINS_BIOME)
-    }
-    if (biomes.isEmpty()) {
-        biomes.add(Biomes.MOUNTAINS_BIOME)
-    }
     val finalBiomeFile = biomeFile.reference.value
     val (biomeGraph, biomeMask) = if (useBiomeFile.value && finalBiomeFile.isNotBlank()) {
         val mask = loadBiomeMaskFromImage(File(finalBiomeFile))
         for (i in 0..mask.size.toInt() - 1) {
-            mask[i] = ((mask[i].toInt() % biomes.size) + 1).toByte()
+            mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
         }
         val graph = Graphs.generateGraph(128, Random(parameters.biomesSeed), 0.8)
         Pair(graph, mask)
@@ -362,11 +327,21 @@ private fun buildBiomesFun(parameters: ParameterSet) {
         val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
         val biomeScale = Math.round(scale * 18) + 10
         val graph = Graphs.generateGraph(128, Random(parameters.biomesSeed), 0.8)
-        buildBiomeMaps(executor, parameters.biomesSeed, graph, biomes, biomeScale)
+        buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
     }
     currentState.biomeGraph = biomeGraph
     currentState.biomeMask = biomeMask
-    currentState.biomes = biomes
+    currentState.biomes = parameters.biomes.map {
+        when (it) {
+            0 -> Biomes.MOUNTAINS_BIOME
+            1 -> Biomes.COASTAL_MOUNTAINS_BIOME
+            2 -> Biomes.FOOTHILLS_BIOME
+            3 -> Biomes.ROLLING_HILLS_BIOME
+            4 -> Biomes.PLATEAU_BIOME
+            5 -> Biomes.PLAINS_BIOME
+            else -> Biomes.MOUNTAINS_BIOME
+        }
+    }
     currentState.heightMapTexture = null
     currentState.riverMapTexture = null
     val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
@@ -401,12 +376,10 @@ private fun syncParameterValues(parameters: ParameterSet) {
     regionSize.value = parameters.regionSize
     iterations.value = parameters.maxRegionTries / 10
     iterations.value = parameters.maxIslandTries / 100
-    mountainsOn.value = parameters.mountainsOn
-    coastalMountainsOn.value = parameters.coastalMountainsOn
-    foothillsOn.value = parameters.foothillsOn
-    rollingHillsOn.value = parameters.rollingHillsOn
-    plateausOn.value = parameters.plateausOn
-    plainsOn.value = parameters.plainsOn
+    biomes.value = parameters.biomes
+    biomes.value.forEachIndexed { i, id ->
+        selectedBiomes[i].value = id
+    }
 }
 
 private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialogLayer: Block) {
@@ -420,7 +393,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             vLongInputRow(regionsSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                 hSpacer(SMALL_SPACER_SIZE)
                 button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
-                    val randomSeed = random.nextLong()
+                    val randomSeed = RANDOM.nextLong()
                     val randomString = randomSeed.toString()
                     if (randomString.length > 18) {
                         regionsSeed.value = randomString.substring(0, 18).toLong()
@@ -468,12 +441,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 regionSize = regionSize.value,
                                 maxRegionTries = iterations.value * 10,
                                 maxIslandTries = iterations.value * 100,
-                                mountainsOn = mountainsOn.value,
-                                coastalMountainsOn = coastalMountainsOn.value,
-                                foothillsOn = foothillsOn.value,
-                                rollingHillsOn = rollingHillsOn.value,
-                                plateausOn = plateausOn.value,
-                                plainsOn = plainsOn.value)
+                                biomes = biomes.value)
                         buildRegionsFun(parameters)
                         val historyLast = historyRegionsCurrent.value
                         if (historyLast != null) {
@@ -491,7 +459,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 hSpacer(SMALL_SPACER_SIZE)
                 generateRandomRegionsButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val randomSeed = random.nextLong()
+                        val randomSeed = RANDOM.nextLong()
                         val randomString = randomSeed.toString()
                         if (randomString.length > 18) {
                             regionsSeed.value = randomString.substring(0, 18).toLong()
@@ -512,12 +480,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 regionSize = regionSize.value,
                                 maxRegionTries = iterations.value * 10,
                                 maxIslandTries = iterations.value * 100,
-                                mountainsOn = mountainsOn.value,
-                                coastalMountainsOn = coastalMountainsOn.value,
-                                foothillsOn = foothillsOn.value,
-                                rollingHillsOn = rollingHillsOn.value,
-                                plateausOn = plateausOn.value,
-                                plainsOn = plainsOn.value)
+                                biomes = biomes.value)
                         buildRegionsFun(parameters)
                         val historyLast = historyRegionsCurrent.value
                         if (historyLast != null) {
@@ -575,7 +538,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                 hSpacer(SMALL_SPACER_SIZE)
                 button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
-                    val randomSeed = random.nextLong()
+                    val randomSeed = RANDOM.nextLong()
                     val randomString = randomSeed.toString()
                     if (randomString.length > 18) {
                         biomesSeed.value = randomString.substring(0, 18).toLong()
@@ -586,12 +549,43 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             }
             vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-            vToggleRow(mountainsOn, LARGE_ROW_HEIGHT, text("Mountains:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            vToggleRow(coastalMountainsOn, LARGE_ROW_HEIGHT, text("Coastal mountains:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            vToggleRow(foothillsOn, LARGE_ROW_HEIGHT, text("Foothills:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            vToggleRow(rollingHillsOn, LARGE_ROW_HEIGHT, text("Rolling hills:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            vToggleRow(plateausOn, LARGE_ROW_HEIGHT, text("Plateaus:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            vToggleRow(plainsOn, LARGE_ROW_HEIGHT, text("Plains:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+            vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+            val biomeRows = block {
+                vAlign = VerticalAlignment.TOP
+                hAlign = HorizontalAlignment.LEFT
+                layout = Layout.VERTICAL
+                hSizing = Sizing.RELATIVE
+                vSizing = Sizing.SHRINK
+            }
+            biomeCount.listener { oldBiomeCount, newBiomeCount ->
+                if (oldBiomeCount != newBiomeCount) {
+                    val newBiomes = ArrayList(biomes.value)
+                    if (biomeRows.layoutChildren.size > newBiomeCount) {
+                        for (i in 1..biomeRows.layoutChildren.size - newBiomeCount) {
+                            val removeAt = biomeRows.layoutChildren.size - 1
+                            biomeRows.layoutChildren.removeAt(removeAt)
+                            biomeRows.renderChildren.removeAt(removeAt)
+                            newBiomes.removeAt(removeAt)
+                        }
+                    } else if (biomeRows.layoutChildren.size < newBiomeCount) {
+                        for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
+                            val index = newBiomes.size
+                            val selectedValue = selectedBiomes[index]
+                            biomeRows.vDropdownRow(dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
+                            newBiomes.add(selectedValue.value)
+                            selectedValue.listener { oldBiomeId, newBiomeId ->
+                                if (oldBiomeId != newBiomeId) {
+                                    val changedBiomes = ArrayList(biomes.value)
+                                    changedBiomes[index] = newBiomeId
+                                    biomes.value = changedBiomes
+                                }
+                            }
+                        }
+                    }
+                    biomes.value = newBiomes
+                }
+            }
+            biomeCount.value = 6
             vButtonRow(LARGE_ROW_HEIGHT) {
                 generateBiomesButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
@@ -609,12 +603,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 regionSize = regionSize.value,
                                 maxRegionTries = iterations.value * 10,
                                 maxIslandTries = iterations.value * 100,
-                                mountainsOn = mountainsOn.value,
-                                coastalMountainsOn = coastalMountainsOn.value,
-                                foothillsOn = foothillsOn.value,
-                                rollingHillsOn = rollingHillsOn.value,
-                                plateausOn = plateausOn.value,
-                                plainsOn = plainsOn.value)
+                                biomes = biomes.value)
                         buildBiomesFun(parameters)
                         val historyLast = historyBiomesCurrent.value
                         if (historyLast != null) {
@@ -632,7 +621,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 hSpacer(SMALL_SPACER_SIZE)
                 generateRandomBiomesButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val randomSeed = random.nextLong()
+                        val randomSeed = RANDOM.nextLong()
                         val randomString = randomSeed.toString()
                         if (randomString.length > 18) {
                             biomesSeed.value = randomString.substring(0, 18).toLong()
@@ -653,12 +642,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 regionSize = regionSize.value,
                                 maxRegionTries = iterations.value * 10,
                                 maxIslandTries = iterations.value * 100,
-                                mountainsOn = mountainsOn.value,
-                                coastalMountainsOn = coastalMountainsOn.value,
-                                foothillsOn = foothillsOn.value,
-                                rollingHillsOn = rollingHillsOn.value,
-                                plateausOn = plateausOn.value,
-                                plainsOn = plainsOn.value)
+                                biomes = biomes.value)
                         buildBiomesFun(parameters)
                         val historyLast = historyBiomesCurrent.value
                         if (historyLast != null) {
@@ -809,12 +793,26 @@ private fun loadRegionMaskFromImage(file: File): Matrix<Byte> {
     val bufferedImage = ImageIO.read(file)
     val widthM1 = bufferedImage.width - 1
     val heightM1 = bufferedImage.height - 1
+    var unknownColors = false
     for (y in 0..127) {
         for (x in 0..127) {
             val actualX = Math.round(((x + 0.5f) / 128.0f) * widthM1)
             val actualY = Math.round(((y + 0.5f) / 128.0f) * heightM1)
             val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
-            colorMap.putIfAbsent(imageValue, colorMap.size)
+            val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
+            if (!unknownColors && curVal == null) {
+                if (!REGION_COLOR_INTS.contains(imageValue)) {
+                    unknownColors = true
+                }
+            }
+        }
+    }
+    if (unknownColors) {
+        colorMap.map { it.key to it.value }.sortedByDescending { it.first and 0x00FF0000 ushr 16 }.forEachIndexed { i, (first) -> colorMap[first] = i }
+    } else {
+        colorMap.clear()
+        REGION_COLOR_INTS.forEachIndexed { i, value ->
+            colorMap[value] = i
         }
     }
     return ByteArrayMatrix(128) { i ->
@@ -827,15 +825,28 @@ private fun loadBiomeMaskFromImage(file: File): Matrix<Byte> {
     val bufferedImage = ImageIO.read(file)
     val widthM1 = bufferedImage.width - 1
     val heightM1 = bufferedImage.height - 1
+    var unknownColors = false
     for (y in 0..127) {
         for (x in 0..127) {
             val actualX = Math.round(((x + 0.5f) / 128.0f) * widthM1)
             val actualY = Math.round(((y + 0.5f) / 128.0f) * heightM1)
             val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
-            colorMap.putIfAbsent(imageValue, colorMap.size)
+            val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
+            if (!unknownColors && curVal == null) {
+                if (!REGION_COLOR_INTS.contains(imageValue)) {
+                    unknownColors = true
+                }
+            }
         }
     }
-    colorMap.map { it.key to it.value }.sortedByDescending { it.first and 0x00FF0000 ushr 16 }.forEachIndexed { i, (first) -> colorMap[first] = i }
+    if (unknownColors) {
+        colorMap.map { it.key to it.value }.sortedByDescending { it.first and 0x00FF0000 ushr 16 }.forEachIndexed { i, (first) -> colorMap[first] = i }
+    } else {
+        colorMap.clear()
+        REGION_COLOR_INTS.forEachIndexed { i, value ->
+            colorMap[value] = i - 1
+        }
+    }
     return ByteArrayMatrix(128) { i ->
         (colorMap[bufferedImage.getRGB(Math.round((((i % 128) + 0.5f) / 128.0f) * widthM1), Math.round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
     }

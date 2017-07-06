@@ -105,4 +105,12 @@ fun color(r: Int, g: Int, b: Int): NVGColor {
     return NVGColor.create().set(r, g, b, 255)
 }
 
+fun color(r: Float, g: Float, b: Float): NVGColor {
+    return NVGColor.create().set(r, g, b, 1.0f)
+}
+
+fun color(r: Float, g: Float, b: Float, a: Float): NVGColor {
+    return NVGColor.create().set(r, g, b, a)
+}
+
 val NO_COLOR = color(0, 0, 0, 0)

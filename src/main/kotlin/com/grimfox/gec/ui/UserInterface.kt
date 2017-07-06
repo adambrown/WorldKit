@@ -184,8 +184,8 @@ private fun getMousePosition(windowId: Long, windowX: Int, windowY: Int): Pair<I
     }
 }
 
-private fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
-    return screenInfoFetcher.getScreensAndWarpLines()
+private fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> {
+    return screenInfoFetcher.getScreens()
 }
 
 private class UserInterfaceInternal internal constructor(internal val window: WindowContext) : UserInterface {
@@ -578,9 +578,6 @@ private class WindowContext(
         var isDragging: Boolean = false,
         var hasMoved: Boolean = false,
 
-        var resizeAreaWidth: Int = 20,
-        var resizeAreaHeight: Int = resizeAreaWidth,
-
         var x: Int = 0,
         var y: Int = 0,
 
@@ -628,7 +625,6 @@ private class WindowContext(
         var restoreY: Int = 0,
 
         var monitors: List<MonitorSpec> = emptyList(),
-        var warpLines: List<WarpLine> = emptyList(),
 
         var ignoreInput: Boolean = false,
 
@@ -903,7 +899,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     val height = windowState?.height ?: 720
     GLFWErrorCallback.createPrint().set()
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
-    val (screens, warpLines) = getScreensAndWarpLines()
+    val screens = getScreens()
     val (monitors, currentMonitor) = getMonitorInfo(screens)
     glfwDefaultWindowHints()
     glfwWindowHint(GLFW_RED_BITS, currentMonitor.redBits)
@@ -978,7 +974,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
         throw RuntimeException("Could not init nanovg.")
     }
     glfwSwapInterval(1)
-    val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, warpLines = warpLines, width = width, height = height)
+    val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, width = width, height = height)
     glfwSetScrollCallback(window.id) { _, xOffset, yOffset ->
         if (!window.ignoreInput) {
             try {
@@ -1190,13 +1186,13 @@ private fun adjustForCurrentMonitor(monitorSpec: MonitorSpec, window: WindowCont
 
 internal interface ScreenInfoFetcher {
 
-    fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>>
+    fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec>
 }
 
 internal class MacScreenInfoFetcher: ScreenInfoFetcher {
 
-    override fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
-        return Pair(LinkedHashMap(), emptyList())
+    override fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> {
+        return LinkedHashMap()
     }
 }
 

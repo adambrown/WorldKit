@@ -55,12 +55,7 @@ object BuildContinent {
 //                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
             ),
             var currentIteration: Int = 0,
-            var mountainsOn: Boolean = true,
-            var coastalMountainsOn: Boolean = true,
-            var foothillsOn: Boolean = true,
-            var rollingHillsOn: Boolean = true,
-            var plateausOn: Boolean = true,
-            var plainsOn: Boolean = true)
+            var biomes: List<Int> = arrayListOf(0))
 
     fun generateRegions(parameterSet: ParameterSet = ParameterSet(), executor: ExecutorService): Pair<Graph, Matrix<Byte>> {
         return timeIt("generated regions in") {
@@ -78,10 +73,9 @@ object BuildContinent {
         }
     }
 
-    fun buildBiomeMaps(executor: ExecutorService, randomSeed: Long, inputGraph: Graph, biomes: List<Biome>, biomeScale: Int): Pair<Graph, Matrix<Byte>> {
+    fun buildBiomeMaps(executor: ExecutorService, randomSeed: Long, inputGraph: Graph, biomeCount: Int, biomeScale: Int): Pair<Graph, Matrix<Byte>> {
         val random = Random(randomSeed)
         val randomSeeds = Array(3) { random.nextLong() }
-        val biomeCount = biomes.size
         val biomeGraphSmallFuture = executor.call {
             val innerRandom = Random(randomSeeds[0])
             val graph = Graphs.generateGraph(biomeScale, innerRandom, 0.98)

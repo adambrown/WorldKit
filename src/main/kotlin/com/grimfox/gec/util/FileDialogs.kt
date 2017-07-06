@@ -1,6 +1,7 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.ui.FileDialogs
+import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import java.io.File
@@ -15,7 +16,25 @@ object FileDialogs {
         try {
             return callback(selectFileDialog(defaultDir, *extensions))
         } catch (e: Exception) {
-            com.grimfox.gec.ui.LOG.error("Unexpected error opening file.", e)
+            LOG.error("Unexpected error opening file.", e)
+            throw e
+        } finally {
+            if (useDialogLayer) {
+                dialogLayer.isVisible = false
+            }
+            ui.ignoreInput = false
+        }
+    }
+
+    fun <T> saveFile(dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, defaultDir: File, vararg extensions: String, callback: (File?) -> T): T {
+        ui.ignoreInput = true
+        if (useDialogLayer) {
+            dialogLayer.isVisible = true
+        }
+        try {
+            return callback(saveFileDialog(defaultDir, *extensions))
+        } catch (e: Exception) {
+            LOG.error("Unexpected error saving file.", e)
             throw e
         } finally {
             if (useDialogLayer) {

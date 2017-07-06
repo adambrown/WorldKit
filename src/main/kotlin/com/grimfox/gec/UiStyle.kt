@@ -1,6 +1,9 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.KeyboardHandler
+import com.grimfox.gec.ui.UiLayout
+import com.grimfox.gec.ui.UserInterface
+import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_LEFT
@@ -8,10 +11,11 @@ import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_RIGHT
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
-import com.grimfox.gec.ui.widgets.toggle
+import com.grimfox.gec.util.FileDialogs.saveFile
 import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.selectFolder
 import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
@@ -32,76 +36,6 @@ val HALF_ROW_HEIGHT = 10.0f
 val SMALL_ROW_HEIGHT = 20.0f
 val MEDIUM_ROW_HEIGHT = 26.0f
 val LARGE_ROW_HEIGHT = 32.0f
-
-val COLOR_REGION_0 = color(243, 0, 81)
-val COLOR_REGION_1 = color(0, 155, 255)
-val COLOR_REGION_2 = color(0, 185, 23)
-val COLOR_REGION_3 = color(254, 137, 0)
-val COLOR_REGION_4 = color(213, 255, 0)
-val COLOR_REGION_5 = color(181, 0, 255)
-val COLOR_REGION_6 = color(255, 0, 246)
-val COLOR_REGION_7 = color(10, 55, 168)
-val COLOR_REGION_8 = color(0, 255, 120)
-val COLOR_REGION_9 = color(255, 177, 103)
-val COLOR_REGION_10 = color(164, 36, 0)
-val COLOR_REGION_11 = color(255, 166, 254)
-val COLOR_REGION_12 = color(1, 255, 254)
-val COLOR_REGION_13 = color(255, 64, 64)
-val COLOR_REGION_14 = color(0, 95, 57)
-val COLOR_REGION_15 = color(238, 210, 2)
-
-val REGION_COLORS = listOf(
-        COLOR_REGION_0,
-        COLOR_REGION_1,
-        COLOR_REGION_2,
-        COLOR_REGION_3,
-        COLOR_REGION_4,
-        COLOR_REGION_5,
-        COLOR_REGION_6,
-        COLOR_REGION_7,
-        COLOR_REGION_8,
-        COLOR_REGION_9,
-        COLOR_REGION_10,
-        COLOR_REGION_11,
-        COLOR_REGION_12,
-        COLOR_REGION_13,
-        COLOR_REGION_14,
-        COLOR_REGION_15)
-
-val COLOR_REGION_ALT_0 = color(73, 238, 73)
-val COLOR_REGION_ALT_1 = color(255, 163, 240)
-val COLOR_REGION_ALT_2 = color(255, 255, 135)
-val COLOR_REGION_ALT_3 = color(160, 62, 227)
-val COLOR_REGION_ALT_4 = color(214, 136, 56)
-val COLOR_REGION_ALT_5 = color(106, 106, 255)
-val COLOR_REGION_ALT_6 = color(246, 88, 88)
-val COLOR_REGION_ALT_7 = color(48, 205, 206)
-val COLOR_REGION_ALT_8 = color(44, 146, 44)
-val COLOR_REGION_ALT_9 = color(194, 43, 168)
-val COLOR_REGION_ALT_10 = color(178, 179, 45)
-val COLOR_REGION_ALT_11 = color(98, 46, 137)
-val COLOR_REGION_ALT_12 = color(126, 87, 49)
-val COLOR_REGION_ALT_13 = color(42, 42, 169)
-val COLOR_REGION_ALT_14 = color(158, 41, 41)
-val COLOR_REGION_ALT_15 = color(52, 116, 116)
-
-val REGION_COLORS_ALT = listOf(
-        COLOR_REGION_ALT_0,
-        COLOR_REGION_ALT_1,
-        COLOR_REGION_ALT_2,
-        COLOR_REGION_ALT_3,
-        COLOR_REGION_ALT_4,
-        COLOR_REGION_ALT_5,
-        COLOR_REGION_ALT_6,
-        COLOR_REGION_ALT_7,
-        COLOR_REGION_ALT_8,
-        COLOR_REGION_ALT_9,
-        COLOR_REGION_ALT_10,
-        COLOR_REGION_ALT_11,
-        COLOR_REGION_ALT_12,
-        COLOR_REGION_ALT_13,
-        COLOR_REGION_ALT_14,
-        COLOR_REGION_ALT_15)
 
 val COLOR_DROP_SHADOW_BLACK = color(5, 5, 6, 72)
 val COLOR_DROP_SHADOW_BLACK_TRANSPARENT = color(5, 5, 6, 0)
@@ -503,13 +437,13 @@ fun Block.label(text: Text, width: Float, hAlign: HorizontalAlignment = RIGHT): 
     }
 }
 
-fun Block.label(text: Text, shrinkGroup: ShrinkGroup): Block {
+fun Block.label(text: Text, shrinkGroup: ShrinkGroup, horizontalAlignment: HorizontalAlignment = RIGHT): Block {
     return block {
         hSizing = SHRINK_GROUP
         hShrinkGroup = shrinkGroup
         layout = HORIZONTAL
         block {
-            hAlign = RIGHT
+            hAlign = horizontalAlignment
             vAlign = MIDDLE
             hSizing = SHRINK
             vSizing = SHRINK
@@ -686,6 +620,49 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
         }
     }
 }
+
+fun Block.vDropdownRow(menuLayer: Block, color: NVGColor, values: List<String>, selected: MonitoredReference<Int>, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
+    return block {
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block {
+            hSizing = SHRINK_GROUP
+            hShrinkGroup = shrinkGroup
+            layout = HORIZONTAL
+            block {
+                hAlign = RIGHT
+                vAlign = MIDDLE
+                hSizing = SHRINK
+                vSizing = SHRINK
+                text = glyph(GLYPH_CIRCLE, 20.0f, color)
+                isMouseAware = false
+            }
+            isMouseAware = false
+        }
+        hSpacer(gap)
+        val textRef = DynamicTextReference(values[selected.value], values.map { it.length }.max()!!, TEXT_STYLE_BUTTON)
+        block {
+            layout = HORIZONTAL
+            hSizing = GROW
+            dropdown(textRef.text, menuLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                values.forEachIndexed { i, value ->
+                    menuItem(value) {
+                        selected.value = i
+                    }
+                }
+            }.with {
+                vAlign = VerticalAlignment.MIDDLE
+            }
+        }
+        selected.listener { old, new ->
+            if (old != new) {
+                textRef.reference.value = values[new]
+            }
+        }
+    }
+}
+
 
 fun Block.vLongInputRow(reference: MonitoredReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NVGColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
     return block {
@@ -914,6 +891,51 @@ fun Block.vFileRow(file: DynamicTextReference, height: Float, label: Text, shrin
             }
             row.supplantEvents(button)
             isMouseAware = false
+        }
+    }
+}
+
+fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                block {
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = file.text
+                    isMouseAware = false
+                }
+                isMouseAware = false
+            }
+            hSpacer(MEDIUM_SPACER_SIZE)
+            val button = button(text("Select file"), NORMAL_TEXT_BUTTON_STYLE) {
+                file.reference.value = saveFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { it }?.canonicalPath ?: file.reference.value
+            }
+            row.supplantEvents(button)
+            isMouseAware = false
+        }
+        hSpacer(gap)
+        block {
+            layout = HORIZONTAL
+            hSizing = SHRINK
+            toggle(toggleValue)
+        }
+        onDrop { strings ->
+            if (strings.isNotEmpty()) {
+                file.reference.value = strings.first()
+            }
         }
     }
 }

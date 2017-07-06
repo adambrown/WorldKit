@@ -97,3 +97,10 @@ fun UiLayout.BLOCK_GLYPH_ERROR(scale: Float): Block.() -> Block {
 }
 
 val UiLayout.BLOCK_GLYPH_ERROR: Block.() -> Block get() = BLOCK_GLYPH_ERROR(BASE_SCALE)
+
+fun UiLayout.BLOCK_GLYPH_CIRCLE(scale: Float): Block.() -> Block {
+    val rescale = scale / BASE_SCALE
+    return createMultiGlyph(GlyphLayer(GLYPH_CIRCLE, glyphFont, 20.0f * rescale, COLOR_GLYPH_DARK_RED, 0.0f, 0.0f))
+}
+
+val UiLayout.BLOCK_GLYPH_CIRCLE: Block.() -> Block get() = BLOCK_GLYPH_ERROR(BASE_SCALE)

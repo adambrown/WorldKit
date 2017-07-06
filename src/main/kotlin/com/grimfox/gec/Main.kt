@@ -14,13 +14,10 @@ import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Layout.VERTICAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.util.mRef
-import com.grimfox.gec.util.ref
 import nl.komponents.kovenant.task
-import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
 import java.awt.Desktop
-import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URISyntaxException
@@ -52,9 +49,9 @@ object Main {
                 disableCursor.listener { old, new ->
                     if (old != new) {
                         if (new) {
-                            ui.disableCursor()
+                            disableCursor()
                         } else {
-                            ui.enableCursor()
+                            enableCursor()
                         }
                     }
                 }
@@ -63,11 +60,11 @@ object Main {
                 textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
                 glyphFont.value = createFont("/fonts/WorldKitUi.ttf", "Glyphs")
 
-                val maxRestoreGlyph = MemoryUtil.memUTF8(if (ui.isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, true)
-                ui.maximizeHandler = {
+                val maxRestoreGlyph = MemoryUtil.memUTF8(if (isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, true)
+                maximizeHandler = {
                     MemoryUtil.memUTF8(GLYPH_RESTORE, true, maxRestoreGlyph, 0)
                 }
-                ui.restoreHandler = {
+                restoreHandler = {
                     MemoryUtil.memUTF8(GLYPH_MAXIMIZE, true, maxRestoreGlyph, 0)
                 }
 
@@ -95,11 +92,6 @@ object Main {
 
                 meshViewport.init()
 
-                var mainLayer = NO_BLOCK
-                var panelLayer = NO_BLOCK
-                var menuLayer = NO_BLOCK
-                var dialogLayer = NO_BLOCK
-
                 var topBar = NO_BLOCK
                 var contentPanel = NO_BLOCK
                 var rightPanel = NO_BLOCK
@@ -117,6 +109,9 @@ object Main {
                     menuLayer = block {
                         isFallThrough = true
                     }
+                    dropdownLayer = block {
+                        isFallThrough = true
+                    }
                     dialogLayer = block {
                         isFallThrough = false
                         isMouseAware = true
@@ -126,7 +121,6 @@ object Main {
                 }
                 var overwriteWarningDialog = NO_BLOCK
                 var errorMessageDialog = NO_BLOCK
-                var preferencesPanel = NO_BLOCK
                 val noop = {}
                 val dialogCallback = mRef(noop)
                 val errorHandler: ErrorDialog = object : ErrorDialog {
@@ -176,39 +170,8 @@ object Main {
                         addProjectToRecentProjects(new.file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                     }
                 }
-                val rememberWindowState = ref(preferences.rememberWindowState)
-                val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
-                val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
-                panelLayer {
-                    preferencesPanel = panel(650.0f) {
-                        vSizing = SHRINK
-                        val shrinkGroup = hShrinkGroup()
-                        vSpacer(LARGE_SPACER_SIZE)
-                        vToggleRow(rememberWindowState, LARGE_ROW_HEIGHT, text("Remember window state:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                        vFolderRow(projectDir, LARGE_ROW_HEIGHT, text("Project folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, false, ui)
-                        vFolderRow(tempDir, LARGE_ROW_HEIGHT, text("Temporary folder:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, false, ui)
-                        vSpacer(MEDIUM_SPACER_SIZE)
-                        vButtonRow(LARGE_ROW_HEIGHT) {
-                            button(text("Save"), DIALOG_BUTTON_STYLE) {
-                                preferences.rememberWindowState = rememberWindowState.value
-                                preferences.projectDir = File(projectDir.reference.value)
-                                preferences.tempDir = File(tempDir.reference.value)
-                                savePreferences(preferences)
-                                preferencesPanel.isVisible = false
-                                panelLayer.isVisible = false
-                            }.with { width = 60.0f }
-                            hSpacer(SMALL_SPACER_SIZE)
-                            button(text("Cancel"), DIALOG_BUTTON_STYLE) {
-                                rememberWindowState.value = preferences.rememberWindowState
-                                projectDir.reference.value = preferences.projectDir.canonicalPath
-                                tempDir.reference.value = preferences.tempDir.canonicalPath
-                                preferencesPanel.isVisible = false
-                                panelLayer.isVisible = false
-                            }.with { width = 60.0f }
-                        }
-                        vSpacer(MEDIUM_SPACER_SIZE)
-                    }
-                }
+                preferencesPanel(ui)
+                exportPanel(ui)
                 mainLayer {
                     topBar = block {
                         vSizing = STATIC
@@ -282,7 +245,8 @@ object Main {
                                 }
                                 menuDivider()
                                 menuItem("Export maps...", "Ctrl+E", isActive = doesActiveProjectExist) {
-                                    println("Export maps...")
+                                    panelLayer.isVisible = true
+                                    exportPanel.isVisible = true
                                 }
                                 menuDivider()
                                 menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {

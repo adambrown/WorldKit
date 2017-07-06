@@ -7,9 +7,8 @@ import java.util.LinkedHashMap
 
 internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
 
-    override fun getScreensAndWarpLines(): Pair<LinkedHashMap<ScreenIdentity, ScreenSpec>, List<WarpLine>> {
+    override fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> {
         val screens = LinkedHashMap<ScreenIdentity, ScreenSpec>()
-        val warpLines = ArrayList<WarpLine>()
         val graphics = GraphicsEnvironment.getLocalGraphicsEnvironment()
         val devices = ArrayList(graphics.screenDevices.toList())
         devices.sortBy { it.defaultConfiguration.bounds.x }
@@ -42,9 +41,6 @@ internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
                 lastIdentity = ScreenIdentity(lastX, Math.round(y1 * scaleFactor).toInt(), currentMode.width, currentMode.height)
                 screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, width, height, currentMode.width, currentMode.height,
                         maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, scaleFactor, width.toDouble() / currentMode.width))
-                if (x1 > lastX) {
-                    warpLines.add(WarpLine(lastX, y1, x1, y1 + height, Math.abs(x1 - lastX), 0))
-                }
                 lastX += currentMode.width
             } else {
                 lastIdentity = ScreenIdentity(x1, y1, currentMode.width, currentMode.height)
@@ -66,7 +62,7 @@ internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
                 screenSpec.scaleFactor = clamp(Math.round((Math.round(screenSpec.scaleFactor * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
             }
         }
-        return Pair(screens, warpLines)
+        return screens
     }
 }
 

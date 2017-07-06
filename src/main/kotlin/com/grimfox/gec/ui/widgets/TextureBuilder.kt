@@ -370,7 +370,7 @@ object TextureBuilder {
 
     fun extractTextureRgbaByte(textureId: TextureId, width: Int): ByteBuffer {
         return doDeferredOpenglWork(ValueCollector {
-            val matrix = BufferUtils.createByteBuffer(width * width)
+            val matrix = BufferUtils.createByteBuffer(width * width * 4)
             glBindTexture(GL_TEXTURE_2D, textureId.id)
             glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, matrix)
             matrix
