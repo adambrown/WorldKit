@@ -112,7 +112,7 @@ object Biomes {
         return tan(angle).toFloat()
     }
 
-    private val noiseGraph128 = Graphs.generateGraph(128, Random(123), 0.98)
+    private val noiseGraph128 = Graphs.generateGraph(128, 123, 0.98)
     private val noisePoints128 = arrayOfNulls<Point3F>(noiseGraph128.vertices.size)
 
     init {
@@ -123,7 +123,7 @@ object Biomes {
         }
     }
 
-    private val noiseGraph64 = Graphs.generateGraph(64, Random(456), 0.98)
+    private val noiseGraph64 = Graphs.generateGraph(64, 456, 0.98)
     private val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
 
     init {
@@ -134,7 +134,7 @@ object Biomes {
         }
     }
 
-    private val noiseGraph32 = Graphs.generateGraph(32, Random(789), 0.98)
+    private val noiseGraph32 = Graphs.generateGraph(32, 789, 0.98)
     private val noisePoints32 = arrayOfNulls<Point3F>(noiseGraph32.vertices.size)
 
     init {
@@ -145,7 +145,7 @@ object Biomes {
         }
     }
 
-    private val noiseGraph16 = Graphs.generateGraph(16, Random(12), 0.98)
+    private val noiseGraph16 = Graphs.generateGraph(16, 12, 0.98)
     private val noisePoints16 = arrayOfNulls<Point3F>(noiseGraph16.vertices.size)
 
     init {
@@ -232,7 +232,7 @@ object Biomes {
     }
 
     private val rollingHillsNoise = { width: Int, buffer: ShortBuffer ->
-        val noiseGraph = Graphs.generateGraph(256, Random(6874475222), 0.98)
+        val noiseGraph = Graphs.generateGraph(256, 6874475222, 0.98)
         val noisePoints = arrayOfNulls<Point3F>(noiseGraph.vertices.size)
         val vertices = noiseGraph.vertices
         for (i in 0..vertices.size - 1) {
@@ -272,7 +272,7 @@ object Biomes {
     }
 
     private val foothillsNoise = { width: Int, buffer: ShortBuffer ->
-        val noiseGraph = Graphs.generateGraph(256, Random(253487348644), 0.98)
+        val noiseGraph = Graphs.generateGraph(256, 253487348644, 0.98)
         val noisePoints = arrayOfNulls<Point3F>(noiseGraph.vertices.size)
         val vertices = noiseGraph.vertices
         for (i in 0..vertices.size - 1) {
@@ -314,21 +314,21 @@ object Biomes {
     private val mountainsNoise = { width: Int, buffer: ShortBuffer ->
         val octaves = floatArrayOf(0.3f, 0.25f, 0.2f, 0.15f, 0.03f, 0.025f, 0.02f, 0.015f, 0.006f, 0.004f)
         val multipliers = floatArrayOf(31.0f, 67.0f, 17.0f, 7.0f, 127.0f, 257.0f, 509.0f, 1021.0f, 2053.0f, 4093.0f)
-        val noiseGraph512 = Graphs.generateGraph(512, Random(136420669786), 0.98)
+        val noiseGraph512 = Graphs.generateGraph(512, 136420669786, 0.98)
         val noisePoints512 = arrayOfNulls<Point3F>(noiseGraph512.vertices.size)
         val noiseGraph512Vertices = noiseGraph512.vertices
         for (i in 0..noiseGraph512Vertices.size - 1) {
             val point = noiseGraph512Vertices.getPoint(i)
             noisePoints512[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 512, point.y * 512)) / 512.0f)
         }
-        val noiseGraph256 = Graphs.generateGraph(256, Random(7642367947869), 0.98)
+        val noiseGraph256 = Graphs.generateGraph(256, 7642367947869, 0.98)
         val noisePoints256 = arrayOfNulls<Point3F>(noiseGraph256.vertices.size)
         val noiseGraph256Vertices = noiseGraph256.vertices
         for (i in 0..noiseGraph256Vertices.size - 1) {
             val point = noiseGraph256Vertices.getPoint(i)
             noisePoints256[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 127, point.y * 127)) / 256)
         }
-        val noiseGraph128 = Graphs.generateGraph(128, Random(458653243663), 0.98)
+        val noiseGraph128 = Graphs.generateGraph(128, 458653243663, 0.98)
         val noisePoints128 = arrayOfNulls<Point3F>(noiseGraph128.vertices.size)
         val noiseGraph128Vertices = noiseGraph128.vertices
         for (i in 0..noiseGraph128Vertices.size - 1) {
@@ -383,14 +383,14 @@ object Biomes {
     }
 
     private val plainsNoise = { width: Int, buffer: ShortBuffer ->
-        val noiseGraph128 = Graphs.generateGraph(128, Random(458653243663), 0.98)
+        val noiseGraph128 = Graphs.generateGraph(128, 458653243663, 0.98)
         val noisePoints128 = arrayOfNulls<Point3F>(noiseGraph128.vertices.size)
         val noiseGraph128Vertices = noiseGraph128.vertices
         for (i in 0..noiseGraph128Vertices.size - 1) {
             val point = noiseGraph128Vertices.getPoint(i)
             noisePoints128[i] = Point3F(point.x, point.y, Math.abs(noise(point.x * 63, point.y * 63)) / 128.0f)
         }
-        val noiseGraph64 = Graphs.generateGraph(64, Random(3766796523564), 0.98)
+        val noiseGraph64 = Graphs.generateGraph(64, 3766796523564, 0.98)
         val noisePoints64 = arrayOfNulls<Point3F>(noiseGraph64.vertices.size)
         val noiseGraph64Vertices = noiseGraph64.vertices
         for (i in 0..noiseGraph64Vertices.size - 1) {

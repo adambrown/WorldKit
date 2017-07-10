@@ -92,12 +92,12 @@ fun loadPreferences(executor: ExecutorService): Preferences {
                 graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
             } catch (e: Exception) {
                 LOG.warn("Error reading from cached graph 256 file.")
-                graph = Graphs.generateGraph(256, Random(0), 0.8, false, false)
+                graph = Graphs.generateGraph(256, 0L, 0.8, false, false)
                 Graphs.serialize(graph, CACHED_GRAPH_256_FILE.outputStream())
                 graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
             }
         } else {
-            graph = Graphs.generateGraph(256, Random(0), 0.8, false, false)
+            graph = Graphs.generateGraph(256, 0L, 0.8, false, false)
             Graphs.serialize(graph, CACHED_GRAPH_256_FILE.outputStream())
             graph = Graphs.deserialize(CACHED_GRAPH_256_FILE.inputStream())
         }
@@ -111,12 +111,12 @@ fun loadPreferences(executor: ExecutorService): Preferences {
                 graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
             } catch (e: Exception) {
                 LOG.warn("Error reading from cached graph 512 file.")
-                graph = Graphs.generateGraph(512, Random(0), 0.8, false, false)
+                graph = Graphs.generateGraph(512, 1L, 0.8, false, false)
                 Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
                 graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
             }
         } else {
-            graph = Graphs.generateGraph(512, Random(0), 0.8, false, false)
+            graph = Graphs.generateGraph(512, 1L, 0.8, false, false)
             Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
             graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
         }
@@ -130,12 +130,12 @@ fun loadPreferences(executor: ExecutorService): Preferences {
                 graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
             } catch (e: Exception) {
                 LOG.warn("Error reading from cached graph 1024 file.")
-                graph = Graphs.generateGraph(1024, Random(0), 0.8, false, false)
+                graph = Graphs.generateGraph(1024, 2L, 0.8, false, false)
                 Graphs.serialize(graph, CACHED_GRAPH_1024_FILE.outputStream())
                 graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
             }
         } else {
-            graph = Graphs.generateGraph(1024, Random(0), 0.8, false, false)
+            graph = Graphs.generateGraph(1024, 2L, 0.8, false, false)
             Graphs.serialize(graph, CACHED_GRAPH_1024_FILE.outputStream())
             graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
         }

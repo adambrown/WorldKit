@@ -46,7 +46,7 @@ object Regions {
         var check4Fails = 0
         var tries = 0
         while (tries < parameters.maxRegionTries) {
-            val graph = generateGraph(parameters.stride, random, 0.8)
+            val graph = generateGraph(parameters.stride, random.nextLong(), 0.8)
             val (interiorVertices, islandCount) = findInteriorVertices(graph, random, parameters, islandDesire, parameters.maxIslandTries)
             val possibleRegions = pickStartRegions(interiorVertices, pickStartCells(graph, random, interiorVertices, parameters.regionCount))
             var bestValue = -Float.MAX_VALUE

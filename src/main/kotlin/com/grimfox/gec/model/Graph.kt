@@ -6,7 +6,8 @@ import java.util.*
 import kotlin.collections.LinkedHashSet
 
 
-class Graph(val vertexIdsToPoints: FloatArray,
+class Graph(val seed: Long,
+            val vertexIdsToPoints: FloatArray,
             val vertexToVertices: List<List<Int>>,
             val vertexToTriangles: List<List<Int>>,
             val triangleToCenters: FloatArray,

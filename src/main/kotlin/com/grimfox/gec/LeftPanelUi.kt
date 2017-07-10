@@ -288,7 +288,18 @@ private fun buildRegionsFun(parameters: ParameterSet) {
     val finalRegionFile = regionFile.reference.value
     val (regionGraph, regionMask) = if (useRegionFile.value && finalRegionFile.isNotBlank()) {
         val mask = loadRegionMaskFromImage(File(finalRegionFile))
-        val graph = Graphs.generateGraph(128, Random(parameters.regionsSeed), 0.8)
+        var water = 0
+        var land = 0
+        for (i in 0..mask.size.toInt() - 1) {
+            if (mask[i] < 1) {
+                water++
+            } else {
+                land++
+            }
+        }
+        val landPercent = land.toFloat() / (water + land)
+        val graph = Graphs.generateGraph(128, parameters.regionsSeed, 0.8)
+        Coastline.refineCoastline(graph, Random(parameters.regionsSeed), mask, BuildContinent.Parameters(graph.stride!!, landPercent, 0.0f, 1,0.1f, 0.05f, 0.035f, 2.0f, 0.005f))
         Pair(graph, mask)
     } else {
         generateRegions(parameters.copy(), executor)
@@ -321,12 +332,12 @@ private fun buildBiomesFun(parameters: ParameterSet) {
         for (i in 0..mask.size.toInt() - 1) {
             mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
         }
-        val graph = Graphs.generateGraph(128, Random(parameters.biomesSeed), 0.8)
+        val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
         Pair(graph, mask)
     } else {
         val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
         val biomeScale = Math.round(scale * 18) + 10
-        val graph = Graphs.generateGraph(128, Random(parameters.biomesSeed), 0.8)
+        val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
         buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
     }
     currentState.biomeGraph = biomeGraph

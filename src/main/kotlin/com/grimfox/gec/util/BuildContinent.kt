@@ -63,7 +63,7 @@ object BuildContinent {
             var (graph, regionMask) = buildRegions(parameterSet)
             parameterSet.parameters.forEachIndexed { i, parameters ->
                 parameterSet.currentIteration = i
-                val localGraph = generateGraph(parameters.stride, random, 0.8)
+                val localGraph = generateGraph(parameters.stride, random.nextLong(), 0.8)
                 val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
                 regionMask = mask
                 refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
@@ -78,13 +78,12 @@ object BuildContinent {
         val randomSeeds = Array(3) { random.nextLong() }
         val biomeGraphSmallFuture = executor.call {
             val innerRandom = Random(randomSeeds[0])
-            val graph = Graphs.generateGraph(biomeScale, innerRandom, 0.98)
+            val graph = Graphs.generateGraph(biomeScale, randomSeeds[0], 0.98)
             val mask = ByteArrayMatrix(graph.stride!!) { ((Math.abs(innerRandom.nextInt()) % biomeCount) + 1).toByte() }
             graph to mask
         }
         val biomeGraphMidFuture = executor.call {
-            val innerRandom = Random(randomSeeds[1])
-            val graph = Graphs.generateGraph(28, innerRandom, 0.98)
+            val graph = Graphs.generateGraph(28, randomSeeds[1], 0.98)
             val vertices = graph.vertices
             val (parentGraph, parentMask) = biomeGraphSmallFuture.value
             val mask = ByteArrayMatrix(graph.stride!!) { i ->
@@ -94,8 +93,7 @@ object BuildContinent {
             graph to mask
         }
         val biomeGraphHighFuture = executor.call {
-            val innerRandom = Random(randomSeeds[2])
-            val graph = Graphs.generateGraph(72, innerRandom, 0.88)
+            val graph = Graphs.generateGraph(72, randomSeeds[2], 0.88)
             val vertices = graph.vertices
             val (parentGraph, parentMask) = biomeGraphMidFuture.value
             val mask = ByteArrayMatrix(graph.stride!!) { i ->

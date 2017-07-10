@@ -19,6 +19,7 @@ object Graphs {
         } else {
             DataOutputStream(outputStream.buffered())
         }.use { output ->
+            output.writeLong(graph.seed)
             writeFloatArray(graph.vertexIdsToPoints, output)
             writeListListInt(graph.vertexToVertices, output)
             writeListListInt(graph.vertexToTriangles, output)
@@ -44,17 +45,18 @@ object Graphs {
         } else {
             DataInputStream(inputStream.buffered())
         }
-        return input.use { input ->
-            val vertexIdsToPoints = readFloatArray(input)
-            val vertexToVertices = readListListInt(input)
-            val vertexToTriangles = readListListInt(input)
-            val triangleToCenters = readFloatArray(input)
-            val triangleToVertices = readIntArray(input)
-            val triangleToTriangles = readIntArray(input)
-            val stride = readNullablePositiveInt(input)
-            val areas = readNullableFloatArray(input)
-            val borders = readNullableBooleanArray(input)
-            Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, areas, borders, false, false)
+        return input.use { stream ->
+            val seed = stream.readLong()
+            val vertexIdsToPoints = readFloatArray(stream)
+            val vertexToVertices = readListListInt(stream)
+            val vertexToTriangles = readListListInt(stream)
+            val triangleToCenters = readFloatArray(stream)
+            val triangleToVertices = readIntArray(stream)
+            val triangleToTriangles = readIntArray(stream)
+            val stride = readNullablePositiveInt(stream)
+            val areas = readNullableFloatArray(stream)
+            val borders = readNullableBooleanArray(stream)
+            Graph(seed, vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, areas, borders, false, false)
         }
     }
 
@@ -153,27 +155,17 @@ object Graphs {
         return array
     }
 
-    fun generateGraph(stride: Int, random: Random, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
+    fun generateGraph(stride: Int, seed: Long, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
+        val random = Random(seed)
         val polygon = Polygon(stride * stride)
         generateSemiUniformPointsD(stride, 1.0, random, constraint) { _, x, y ->
             polygon.add(Vertex(x, y))
         }
         val mesh = polygon.triangulate()
-        return buildGraph(mesh, stride, null, cacheVertices, cacheTriangles)
+        return buildGraph(seed, mesh, stride, null, cacheVertices, cacheTriangles)
     }
 
-    fun buildGraph(width: Float, points: List<Point2F>, stride: Int? = null): Graph {
-        val polygon = Polygon(points.size)
-        points.mapIndexedTo(polygon.points) { i, point ->
-            val v = Vertex(point.x.toDouble(), point.y.toDouble())
-            v.id = i
-            v
-        }
-        val mesh = polygon.triangulate()
-        return buildGraph(mesh, stride, width)
-    }
-
-    private fun buildGraph(mesh: Mesh, stride: Int? = null, width: Float? = null, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
+    private fun buildGraph(seed: Long, mesh: Mesh, stride: Int? = null, width: Float? = null, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         mesh.renumber()
         val points: List<Point> = mesh.vertices
         val triangles: List<Triangle> = mesh.triangles
@@ -298,6 +290,6 @@ object Graphs {
             vertexToTriangles.add(adjacentTriangles)
             vertexToVertices.add(adjacentPoints)
         }
-        return Graph(vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, null, null, cacheVertices, cacheTriangles)
+        return Graph(seed, vertexIdsToPoints, vertexToVertices, vertexToTriangles, triangleToCenters, triangleToVertices, triangleToTriangles, stride, null, null, cacheVertices, cacheTriangles)
     }
 }
