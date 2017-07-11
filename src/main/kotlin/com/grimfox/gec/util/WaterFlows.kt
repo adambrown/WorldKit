@@ -249,7 +249,7 @@ object WaterFlows {
         val vertices = graph.vertices
         val land = LinkedHashSet(regionData.land)
         val water = ArrayList(regionData.water)
-        val coast = regionData.beach
+        val coast = LinkedHashSet(regionData.beach)
         val border = LinkedHashSet(graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
         val beach1 = LinkedHashSet(coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { land.contains(it) })
         val beach2 = coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { !beach1.contains(it) && land.contains(it) }

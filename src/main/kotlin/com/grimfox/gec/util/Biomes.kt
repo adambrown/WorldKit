@@ -59,6 +59,8 @@ object Biomes {
 
     private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
 
+    private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0, 15.0, 0.0)
+
     private fun buildPlateauTalusAngles(): FloatArray {
         val profiles = arrayOf(
                 arrayOf(240 to 30.0,
@@ -1086,7 +1088,7 @@ object Biomes {
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
-                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
+                    talusAngles = TALUS_ANGLES_UNDERWATER,
                     heightMultiplier = 1.0f,
                     erosionPower = 0.000000005f),
             erosionLowSettings = ErosionLevel(
@@ -1095,7 +1097,7 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 50,
                                     deltaTime = 3000000.0f,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    talusAngles = TALUS_ANGLES_UNDERWATER,
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.000000012f))),
             erosionMidSettings = ErosionLevel(
@@ -1104,7 +1106,7 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 25,
                                     deltaTime = 250000.0f,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    talusAngles = TALUS_ANGLES_UNDERWATER,
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.000000016f))),
             erosionHighSettings = ErosionLevel(
@@ -1113,7 +1115,7 @@ object Biomes {
                             ErosionSettings(
                                     iterations = 5,
                                     deltaTime = 250000.0f,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    talusAngles = TALUS_ANGLES_UNDERWATER,
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.00000002f)))
     )
