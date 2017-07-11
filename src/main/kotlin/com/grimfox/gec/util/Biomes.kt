@@ -158,6 +158,7 @@ object Biomes {
 
     class RegionData(
             val land: List<Int>,
+            val water: List<Int>,
             val beach: LinkedHashSet<Int>)
 
     class ErosionSettings(
@@ -1030,5 +1031,90 @@ object Biomes {
                                     talusAngles = TALUS_ANGLES_PLATEAU,
                                     heightMultiplier = 10.0f,
                                     erosionPower = 0.0000004f)))
+    )
+
+    private val underWaterUpliftShader = object : UpliftShader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val textureScaleUniform = ShaderUniform("textureScale")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val landMaskTextureUniform = ShaderUniform("landMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/under-water.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/under-water.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, coastDistanceTextureUniform, landMaskTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(textureScaleUniform.location, textureScale)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(landMaskTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, landMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
+        }
+    }
+
+    val UNDER_WATER_BIOME = Biome(
+            minUplift = 0.0f,
+            deltaUplift = 0.0f,
+            upliftShader = underWaterUpliftShader,
+            bootstrapSettings = ErosionSettings(
+                    iterations = 1,
+                    deltaTime = 85000.0f,
+                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
+                    heightMultiplier = 1.0f,
+                    erosionPower = 0.000000005f),
+            erosionLowSettings = ErosionLevel(
+                    upliftMultiplier = 1.0f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 50,
+                                    deltaTime = 3000000.0f,
+                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.000000012f))),
+            erosionMidSettings = ErosionLevel(
+                    upliftMultiplier = 1.0f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 25,
+                                    deltaTime = 250000.0f,
+                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.000000016f))),
+            erosionHighSettings = ErosionLevel(
+                    upliftMultiplier = 1.0f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 5,
+                                    deltaTime = 250000.0f,
+                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.00000002f)))
     )
 }

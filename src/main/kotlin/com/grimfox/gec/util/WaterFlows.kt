@@ -11,8 +11,10 @@ import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedByte
+import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedFloat
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.util.Biomes.UNDER_WATER_BIOME
 import com.grimfox.gec.util.Rendering.renderEdges
 import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
@@ -25,6 +27,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.collections.ArrayList
 
 object WaterFlows {
 
@@ -40,7 +43,8 @@ object WaterFlows {
                     var uplift: Float,
                     var height: Float,
                     var drainageArea: Float,
-                    var biome: Int) {
+                    var biome: Int,
+                    val isPinned: Boolean) {
 
         var lake: Int = -1
         var parent: WaterNode = this
@@ -89,8 +93,30 @@ object WaterFlows {
                 textureRenderer.unbind()
                 retVal
             }
+            val underWaterTextureId = render { _, dynamicGeometry2D, textureRenderer ->
+                glDisable(GL11.GL_BLEND)
+                glDisable(GL11.GL_CULL_FACE)
+                glDisable(GL13.GL_MULTISAMPLE)
+                glEnable(GL_DEPTH_TEST)
+                glDisable(GL11.GL_SCISSOR_TEST)
+                glDisable(GL13.GL_MULTISAMPLE)
+                textureRenderer.bind()
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+                val vertexData = floatArrayOf(
+                        0.0f, 0.0f,
+                        1.0f, 0.0f,
+                        1.0f, 1.0f,
+                        0.0f, 1.0f)
+                val indexData = intArrayOf(0, 1, 2, 2, 3, 0)
+                UNDER_WATER_BIOME.upliftShader.bind(shaderTextureScale, shaderBorderDistanceScale, landMapTextureId, coastalBorderTextureId, biomeTextureId, biomeBorderTextureId, riverBorderTextureId, mountainBorderTextureId)
+                dynamicGeometry2D.render(vertexData, indexData, UNDER_WATER_BIOME.upliftShader.positionAttribute)
+                val retVal = textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
+                textureRenderer.unbind()
+                retVal
+            }
             val upliftMask = ByteBufferMatrix(4096, extractTextureRedByte(upliftTextureId, 4096))
-
+            val underWaterMask = FloatArrayMatrix(4096, extractTextureRedFloat(underWaterTextureId, 4096))
             val landMask = ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096))
 
             riverBorderTextureId.free()
@@ -99,33 +125,59 @@ object WaterFlows {
             biomeTextureId.free()
             biomeBorderTextureId.free()
             upliftTextureId.free()
-            Triple(biomeMap, upliftMask, landMask)
+            Quadruple(biomeMap, upliftMask, landMask, underWaterMask)
         }
-
+        val regionDataFuture = executor.call {
+            buildRegionData(flowGraphSmall, biomeMasksFuture.value.third)
+        }
         val smallMapsFuture = executor.call {
-            val regionData = buildRegionData(flowGraphSmall, biomeMasksFuture.value.third)
-            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionData, biomes, biomeMasksFuture.value.first, biomeMasksFuture.value.second, distanceScale, Random(randomSeeds[1]))
-            performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 50, biomes.map { it.erosionLowSettings }, 1024)
+            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.first, biomeMasksFuture.value.second, distanceScale, Random(randomSeeds[1]))
+            performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 50, biomes.map { it.erosionLowSettings }, 1024, null,-1.0f)
+        }
+        val smallWaterMapsFuture = executor.call {
+            val (nodeIndex, nodes, rivers) = bootstrapUnderWaterErosion(executor, flowGraphSmall, regionDataFuture.value, biomeMasksFuture.value.fourth, distanceScale, Random(randomSeeds[1]))
+            performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 20, listOf(UNDER_WATER_BIOME.erosionLowSettings), 1024, null, 0.0f)
         }
         val midNodesFuture = executor.call {
             prepareGraphNodes(executor, flowGraphMedium, biomeMasksFuture.value.third, distanceScale)
         }
+        val midWaterNodesFuture = executor.call {
+            prepareGraphNodesUnderWater(executor, flowGraphMedium, biomeMasksFuture.value.third, distanceScale)
+        }
         val highNodesFuture = executor.call {
             prepareGraphNodes(executor, flowGraphLarge, biomeMasksFuture.value.third, distanceScale)
+        }
+        val highWaterNodesFuture = executor.call {
+            prepareGraphNodesUnderWater(executor, flowGraphLarge, biomeMasksFuture.value.third, distanceScale)
         }
         val midMapsFuture = executor.call {
             val heightMap = smallMapsFuture.value
             val (nodeIndex, nodes, rivers) = midNodesFuture.value
             val erosionSettings = biomes.map { it.erosionMidSettings }
             applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.second, biomes, erosionSettings, biomeMasksFuture.value.first, nodes)
-            performErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, 25, erosionSettings, 2048)
+            performErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, 25, erosionSettings, 2048, null, -1.0f)
+        }
+        val midWaterMapsFuture = executor.call {
+            val heightMap = smallWaterMapsFuture.value
+            val (nodeIndex, nodes, rivers) = midWaterNodesFuture.value
+            val erosionSettings = listOf(UNDER_WATER_BIOME.erosionMidSettings)
+            applyMapsToUnderWaterNodes(executor, flowGraphMedium.vertices, heightMap, nodes)
+            performErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, 10, erosionSettings, 2048, null, 0.0f)
+        }
+        val highWaterMapsFuture = executor.call {
+            val heightMap = midWaterMapsFuture.value
+            val (nodeIndex, nodes, rivers) = highWaterNodesFuture.value
+            val erosionSettings = listOf(UNDER_WATER_BIOME.erosionHighSettings)
+            applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes)
+            performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 2, erosionSettings, outputWidth, null, 0.0f)
         }
         val highMapsFuture = executor.call {
             val heightMap = midMapsFuture.value
             val (nodeIndex, nodes, rivers) = highNodesFuture.value
             val erosionSettings = biomes.map { it.erosionHighSettings }
             applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.second, biomes, erosionSettings, biomeMasksFuture.value.first, nodes)
-            val retVal = performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 5, erosionSettings, outputWidth)
+            val underWaterMask = highWaterMapsFuture.value
+            val retVal = performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 5, erosionSettings, outputWidth, underWaterMask, -600.0f)
             val riverEdges = ArrayList<LineSegment2F>()
             rivers.forEach {
                 riverEdges.addAll(recurseFindRiverEdges(flowGraphLarge.vertices, it, minFlowScale))
@@ -190,7 +242,53 @@ object WaterFlows {
             }
         }
         val beach = extractBeachFromGraphAndWater(vertices, water)
-        return RegionData(land, beach)
+        return RegionData(land, water.toList(), beach)
+    }
+
+    private fun bootstrapUnderWaterErosion(executor: ExecutorService, graph: Graph, regionData: RegionData, heightMap: Matrix<Float>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
+        val vertices = graph.vertices
+        val land = LinkedHashSet(regionData.land)
+        val water = ArrayList(regionData.water)
+        val coast = regionData.beach
+        val border = LinkedHashSet(graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
+        val beach1 = LinkedHashSet(coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { land.contains(it) })
+        val beach2 = coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { !beach1.contains(it) && land.contains(it) }
+        water.addAll(beach1)
+        water.addAll(beach2)
+        coast.addAll(beach1)
+        coast.addAll(beach2)
+        val (nodeIndex, nodes) = createWaterNodes(executor, vertices, water, border, heightMap, distanceScale, coast)
+        val rivers = ArrayList<WaterNode>()
+        border.forEach { id ->
+            rivers.add(nodeIndex[id]!!)
+        }
+        val unused = LinkedHashSet(water)
+        val used = LinkedHashSet(border)
+        unused.removeAll(used)
+        val next = LinkedHashSet(border)
+        while (unused.isNotEmpty()) {
+            val nextOrder = ArrayList(next)
+            Collections.shuffle(nextOrder, random)
+            next.clear()
+            nextOrder.forEach { id ->
+                val node = nodeIndex[id]!!
+                node.adjacents.forEach { (otherNode, second) ->
+                    if (!used.contains(otherNode.id)) {
+                        otherNode.parent.children.remove(otherNode)
+                        otherNode.parent = node
+                        otherNode.distanceToParent = second
+                        node.children.add(otherNode)
+                        next.add(otherNode.id)
+                        used.add(otherNode.id)
+                        unused.remove(otherNode.id)
+                    }
+                }
+            }
+        }
+        computeAreas(executor, rivers)
+        val biomeBootstrapSettings = listOf(UNDER_WATER_BIOME.bootstrapSettings)
+        computeHeights(executor, rivers, biomeBootstrapSettings)
+        return Triple(nodeIndex, nodes, rivers)
     }
 
     private fun bootstrapErosion(executor: ExecutorService, graph: Graph, regionData: RegionData, biomes: List<Biome>, biomeMask: Matrix<Byte>, upliftMask: Matrix<Byte>, distanceScale: Float, random: Random): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
@@ -231,7 +329,7 @@ object WaterFlows {
         return Triple(nodeIndex, nodes, rivers)
     }
 
-    private fun performErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, erosionLevels: List<ErosionLevel>, heightMapWidth: Int): FloatArrayMatrix {
+    private fun performErosion(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, erosionLevels: List<ErosionLevel>, heightMapWidth: Int, fallback: Matrix<Float>? = null, defaultValue: Float = 0.0f): FloatArrayMatrix {
         val biomeSettings = erosionLevels.map { erosionLevel ->
             val erosionSettingsRaw = erosionLevel.erosionSettings.flatMapTo(ArrayList()) {
                 val expanded = ArrayList<ErosionSettings>(it.iterations)
@@ -259,9 +357,40 @@ object WaterFlows {
             computeAreas(executor, rivers)
             computeHeights(executor, rivers, biomeSettings.map { it[i] })
         }
-        val heightMap = FloatArrayMatrix(heightMapWidth) { -1.0f }
-        renderHeightmap(executor, graph, nodeIndex, heightMap, threadCount)
+        val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
+        renderHeightmap(executor, graph, nodeIndex, heightMap, fallback, threadCount)
         return heightMap
+    }
+
+    private fun prepareGraphNodesUnderWater(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
+        val vertices = graph.vertices
+        val land = LinkedHashSet<Int>(vertices.size)
+        val water = ArrayList<Int>(vertices.size)
+        val landMaskWidth = landMask.width
+        val landMaskWidthM1 = landMaskWidth - 1
+        for (i in 0..vertices.size - 1) {
+            val point = vertices.getPoint(i)
+            val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
+            if (landMask[index].toInt() and 0xFF < 128) {
+                water.add(i)
+            } else {
+                land.add(i)
+            }
+        }
+        val border = LinkedHashSet(graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList())
+        val coast = extractBeachFromGraphAndWater(graph.vertices, LinkedHashSet(water))
+        val beach1 = LinkedHashSet(coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { land.contains(it) })
+        val beach2 = coast.flatMap { vertices.getAdjacentVertices(it) }.toSet().filter { !beach1.contains(it) && land.contains(it) }
+        water.addAll(beach1)
+        water.addAll(beach2)
+        coast.addAll(beach1)
+        coast.addAll(beach2)
+        val (nodeIndex, nodes) = createWaterNodes(executor, vertices, water, border, distanceScale, coast)
+        val rivers = ArrayList<WaterNode>()
+        border.forEach { id ->
+            rivers.add(nodeIndex[id]!!)
+        }
+        return Triple(nodeIndex, nodes, rivers)
     }
 
     private fun prepareGraphNodes(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
@@ -361,7 +490,52 @@ object WaterFlows {
         futures.forEach { it.join() }
     }
 
-    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: List<Int>, riverMouths: LinkedHashSet<Int>, biomes: List<Biome>, biomeMask: Matrix<Byte>, upliftMask: Matrix<Byte>, distanceScale: Float): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
+    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: List<Int>, riverMouths: LinkedHashSet<Int>, heightMap: Matrix<Float>, distanceScale: Float, pinned: LinkedHashSet<Int>? = null): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
+        val areaScale = distanceScale * distanceScale
+        val nodeIndex = arrayOfNulls<WaterNode>(vertices.size)
+        val width = heightMap.width
+        val widthM1 = width - 1
+        val nodeFutures = (0..threadCount - 1).map { i ->
+            executor.call {
+                for (id in i..land.size - 1 step threadCount) {
+                    val landId = land[id]
+                    val isExternal = riverMouths.contains(landId)
+                    val area = vertices.getArea(landId) * areaScale
+                    val point = vertices.getPoint(landId)
+                    val index = (Math.round(point.y * widthM1) * width) + Math.round(point.x * widthM1)
+                    val isPinned = isExternal || pinned?.contains(landId) ?: false
+                    val height = if (isExternal) 0.0f else if (isPinned) 600.0f else heightMap[index] * 600.0f
+                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, height, area, 0, isPinned)
+                    nodeIndex[landId] = node
+                }
+            }
+        }
+        nodeFutures.forEach { it.join() }
+        val nodes = ArrayList<WaterNode>(land.size)
+        nodeIndex.forEach {
+            if (it != null) {
+                nodes.add(it)
+            }
+        }
+        val nodeFutures2 = (0..threadCount - 1).map { i ->
+            executor.call {
+                for (id in i..nodes.size - 1 step threadCount) {
+                    val node = nodes[id]
+                    val position = vertices.getPoint(node.id)
+                    vertices.getAdjacentVertices(node.id).forEach { adjacent ->
+                        val otherNode = nodeIndex[adjacent]
+                        if (otherNode != null) {
+                            node.adjacents.add(Pair(otherNode, position.distance(vertices.getPoint(adjacent)) * distanceScale))
+                        }
+                    }
+                }
+            }
+        }
+        nodeFutures2.forEach { it.join() }
+        return Pair(nodeIndex, nodes)
+    }
+
+    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: List<Int>, riverMouths: LinkedHashSet<Int>, biomes: List<Biome>, biomeMask: Matrix<Byte>, upliftMask: Matrix<Byte>, distanceScale: Float, pinned: LinkedHashSet<Int>? = null): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
         val areaScale = distanceScale * distanceScale
         val nodeIndex = arrayOfNulls<WaterNode>(vertices.size)
         val biomeWidth = biomeMask.width
@@ -385,7 +559,7 @@ object WaterFlows {
                     } else {
                         ((tempLift / 256.0f) * biome.deltaUplift + biome.minUplift) * biome.erosionLowSettings.upliftMultiplier
                     }
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, uplift, 0.0f, area, biomeId)
+                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, uplift, 0.0f, area, biomeId, isExternal || pinned?.contains(landId) ?: false)
                     nodeIndex[landId] = node
                 }
             }
@@ -415,7 +589,7 @@ object WaterFlows {
         return Pair(nodeIndex, nodes)
     }
 
-    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: ArrayList<Int>, riverMouths: LinkedHashSet<Int>, distanceScale: Float): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
+    private fun createWaterNodes(executor: ExecutorService, vertices: Vertices, land: ArrayList<Int>, riverMouths: LinkedHashSet<Int>, distanceScale: Float, pinned: LinkedHashSet<Int>? = null): Pair<Array<WaterNode?>, ArrayList<WaterNode>> {
         val areaScale = distanceScale * distanceScale
         val nodeIndex = arrayOfNulls<WaterNode>(vertices.size)
         val nodeFutures = (0..threadCount - 1).map { i ->
@@ -425,7 +599,8 @@ object WaterFlows {
                     val isExternal = riverMouths.contains(landId)
                     val area = vertices.getArea(landId) * areaScale
                     val point = vertices.getPoint(landId)
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0)
+                    val isPinned = isExternal || pinned?.contains(landId) ?: false
+                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0, isPinned)
                     nodeIndex[landId] = node
                 }
             }
@@ -453,6 +628,31 @@ object WaterFlows {
         }
         nodeFutures2.forEach { it.join() }
         return Pair(nodeIndex, nodes)
+    }
+
+    private fun applyMapsToUnderWaterNodes(executor: ExecutorService, vertices: Vertices, heightMap: Matrix<Float>, nodes: ArrayList<WaterNode>) {
+        val hWidth = heightMap.width
+        val hWidthM1 = hWidth - 1
+        val nodeFutures = (0..threadCount - 1).map { i ->
+            executor.call {
+                for (id in i..nodes.size - 1 step threadCount) {
+                    val node = nodes[id]
+                    val height = if (node.isExternal) {
+                        0.0f
+                    } else if (node.isPinned) {
+                        600.0f
+                    } else {
+                        val point = vertices.getPoint(node.id)
+                        val hIndex = (Math.round(point.y * hWidthM1) * hWidth) + Math.round(point.x * hWidthM1)
+                        heightMap[hIndex]
+                    }
+                    node.height = Math.max(0.0f, height)
+                    node.uplift = 0.0f
+                    node.biome = 0
+                }
+            }
+        }
+        nodeFutures.forEach { it.join() }
     }
 
     private fun applyMapsToNodes(executor: ExecutorService, vertices: Vertices, heightMap: Matrix<Float>, upliftMask: Matrix<Byte>, biomes: List<Biome>, erosionSettings: List<ErosionLevel>, biomeMask: Matrix<Byte>, nodes: ArrayList<WaterNode>) {
@@ -466,7 +666,7 @@ object WaterFlows {
             executor.call {
                 for (id in i..nodes.size - 1 step threadCount) {
                     val node = nodes[id]
-                    if (!node.isExternal) {
+                    if (!node.isPinned) {
                         val point = vertices.getPoint(node.id)
                         val hIndex = (Math.round(point.y * hWidthM1) * hWidth) + Math.round(point.x * hWidthM1)
                         val height = heightMap[hIndex]
@@ -560,18 +760,20 @@ object WaterFlows {
         if (node.isExternal) {
             node.children.forEach { recurseHeights(it, erosionSettings) }
         } else {
-            val settings = erosionSettings[node.biome]
-            val parent = node.parent
-            val parentHeight = parent.height
-            val flow = settings.erosionPower * Math.pow(node.drainageArea.toDouble(), 0.5)
-            val erosion = flow / node.distanceToParent
-            val denominator = 1.0 + (erosion * settings.deltaTime)
-            val numerator = node.height + (settings.deltaTime * (node.uplift + (erosion * parentHeight)))
-            node.height = (numerator / denominator).toFloat()
-            val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
-            val talus = settings.talusAngles[(Math.min(1023, Math.max(0, Math.round(node.height * settings.heightMultiplier))) * 256) + Math.round((variance + 1) * 128)]
-            if ((node.height - parent.height) / node.distanceToParent > talus) {
-                node.height = (node.distanceToParent * talus) + parent.height
+            if (!node.isPinned) {
+                val settings = erosionSettings[node.biome]
+                val parent = node.parent
+                val parentHeight = parent.height
+                val flow = settings.erosionPower * Math.pow(node.drainageArea.toDouble(), 0.5)
+                val erosion = flow / node.distanceToParent
+                val denominator = 1.0 + (erosion * settings.deltaTime)
+                val numerator = node.height + (settings.deltaTime * (node.uplift + (erosion * parentHeight)))
+                node.height = (numerator / denominator).toFloat()
+                val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
+                val talus = settings.talusAngles[(Math.min(1023, Math.max(0, Math.round(node.height * settings.heightMultiplier))) * 256) + Math.round((variance + 1) * 128)]
+                if ((node.height - parent.height) / node.distanceToParent > talus) {
+                    node.height = (node.distanceToParent * talus) + parent.height
+                }
             }
             node.children.forEach { recurseHeights(it, erosionSettings) }
         }
@@ -592,7 +794,9 @@ object WaterFlows {
         return false
     }
 
-    fun renderHeightmap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMap: Matrix<Float>, threadCount: Int) {
+    fun renderHeightmap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMap: Matrix<Float>, fallback: Matrix<Float>?, threadCount: Int) {
+        val fWidth = fallback?.width ?: 0
+        val fWidthM1 = fWidth - 1
         val futures = ArrayList<Future<*>>(threadCount)
         val triangles = graph.triangles
         (0..threadCount - 1).mapTo(futures) {
@@ -606,7 +810,43 @@ object WaterFlows {
                     val nb = nodeIndex[vb.id]
                     val nc = nodeIndex[vc.id]
                     if (na == null || nb == null || nc == null) {
-                        continue
+                        if (fallback != null) {
+                            val naH = if (na != null) {
+                                na.height
+                            } else {
+                                val point = va.point
+                                val index = (Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)
+                                fallback[index] - 600
+                            }
+                            val nbH = if (nb != null) {
+                                nb.height
+                            } else {
+                                val point = vb.point
+                                val index = (Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)
+                                fallback[index] - 600
+                            }
+                            val ncH = if (nc != null) {
+                                nc.height
+                            } else {
+                                val point = vc.point
+                                val index = (Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)
+                                fallback[index] - 600
+                            }
+                            val pa = va.point
+                            val pb = vb.point
+                            val pc = vc.point
+                            val a = Point3F(pa.x, pa.y, naH)
+                            val b = Point3F(pb.x, pb.y, nbH)
+                            val c = Point3F(pc.x, pc.y, ncH)
+                            val cross = (b - a).cross(c - a)
+                            if (cross.c < 0) {
+                                renderTriangle(a, b, c, heightMap)
+                            } else {
+                                renderTriangle(a, c, b, heightMap)
+                            }
+                        } else {
+                            continue
+                        }
                     } else {
                         val pa = va.point
                         val pb = vb.point
@@ -672,13 +912,16 @@ object WaterFlows {
         val output = ShortArray(width * width)
         val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.max() ?: 0.0f
         println("maxLandValue = $maxLandValue")
+        val minWaterValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.min() ?: 0.0f
+        println("minWaterValue = $minWaterValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
+        val waterFactor = (1.0f / minWaterValue) * waterLine
         for (y in (0..width - 1)) {
             for (x in (0..width - 1)) {
                 val heightValue = heightMap[x, y]
                 if (heightValue < 0.0f) {
-                    output[y * width + x] = 0
+                    output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
                 } else {
                     output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
                 }
