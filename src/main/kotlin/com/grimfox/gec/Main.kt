@@ -1,17 +1,13 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.util.BuildContinent.ParameterSet
 import com.grimfox.gec.util.BuildContinent.generateRegions
 import com.grimfox.gec.util.loadTexture2D
-import com.grimfox.gec.ui.LOG
-import com.grimfox.gec.ui.layout
-import com.grimfox.gec.ui.set
-import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
-import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
-import com.grimfox.gec.ui.widgets.Layout.VERTICAL
+import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.util.mRef
 import nl.komponents.kovenant.task
@@ -52,6 +48,15 @@ object Main {
                             disableCursor()
                         } else {
                             enableCursor()
+                        }
+                    }
+                }
+                hideCursor.listener { old, new ->
+                    if (old != new) {
+                        if (new) {
+                            hideCursor()
+                        } else {
+                            showCursor()
                         }
                     }
                 }
@@ -117,6 +122,9 @@ object Main {
                         isMouseAware = true
                         isVisible = false
                         shape = FILL_GREY_OUT
+                    }
+                    mouseOverlayLayer = block {
+                        isFallThrough = true
                     }
                 }
                 var overwriteWarningDialog = NO_BLOCK
@@ -405,6 +413,54 @@ object Main {
                     resizeAreaSouthEast = resizeArea(ShapeTriangle.Direction.SOUTH_EAST)
                     resizeAreaSouthWest = resizeArea(ShapeTriangle.Direction.SOUTH_WEST)
                 }
+                mouseOverlayLayer {
+                    brushShapeOuter = block {
+                        layout = ABSOLUTE
+                        hSizing = STATIC
+                        vSizing = STATIC
+                        width = 10.0f
+                        height = 10.0f
+                        shape = ShapeCircle(NO_FILL, STROKE_WHITE_1)
+                        isFallThrough = true
+                        isMouseAware = false
+                    }
+                    brushShapeInner = block {
+                        layout = ABSOLUTE
+                        hSizing = STATIC
+                        vSizing = STATIC
+                        width = 8.0f
+                        height = 8.0f
+                        shape = ShapeCircle(NO_FILL, STROKE_BLACK_1)
+                        isFallThrough = true
+                        isMouseAware = false
+                    }
+                }
+                brushActive.listener { _, new ->
+                    mouseOverlayLayer.isVisible = new
+                    mouseOverlayLayer.isMouseAware = new
+                    brushShapeOuter.isVisible = new
+                    brushShapeOuter.isMouseAware = new
+                    brushShapeInner.isVisible = new
+                    brushShapeInner.isMouseAware = new
+                    if (new) {
+                        mouseOverlayLayer.onTick = { x, y ->
+                            if (brushActive.value) {
+                                val brushSize = brushSize.value
+                                brushShapeOuter.xOffset = x - (brushSize / 2.0f)
+                                brushShapeOuter.yOffset = y - (brushSize / 2.0f)
+                                brushShapeOuter.width = brushSize
+                                brushShapeOuter.height = brushSize
+                                brushShapeInner.xOffset = x - ((brushSize - 2) / 2.0f)
+                                brushShapeInner.yOffset = y - ((brushSize - 2) / 2.0f)
+                                brushShapeInner.width = brushSize - 2
+                                brushShapeInner.height = brushSize - 2
+                            }
+                        }
+                    } else {
+                        mouseOverlayLayer.onTick = null
+                    }
+                }
+                brushActive.value = false
             }
         }
 

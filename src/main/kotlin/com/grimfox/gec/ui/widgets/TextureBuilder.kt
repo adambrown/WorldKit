@@ -341,6 +341,17 @@ object TextureBuilder {
         return renderTrianglesTexRgbaByte(vertices to indices, minFilter, magFilter)
     }
 
+    fun renderTrianglesToTexture(vertices: FloatArray, indices: IntArray, textureId: TextureId): TextureId {
+        return renderTrianglesToTexture(vertices to indices, textureId)
+    }
+
+    fun renderTrianglesToTexture(input: Pair<FloatArray, IntArray>, textureId: TextureId): TextureId {
+        return renderTrianglesInternal(input, {
+            it.copyTexture(textureId)
+            textureId
+        })
+    }
+
     fun extractTextureRedFloat(textureId: TextureId, width: Int): FloatArray {
         return doDeferredOpenglWork(ValueCollector {
             val matrix = FloatArray(width * width)
@@ -576,6 +587,12 @@ object TextureBuilder {
             glReadBuffer(GL_COLOR_ATTACHMENT0)
             glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
             return TextureId(newTexId)
+        }
+
+        fun copyTexture(textureId: TextureId) {
+            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
         }
 
         @Suppress("unused")

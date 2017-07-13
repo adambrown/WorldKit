@@ -25,7 +25,13 @@ class MeshViewport3D(
         val waterPlaneOn: Reference<Boolean>,
         val heightMapScaleFactor: Reference<Float>,
         val imageMode: Reference<Int>,
-        val disableCursor: MutableReference<Boolean>) {
+        val disableCursor: MutableReference<Boolean>,
+        val hideCursor: MutableReference<Boolean>,
+        val brushOn: Reference<Boolean>,
+        val brushActive: MutableReference<Boolean>,
+        val brushListener: Reference<BrushListener?>,
+        val brushSize: MutableReference<Float>,
+        val editBrushSize: Reference<Float>) {
 
     private val pressedKeys = Collections.synchronizedSet(LinkedHashSet<Int>())
 
@@ -142,10 +148,21 @@ class MeshViewport3D(
     private var mouseX = 0
     private var mouseY = 0
 
+    private var texCoordX = 0
+    private var texCoordY = 0
+
+    private var lastTexCoordX = 0
+    private var lastTexCoordY = 0
+
     private var hotZoneX1 = 0
     private var hotZoneX2 = 0
     private var hotZoneY1 = 0
     private var hotZoneY2 = 0
+
+    private var texAreaX1 = 0
+    private var texAreaX2 = 0
+    private var texAreaY1 = 0
+    private var texAreaY2 = 0
 
     private var isRollOn = false
     private var isRotateOn = false
@@ -238,21 +255,38 @@ class MeshViewport3D(
 
     fun onMouseDown(button: Int, x: Int, y: Int) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (isTranslateOn) {
-                isTranslateOn = false
-                isFlyModeOn = true
-            } else if (x <= hotZoneX1 || x > hotZoneX2 || y <= hotZoneY1 || y > hotZoneY2) {
-                if (!isRollOn && !isRotateOn && !isTranslateOn) {
-                    lastMouseX = x.toFloat()
-                    lastMouseY = y.toFloat()
-                    isRollOn = true
+            if (brushOn.value) {
+                if (x in texAreaX1..texAreaX2 && y in texAreaY1..texAreaY2) {
+                    val width = texAreaX2 - texAreaX1
+                    val height = texAreaY2 - texAreaY1
+                    val xOff = x - texAreaX1
+                    val yOff = y - texAreaY1
+                    texCoordX = round((xOff.toFloat() / width) * 127)
+                    texCoordY = round((yOff.toFloat() / height) * 127)
+                    lastTexCoordX = texCoordX
+                    lastTexCoordY = texCoordY
+                    brushListener.value?.onMouseDown(texCoordX, texCoordY)
+                    brushSize.value = editBrushSize.value * width
+                    brushActive.value = true
+                    hideCursor.value = true
                 }
             } else {
-                if (!isRollOn && !isRotateOn && !isTranslateOn) {
-                    lastMouseX = x.toFloat()
-                    lastMouseY = y.toFloat()
-                    isRotateOn = true
-                    modelMatrix.getTranslation(pivot)
+                if (isTranslateOn) {
+                    isTranslateOn = false
+                    isFlyModeOn = true
+                } else if (x <= hotZoneX1 || x > hotZoneX2 || y <= hotZoneY1 || y > hotZoneY2) {
+                    if (!isRollOn && !isRotateOn && !isTranslateOn) {
+                        lastMouseX = x.toFloat()
+                        lastMouseY = y.toFloat()
+                        isRollOn = true
+                    }
+                } else {
+                    if (!isRollOn && !isRotateOn && !isTranslateOn) {
+                        lastMouseX = x.toFloat()
+                        lastMouseY = y.toFloat()
+                        isRotateOn = true
+                        modelMatrix.getTranslation(pivot)
+                    }
                 }
             }
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
@@ -271,6 +305,21 @@ class MeshViewport3D(
     fun onMouseDrag(x: Int, y: Int) {
         mouseX = x
         mouseY = y
+        if (brushOn.value && x in texAreaX1..texAreaX2 && y in texAreaY1..texAreaY2) {
+            val width = texAreaX2 - texAreaX1
+            val height = texAreaY2 - texAreaY1
+            val xOff = x - texAreaX1
+            val yOff = y - texAreaY1
+            val tempTexCoordX = round((xOff.toFloat() / width) * 127)
+            val tempTexCoordY = round((yOff.toFloat() / height) * 127)
+            if (tempTexCoordX != lastTexCoordX || tempTexCoordY != lastTexCoordY) {
+                lastTexCoordX = texCoordX
+                lastTexCoordY = texCoordY
+                texCoordX = tempTexCoordX
+                texCoordY = tempTexCoordY
+                brushListener.value?.onLine(lastTexCoordX, lastTexCoordY, texCoordX, texCoordY)
+            }
+        }
     }
 
     fun onMouseRelease(button: Int, x: Int, y: Int) {
@@ -290,6 +339,10 @@ class MeshViewport3D(
                 eliminateMovement = true
             }
         }
+        if (brushActive.value && hideCursor.value) {
+            hideCursor.value = false
+        }
+        brushActive.value = false
     }
 
     fun onScroll(scrollDelta: Double) {
@@ -393,6 +446,11 @@ class MeshViewport3D(
                 val adjustedX = round(xPosition / scale)
                 val adjustedY = round(yPosition / scale)
 
+                texAreaX1 = (adjustedX + (adjustedWidth / 2)) - (adjustedHeight / 2)
+                texAreaY1 = adjustedY
+                texAreaX2 = texAreaX1 + adjustedHeight
+                texAreaY2 = texAreaY1 + adjustedHeight
+
                 val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
                 val hotZoneWidth = adjustedWidth - (2 * marginWidth)
                 hotZoneX1 = adjustedX + marginWidth
@@ -451,6 +509,11 @@ class MeshViewport3D(
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
                 val adjustedY = round(yPosition / scale)
+
+                texAreaX1 = (adjustedX + (adjustedWidth / 2)) - (adjustedHeight / 2)
+                texAreaY1 = adjustedY
+                texAreaX2 = texAreaX1 + adjustedHeight
+                texAreaY2 = texAreaY1 + adjustedHeight
 
                 val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
                 val hotZoneWidth = adjustedWidth - (2 * marginWidth)
@@ -513,6 +576,11 @@ class MeshViewport3D(
                 val adjustedHeight = round(height / scale)
                 val adjustedX = round(xPosition / scale)
                 val adjustedY = round(yPosition / scale)
+
+                texAreaX1 = (adjustedX + (adjustedWidth / 2)) - (adjustedHeight / 2)
+                texAreaY1 = adjustedY
+                texAreaX2 = texAreaX1 + adjustedHeight
+                texAreaY2 = texAreaY1 + adjustedHeight
 
                 val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
                 val hotZoneWidth = adjustedWidth - (2 * marginWidth)
@@ -1033,5 +1101,12 @@ class MeshViewport3D(
                         }
                     }
                 })
+    }
+
+    interface BrushListener {
+
+        fun onMouseDown(x: Int, y: Int)
+
+        fun onLine(x1: Int, y1: Int, x2: Int, y2: Int)
     }
 }

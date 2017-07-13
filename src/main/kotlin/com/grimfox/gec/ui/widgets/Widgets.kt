@@ -895,6 +895,10 @@ abstract class Block {
         this.onDrop = onDrop
     }
 
+    fun onTick(onTick: Block.(mouseX: Int, mouseY: Int) -> Unit) {
+        this.onTick = onTick
+    }
+
     operator fun invoke(builder: Block.() -> Unit): Block {
         this.builder()
         return this

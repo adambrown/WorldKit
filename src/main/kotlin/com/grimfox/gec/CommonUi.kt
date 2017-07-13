@@ -74,17 +74,26 @@ val rotateAroundCamera = ref(false)
 val resetView = mRef(false)
 val imageMode = ref(2)
 val disableCursor = ref(false)
+val hideCursor = ref(false)
+val brushOn = ref(false)
+val brushActive = ref(false)
+val brushSize = ref(10.0f)
+val regionEditBrushSize = ref(0.0859375f)
+val brushListener = ref<MeshViewport3D.BrushListener?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor)
+val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, regionEditBrushSize)
 
 var mainLayer = NO_BLOCK
 var panelLayer = NO_BLOCK
 var menuLayer = NO_BLOCK
 var dropdownLayer = NO_BLOCK
 var dialogLayer = NO_BLOCK
+var mouseOverlayLayer = NO_BLOCK
+var brushShapeOuter = NO_BLOCK
+var brushShapeInner = NO_BLOCK
 
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK

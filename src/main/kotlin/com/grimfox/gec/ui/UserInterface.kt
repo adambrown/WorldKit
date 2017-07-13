@@ -129,7 +129,7 @@ interface UserInterface {
     val isMinimized: Boolean
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
-    var  ignoreInput: Boolean
+    var ignoreInput: Boolean
     var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) -> Unit
     var scrollHandler: (x: Double, y: Double) -> Unit
     var maximizeHandler: () -> Unit
@@ -159,6 +159,10 @@ interface UserInterface {
     fun disableCursor()
 
     fun enableCursor()
+
+    fun hideCursor()
+
+    fun showCursor()
 
     fun getClipboardString(): String
 
@@ -309,6 +313,14 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
 
     override fun getClipboardString(): String {
         return window.getClipboardString()
+    }
+
+    override fun hideCursor() {
+        window.hideCursor()
+    }
+
+    override fun showCursor() {
+        window.showCursor()
     }
 
     override fun setClipboardString(string: String) {
@@ -882,6 +894,14 @@ private class WindowContext(
     }
 
     internal fun enableCursor() {
+        glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
+    }
+
+    internal fun hideCursor() {
+        glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_HIDDEN)
+    }
+
+    internal fun showCursor() {
         glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
     }
 

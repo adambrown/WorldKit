@@ -15,7 +15,6 @@ import com.grimfox.gec.util.FileDialogs.saveFile
 import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.selectFolder
 import com.grimfox.gec.util.MonitoredReference
-import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.cRef
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
@@ -86,6 +85,12 @@ val SHAPE_BUTTON_DIALOG = ShapeRectangle(FILL_BACKGROUND, STROKE_BUTTON_DIALOG)
 
 val SHAPE_BUTTON_POSITIVE = ShapeRectangle(FILL_POSITIVE_HIGHLIGHT, NO_STROKE)
 val SHAPE_BUTTON_NEGATIVE = ShapeRectangle(FILL_NEGATIVE_HIGHLIGHT, NO_STROKE)
+
+val COLOR_WHITE = color(255, 255, 255, 255)
+val COLOR_BLACK = color(0, 0, 0, 255)
+
+val STROKE_WHITE_1 = StrokeColor(COLOR_WHITE, 1.0f)
+val STROKE_BLACK_1 = StrokeColor(COLOR_BLACK, 1.0f)
 
 val SWITCH_HEIGHT = 12.0f
 val ELEMENT_INSET = 3.0f

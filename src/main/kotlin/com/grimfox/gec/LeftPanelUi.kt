@@ -1,23 +1,68 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.model.ByteArrayMatrix
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.geometry.LineSegment2F
+import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.ui.widgets.MeshViewport3D.BrushListener
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.ParameterSet
 import com.grimfox.gec.util.BuildContinent.buildBiomeMaps
 import com.grimfox.gec.util.BuildContinent.generateRegionSplines
 import com.grimfox.gec.util.BuildContinent.generateRegions
 import com.grimfox.gec.util.BuildContinent.generateWaterFlows
+import com.grimfox.gec.util.Rendering.renderRegions
 import org.lwjgl.glfw.GLFW
 import java.io.File
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 
+class MaskDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>): BrushListener {
+
+    var currentValue = 0.toByte()
+
+    override fun onMouseDown(x: Int, y: Int) {
+        currentValue = mask[x, y]
+    }
+
+    override fun onLine(x1: Int, y1: Int, x2: Int, y2: Int) {
+        val maxDist = (brushSize.value / 2.0f)
+        val maxDist2 = maxDist * maxDist
+        val brushMargin = Math.ceil(maxDist * 127.0).toInt() + 1
+        val cpStartX = Math.max(0, Math.min(x1, x2) - brushMargin)
+        val cpEndX = Math.min(127, Math.max(x1, x2) + brushMargin)
+        val cpStartY = Math.max(0, Math.min(y1, y2) - brushMargin)
+        val cpEndY = Math.min(127, Math.max(y1, y2) + brushMargin)
+        val x1f = x1 / 127.0f
+        val x2f = x2 / 127.0f
+        val y1f = y1 / 127.0f
+        val y2f = y2 / 127.0f
+        val line = LineSegment2F(Point2F(x1f, y1f), Point2F(x2f, y2f))
+        val vertices = graph.vertices
+        for (x in cpStartX..cpEndX) {
+            for (y in cpStartY..cpEndY) {
+                val dist = line.distance2(vertices.getPoint(y * 128 + x))
+                if (dist <= maxDist2) {
+                    mask[x, y] = currentValue
+                }
+            }
+        }
+        executor.call {
+            if (texture.value.id < 0) {
+                texture.value = renderRegions(graph, mask)
+            } else {
+                renderRegions(graph, mask, texture.value)
+            }
+        }
+    }
+}
 
 private val biomeValues = linkedMapOf(
         "Mountains" to 0,
@@ -108,6 +153,7 @@ private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useRegionFile = ref(false)
 private val useBiomeFile = ref(false)
 private val allowUnsafe = ref(false)
+private val editRegionsMode = ref(false)
 private val regionsSeed = ref(1L)
 private val biomesSeed = ref(1L)
 private val regionsMapScale = ref(4)
@@ -168,6 +214,7 @@ private var backBiomesButton = NO_BLOCK
 private var forwardBiomesButton = NO_BLOCK
 private var backBiomesLabel = NO_BLOCK
 private var forwardBiomesLabel = NO_BLOCK
+private var editToggle = NO_BLOCK
 
 private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
@@ -205,6 +252,7 @@ fun disableGenerateButtons() {
     showMeshLabel.isVisible = !displayBuildLabel
     buildButton.isVisible = false
     buildLabel.isVisible = displayBuildLabel
+    editToggle.isVisible = editRegionsMode.value
 }
 
 private fun enableGenerateButtons() {
@@ -260,6 +308,7 @@ private fun enableGenerateButtons() {
             buildLabel.isVisible = true
         }
     }
+    editToggle.isVisible = currentState.regionGraph != null && currentState.regionMask != null && displayMode == DisplayMode.REGIONS
 }
 
 private fun doGeneration(doWork: () -> Unit) {
@@ -284,25 +333,57 @@ private fun doGeneration(doWork: () -> Unit) {
     }
 }
 
-private fun buildRegionsFun(parameters: ParameterSet) {
-    val finalRegionFile = regionFile.reference.value
-    val (regionGraph, regionMask) = if (useRegionFile.value && finalRegionFile.isNotBlank()) {
-        val mask = loadRegionMaskFromImage(File(finalRegionFile))
-        var water = 0
-        var land = 0
-        for (i in 0..mask.size.toInt() - 1) {
-            if (mask[i] < 1) {
-                water++
-            } else {
-                land++
+private fun doGenerationStart() {
+    if (generateLock.tryLock()) {
+        try {
+            if (!generating) {
+                generating = true
+                disableGenerateButtons()
             }
+        } finally {
+            generateLock.unlock()
         }
-        val landPercent = land.toFloat() / (water + land)
-        val graph = Graphs.generateGraph(128, parameters.regionsSeed, 0.8)
-        Coastline.refineCoastline(graph, Random(parameters.regionsSeed), mask, BuildContinent.Parameters(graph.stride!!, landPercent, 0.0f, 1,0.1f, 0.05f, 0.035f, 2.0f, 0.005f))
-        Pair(graph, mask)
+    }
+}
+
+private fun doGenerationStop() {
+    if (generateLock.tryLock()) {
+        try {
+            if (generating) {
+                enableGenerateButtons()
+                generating = false
+            }
+        } finally {
+            generateLock.unlock()
+        }
+    }
+}
+
+private fun buildRegionsFun(parameters: ParameterSet, refreshOnly: Boolean = false) {
+    val currentRegionGraph = currentState.regionGraph
+    val currentRegionMask = currentState.regionMask
+    val (regionGraph, regionMask) = if (refreshOnly && currentRegionGraph != null && currentRegionMask != null) {
+        currentRegionGraph to currentRegionMask
     } else {
-        generateRegions(parameters.copy(), executor)
+        val finalRegionFile = regionFile.reference.value
+        if (useRegionFile.value && finalRegionFile.isNotBlank()) {
+            val mask = loadRegionMaskFromImage(File(finalRegionFile))
+            var water = 0
+            var land = 0
+            for (i in 0..mask.size.toInt() - 1) {
+                if (mask[i] < 1) {
+                    water++
+                } else {
+                    land++
+                }
+            }
+            val landPercent = land.toFloat() / (water + land)
+            val graph = Graphs.generateGraph(128, parameters.regionsSeed, 0.8)
+            Coastline.refineCoastline(graph, Random(parameters.regionsSeed), mask, BuildContinent.Parameters(graph.stride!!, landPercent, 0.0f, 1, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f))
+            Pair(graph, mask)
+        } else {
+            generateRegions(parameters.copy(), executor)
+        }
     }
     val regionSplines = generateRegionSplines(Random(parameters.regionsSeed), regionGraph, regionMask, parameters.regionsMapScale)
     currentState.parameters = parameters.copy()
@@ -318,7 +399,7 @@ private fun buildRegionsFun(parameters: ParameterSet) {
         imageMode.value = 1
         displayMode = DisplayMode.MAP
     } else {
-        val regionTextureId = Rendering.renderRegions(regionGraph, regionMask)
+        val regionTextureId = renderRegions(regionGraph, regionMask)
         meshViewport.setRegions(regionTextureId)
         imageMode.value = 0
         displayMode = DisplayMode.REGIONS
@@ -355,7 +436,7 @@ private fun buildBiomesFun(parameters: ParameterSet) {
     }
     currentState.heightMapTexture = null
     currentState.riverMapTexture = null
-    val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
+    val biomeTextureId = renderRegions(biomeGraph, biomeMask)
     meshViewport.setRegions(biomeTextureId)
     imageMode.value = 0
     displayMode = DisplayMode.BIOMES
@@ -435,6 +516,44 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             allowUnsafe.value = false
+            editToggle = vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+            editToggle.isVisible = false
+            val editBlocks = ArrayList<Block>()
+            editBlocks.add(vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+            editRegionsMode.listener { old, new ->
+                editBlocks.forEach {
+                    it.isMouseAware = new
+                    it.isVisible = new
+                }
+                if (old != new) {
+                    executor.call {
+                        if (new) {
+                            val currentGraph = currentState.regionGraph
+                            val currentMask = currentState.regionMask
+                            if (currentGraph != null && currentMask != null) {
+                                doGenerationStart()
+                                val textureReference = ref(TextureId(-1))
+                                textureReference.listener { oldTexture, newTexture ->
+                                    if (oldTexture != newTexture) {
+                                        meshViewport.setRegions(newTexture)
+                                    }
+                                }
+                                brushListener.value = MaskDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
+                                brushOn.value = true
+                            }
+                        } else {
+                            brushListener.value = null
+                            brushOn.value = false
+                            val parameters = currentState.parameters
+                            if (parameters != null) {
+                                buildRegionsFun(parameters, true)
+                            }
+                            doGenerationStop()
+                        }
+                    }
+                }
+            }
+            editRegionsMode.value = false
             vButtonRow(LARGE_ROW_HEIGHT) {
                 generateRegionsButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
@@ -713,7 +832,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     val currentRegionGraph = currentState.regionGraph
                     val currentRegionMask = currentState.regionMask
                     if (currentRegionGraph != null && currentRegionMask != null) {
-                        val regionTextureId = Rendering.renderRegions(currentRegionGraph, currentRegionMask)
+                        val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
                         meshViewport.setRegions(regionTextureId)
                         imageMode.value = 0
                         displayMode = DisplayMode.REGIONS
@@ -744,7 +863,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     val currentBiomeGraph = currentState.biomeGraph
                     val currentBiomeMask = currentState.biomeMask
                     if (currentBiomeGraph != null && currentBiomeMask != null) {
-                        val regionTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
+                        val regionTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
                         meshViewport.setRegions(regionTextureId)
                         imageMode.value = 0
                         displayMode = DisplayMode.BIOMES

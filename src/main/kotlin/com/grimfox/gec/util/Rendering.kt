@@ -8,6 +8,7 @@ import com.grimfox.gec.model.geometry.Vector2F
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesTexRedByte
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesTexRedFloat
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesToTexture
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.GL_NEAREST
 import java.util.ArrayList
@@ -18,6 +19,16 @@ import java.util.concurrent.Future
 object Rendering {
 
     fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
+        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
+        return renderTrianglesTexRedByte(vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
+    }
+
+    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0) {
+        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
+        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
+    }
+
+    private fun renderInternal(offset: Float, graph: Graph, regionMask: Matrix<Byte>, skips: Int, divisor: Float): Pair<ArrayList<Float>, ArrayList<Int>> {
         val base = 1.0f - offset
         val vertexData = ArrayList<Float>()
         val indexData = ArrayList<Int>()
@@ -52,7 +63,7 @@ object Rendering {
                 buildTriangle(centerId, borderIds[i % border.size], borderIds[i - 1])
             }
         }
-        return renderTrianglesTexRedByte(vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
+        return Pair(vertexData, indexData)
     }
 
     fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
