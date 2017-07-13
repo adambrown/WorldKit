@@ -136,7 +136,7 @@ object WaterFlows {
         }
         val smallWaterMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = bootstrapUnderWaterErosion(executor, flowGraphSmall, regionDataFuture.value, biomeMasksFuture.value.fourth, distanceScale, Random(randomSeeds[1]))
-            performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 20, listOf(UNDER_WATER_BIOME.erosionLowSettings), 1024, null, 0.0f)
+            performErosion(executor, flowGraphSmall, nodeIndex, nodes, rivers, 10, listOf(UNDER_WATER_BIOME.erosionLowSettings), 1024, null, 0.0f)
         }
         val midNodesFuture = executor.call {
             prepareGraphNodes(executor, flowGraphMedium, biomeMasksFuture.value.third, distanceScale)

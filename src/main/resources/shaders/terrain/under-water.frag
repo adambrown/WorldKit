@@ -16,7 +16,7 @@ void main() {
     bool isWater = texture(landMask, VertexIn.uv).r < 0.5;
     if (isWater) {
         float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
-        float height = 1.0 - min(1.0, (1.0 - coastDistance * coastDistance) * 5 * borderDistanceScale);
+        float height = 1.0 - min(1.0, (1.0 - coastDistance * coastDistance) * 7 * borderDistanceScale);
         float noiseHeight = texture(noiseMask1, VertexIn.uv * textureScale * 0.6).r * 0.5;
         height = max(height, noiseHeight);
         colorOut = vec4(height, height, height, 1.0);
