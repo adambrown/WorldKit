@@ -233,6 +233,56 @@ object TextureBuilder {
         }
     }
 
+    fun renderSplines(landBodyPolygons: List<List<Point2F>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+        return renderNvgInternal { textureRenderer ->
+            val width = textureRenderer.width
+            val height = textureRenderer.height
+
+            textureRenderer.bind()
+
+            nvgSave(nvg)
+            glViewport(0, 0, width, height)
+            if (landBodyPolygons.isEmpty() && riverPolygons.isEmpty() && mountainPolygons.isEmpty()) {
+                glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+            } else {
+                glClearColor(0.0f, 0.8f, 0.0f, 1.0f)
+            }
+            glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
+            nvgBeginFrame(nvg, width, height, 1.0f)
+
+            val color = NVGColor.create()
+            rgba(255, 0, 0, 255, color)
+            nvgFillColor(nvg, color)
+            nvgStrokeWidth(nvg, 8.0f)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it, true)
+                nvgFill(nvg)
+            }
+            rgba(255, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
+            riverPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            mountainPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            rgba(0, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it, true)
+                nvgStroke(nvg)
+            }
+
+            nvgEndFrame(nvg)
+            nvgRestore(nvg)
+            val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
+            textureRenderer.unbind()
+            retVal
+        }
+    }
+
     fun drawShape(nvg: Long, points: List<Point2F>, isClosed: Boolean) {
         nvgBeginPath(nvg)
         drawLines(nvg, points, isClosed, true, 4096.0f)

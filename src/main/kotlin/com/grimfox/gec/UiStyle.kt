@@ -11,17 +11,16 @@ import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_RIGHT
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
+import com.grimfox.gec.util.*
 import com.grimfox.gec.util.FileDialogs.saveFile
 import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.selectFolder
-import com.grimfox.gec.util.MonitoredReference
-import com.grimfox.gec.util.cRef
-import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.nanovg.NVGColor
 import java.io.File
 import java.math.BigDecimal
 import java.nio.ByteBuffer
+import javax.management.monitor.Monitor
 
 val textFont = ref(-1)
 val glyphFont = ref(-1)
@@ -626,24 +625,53 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
     }
 }
 
-fun Block.vDropdownRow(menuLayer: Block, color: NVGColor, values: List<String>, selected: MonitoredReference<Int>, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
+fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrushValue: MonitoredReference<Byte>, menuLayer: Block, color: NVGColor, values: List<String>, selected: MonitoredReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         vSizing = STATIC
         this.height = height
         layout = VERTICAL
+        var editIconBlock = NO_BLOCK
         block {
             hSizing = SHRINK_GROUP
             hShrinkGroup = shrinkGroup
             layout = HORIZONTAL
             block {
+                layout = HORIZONTAL
                 hAlign = RIGHT
                 vAlign = MIDDLE
                 hSizing = SHRINK
                 vSizing = SHRINK
-                text = glyph(GLYPH_CIRCLE, 20.0f, color)
+                editIconBlock = block {
+                    layout = HORIZONTAL
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = glyph(GLYPH_BRUSH, 18.0f, COLOR_ACTIVE_HIGHLIGHT)
+                    isVisible = false
+                    editModeOn.listener { old, new ->
+                        if (old != new) {
+                            isVisible = currentBrushValue.value.toInt() == index + 1 && new
+                        }
+                    }
+                }
+                block {
+                    layout = HORIZONTAL
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = glyph(GLYPH_CIRCLE, 20.0f, color)
+                }
                 isMouseAware = false
             }
-            isMouseAware = false
+        }.onMouseClick { button, _, _, _ ->
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && editModeOn.value) {
+                currentBrushValue.value = (index + 1).toByte()
+            }
+        }
+        currentBrushValue.listener { old, new ->
+            if (old != new) {
+                editIconBlock.isVisible = new.toInt() == index + 1 && editModeOn.value
+            }
         }
         hSpacer(gap)
         val textRef = DynamicTextReference(values[selected.value], values.map { it.length }.max()!!, TEXT_STYLE_BUTTON)

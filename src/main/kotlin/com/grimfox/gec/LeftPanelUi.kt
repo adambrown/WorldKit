@@ -24,7 +24,7 @@ import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 
-class MaskDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>): BrushListener {
+class PickAndGoDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>): BrushListener {
 
     var currentValue = 0.toByte()
 
@@ -51,6 +51,44 @@ class MaskDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushS
                 val dist = line.distance2(vertices.getPoint(y * 128 + x))
                 if (dist <= maxDist2) {
                     mask[x, y] = currentValue
+                }
+            }
+        }
+        executor.call {
+            if (texture.value.id < 0) {
+                texture.value = renderRegions(graph, mask)
+            } else {
+                renderRegions(graph, mask, texture.value)
+            }
+        }
+    }
+}
+
+class PreSelectDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>, val currentValue: Reference<Byte>): BrushListener {
+
+    override fun onMouseDown(x: Int, y: Int) {
+        onLine(x, y, x, y)
+    }
+
+    override fun onLine(x1: Int, y1: Int, x2: Int, y2: Int) {
+        val maxDist = (brushSize.value / 2.0f)
+        val maxDist2 = maxDist * maxDist
+        val brushMargin = Math.ceil(maxDist * 127.0).toInt() + 1
+        val cpStartX = Math.max(0, Math.min(x1, x2) - brushMargin)
+        val cpEndX = Math.min(127, Math.max(x1, x2) + brushMargin)
+        val cpStartY = Math.max(0, Math.min(y1, y2) - brushMargin)
+        val cpEndY = Math.min(127, Math.max(y1, y2) + brushMargin)
+        val x1f = x1 / 127.0f
+        val x2f = x2 / 127.0f
+        val y1f = y1 / 127.0f
+        val y2f = y2 / 127.0f
+        val line = LineSegment2F(Point2F(x1f, y1f), Point2F(x2f, y2f))
+        val vertices = graph.vertices
+        for (x in cpStartX..cpEndX) {
+            for (y in cpStartY..cpEndY) {
+                val dist = line.distance2(vertices.getPoint(y * 128 + x))
+                if (dist <= maxDist2) {
+                    mask[x, y] = currentValue.value
                 }
             }
         }
@@ -154,6 +192,7 @@ private val useRegionFile = ref(false)
 private val useBiomeFile = ref(false)
 private val allowUnsafe = ref(false)
 private val editRegionsMode = ref(false)
+private val editBiomesMode = ref(false)
 private val regionsSeed = ref(1L)
 private val biomesSeed = ref(1L)
 private val regionsMapScale = ref(4)
@@ -167,6 +206,7 @@ private val reduction = ref(7)
 private val connectedness = ref(0.114f)
 private val regionSize = ref(0.034f)
 private val iterations = ref(5)
+private val currentBiomeBrushValue = ref(1.toByte())
 private val historyRegionsBackQueue = HistoryQueue<ParameterSet>(100)
 private val historyRegionsCurrent = ref<ParameterSet?>(null)
 private val historyRegionsForwardQueue = HistoryQueue<ParameterSet>(100)
@@ -214,7 +254,8 @@ private var backBiomesButton = NO_BLOCK
 private var forwardBiomesButton = NO_BLOCK
 private var backBiomesLabel = NO_BLOCK
 private var forwardBiomesLabel = NO_BLOCK
-private var editToggle = NO_BLOCK
+private var editRegionsToggle = NO_BLOCK
+private var editBiomesToggle = NO_BLOCK
 
 private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
@@ -252,7 +293,8 @@ fun disableGenerateButtons() {
     showMeshLabel.isVisible = !displayBuildLabel
     buildButton.isVisible = false
     buildLabel.isVisible = displayBuildLabel
-    editToggle.isVisible = editRegionsMode.value
+    editRegionsToggle.isVisible = editRegionsMode.value
+    editBiomesToggle.isVisible = editBiomesMode.value
 }
 
 private fun enableGenerateButtons() {
@@ -308,7 +350,8 @@ private fun enableGenerateButtons() {
             buildLabel.isVisible = true
         }
     }
-    editToggle.isVisible = currentState.regionGraph != null && currentState.regionMask != null && displayMode == DisplayMode.REGIONS
+    editRegionsToggle.isVisible = currentState.regionGraph != null && currentState.regionMask != null && displayMode == DisplayMode.REGIONS
+    editBiomesToggle.isVisible = currentState.biomeGraph != null && currentState.biomeMask != null && displayMode == DisplayMode.BIOMES
 }
 
 private fun doGeneration(doWork: () -> Unit) {
@@ -394,8 +437,8 @@ private fun buildRegionsFun(parameters: ParameterSet, refreshOnly: Boolean = fal
     currentState.heightMapTexture = null
     currentState.riverMapTexture = null
     if (displayMode == DisplayMode.MAP || (defaultToMap && displayMode != DisplayMode.REGIONS)) {
-        val regionTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
-        meshViewport.setImage(regionTextureId)
+        val mapTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints)
+        meshViewport.setImage(mapTextureId)
         imageMode.value = 1
         displayMode = DisplayMode.MAP
     } else {
@@ -406,20 +449,26 @@ private fun buildRegionsFun(parameters: ParameterSet, refreshOnly: Boolean = fal
     }
 }
 
-private fun buildBiomesFun(parameters: ParameterSet) {
-    val finalBiomeFile = biomeFile.reference.value
-    val (biomeGraph, biomeMask) = if (useBiomeFile.value && finalBiomeFile.isNotBlank()) {
-        val mask = loadBiomeMaskFromImage(File(finalBiomeFile))
-        for (i in 0..mask.size.toInt() - 1) {
-            mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
-        }
-        val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
-        Pair(graph, mask)
+private fun buildBiomesFun(parameters: ParameterSet, refreshOnly: Boolean = false) {
+    val currentBiomeGraph = currentState.biomeGraph
+    val currentBiomeMask = currentState.biomeMask
+    val (biomeGraph, biomeMask) = if (refreshOnly && currentBiomeGraph != null && currentBiomeMask != null) {
+        currentBiomeGraph to currentBiomeMask
     } else {
-        val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
-        val biomeScale = Math.round(scale * 18) + 10
-        val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
-        buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
+        val finalBiomeFile = biomeFile.reference.value
+        if (useBiomeFile.value && finalBiomeFile.isNotBlank()) {
+            val mask = loadBiomeMaskFromImage(File(finalBiomeFile))
+            for (i in 0..mask.size.toInt() - 1) {
+                mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
+            }
+            val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
+            Pair(graph, mask)
+        } else {
+            val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
+            val biomeScale = Math.round(scale * 18) + 10
+            val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
+            buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
+        }
     }
     currentState.biomeGraph = biomeGraph
     currentState.biomeMask = biomeMask
@@ -437,8 +486,14 @@ private fun buildBiomesFun(parameters: ParameterSet) {
     currentState.heightMapTexture = null
     currentState.riverMapTexture = null
     val biomeTextureId = renderRegions(biomeGraph, biomeMask)
-    meshViewport.setRegions(biomeTextureId)
-    imageMode.value = 0
+    val currentSplines = currentState.regionSplines
+    val splineTextureId = if (currentSplines != null) {
+        TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints, currentSplines.mountainPoints)
+    } else {
+        TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+    }
+    meshViewport.setBiomes(biomeTextureId, splineTextureId)
+    imageMode.value = 2
     displayMode = DisplayMode.BIOMES
 }
 
@@ -516,8 +571,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             allowUnsafe.value = false
-            editToggle = vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            editToggle.isVisible = false
+            editRegionsToggle = vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+            editRegionsToggle.isVisible = false
             val editBlocks = ArrayList<Block>()
             editBlocks.add(vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
             editRegionsMode.listener { old, new ->
@@ -538,16 +593,16 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                         meshViewport.setRegions(newTexture)
                                     }
                                 }
-                                brushListener.value = MaskDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
+                                currentEditBrushSize.value = regionEditBrushSize
+                                brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
                                 brushOn.value = true
                             }
                         } else {
                             brushListener.value = null
                             brushOn.value = false
-                            val parameters = currentState.parameters
-                            if (parameters != null) {
-                                buildRegionsFun(parameters, true)
-                            }
+                            val parameters = extractCurrentParameters()
+                            buildRegionsFun(parameters, true)
+                            updateRegionsHistory(parameters)
                             doGenerationStop()
                         }
                     }
@@ -557,30 +612,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             vButtonRow(LARGE_ROW_HEIGHT) {
                 generateRegionsButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val parameters = ParameterSet(
-                                regionsSeed = regionsSeed.value,
-                                biomesSeed = biomesSeed.value,
-                                regionsMapScale = regionsMapScale.value,
-                                biomesMapScale = biomesMapScale.value,
-                                regionCount = regions.value,
-                                stride = stride.value,
-                                islandDesire = islands.value,
-                                regionPoints = startPoints.value,
-                                initialReduction = reduction.value,
-                                connectedness = connectedness.value,
-                                regionSize = regionSize.value,
-                                maxRegionTries = iterations.value * 10,
-                                maxIslandTries = iterations.value * 100,
-                                biomes = biomes.value)
+                        val parameters = extractCurrentParameters()
                         buildRegionsFun(parameters)
-                        val historyLast = historyRegionsCurrent.value
-                        if (historyLast != null) {
-                            if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                historyRegionsBackQueue.push(historyLast.copy())
-                            }
-                        }
-                        historyRegionsForwardQueue.clear()
-                        historyRegionsCurrent.value = parameters.copy()
+                        updateRegionsHistory(parameters)
                     }
                 }
                 generateRegionsLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -596,30 +630,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         } else {
                             regionsSeed.value = randomSeed
                         }
-                        val parameters = ParameterSet(
-                                regionsSeed = regionsSeed.value,
-                                biomesSeed = biomesSeed.value,
-                                regionsMapScale = regionsMapScale.value,
-                                biomesMapScale = biomesMapScale.value,
-                                regionCount = regions.value,
-                                stride = stride.value,
-                                islandDesire = islands.value,
-                                regionPoints = startPoints.value,
-                                initialReduction = reduction.value,
-                                connectedness = connectedness.value,
-                                regionSize = regionSize.value,
-                                maxRegionTries = iterations.value * 10,
-                                maxIslandTries = iterations.value * 100,
-                                biomes = biomes.value)
+                        val parameters = extractCurrentParameters()
                         buildRegionsFun(parameters)
-                        val historyLast = historyRegionsCurrent.value
-                        if (historyLast != null) {
-                            if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                historyRegionsBackQueue.push(historyLast.copy())
-                            }
-                        }
-                        historyRegionsForwardQueue.clear()
-                        historyRegionsCurrent.value = parameters.copy()
+                        updateRegionsHistory(parameters)
                     }
                 }
                 generateRandomRegionsLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -701,7 +714,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
                             val index = newBiomes.size
                             val selectedValue = selectedBiomes[index]
-                            biomeRows.vDropdownRow(dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
+                            biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
                             newBiomes.add(selectedValue.value)
                             selectedValue.listener { oldBiomeId, newBiomeId ->
                                 if (oldBiomeId != newBiomeId) {
@@ -716,33 +729,50 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             biomeCount.value = 6
+            editBiomesToggle = vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+            editBiomesToggle.isVisible = false
+            val editBlocks = ArrayList<Block>()
+            editBlocks.add(vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+            editBiomesMode.listener { old, new ->
+                editBlocks.forEach {
+                    it.isMouseAware = new
+                    it.isVisible = new
+                }
+                if (old != new) {
+                    executor.call {
+                        if (new) {
+                            val currentGraph = currentState.biomeGraph
+                            val currentMask = currentState.biomeMask
+                            if (currentGraph != null && currentMask != null) {
+                                doGenerationStart()
+                                val textureReference = ref(TextureId(-1))
+                                textureReference.listener { oldTexture, newTexture ->
+                                    if (oldTexture != newTexture) {
+                                        meshViewport.setBiomes(newTexture)
+                                    }
+                                }
+                                currentEditBrushSize.value = biomeEditBrushSize
+                                brushListener.value = PreSelectDrawBrushListener(currentGraph, currentMask, biomeEditBrushSize, textureReference, currentBiomeBrushValue)
+                                brushOn.value = true
+                            }
+                        } else {
+                            brushListener.value = null
+                            brushOn.value = false
+                            val parameters = extractCurrentParameters()
+                            buildBiomesFun(parameters, true)
+                            updateBiomesHistory(parameters)
+                            doGenerationStop()
+                        }
+                    }
+                }
+            }
+            editBiomesMode.value = false
             vButtonRow(LARGE_ROW_HEIGHT) {
                 generateBiomesButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val parameters = ParameterSet(
-                                regionsSeed = regionsSeed.value,
-                                biomesSeed = biomesSeed.value,
-                                regionsMapScale = regionsMapScale.value,
-                                biomesMapScale = biomesMapScale.value,
-                                regionCount = regions.value,
-                                stride = stride.value,
-                                islandDesire = islands.value,
-                                regionPoints = startPoints.value,
-                                initialReduction = reduction.value,
-                                connectedness = connectedness.value,
-                                regionSize = regionSize.value,
-                                maxRegionTries = iterations.value * 10,
-                                maxIslandTries = iterations.value * 100,
-                                biomes = biomes.value)
+                        val parameters = extractCurrentParameters()
                         buildBiomesFun(parameters)
-                        val historyLast = historyBiomesCurrent.value
-                        if (historyLast != null) {
-                            if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                historyBiomesBackQueue.push(historyLast.copy())
-                            }
-                        }
-                        historyBiomesForwardQueue.clear()
-                        historyBiomesCurrent.value = parameters.copy()
+                        updateBiomesHistory(parameters)
                     }
                 }
                 generateBiomesLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -758,30 +788,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         } else {
                             biomesSeed.value = randomSeed
                         }
-                        val parameters = ParameterSet(
-                                regionsSeed = regionsSeed.value,
-                                biomesSeed = biomesSeed.value,
-                                regionsMapScale = regionsMapScale.value,
-                                biomesMapScale = biomesMapScale.value,
-                                regionCount = regions.value,
-                                stride = stride.value,
-                                islandDesire = islands.value,
-                                regionPoints = startPoints.value,
-                                initialReduction = reduction.value,
-                                connectedness = connectedness.value,
-                                regionSize = regionSize.value,
-                                maxRegionTries = iterations.value * 10,
-                                maxIslandTries = iterations.value * 100,
-                                biomes = biomes.value)
+                        val parameters = extractCurrentParameters()
                         buildBiomesFun(parameters)
-                        val historyLast = historyBiomesCurrent.value
-                        if (historyLast != null) {
-                            if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && parameters != historyLast) {
-                                historyBiomesBackQueue.push(historyLast.copy())
-                            }
-                        }
-                        historyBiomesForwardQueue.clear()
-                        historyBiomesCurrent.value = parameters.copy()
+                        updateBiomesHistory(parameters)
                     }
                 }
                 generateRandomBiomesLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -862,10 +871,16 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 doGeneration {
                     val currentBiomeGraph = currentState.biomeGraph
                     val currentBiomeMask = currentState.biomeMask
+                    val currentSplines = currentState.regionSplines
                     if (currentBiomeGraph != null && currentBiomeMask != null) {
-                        val regionTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
-                        meshViewport.setRegions(regionTextureId)
-                        imageMode.value = 0
+                        val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
+                        val splineTextureId = if (currentSplines != null) {
+                            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints, currentSplines.mountainPoints)
+                        } else {
+                            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                        }
+                        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+                        imageMode.value = 2
                         displayMode = DisplayMode.BIOMES
                     }
                 }
@@ -890,7 +905,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         currentState.riverMapTexture = riverMapTexId
                         val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
                         heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
-                        imageMode.value = 2
+                        imageMode.value = 3
                         displayMode = DisplayMode.MESH
                     }
                 }
@@ -904,7 +919,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     val currentRiverMap = currentState.riverMapTexture
                     if (currentHeightMap != null && currentRiverMap != null) {
                         meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
-                        imageMode.value = 2
+                        imageMode.value = 3
                         displayMode = DisplayMode.MESH
                     }
                 }
@@ -915,6 +930,47 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
         }
         enableGenerateButtons()
     }
+}
+
+private fun updateRegionsHistory(parameters: ParameterSet) {
+    val historyLast = historyRegionsCurrent.value
+    if (historyLast != null) {
+        if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && parameters != historyLast) {
+            historyRegionsBackQueue.push(historyLast.copy())
+        }
+    }
+    historyRegionsForwardQueue.clear()
+    historyRegionsCurrent.value = parameters.copy()
+}
+
+private fun updateBiomesHistory(parameters: ParameterSet) {
+    val historyLast = historyBiomesCurrent.value
+    if (historyLast != null) {
+        if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && parameters != historyLast) {
+            historyBiomesBackQueue.push(historyLast.copy())
+        }
+    }
+    historyBiomesForwardQueue.clear()
+    historyBiomesCurrent.value = parameters.copy()
+}
+
+private fun extractCurrentParameters(): ParameterSet {
+    val parameters = ParameterSet(
+            regionsSeed = regionsSeed.value,
+            biomesSeed = biomesSeed.value,
+            regionsMapScale = regionsMapScale.value,
+            biomesMapScale = biomesMapScale.value,
+            regionCount = regions.value,
+            stride = stride.value,
+            islandDesire = islands.value,
+            regionPoints = startPoints.value,
+            initialReduction = reduction.value,
+            connectedness = connectedness.value,
+            regionSize = regionSize.value,
+            maxRegionTries = iterations.value * 10,
+            maxIslandTries = iterations.value * 100,
+            biomes = biomes.value)
+    return parameters
 }
 
 private fun loadRegionMaskFromImage(file: File): Matrix<Byte> {

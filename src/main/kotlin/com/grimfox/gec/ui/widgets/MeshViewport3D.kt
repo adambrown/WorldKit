@@ -31,7 +31,7 @@ class MeshViewport3D(
         val brushActive: MutableReference<Boolean>,
         val brushListener: Reference<BrushListener?>,
         val brushSize: MutableReference<Float>,
-        val editBrushSize: Reference<Float>) {
+        val editBrushSizeRef: Reference<Reference<Float>>) {
 
     private val pressedKeys = Collections.synchronizedSet(LinkedHashSet<Int>())
 
@@ -100,6 +100,10 @@ class MeshViewport3D(
     private val mvpMatrixUniformImage = ShaderUniform("modelViewProjectionMatrix")
     private val imageTextureUniform = ShaderUniform("imageTexture")
 
+    private val mvpMatrixUniformBiome = ShaderUniform("modelViewProjectionMatrix")
+    private val biomeTextureUniform = ShaderUniform("biomeTexture")
+    private val splineTextureUniform = ShaderUniform("splineTexture")
+
     private val positionAttribute = ShaderAttribute("position")
     private val uvAttribute = ShaderAttribute("uv")
 
@@ -112,6 +116,10 @@ class MeshViewport3D(
     private val positionAttributeImage = ShaderAttribute("position")
     private val uvAttributeImage = ShaderAttribute("uv")
 
+    private val positionAttributeBiome = ShaderAttribute("position")
+    private val uvAttributeBiome = ShaderAttribute("uv")
+
+
     private val textureLock = Object()
     private var hasHeightmap = false
     private var heightmapId: TextureId? = null
@@ -120,6 +128,10 @@ class MeshViewport3D(
 
     private var hasRegions = false
     private var regionTextureId: TextureId? = null
+
+    private var hasBiomes = false
+    private var biomeTextureId: TextureId? = null
+    private var splineTextureId: TextureId? = null
 
     private var hasImage = false
     private var imageTextureId: TextureId? = null
@@ -132,6 +144,7 @@ class MeshViewport3D(
     private var waterPlaneProgram: Int = 0
     private var regionPlaneProgram: Int = 0
     private var imagePlaneProgram: Int = 0
+    private var biomePlaneProgram: Int = 0
 
     private var lastScroll = 0.0f
     private var scroll = 0.0f
@@ -175,6 +188,10 @@ class MeshViewport3D(
 
     private lateinit var imagePlane: ImagePlane
 
+    private lateinit var regionPlane: ImagePlane
+
+    private lateinit var biomePlane: ImagePlane
+
     val keyboardHandler: KeyboardHandler = viewportKeyboardHandler()
 
     fun init() {
@@ -196,6 +213,9 @@ class MeshViewport3D(
         val regionVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/regions.vert"))
         val regionFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/regions.frag"))
 
+        val biomeVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/biomes.vert"))
+        val biomeFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/biomes.frag"))
+
         val imagePlaneVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/image-plane.vert"))
         val imagePlaneFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/image-plane.frag"))
 
@@ -214,6 +234,11 @@ class MeshViewport3D(
                 listOf(positionAttributeRegion, uvAttributeRegion),
                 listOf(mvpMatrixUniformRegion, regionTextureUniform))
 
+        biomePlaneProgram = createAndLinkProgram(
+                listOf(biomeVertexShader, biomeFragmentShader),
+                listOf(positionAttributeBiome, uvAttributeBiome),
+                listOf(mvpMatrixUniformBiome, biomeTextureUniform, splineTextureUniform))
+
         imagePlaneProgram = createAndLinkProgram(
                 listOf(imagePlaneVertexShader, imagePlaneFragmentShader),
                 listOf(positionAttributeImage, uvAttributeImage),
@@ -223,7 +248,11 @@ class MeshViewport3D(
 
         waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
-        imagePlane = ImagePlane(2600.0f, positionAttributeRegion, uvAttributeRegion)
+        imagePlane = ImagePlane(2600.0f, positionAttributeImage, uvAttributeImage)
+
+        regionPlane = ImagePlane(2600.0f, positionAttributeRegion, uvAttributeRegion)
+
+        biomePlane = ImagePlane(2600.0f, positionAttributeBiome, uvAttributeBiome)
 
         lightDirection.normalize()
 
@@ -243,6 +272,20 @@ class MeshViewport3D(
         synchronized(textureLock) {
             hasRegions = true
             regionTextureId = textureId
+        }
+    }
+
+    fun setBiomes(biomeTextureId: TextureId, splineTextureId: TextureId) {
+        synchronized(textureLock) {
+            hasBiomes = true
+            this.biomeTextureId = biomeTextureId
+            this.splineTextureId = splineTextureId
+        }
+    }
+
+    fun setBiomes(biomeTextureId: TextureId) {
+        synchronized(textureLock) {
+            this.biomeTextureId = biomeTextureId
         }
     }
 
@@ -266,7 +309,7 @@ class MeshViewport3D(
                     lastTexCoordX = texCoordX
                     lastTexCoordY = texCoordY
                     brushListener.value?.onMouseDown(texCoordX, texCoordY)
-                    brushSize.value = editBrushSize.value * width
+                    brushSize.value = editBrushSizeRef.value.value * width
                     brushActive.value = true
                     hideCursor.value = true
                 }
@@ -430,6 +473,8 @@ class MeshViewport3D(
             onDrawFrameInternalRegion(xPosition, yPosition, width, height, rootHeight, scale)
         } else if (imageMode.value == 1) {
             onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
+        } else if (imageMode.value == 2) {
+            onDrawFrameInternalBiome(xPosition, yPosition, width, height, rootHeight, scale)
         } else {
             onDrawFrameInternalHeightmap(xPosition, yPosition, width, height, rootHeight, scale)
         }
@@ -493,6 +538,70 @@ class MeshViewport3D(
                 glViewport(xPosition, flippedY, width, height)
 
                 drawRegionPlane()
+
+                glDisable(GL_SCISSOR_TEST)
+            }
+        }
+    }
+
+    private fun onDrawFrameInternalBiome(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+        if (width < 1 || height < 1) {
+            return
+        }
+        synchronized(textureLock) {
+            if (hasBiomes) {
+                val adjustedWidth = round(width / scale)
+                val adjustedHeight = round(height / scale)
+                val adjustedX = round(xPosition / scale)
+                val adjustedY = round(yPosition / scale)
+
+                texAreaX1 = (adjustedX + (adjustedWidth / 2)) - (adjustedHeight / 2)
+                texAreaY1 = adjustedY
+                texAreaX2 = texAreaX1 + adjustedHeight
+                texAreaY2 = texAreaY1 + adjustedHeight
+
+                val marginWidth = Math.min(220, ((adjustedWidth * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneWidth = adjustedWidth - (2 * marginWidth)
+                hotZoneX1 = adjustedX + marginWidth
+                hotZoneX2 = adjustedX + marginWidth + hotZoneWidth
+                val marginHeight = Math.min(220, ((adjustedHeight * 0.33333333f) + 0.5f).toInt() / 2)
+                val hotZoneHeight = adjustedHeight - (2 * marginHeight)
+                hotZoneY1 = adjustedY + marginHeight
+                hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
+
+                val flippedY = rootHeight - (yPosition + height)
+
+                val premulRatio = width / height.toFloat()
+                val orthoZoom = zoom * perspectiveToOrtho
+                projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
+
+                zoom = defaultZoom
+                modelMatrix.translation(defaultTranslation).rotate(defaultRotation)
+
+                deltaX = mouseX - lastMouseX
+                deltaY = mouseY - lastMouseY
+
+                lastMouseX = mouseX.toFloat()
+                lastMouseY = mouseY.toFloat()
+
+                deltaRotation.identity()
+
+                viewMatrix.mul(modelMatrix, mvMatrix)
+                projectionMatrix.mul(mvMatrix, mvpMatrix)
+
+                glDisable(GL_BLEND)
+                glDisable(GL_CULL_FACE)
+                glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
+                glEnable(GL_MULTISAMPLE)
+
+                glClearColor(background.r, background.g, background.b, background.a)
+                glScissor(xPosition, flippedY, width, height)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
+
+                drawBiomePlane()
 
                 glDisable(GL_SCISSOR_TEST)
             }
@@ -744,7 +853,19 @@ class MeshViewport3D(
         glUniform1i(regionTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, regionTextureId?.id ?: -1)
-        imagePlane.render()
+        regionPlane.render()
+    }
+
+    private fun drawBiomePlane() {
+        glUseProgram(biomePlaneProgram)
+        glUniformMatrix4fv(mvpMatrixUniformBiome.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform1i(biomeTextureUniform.location, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, biomeTextureId?.id ?: -1)
+        glUniform1i(splineTextureUniform.location, 1)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, splineTextureId?.id ?: -1)
+        biomePlane.render()
     }
 
     private fun drawImagePlane() {

@@ -24,6 +24,7 @@ val GLYPH_HELP = glyphIndex[11]
 val GLYPH_WARNING_TRIANGLE = glyphIndex[12]
 val GLYPH_WARNING = glyphIndex[13]
 val GLYPH_ERROR = glyphIndex[14]
+val GLYPH_BRUSH = glyphIndex[15]
 
 private val COLOR_GLYPH_TRUE_WHITE = color(255, 255, 255)
 private val COLOR_GLYPH_RED = color(255, 57, 43)
