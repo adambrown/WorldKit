@@ -35,7 +35,7 @@ object WaterFlows {
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
     class WaterNode(val id: Int,
-                    val isExternal: Boolean,
+                    var isExternal: Boolean,
                     val area: Float,
                     val adjacents: ArrayList<Pair<WaterNode, Float>>,
                     val simplexX: Float,
@@ -72,7 +72,7 @@ object WaterFlows {
             val landMapTextureId = renderLandImage(regionSplines.coastPoints)
             val riverBorderTextureId = renderEdges(executor, regionSplines.riverEdges, threadCount)
             val mountainBorderTextureId = renderEdges(executor, regionSplines.mountainEdges, threadCount)
-            val coastalBorderTextureId = renderEdges(executor, regionSplines.coastEdges, threadCount)
+            val coastalBorderTextureId = renderEdges(executor, regionSplines.coastEdges.flatMap { it.first + it.second.flatMap { it } }, threadCount)
             val upliftTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
                 glDisable(GL11.GL_CULL_FACE)
@@ -159,16 +159,76 @@ object WaterFlows {
         }
         val midWaterMapsFuture = executor.call {
             val heightMap = smallWaterMapsFuture.value
-            val (nodeIndex, nodes, rivers) = midWaterNodesFuture.value
+            val (nodeIndex, nodes, rivers, water, border) = midWaterNodesFuture.value
             val erosionSettings = listOf(UNDER_WATER_BIOME.erosionMidSettings)
             applyMapsToUnderWaterNodes(executor, flowGraphMedium.vertices, heightMap, nodes)
+
+            val unused = LinkedHashSet(water)
+            val used = LinkedHashSet(border)
+            unused.removeAll(used)
+            val next = LinkedHashSet(border)
+            var lastUnusedCount = unused.size
+            while (unused.isNotEmpty()) {
+                val nextOrder = ArrayList(next)
+                next.clear()
+                nextOrder.forEach { id ->
+                    val node = nodeIndex[id]!!
+                    node.adjacents.forEach { (otherNode) ->
+                        if (!used.contains(otherNode.id)) {
+                            next.add(otherNode.id)
+                            used.add(otherNode.id)
+                            unused.remove(otherNode.id)
+                        }
+                    }
+                }
+                if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                    val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                    makeSink.isExternal = true
+                    rivers.add(makeSink)
+                    used.add(makeSink.id)
+                    unused.remove(makeSink.id)
+                    next.add(makeSink.id)
+                }
+                lastUnusedCount = unused.size
+            }
+
             performErosion(executor, flowGraphMedium, nodeIndex, nodes, rivers, 10, erosionSettings, 2048, null, 0.0f)
         }
         val highWaterMapsFuture = executor.call {
             val heightMap = midWaterMapsFuture.value
-            val (nodeIndex, nodes, rivers) = highWaterNodesFuture.value
+            val (nodeIndex, nodes, rivers, water, border) = highWaterNodesFuture.value
             val erosionSettings = listOf(UNDER_WATER_BIOME.erosionHighSettings)
             applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes)
+
+            val unused = LinkedHashSet(water)
+            val used = LinkedHashSet(border)
+            unused.removeAll(used)
+            val next = LinkedHashSet(border)
+            var lastUnusedCount = unused.size
+            while (unused.isNotEmpty()) {
+                val nextOrder = ArrayList(next)
+                next.clear()
+                nextOrder.forEach { id ->
+                    val node = nodeIndex[id]!!
+                    node.adjacents.forEach { (otherNode) ->
+                        if (!used.contains(otherNode.id)) {
+                            next.add(otherNode.id)
+                            used.add(otherNode.id)
+                            unused.remove(otherNode.id)
+                        }
+                    }
+                }
+                if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                    val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                    makeSink.isExternal = true
+                    rivers.add(makeSink)
+                    used.add(makeSink.id)
+                    unused.remove(makeSink.id)
+                    next.add(makeSink.id)
+                }
+                lastUnusedCount = unused.size
+            }
+
             performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 2, erosionSettings, outputWidth, null, 0.0f)
         }
         val highMapsFuture = executor.call {
@@ -266,6 +326,7 @@ object WaterFlows {
         val used = LinkedHashSet(border)
         unused.removeAll(used)
         val next = LinkedHashSet(border)
+        var lastUnusedCount = unused.size
         while (unused.isNotEmpty()) {
             val nextOrder = ArrayList(next)
             Collections.shuffle(nextOrder, random)
@@ -284,6 +345,15 @@ object WaterFlows {
                     }
                 }
             }
+            if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                makeSink.isExternal = true
+                rivers.add(makeSink)
+                used.add(makeSink.id)
+                unused.remove(makeSink.id)
+                next.add(makeSink.id)
+            }
+            lastUnusedCount = unused.size
         }
         computeAreas(executor, rivers)
         val biomeBootstrapSettings = listOf(UNDER_WATER_BIOME.bootstrapSettings)
@@ -362,7 +432,7 @@ object WaterFlows {
         return heightMap
     }
 
-    private fun prepareGraphNodesUnderWater(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {
+    private fun prepareGraphNodesUnderWater(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Quintuple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>, ArrayList<Int>, LinkedHashSet<Int>> {
         val vertices = graph.vertices
         val land = LinkedHashSet<Int>(vertices.size)
         val water = ArrayList<Int>(vertices.size)
@@ -390,7 +460,7 @@ object WaterFlows {
         border.forEach { id ->
             rivers.add(nodeIndex[id]!!)
         }
-        return Triple(nodeIndex, nodes, rivers)
+        return Quintuple(nodeIndex, nodes, rivers, water, border)
     }
 
     private fun prepareGraphNodes(executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, distanceScale: Float): Triple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>> {

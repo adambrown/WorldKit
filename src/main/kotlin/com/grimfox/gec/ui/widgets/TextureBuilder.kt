@@ -153,7 +153,7 @@ object TextureBuilder {
         return doDeferredOpenglWork(ValueCollector { collector(textureRenderer) })
     }
 
-    fun renderLandImage(landBodyPolygons: List<List<Point2F>>): TextureId {
+    fun renderLandImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -170,7 +170,11 @@ object TextureBuilder {
             rgba(255, 255, 255, 255, color)
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
-                drawShape(nvg, it, true)
+                nvgBeginPath(nvg)
+                drawShape(nvg, it.first, true)
+                it.second.forEach {
+                    drawHole(nvg, it)
+                }
                 nvgFill(nvg)
             }
 
@@ -186,7 +190,11 @@ object TextureBuilder {
         return nvgRGBA(r.toByte(), g.toByte(), b.toByte(), a.toByte(), color)
     }
 
-    fun renderMapImage(landBodyPolygons: List<List<Point2F>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+    fun rgba(r: Float, g: Float, b: Float, a: Float, color: NVGColor): NVGColor {
+        return nvgRGBAf(r, g, b, a, color)
+    }
+
+    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -202,27 +210,37 @@ object TextureBuilder {
             val color = NVGColor.create()
             rgba(110, 210, 115, 255, color)
             nvgFillColor(nvg, color)
-            rgba(0, 0, 0, 255, color)
-            nvgStrokeWidth(nvg, 8.0f)
-            nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
-                drawShape(nvg, it, true)
+                nvgBeginPath(nvg)
+                drawShape(nvg, it.first, true)
+                it.second.forEach {
+                    drawHole(nvg, it)
+                }
                 nvgFill(nvg)
-                nvgStroke(nvg)
             }
-
+            nvgStrokeWidth(nvg, 6.0f)
             rgba(40, 45, 245, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
-
             rgba(245, 45, 40, 255, color)
             nvgStrokeColor(nvg, color)
             mountainPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
+            }
+            rgba(0, 0, 0, 255, color)
+            nvgStrokeWidth(nvg, 6.0f)
+            nvgStrokeColor(nvg, color)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it.first, true)
+                nvgStroke(nvg)
+                it.second.forEach {
+                    drawShape(nvg, it, true)
+                    nvgStroke(nvg)
+                }
             }
 
             nvgEndFrame(nvg)
@@ -233,7 +251,7 @@ object TextureBuilder {
         }
     }
 
-    fun renderSplines(landBodyPolygons: List<List<Point2F>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+    fun renderSplines(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -253,11 +271,26 @@ object TextureBuilder {
             val color = NVGColor.create()
             rgba(255, 0, 0, 255, color)
             nvgFillColor(nvg, color)
-            nvgStrokeWidth(nvg, 8.0f)
             landBodyPolygons.forEach {
-                drawShape(nvg, it, true)
+                nvgBeginPath(nvg)
+                drawShape(nvg, it.first, true)
+                it.second.forEach {
+                    drawHole(nvg, it)
+                }
                 nvgFill(nvg)
             }
+            nvgStrokeWidth(nvg, 8.0f)
+            rgba(0, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
+            riverPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            mountainPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            nvgStrokeWidth(nvg, 4.0f)
             rgba(255, 255, 0, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
@@ -268,11 +301,27 @@ object TextureBuilder {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
+            nvgStrokeWidth(nvg, 8.0f)
+            rgba(255, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
+            landBodyPolygons.forEach {
+                drawShape(nvg, it.first, true)
+                nvgStroke(nvg)
+                it.second.forEach {
+                    drawShape(nvg, it, true)
+                    nvgStroke(nvg)
+                }
+            }
+            nvgStrokeWidth(nvg, 4.0f)
             rgba(0, 255, 0, 255, color)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
-                drawShape(nvg, it, true)
+                drawShape(nvg, it.first, true)
                 nvgStroke(nvg)
+                it.second.forEach {
+                    drawShape(nvg, it, true)
+                    nvgStroke(nvg)
+                }
             }
 
             nvgEndFrame(nvg)
@@ -283,11 +332,21 @@ object TextureBuilder {
         }
     }
 
-    fun drawShape(nvg: Long, points: List<Point2F>, isClosed: Boolean) {
-        nvgBeginPath(nvg)
+    fun drawHole(nvg: Long, points: List<Point2F>) {
+        drawLines(nvg, points, true, true, 4096.0f)
+        nvgPathWinding(nvg, NVG_HOLE)
+    }
+
+    fun drawShape(nvg: Long, points: List<Point2F>, isClosed: Boolean, isComposite: Boolean = false) {
+        if (!isComposite) {
+            nvgBeginPath(nvg)
+        }
         drawLines(nvg, points, isClosed, true, 4096.0f)
         if (isClosed) {
-            nvgClosePath(nvg)
+            if (!isComposite) {
+                nvgPathWinding(nvg, NVG_SOLID)
+                nvgClosePath(nvg)
+            }
         }
     }
 

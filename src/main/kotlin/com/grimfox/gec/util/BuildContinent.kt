@@ -17,6 +17,7 @@ import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.WaterFlows.generateWaterFlows
 import java.util.*
 import java.util.concurrent.ExecutorService
+import kotlin.collections.LinkedHashSet
 
 object BuildContinent {
 
@@ -116,35 +117,36 @@ object BuildContinent {
         return biomeGraphFinalFuture.value
     }
 
-    class RegionSplines(val coastEdges: List<LineSegment2F>, val coastPoints: List<List<Point2F>>, val riverEdges: List<LineSegment2F>, val riverPoints: List<List<Point2F>>, val mountainEdges: List<LineSegment2F>, val mountainPoints: List<List<Point2F>>)
+    class RegionSplines(val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>, val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>, val riverEdges: List<LineSegment2F>, val riverPoints: List<List<Point2F>>, val mountainEdges: List<LineSegment2F>, val mountainPoints: List<List<Point2F>>)
 
     fun generateRegionSplines(random: Random, regionGraph: Graph, regionMask: Matrix<Byte>, mapScale: Int): RegionSplines {
         val smoothing = (1.0f - (mapScale / 20.0f)).coerceIn(0.0f, 1.0f)
         val water = LinkedHashSet<Int>(regionGraph.vertices.size)
-        val regions = ArrayList<LinkedHashSet<Int>>(16)
+        val land = LinkedHashSet<Int>(regionGraph.vertices.size)
+        var regionCount = 1
         for (i in 0..regionGraph.vertices.size - 1) {
             val maskValue = regionMask[i]
             if (maskValue < 1) {
                 water.add(i)
             } else {
-                val regionId = maskValue - 1
-                if (regions.size < maskValue) {
-                    for (j in 0..regionId - regions.size) {
-                        regions.add(LinkedHashSet<Int>())
-                    }
+                land.add(i)
+                if (maskValue > regionCount) {
+                    regionCount = maskValue.toInt()
                 }
-                regions[regionId].add(i)
             }
         }
 
-        val borderSegments = findAllBorderSegments(random, regionGraph, regions, water)
+        val borderSegments = findAllBorderSegments(random, regionGraph, regionMask, regionCount, land, water)
 
-        val coastEdges = ArrayList<LineSegment2F>()
-        val coastPoints = ArrayList<List<Point2F>>()
-        borderSegments.first.forEach {
-            val points = buildClosedEdges(it, smoothing)
-            coastPoints.add(points)
-            (1..points.size - 1).mapTo(coastEdges) { LineSegment2F(points[it - 1], points[it]) }
+        val coastEdges = ArrayList<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>()
+        val coastPoints = ArrayList<Pair<List<Point2F>, List<List<Point2F>>>>()
+        borderSegments.first.forEach { pair ->
+            val outsideCoast = pair.first
+            val outsideCoastPoints = buildClosedEdges(outsideCoast, smoothing)
+            val insideCoasts = pair.second
+            val insideCoastPoints = insideCoasts.map { buildClosedEdges(it, smoothing) }
+            coastPoints.add(outsideCoastPoints to insideCoastPoints)
+            coastEdges.add((1..outsideCoastPoints.size - 1).map { LineSegment2F(outsideCoastPoints[it - 1], outsideCoastPoints[it]) } to insideCoastPoints.map { insideCoast -> (1..insideCoast.size - 1).map { LineSegment2F(insideCoast[it - 1], insideCoast[it]) } })
         }
 
         val riverEdges = ArrayList<LineSegment2F>()
@@ -182,159 +184,54 @@ object BuildContinent {
         return points
     }
 
-    fun findAllBorderSegments(random: Random, graph: Graph, regions: List<LinkedHashSet<Int>>, water: LinkedHashSet<Int>): Triple<ArrayList<ArrayList<Polygon2F>>, ArrayList<Polygon2F>, ArrayList<Polygon2F>> {
+    private class Body(val ids: LinkedHashSet<Int>, val children: List<Body>, var coasts: Array<ArrayList<LineSegment2F>>, var lakes: Array<ArrayList<LineSegment2F>>, var borders: Array<ArrayList<LineSegment2F>>)
+
+    private fun findNestedBodies(graph: Graph, currentBodies: List<LinkedHashSet<Int>>, currentPool: ArrayList<LinkedHashSet<Int>>, nextPool: ArrayList<LinkedHashSet<Int>>, regionCount: Int): List<Body> {
+        return currentBodies.mapTo(ArrayList<Body>()) { currentBody ->
+            Body(currentBody, findNestedBodies(graph, findChildren(graph, currentBody, currentPool), nextPool, currentPool, regionCount), Array(regionCount) { ArrayList<LineSegment2F>() }, Array(regionCount) { ArrayList<LineSegment2F>() }, Array(regionCount * regionCount) { ArrayList<LineSegment2F>() })
+        }
+    }
+
+    fun findAllBorderSegments(random: Random, graph: Graph, regionMask: Matrix<Byte>, regionCount: Int, land: LinkedHashSet<Int>, water: LinkedHashSet<Int>): Triple<ArrayList<Pair<ArrayList<Polygon2F>, ArrayList<ArrayList<Polygon2F>>>>, ArrayList<Polygon2F>, ArrayList<Polygon2F>> {
+        val borderPoints = graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList()
+        val waterBodies = graph.getConnectedBodies(water)
+        val landBodies = graph.getConnectedBodies(land)
+        val oceanWaterBodies = waterBodies.filter { it.containsAny(borderPoints) }
+        val lakeWaterBodies = ArrayList(waterBodies.filter { !oceanWaterBodies.contains(it) })
+        val oceanWater = oceanWaterBodies.flatMapTo(LinkedHashSet<Int>()) { it }
+        val ocean = findNestedBodies(graph, listOf(oceanWater), landBodies, lakeWaterBodies, regionCount).first()
         val vertices = graph.vertices
         val epsilon = 0.0f
-        val coasts = Array(regions.size) { ArrayList<LineSegment2F>() }
-        val borders = Array(regions.size * regions.size) { ArrayList<LineSegment2F>() }
-        for (i in 0..regions.size - 1) {
-            val region = regions[i]
-            region.forEach { id ->
-                vertices.getAdjacentVertices(id).forEach { adjacentId ->
-                    if (!region.contains(adjacentId)) {
-                        if (water.contains(adjacentId)) {
-                            addBorderEdge(vertices, coasts[i], id, adjacentId, true)
-                        } else {
-                            for (j in i + 1..regions.size - 1) {
-                                val otherRegion = regions[j]
-                                if (otherRegion.contains(adjacentId)) {
-                                    addBorderEdge(vertices, borders[i * regions.size + j], id, adjacentId, true)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        val bodiesToDraw = ArrayList<Body>()
+        findBordersCoastsAndLakes(bodiesToDraw, ocean, regionMask, vertices, regionCount)
+        val coasts = ArrayList<Pair<ArrayList<Polygon2F>, ArrayList<ArrayList<Polygon2F>>>>()
+        val rivers = ArrayList<Polygon2F>()
+        val mountains = ArrayList<Polygon2F>()
+        bodiesToDraw.forEach { body ->
+            val (coast, lakes, localRivers, localMountains) = extractBodyPolygons(body, epsilon, random)
+            rivers.addAll(localRivers)
+            mountains.addAll(localMountains)
+            coasts.add(coast to lakes)
+
         }
-        val closedPolygons = ArrayList<ArrayList<Polygon2F>>()
+        return Triple(coasts, rivers, mountains)
+    }
+
+    private fun extractBodyPolygons(body: Body, epsilon: Float, random: Random): Quadruple<ArrayList<Polygon2F>, ArrayList<ArrayList<Polygon2F>>, ArrayList<Polygon2F>, ArrayList<Polygon2F>> {
+        val closedCoastPolygons = ArrayList<ArrayList<Polygon2F>>()
         val coastPolygons = ArrayList<ArrayList<Polygon2F>>()
-        coasts.forEach {
-            if (it.isNotEmpty()) {
-                val edgeSegments = LineSegment2F.getConnectedEdgeSegments(it, epsilon)
-                edgeSegments.forEach {
-                    val polygon = Polygon2F.fromUnsortedEdges(it, null, true, epsilon)
-                    if (polygon.isClosed) {
-                        closedPolygons.add(arrayListOf(polygon))
-                    } else {
-                        val first = polygon.points.first()
-                        val last = polygon.points.last()
-                        var makeNew = true
-                        for (other in coastPolygons) {
-                            val otherFirst1 = other.first().points.first()
-                            val otherFirst2 = other.first().points.last()
-                            val otherLast1 = other.last().points.first()
-                            val otherLast2 = other.last().points.last()
-                            if (first.epsilonEquals(otherFirst1, 0.0f)
-                                    || first.epsilonEquals(otherFirst2, epsilon)
-                                    || last.epsilonEquals(otherFirst1, epsilon)
-                                    || last.epsilonEquals(otherFirst2, epsilon)) {
-                                other.reverse()
-                                other.add(polygon)
-                                makeNew = false
-                                break
-                            } else if (first.epsilonEquals(otherLast1, epsilon)
-                                    || first.epsilonEquals(otherLast2, epsilon)
-                                    || last.epsilonEquals(otherLast1, epsilon)
-                                    || last.epsilonEquals(otherLast2, epsilon)) {
-                                other.add(polygon)
-                                makeNew = false
-                                break
-                            }
-                        }
-                        if (makeNew) {
-                            coastPolygons.add(arrayListOf(polygon))
-                        }
-                    }
-                }
-            }
-        }
-        for (i in coastPolygons.size - 1 downTo 0) {
-            val polygonList = coastPolygons[i]
-            val first1 = polygonList.first().points.first()
-            val first2 = polygonList.first().points.last()
-            val last1 = polygonList.last().points.first()
-            val last2 = polygonList.last().points.last()
-            for (j in i - 1 downTo 0) {
-                val other = coastPolygons[j]
-                val otherFirst1 = other.first().points.first()
-                val otherFirst2 = other.first().points.last()
-                val otherLast1 = other.last().points.first()
-                val otherLast2 = other.last().points.last()
-                if (first1.epsilonEquals(otherFirst1, 0.0f)
-                        || first1.epsilonEquals(otherFirst2, epsilon)
-                        || first2.epsilonEquals(otherFirst1, epsilon)
-                        || first2.epsilonEquals(otherFirst2, epsilon)) {
-                    other.reverse()
-                    other.addAll(polygonList)
-                    coastPolygons.removeAt(i)
-                    break
-                } else if (last1.epsilonEquals(otherFirst1, epsilon)
-                        || last1.epsilonEquals(otherFirst2, epsilon)
-                        || last2.epsilonEquals(otherFirst1, epsilon)
-                        || last2.epsilonEquals(otherFirst2, epsilon)) {
-                    other.reverse()
-                    polygonList.reverse()
-                    other.addAll(polygonList)
-                    coastPolygons.removeAt(i)
-                    break
-                } else if (first1.epsilonEquals(otherLast1, epsilon)
-                        || first1.epsilonEquals(otherLast2, epsilon)
-                        || first2.epsilonEquals(otherLast1, epsilon)
-                        || first2.epsilonEquals(otherLast2, epsilon)) {
-                    other.addAll(polygonList)
-                    coastPolygons.removeAt(i)
-                    break
-                } else if (last1.epsilonEquals(otherLast1, epsilon)
-                        || last1.epsilonEquals(otherLast2, epsilon)
-                        || last2.epsilonEquals(otherLast1, epsilon)
-                        || last2.epsilonEquals(otherLast2, epsilon)) {
-                    polygonList.reverse()
-                    other.addAll(polygonList)
-                    coastPolygons.removeAt(i)
-                    break
-                }
-            }
-        }
-        coastPolygons.filter { it.size >= 2 }.forEach {
-            if (it.size == 2) {
-                if (!it.first().points.last().epsilonEquals(it.last().points.first())) {
-                    it[it.size - 1] = Polygon2F(it[it.size - 1].points.reversed(), false)
-                }
-            } else {
-                for (i in 0..it.size - 2) {
-                    if (i == 0) {
-                        val current = it[i]
-                        val next = it[i + 1]
-                        val currentFirst = current.points.first()
-                        val currentLast = current.points.last()
-                        val nextFirst = next.points.first()
-                        val nextLast = next.points.last()
-                        if (currentLast.epsilonEquals(nextLast, epsilon)) {
-                            it[i + 1] = Polygon2F(next.points.reversed(), false)
-                        } else if (currentFirst.epsilonEquals(nextFirst, epsilon)) {
-                            it[i] = Polygon2F(current.points.reversed(), false)
-                        } else if (currentFirst.epsilonEquals(nextLast, epsilon)) {
-                            it[i] = Polygon2F(current.points.reversed(), false)
-                            it[i + 1] = Polygon2F(next.points.reversed(), false)
-                        }
-                    } else {
-                        val next = it[i + 1]
-                        val currentLast = it[i].points.last()
-                        val nextFirst = next.points.first()
-                        if (!currentLast.epsilonEquals(nextFirst, epsilon)) {
-                            it[i + 1] = Polygon2F(next.points.reversed(), false)
-                        }
-                    }
-                }
-            }
-        }
-        coastPolygons.addAll(closedPolygons)
+        val closedLakePolygons = ArrayList<ArrayList<Polygon2F>>()
+        val lakePolygons = ArrayList<ArrayList<Polygon2F>>()
+        buildCoastPolygons(body.coasts, closedCoastPolygons, coastPolygons, epsilon)
+        buildCoastPolygons(body.lakes, closedLakePolygons, lakePolygons, epsilon)
+        orderAndOrientCoastPolygons(closedCoastPolygons, coastPolygons, epsilon)
+        orderAndOrientCoastPolygons(closedLakePolygons, lakePolygons, epsilon)
         val borderPolygons = ArrayList<Polygon2F>()
-        val coastPoints = coastPolygons.flatMap { it.flatMap { it.points } }
+        val coastPoints = coastPolygons.flatMap { it.flatMap { it.points } } + lakePolygons.flatMap { it.flatMap { it.points } }
         val potentialOutlets = ArrayList<Point2F>()
         val finalRiverPolygons = ArrayList<Polygon2F>()
         val finalMountainPolygons = ArrayList<Polygon2F>()
-        borders.forEach {
+        body.borders.forEach {
             if (it.isNotEmpty()) {
                 val edgeSegments = LineSegment2F.getConnectedEdgeSegments(it, epsilon)
                 edgeSegments.forEach {
@@ -461,7 +358,177 @@ object BuildContinent {
         finalRiverPolygons.addAll(riverPolygons)
         finalMountainPolygons.addAll(mountainPolygons)
 
-        return Triple(coastPolygons, finalRiverPolygons, finalMountainPolygons)
+        if (coastPolygons.size != 1) {
+            throw RuntimeException("A single land body created ${coastPolygons.size} polygons. How is this possible.")
+        }
+
+        return Quadruple(coastPolygons.first(), lakePolygons, finalRiverPolygons, finalMountainPolygons)
+    }
+
+    private fun findBordersCoastsAndLakes(bodiesWithLakes: MutableList<Body>, enclosingWaterBody: Body, regionMask: Matrix<Byte>, vertices: Vertices, regionCount: Int) {
+        enclosingWaterBody.children.forEach { body ->
+            bodiesWithLakes.add(body)
+            body.ids.forEach { id ->
+                val region = regionMask[id]
+                vertices.getAdjacentVertices(id).forEach { adjacentId ->
+                    val adjacentRegion = regionMask[adjacentId]
+                    if (adjacentRegion > region && body.ids.contains(adjacentId)) {
+                        addBorderEdge(vertices, body.borders[(region - 1) * regionCount + adjacentRegion - 1], id, adjacentId, true)
+                    } else if (enclosingWaterBody.ids.contains(adjacentId)) {
+                        addBorderEdge(vertices, body.coasts[region - 1], id, adjacentId, true)
+                    } else if (body.children.any { it.ids.contains(adjacentId) }) {
+                        addBorderEdge(vertices, body.lakes[region - 1], id, adjacentId, true)
+                    }
+                }
+            }
+            body.children.forEach { enclosedWaterBody ->
+                findBordersCoastsAndLakes(bodiesWithLakes, enclosedWaterBody, regionMask, vertices, regionCount)
+            }
+        }
+    }
+
+    private fun findChildren(graph: Graph, parent: LinkedHashSet<Int>, options: ArrayList<LinkedHashSet<Int>>): ArrayList<LinkedHashSet<Int>> {
+        return (options.size - 1 downTo 0)
+                .filter { hasBorder(graph, parent, options[it]) }
+                .mapTo(ArrayList<LinkedHashSet<Int>>()) { options.removeAt(it) }
+    }
+
+    private fun hasBorder(graph: Graph, parent: LinkedHashSet<Int>, option: LinkedHashSet<Int>): Boolean {
+        val vertices = graph.vertices
+        option.forEach { id ->
+            vertices.getAdjacentVertices(id)
+                    .asSequence()
+                    .filter { parent.contains(it) }
+                    .forEach { return true }
+        }
+        return false
+    }
+
+    private fun orderAndOrientCoastPolygons(closedCoastPolygons: ArrayList<ArrayList<Polygon2F>>, coastPolygons: ArrayList<ArrayList<Polygon2F>>, epsilon: Float) {
+        for (i in coastPolygons.size - 1 downTo 0) {
+            val polygonList = coastPolygons[i]
+            val first1 = polygonList.first().points.first()
+            val first2 = polygonList.first().points.last()
+            val last1 = polygonList.last().points.first()
+            val last2 = polygonList.last().points.last()
+            for (j in i - 1 downTo 0) {
+                val other = coastPolygons[j]
+                val otherFirst1 = other.first().points.first()
+                val otherFirst2 = other.first().points.last()
+                val otherLast1 = other.last().points.first()
+                val otherLast2 = other.last().points.last()
+                if (first1.epsilonEquals(otherFirst1, epsilon)
+                        || first1.epsilonEquals(otherFirst2, epsilon)
+                        || first2.epsilonEquals(otherFirst1, epsilon)
+                        || first2.epsilonEquals(otherFirst2, epsilon)) {
+                    other.reverse()
+                    other.addAll(polygonList)
+                    coastPolygons.removeAt(i)
+                    break
+                } else if (last1.epsilonEquals(otherFirst1, epsilon)
+                        || last1.epsilonEquals(otherFirst2, epsilon)
+                        || last2.epsilonEquals(otherFirst1, epsilon)
+                        || last2.epsilonEquals(otherFirst2, epsilon)) {
+                    other.reverse()
+                    polygonList.reverse()
+                    other.addAll(polygonList)
+                    coastPolygons.removeAt(i)
+                    break
+                } else if (first1.epsilonEquals(otherLast1, epsilon)
+                        || first1.epsilonEquals(otherLast2, epsilon)
+                        || first2.epsilonEquals(otherLast1, epsilon)
+                        || first2.epsilonEquals(otherLast2, epsilon)) {
+                    other.addAll(polygonList)
+                    coastPolygons.removeAt(i)
+                    break
+                } else if (last1.epsilonEquals(otherLast1, epsilon)
+                        || last1.epsilonEquals(otherLast2, epsilon)
+                        || last2.epsilonEquals(otherLast1, epsilon)
+                        || last2.epsilonEquals(otherLast2, epsilon)) {
+                    polygonList.reverse()
+                    other.addAll(polygonList)
+                    coastPolygons.removeAt(i)
+                    break
+                }
+            }
+        }
+        coastPolygons.filter { it.size >= 2 }.forEach {
+            if (it.size == 2) {
+                if (!it.first().points.last().epsilonEquals(it.last().points.first())) {
+                    it[it.size - 1] = Polygon2F(it[it.size - 1].points.reversed(), false)
+                }
+            } else {
+                for (i in 0..it.size - 2) {
+                    if (i == 0) {
+                        val current = it[i]
+                        val next = it[i + 1]
+                        val currentFirst = current.points.first()
+                        val currentLast = current.points.last()
+                        val nextFirst = next.points.first()
+                        val nextLast = next.points.last()
+                        if (currentLast.epsilonEquals(nextLast, epsilon)) {
+                            it[i + 1] = Polygon2F(next.points.reversed(), false)
+                        } else if (currentFirst.epsilonEquals(nextFirst, epsilon)) {
+                            it[i] = Polygon2F(current.points.reversed(), false)
+                        } else if (currentFirst.epsilonEquals(nextLast, epsilon)) {
+                            it[i] = Polygon2F(current.points.reversed(), false)
+                            it[i + 1] = Polygon2F(next.points.reversed(), false)
+                        }
+                    } else {
+                        val next = it[i + 1]
+                        val currentLast = it[i].points.last()
+                        val nextFirst = next.points.first()
+                        if (!currentLast.epsilonEquals(nextFirst, epsilon)) {
+                            it[i + 1] = Polygon2F(next.points.reversed(), false)
+                        }
+                    }
+                }
+            }
+        }
+        coastPolygons.addAll(closedCoastPolygons)
+    }
+
+    private fun buildCoastPolygons(coasts: Array<ArrayList<LineSegment2F>>, closedCoastPolygons: ArrayList<ArrayList<Polygon2F>>, coastPolygons: ArrayList<ArrayList<Polygon2F>>, epsilon: Float) {
+        coasts.forEach {
+            if (it.isNotEmpty()) {
+                val edgeSegments = LineSegment2F.getConnectedEdgeSegments(it, epsilon)
+                edgeSegments.forEach {
+                    val polygon = Polygon2F.fromUnsortedEdges(it, null, true, epsilon)
+                    if (polygon.isClosed) {
+                        closedCoastPolygons.add(arrayListOf(polygon))
+                    } else {
+                        val first = polygon.points.first()
+                        val last = polygon.points.last()
+                        var makeNew = true
+                        for (other in coastPolygons) {
+                            val otherFirst1 = other.first().points.first()
+                            val otherFirst2 = other.first().points.last()
+                            val otherLast1 = other.last().points.first()
+                            val otherLast2 = other.last().points.last()
+                            if (first.epsilonEquals(otherFirst1, epsilon)
+                                    || first.epsilonEquals(otherFirst2, epsilon)
+                                    || last.epsilonEquals(otherFirst1, epsilon)
+                                    || last.epsilonEquals(otherFirst2, epsilon)) {
+                                other.reverse()
+                                other.add(polygon)
+                                makeNew = false
+                                break
+                            } else if (first.epsilonEquals(otherLast1, epsilon)
+                                    || first.epsilonEquals(otherLast2, epsilon)
+                                    || last.epsilonEquals(otherLast1, epsilon)
+                                    || last.epsilonEquals(otherLast2, epsilon)) {
+                                other.add(polygon)
+                                makeNew = false
+                                break
+                            }
+                        }
+                        if (makeNew) {
+                            coastPolygons.add(arrayListOf(polygon))
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun addBorderEdge(vertices: Vertices, borderEdges: ArrayList<LineSegment2F>, id: Int, adjacentId: Int, useTriangles: Boolean) {
@@ -470,6 +537,15 @@ object BuildContinent {
         val edge = cell1.sharedEdge(cell2, useTriangles)
         if (edge != null) {
             borderEdges.add(edge)
+        }
+    }
+
+    private fun addBorderEdge(vertices: Vertices, borderEdges: ArrayList<Pair<Int, LineSegment2F>>, body: Int, id: Int, adjacentId: Int, useTriangles: Boolean) {
+        val cell1 = vertices[id].cell
+        val cell2 = vertices[adjacentId].cell
+        val edge = cell1.sharedEdge(cell2, useTriangles)
+        if (edge != null) {
+            borderEdges.add(body to edge)
         }
     }
 
