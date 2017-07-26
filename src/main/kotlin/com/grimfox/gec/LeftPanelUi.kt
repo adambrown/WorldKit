@@ -20,35 +20,35 @@ import com.grimfox.gec.util.BuildContinent.generateWaterFlows
 import com.grimfox.gec.util.Rendering.renderRegions
 import org.lwjgl.glfw.GLFW
 import java.io.File
+import java.lang.Math.round
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 
 class PickAndGoDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>): BrushListener {
 
+    private val maskWidth = mask.width
+    private val maskWidthM1 = maskWidth - 1
+
     var currentValue = 0.toByte()
 
-    override fun onMouseDown(x: Int, y: Int) {
-        currentValue = mask[x, y]
+    override fun onMouseDown(x: Float, y: Float) {
+        currentValue = mask[round(x * maskWidthM1), round(y * maskWidthM1)]
     }
 
-    override fun onLine(x1: Int, y1: Int, x2: Int, y2: Int) {
+    override fun onLine(x1: Float, y1: Float, x2: Float, y2: Float) {
         val maxDist = (brushSize.value / 2.0f)
         val maxDist2 = maxDist * maxDist
-        val brushMargin = Math.ceil(maxDist * 127.0).toInt() + 1
-        val cpStartX = Math.max(0, Math.min(x1, x2) - brushMargin)
-        val cpEndX = Math.min(127, Math.max(x1, x2) + brushMargin)
-        val cpStartY = Math.max(0, Math.min(y1, y2) - brushMargin)
-        val cpEndY = Math.min(127, Math.max(y1, y2) + brushMargin)
-        val x1f = x1 / 127.0f
-        val x2f = x2 / 127.0f
-        val y1f = y1 / 127.0f
-        val y2f = y2 / 127.0f
-        val line = LineSegment2F(Point2F(x1f, y1f), Point2F(x2f, y2f))
+        val brushMargin = Math.ceil(maxDist.toDouble() * maskWidthM1).toInt() + 1
+        val cpStartX = Math.max(0, round(Math.min(x1, x2) * maskWidthM1) - brushMargin)
+        val cpEndX = Math.min(maskWidthM1, round(Math.max(x1, x2) * maskWidthM1) + brushMargin)
+        val cpStartY = Math.max(0, round(Math.min(y1, y2) * maskWidthM1) - brushMargin)
+        val cpEndY = Math.min(maskWidthM1, round(Math.max(y1, y2) * maskWidthM1) + brushMargin)
+        val line = LineSegment2F(Point2F(x1, y1), Point2F(x2, y2))
         val vertices = graph.vertices
         for (x in cpStartX..cpEndX) {
             for (y in cpStartY..cpEndY) {
-                val dist = line.distance2(vertices.getPoint(y * 128 + x))
+                val dist = line.distance2(vertices.getPoint(y * maskWidth + x))
                 if (dist <= maxDist2) {
                     mask[x, y] = currentValue
                 }
@@ -66,27 +66,26 @@ class PickAndGoDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val b
 
 class PreSelectDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>, val currentValue: Reference<Byte>): BrushListener {
 
-    override fun onMouseDown(x: Int, y: Int) {
+    private val maskWidth = mask.width
+    private val maskWidthM1 = maskWidth - 1
+
+    override fun onMouseDown(x: Float, y: Float) {
         onLine(x, y, x, y)
     }
 
-    override fun onLine(x1: Int, y1: Int, x2: Int, y2: Int) {
+    override fun onLine(x1: Float, y1: Float, x2: Float, y2: Float) {
         val maxDist = (brushSize.value / 2.0f)
         val maxDist2 = maxDist * maxDist
-        val brushMargin = Math.ceil(maxDist * 127.0).toInt() + 1
-        val cpStartX = Math.max(0, Math.min(x1, x2) - brushMargin)
-        val cpEndX = Math.min(127, Math.max(x1, x2) + brushMargin)
-        val cpStartY = Math.max(0, Math.min(y1, y2) - brushMargin)
-        val cpEndY = Math.min(127, Math.max(y1, y2) + brushMargin)
-        val x1f = x1 / 127.0f
-        val x2f = x2 / 127.0f
-        val y1f = y1 / 127.0f
-        val y2f = y2 / 127.0f
-        val line = LineSegment2F(Point2F(x1f, y1f), Point2F(x2f, y2f))
+        val brushMargin = Math.ceil(maxDist.toDouble() * maskWidthM1).toInt() + 1
+        val cpStartX = Math.max(0, round(Math.min(x1, x2) * maskWidthM1) - brushMargin)
+        val cpEndX = Math.min(maskWidthM1, round(Math.max(x1, x2) * maskWidthM1) + brushMargin)
+        val cpStartY = Math.max(0, round(Math.min(y1, y2) * maskWidthM1) - brushMargin)
+        val cpEndY = Math.min(maskWidthM1, round(Math.max(y1, y2) * maskWidthM1) + brushMargin)
+        val line = LineSegment2F(Point2F(x1, y1), Point2F(x2, y2))
         val vertices = graph.vertices
         for (x in cpStartX..cpEndX) {
             for (y in cpStartY..cpEndY) {
-                val dist = line.distance2(vertices.getPoint(y * 128 + x))
+                val dist = line.distance2(vertices.getPoint(y * maskWidth + x))
                 if (dist <= maxDist2) {
                     mask[x, y] = currentValue.value
                 }
@@ -220,10 +219,10 @@ private val onUpdateParamsFun = {
         val approxInland = stride2 - (4 * stride.value) + 4
         startPoints.value = Math.min(6, Math.max(1, Math.floor(approxInland / (regions.value.toDouble() + (islands.value / 2))).toInt() - 1))
         reduction.value = Math.floor((approxInland - (startPoints.value * regions.value)) * 0.8).toInt()
-        connectedness.value = Math.round(((1.0f / stride.value) * 0.77f) * 1000.0f) / 1000.0f
+        connectedness.value = round(((1.0f / stride.value) * 0.77f) * 1000.0f) / 1000.0f
         val unitLength = 1.0f / stride.value
         val unit2 = unitLength * unitLength
-        regionSize.value = Math.round((((unit2 * (approxInland - reduction.value)) / regions.value) * 0.763f) * 1000.0f) / 1000.0f
+        regionSize.value = round((((unit2 * (approxInland - reduction.value)) / regions.value) * 0.763f) * 1000.0f) / 1000.0f
     }
 }
 private val generateLock = ReentrantLock()
@@ -465,7 +464,7 @@ private fun buildBiomesFun(parameters: ParameterSet, refreshOnly: Boolean = fals
             Pair(graph, mask)
         } else {
             val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
-            val biomeScale = Math.round(scale * 18) + 10
+            val biomeScale = round(scale * 18) + 10
             val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
             buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
         }
@@ -982,8 +981,8 @@ private fun loadRegionMaskFromImage(file: File): Matrix<Byte> {
     var unknownColors = false
     for (y in 0..127) {
         for (x in 0..127) {
-            val actualX = Math.round(((x + 0.5f) / 128.0f) * widthM1)
-            val actualY = Math.round(((y + 0.5f) / 128.0f) * heightM1)
+            val actualX = round(((x + 0.5f) / 128.0f) * widthM1)
+            val actualY = round(((y + 0.5f) / 128.0f) * heightM1)
             val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
             val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
             if (!unknownColors && curVal == null) {
@@ -1002,7 +1001,7 @@ private fun loadRegionMaskFromImage(file: File): Matrix<Byte> {
         }
     }
     return ByteArrayMatrix(128) { i ->
-        (colorMap[bufferedImage.getRGB(Math.round((((i % 128) + 0.5f) / 128.0f) * widthM1), Math.round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
+        (colorMap[bufferedImage.getRGB(round((((i % 128) + 0.5f) / 128.0f) * widthM1), round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
     }
 }
 
@@ -1014,8 +1013,8 @@ private fun loadBiomeMaskFromImage(file: File): Matrix<Byte> {
     var unknownColors = false
     for (y in 0..127) {
         for (x in 0..127) {
-            val actualX = Math.round(((x + 0.5f) / 128.0f) * widthM1)
-            val actualY = Math.round(((y + 0.5f) / 128.0f) * heightM1)
+            val actualX = round(((x + 0.5f) / 128.0f) * widthM1)
+            val actualY = round(((y + 0.5f) / 128.0f) * heightM1)
             val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
             val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
             if (!unknownColors && curVal == null) {
@@ -1034,6 +1033,6 @@ private fun loadBiomeMaskFromImage(file: File): Matrix<Byte> {
         }
     }
     return ByteArrayMatrix(128) { i ->
-        (colorMap[bufferedImage.getRGB(Math.round((((i % 128) + 0.5f) / 128.0f) * widthM1), Math.round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
+        (colorMap[bufferedImage.getRGB(round((((i % 128) + 0.5f) / 128.0f) * widthM1), round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
     }
 }

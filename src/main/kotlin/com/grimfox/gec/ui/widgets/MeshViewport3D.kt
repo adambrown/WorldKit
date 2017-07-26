@@ -161,11 +161,11 @@ class MeshViewport3D(
     private var mouseX = 0
     private var mouseY = 0
 
-    private var texCoordX = 0
-    private var texCoordY = 0
+    private var texCoordX = 0.0f
+    private var texCoordY = 0.0f
 
-    private var lastTexCoordX = 0
-    private var lastTexCoordY = 0
+    private var lastTexCoordX = 0.0f
+    private var lastTexCoordY = 0.0f
 
     private var hotZoneX1 = 0
     private var hotZoneX2 = 0
@@ -304,8 +304,8 @@ class MeshViewport3D(
                     val height = texAreaY2 - texAreaY1
                     val xOff = x - texAreaX1
                     val yOff = y - texAreaY1
-                    texCoordX = round((xOff.toFloat() / width) * 127)
-                    texCoordY = round((yOff.toFloat() / height) * 127)
+                    texCoordX = xOff.toFloat() / width
+                    texCoordY = yOff.toFloat() / height
                     lastTexCoordX = texCoordX
                     lastTexCoordY = texCoordY
                     brushListener.value?.onMouseDown(texCoordX, texCoordY)
@@ -353,8 +353,8 @@ class MeshViewport3D(
             val height = texAreaY2 - texAreaY1
             val xOff = x - texAreaX1
             val yOff = y - texAreaY1
-            val tempTexCoordX = round((xOff.toFloat() / width) * 127)
-            val tempTexCoordY = round((yOff.toFloat() / height) * 127)
+            val tempTexCoordX = xOff.toFloat() / width
+            val tempTexCoordY = yOff.toFloat() / height
             if (tempTexCoordX != lastTexCoordX || tempTexCoordY != lastTexCoordY) {
                 lastTexCoordX = texCoordX
                 lastTexCoordY = texCoordY
@@ -1226,8 +1226,8 @@ class MeshViewport3D(
 
     interface BrushListener {
 
-        fun onMouseDown(x: Int, y: Int)
+        fun onMouseDown(x: Float, y: Float)
 
-        fun onLine(x1: Int, y1: Int, x2: Int, y2: Int)
+        fun onLine(x1: Float, y1: Float, x2: Float, y2: Float)
     }
 }
