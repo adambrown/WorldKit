@@ -152,7 +152,11 @@ object BuildContinent {
         val riverEdges = ArrayList<LineSegment2F>()
         val riverPoints = ArrayList<List<Point2F>>()
         borderSegments.second.forEach {
-            val points = buildOpenEdges(it, smoothing)
+            val points = if (it.isClosed) {
+                buildClosedEdges(listOf(it), smoothing)
+            } else {
+                buildOpenEdges(it, smoothing)
+            }
             riverPoints.add(points)
             (1..points.size - 1).mapTo(riverEdges) { LineSegment2F(points[it - 1], points[it]) }
         }
@@ -160,7 +164,11 @@ object BuildContinent {
         val mountainEdges = ArrayList<LineSegment2F>()
         val mountainPoints = ArrayList<List<Point2F>>()
         borderSegments.third.forEach {
-            val points = buildOpenEdges(it, smoothing)
+            val points = if (it.isClosed) {
+                buildClosedEdges(listOf(it), smoothing)
+            } else {
+                buildOpenEdges(it, smoothing)
+            }
             mountainPoints.add(points)
             (1..points.size - 1).mapTo(mountainEdges) { LineSegment2F(points[it - 1], points[it]) }
         }
