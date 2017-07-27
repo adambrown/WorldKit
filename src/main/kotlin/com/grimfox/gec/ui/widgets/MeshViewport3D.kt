@@ -31,7 +31,9 @@ class MeshViewport3D(
         val brushActive: MutableReference<Boolean>,
         val brushListener: Reference<BrushListener?>,
         val brushSize: MutableReference<Float>,
-        val editBrushSizeRef: Reference<Reference<Float>>) {
+        val editBrushSizeRef: Reference<Reference<Float>>,
+        val pickerOn: Reference<Boolean>,
+        val pointPicker: Reference<PointPicker?>) {
 
     private val pressedKeys = Collections.synchronizedSet(LinkedHashSet<Int>())
 
@@ -312,6 +314,14 @@ class MeshViewport3D(
                     brushSize.value = editBrushSizeRef.value.value * width
                     brushActive.value = true
                     hideCursor.value = true
+                }
+            } else if (pickerOn.value) {
+                if (x in texAreaX1..texAreaX2 && y in texAreaY1..texAreaY2) {
+                    val width = texAreaX2 - texAreaX1
+                    val height = texAreaY2 - texAreaY1
+                    val xOff = x - texAreaX1
+                    val yOff = y - texAreaY1
+                    pointPicker.value?.onMouseDown(xOff.toFloat() / width, yOff.toFloat() / height)
                 }
             } else {
                 if (isTranslateOn) {
@@ -1224,9 +1234,12 @@ class MeshViewport3D(
                 })
     }
 
-    interface BrushListener {
+    interface PointPicker {
 
         fun onMouseDown(x: Float, y: Float)
+    }
+
+    interface BrushListener: PointPicker {
 
         fun onLine(x1: Float, y1: Float, x2: Float, y2: Float)
     }

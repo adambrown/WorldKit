@@ -82,11 +82,13 @@ val regionEditBrushSize = ref(0.0859375f)
 val biomeEditBrushSize = ref(0.0859375f)
 val currentEditBrushSize = ref(regionEditBrushSize)
 val brushListener = ref<MeshViewport3D.BrushListener?>(null)
+val pickerOn = ref(false)
+val pointPicker = ref<MeshViewport3D.PointPicker?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize)
+val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker)
 
 var mainLayer = NO_BLOCK
 var panelLayer = NO_BLOCK

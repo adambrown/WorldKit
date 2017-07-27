@@ -117,7 +117,7 @@ object BuildContinent {
         return biomeGraphFinalFuture.value
     }
 
-    class RegionSplines(val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>, val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>, val riverEdges: List<LineSegment2F>, val riverPoints: List<List<Point2F>>, val mountainEdges: List<LineSegment2F>, val mountainPoints: List<List<Point2F>>)
+    class RegionSplines(val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>, val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>, val riverEdges: List<List<LineSegment2F>>, val riverPoints: List<List<Point2F>>, val mountainEdges: List<List<LineSegment2F>>, val mountainPoints: List<List<Point2F>>, val ignoredEdges: List<List<LineSegment2F>>, val ignoredPoints: List<List<Point2F>>)
 
     fun generateRegionSplines(random: Random, regionGraph: Graph, regionMask: Matrix<Byte>, mapScale: Int): RegionSplines {
         val smoothing = (1.0f - (mapScale / 20.0f)).coerceIn(0.0f, 1.0f)
@@ -149,7 +149,7 @@ object BuildContinent {
             coastEdges.add((1..outsideCoastPoints.size - 1).map { LineSegment2F(outsideCoastPoints[it - 1], outsideCoastPoints[it]) } to insideCoastPoints.map { insideCoast -> (1..insideCoast.size - 1).map { LineSegment2F(insideCoast[it - 1], insideCoast[it]) } })
         }
 
-        val riverEdges = ArrayList<LineSegment2F>()
+        val riverEdges = ArrayList<List<LineSegment2F>>()
         val riverPoints = ArrayList<List<Point2F>>()
         borderSegments.second.forEach {
             val points = if (it.isClosed) {
@@ -158,10 +158,10 @@ object BuildContinent {
                 buildOpenEdges(it, smoothing)
             }
             riverPoints.add(points)
-            (1..points.size - 1).mapTo(riverEdges) { LineSegment2F(points[it - 1], points[it]) }
+            riverEdges.add((1..points.size - 1).mapTo(ArrayList()) { LineSegment2F(points[it - 1], points[it]) })
         }
 
-        val mountainEdges = ArrayList<LineSegment2F>()
+        val mountainEdges = ArrayList<List<LineSegment2F>>()
         val mountainPoints = ArrayList<List<Point2F>>()
         borderSegments.third.forEach {
             val points = if (it.isClosed) {
@@ -170,10 +170,10 @@ object BuildContinent {
                 buildOpenEdges(it, smoothing)
             }
             mountainPoints.add(points)
-            (1..points.size - 1).mapTo(mountainEdges) { LineSegment2F(points[it - 1], points[it]) }
+            mountainEdges.add((1..points.size - 1).mapTo(ArrayList()) { LineSegment2F(points[it - 1], points[it]) })
         }
 
-        return RegionSplines(coastEdges, coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints)
+        return RegionSplines(coastEdges, coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints, emptyList(), emptyList())
     }
 
     private fun buildOpenEdges(polygon: Polygon2F, smoothing: Float): List<Point2F> {
@@ -220,7 +220,6 @@ object BuildContinent {
             rivers.addAll(localRivers)
             mountains.addAll(localMountains)
             coasts.add(coast to lakes)
-
         }
         return Triple(coasts, rivers, mountains)
     }
@@ -321,12 +320,10 @@ object BuildContinent {
                     if (point.epsilonEquals(first, epsilon)) {
                         potentialOutlets.add(last)
                         isolatedRivers.removeAt(i)
-                        riverPolygons.add(river)
                         break
                     } else if (point.epsilonEquals(last, epsilon)) {
                         potentialOutlets.add(first)
                         isolatedRivers.removeAt(i)
-                        riverPolygons.add(river)
                         break
                     }
                 }

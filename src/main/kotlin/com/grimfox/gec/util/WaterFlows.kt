@@ -70,8 +70,8 @@ object WaterFlows {
             val biomeMap = ByteBufferMatrix(4096, extractTextureRedByte(biomeTextureId, 4096))
             val biomeBorderTextureId = renderRegionBorders(executor, biomeGraph, biomeMask, threadCount)
             val landMapTextureId = renderLandImage(regionSplines.coastPoints)
-            val riverBorderTextureId = renderEdges(executor, regionSplines.riverEdges, threadCount)
-            val mountainBorderTextureId = renderEdges(executor, regionSplines.mountainEdges, threadCount)
+            val riverBorderTextureId = renderEdges(executor, regionSplines.riverEdges.flatMap { it }, threadCount)
+            val mountainBorderTextureId = renderEdges(executor, regionSplines.mountainEdges.flatMap { it }, threadCount)
             val coastalBorderTextureId = renderEdges(executor, regionSplines.coastEdges.flatMap { it.first + it.second.flatMap { it } }, threadCount)
             val upliftTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)

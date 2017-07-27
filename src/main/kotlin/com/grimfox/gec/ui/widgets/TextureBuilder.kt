@@ -159,6 +159,7 @@ object TextureBuilder {
             val height = textureRenderer.height
 
             textureRenderer.bind()
+            glDisable(GL_MULTISAMPLE)
 
             nvgSave(nvg)
             glViewport(0, 0, width, height)
@@ -194,12 +195,13 @@ object TextureBuilder {
         return nvgRGBAf(r, g, b, a, color)
     }
 
-    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>>, target: TextureId? = null): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
 
             textureRenderer.bind()
+            glEnable(GL_MULTISAMPLE)
 
             nvgSave(nvg)
             glViewport(0, 0, width, height)
@@ -231,6 +233,12 @@ object TextureBuilder {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
+            rgba(220, 220, 220, 255, color)
+            nvgStrokeColor(nvg, color)
+            ignoredPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
             rgba(0, 0, 0, 255, color)
             nvgStrokeWidth(nvg, 6.0f)
             nvgStrokeColor(nvg, color)
@@ -245,7 +253,46 @@ object TextureBuilder {
 
             nvgEndFrame(nvg)
             nvgRestore(nvg)
-            val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
+            if (target == null) {
+                val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
+                textureRenderer.unbind()
+                retVal
+            } else {
+                textureRenderer.copyTexture(target)
+                textureRenderer.unbind()
+                target
+            }
+        }
+    }
+
+    fun renderSplineSelectors(splines: List<Pair<Int, List<Point2F>>>): TextureId {
+        return renderNvgInternal { textureRenderer ->
+            val width = textureRenderer.width
+            val height = textureRenderer.height
+
+            textureRenderer.bind()
+            glDisable(GL_MULTISAMPLE)
+
+            nvgSave(nvg)
+            glViewport(0, 0, width, height)
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+            glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
+            nvgBeginFrame(nvg, width, height, 1.0f)
+
+            val color = NVGColor.create()
+            nvgStrokeWidth(nvg, 80.0f)
+            splines.forEach { (index, spline) ->
+                val r = index and 0x000000FF
+                val g = (index shr 8) and 0x000000FF
+                rgba(r, g, 0, 255, color)
+                nvgStrokeColor(nvg, color)
+                drawShape(nvg, spline, false)
+                nvgStroke(nvg)
+            }
+
+            nvgEndFrame(nvg)
+            nvgRestore(nvg)
+            val retVal = textureRenderer.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
             textureRenderer.unbind()
             retVal
         }
@@ -257,6 +304,7 @@ object TextureBuilder {
             val height = textureRenderer.height
 
             textureRenderer.bind()
+            glEnable(GL_MULTISAMPLE)
 
             nvgSave(nvg)
             glViewport(0, 0, width, height)

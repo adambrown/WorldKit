@@ -19,6 +19,7 @@ import org.lwjgl.nanovg.NanoVGGL3.*
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL.*
 import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
 import org.lwjgl.opengl.GLUtil.*
 import org.lwjgl.system.*
 import org.lwjgl.system.MemoryStack.*
@@ -363,6 +364,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         }
         if (isMac) {
             glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+            glEnable(GL_MULTISAMPLE)
             nvgSave(nvg)
             val scale = if (window.isResizing) {
                 window.resizeScaleFactor
@@ -378,6 +380,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
         } else {
             glViewport(0, 0, width, height)
+            glEnable(GL_MULTISAMPLE)
             nvgSave(nvg)
             val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
             root.width = width / scale
@@ -431,10 +434,6 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         return buffer
     }
 
-//    override fun createImage(resource: String, options: Int): Int {
-//        return nvgCreateImage(nvg, getPathForResource(resource), options)
-//    }
-//
     override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int {
         return nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
     }
@@ -989,7 +988,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     } else if (caps.GL_ARB_debug_output) {
         ARBDebugOutput.glDebugMessageControlARB(ARBDebugOutput.GL_DEBUG_SOURCE_API_ARB, ARBDebugOutput.GL_DEBUG_TYPE_OTHER_ARB, ARBDebugOutput.GL_DEBUG_SEVERITY_LOW_ARB, null as IntBuffer?, false)
     }
-    val nvg = nvgCreate(NVG_ANTIALIAS or NVG_STENCIL_STROKES or NVG_DEBUG)
+    val nvg = nvgCreate(NVG_STENCIL_STROKES)
     if (nvg == NULL) {
         throw RuntimeException("Could not init nanovg.")
     }
