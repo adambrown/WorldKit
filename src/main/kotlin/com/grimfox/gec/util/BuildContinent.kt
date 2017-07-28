@@ -605,40 +605,44 @@ object BuildContinent {
         var output: MutableList<Vector2F> = newPoints2
         var input: MutableList<Vector2F>
         var size = newPoints.size
-        val smoothFactor = Math.round(smoothing * 15).coerceIn(0, 15) + 9
-        (1..smoothFactor).forEach { iteration ->
-            input = if (iteration % 2 == 0) {
-                output = newPoints
-                newPoints2
-            } else {
-                output = newPoints2
-                newPoints
-            }
-            if (iteration % 5 == 0) {
-                for (i in if (isClosed) size - 2 downTo 0 step 2 else size - 3 downTo 1 step 2) {
-                    input.removeAt(i)
-                    output.removeAt(i)
+
+        if (size > 3) {
+            val smoothFactor = Math.round(smoothing * 15).coerceIn(0, 15) + 9
+            (1..smoothFactor).forEach { iteration ->
+                input = if (iteration % 2 == 0) {
+                    output = newPoints
+                    newPoints2
+                } else {
+                    output = newPoints2
+                    newPoints
                 }
-                size = input.size
-            }
-            for (i in if (isClosed) 1..size else 1..size - 2) {
-                val initialPosition = input[i % size]
-                var affectingPoint = input[i - 1]
-                var x = affectingPoint.a
-                var y = affectingPoint.b
-                affectingPoint = input[(i + 1) % size]
-                x += affectingPoint.a
-                y += affectingPoint.b
-                x *= 0.325f
-                y *= 0.325f
-                x += initialPosition.a * 0.35f
-                y += initialPosition.b * 0.35f
-                val nextPosition = output[i % size]
-                nextPosition.a = x
-                nextPosition.b = y
+                if (iteration % 5 == 0) {
+                    if (size > 3) {
+                        for (i in if (isClosed) size - 2 downTo 0 step 2 else size - 3 downTo 1 step 2) {
+                            input.removeAt(i)
+                            output.removeAt(i)
+                        }
+                        size = input.size
+                    }
+                }
+                for (i in if (isClosed) 1..size else 1..size - 2) {
+                    val initialPosition = input[i % size]
+                    var affectingPoint = input[i - 1]
+                    var x = affectingPoint.a
+                    var y = affectingPoint.b
+                    affectingPoint = input[(i + 1) % size]
+                    x += affectingPoint.a
+                    y += affectingPoint.b
+                    x *= 0.325f
+                    y *= 0.325f
+                    x += initialPosition.a * 0.35f
+                    y += initialPosition.b * 0.35f
+                    val nextPosition = output[i % size]
+                    nextPosition.a = x
+                    nextPosition.b = y
+                }
             }
         }
-
         return output.map { Point2F(it.a, 1.0f - it.b) }
     }
 

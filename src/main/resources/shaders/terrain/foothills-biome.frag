@@ -14,16 +14,16 @@ in VertexData {
 layout(location = 0) out vec4 colorOut;
 
 void main() {
-    float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
-    float minBorderDist = borderDistanceScale * 0.005;
+    float riverBorderDistance = texture(riverBorderDistanceMask, VertexIn.uv).r;
+    float minBorderDist = borderDistanceScale * 0.01;
     float minBorderDistInverse = 1.0 - minBorderDist;
-    if (mountainBorderDistance > minBorderDistInverse) {
-        colorOut = vec4(1.0, 1.0, 1.0, 1.0);
+    if (riverBorderDistance > minBorderDistInverse) {
+        float height = (minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 45 + 0.00001;
+        colorOut = vec4(height, height, height, 1.0);
     } else {
-        float riverBorderDistance = texture(riverBorderDistanceMask, VertexIn.uv).r;
-        if (riverBorderDistance > minBorderDistInverse) {
-            float height = (minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 45 + 0.00001;
-            colorOut = vec4(height, height, height, 1.0);
+        float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
+        if (mountainBorderDistance > minBorderDistInverse) {
+            colorOut = vec4(1.0, 1.0, 1.0, 1.0);
         } else {
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {

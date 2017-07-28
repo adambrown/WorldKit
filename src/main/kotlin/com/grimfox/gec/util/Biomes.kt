@@ -525,29 +525,23 @@ object Biomes {
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.0000006f))),
             erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.35f,
+                    upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_MEDIUM_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.0000006f))),
+                                    erosionPower = 0.0000017f))),
             erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.15f,
+                    upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 2,
-                                    deltaTime = 250000.0f,
+                                    iterations = 25,
+                                    deltaTime = 10000.0f,
                                     talusAngles = TALUS_ANGLES_LOW_VARIANCE,
                                     heightMultiplier = 1.0f,
-                                    erosionPower = 0.0000006f),
-                            ErosionSettings(
-                                    iterations = 3,
-                                    deltaTime = 250000.0f,
-                                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.0000006f)))
+                                    erosionPower = 0.000005f)))
     )
 
     val rollingHillsNoiseTexture by lazy { rollingHillsNoiseTextureFuture.value }
@@ -603,7 +597,7 @@ object Biomes {
 
     val ROLLING_HILLS_BIOME = Biome(
             minUplift = 0.000001f,
-            deltaUplift = 0.00015f,
+            deltaUplift = 0.0002f,
             upliftShader = rollingHillsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
@@ -618,19 +612,19 @@ object Biomes {
                                     iterations = 1,
                                     deltaTime = 3000000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 11.0f,
+                                    heightMultiplier = 30.0f,
                                     erosionPower = 0.000004488f),
                             ErosionSettings(
                                     iterations = 4,
                                     deltaTime = 75000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 11.0f,
+                                    heightMultiplier = 30.0f,
                                     erosionPower = 0.000004488f),
                             ErosionSettings(
                                     iterations = 45,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 11.0f,
+                                    heightMultiplier = 30.0f,
                                     erosionPower = 0.000004488f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 0.4f,
@@ -639,16 +633,16 @@ object Biomes {
                                     iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 11.0f,
+                                    heightMultiplier = 30.0f,
                                     erosionPower = 0.000002244f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 0.4f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 5,
+                                    iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 11.0f,
+                                    heightMultiplier = 30.0f,
                                     erosionPower = 0.0000014025f)))
     )
 
@@ -736,7 +730,7 @@ object Biomes {
                     upliftMultiplier = 0.25f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 5,
+                                    iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_LOW_VARIANCE,
                                     heightMultiplier = 1.0f,
@@ -838,13 +832,13 @@ object Biomes {
                     upliftMultiplier = 0.2f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 2,
+                                    iterations = 9,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_HIGH_LOW_VARIANCE,
                                     heightMultiplier = 1.0f,
                                     erosionPower = 0.000000561f),
                             ErosionSettings(
-                                    iterations = 3,
+                                    iterations = 16,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_HIGH_NO_VARIANCE,
                                     heightMultiplier = 1.0f,
@@ -904,7 +898,7 @@ object Biomes {
 
     val PLAINS_BIOME = Biome(
             minUplift = 0.0000015f,
-            deltaUplift = 0.00005f,
+            deltaUplift = 0.000025f,
             upliftShader = plainsUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
@@ -946,7 +940,7 @@ object Biomes {
                     upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 5,
+                                    iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT,
                                     heightMultiplier = 100.0f,
@@ -1028,7 +1022,7 @@ object Biomes {
                     upliftMultiplier = 0.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 5,
+                                    iterations = 25,
                                     deltaTime = 50000.0f,
                                     talusAngles = TALUS_ANGLES_PLATEAU,
                                     heightMultiplier = 10.0f,
@@ -1113,7 +1107,7 @@ object Biomes {
                     upliftMultiplier = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
-                                    iterations = 5,
+                                    iterations = 25,
                                     deltaTime = 250000.0f,
                                     talusAngles = TALUS_ANGLES_UNDERWATER,
                                     heightMultiplier = 1.0f,

@@ -237,7 +237,7 @@ object WaterFlows {
             val erosionSettings = biomes.map { it.erosionHighSettings }
             applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.second, biomes, erosionSettings, biomeMasksFuture.value.first, nodes)
             val underWaterMask = highWaterMapsFuture.value
-            val retVal = performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 5, erosionSettings, outputWidth, underWaterMask, -600.0f)
+            val retVal = performErosion(executor, flowGraphLarge, nodeIndex, nodes, rivers, 25, erosionSettings, outputWidth, underWaterMask, -600.0f)
             val riverEdges = ArrayList<LineSegment2F>()
             rivers.forEach {
                 riverEdges.addAll(recurseFindRiverEdges(flowGraphLarge.vertices, it, minFlowScale))
