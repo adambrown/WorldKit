@@ -117,7 +117,17 @@ object BuildContinent {
         return biomeGraphFinalFuture.value
     }
 
-    class RegionSplines(val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>, val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>, val riverEdges: List<List<LineSegment2F>>, val riverPoints: List<List<Point2F>>, val mountainEdges: List<List<LineSegment2F>>, val mountainPoints: List<List<Point2F>>, val ignoredEdges: List<List<LineSegment2F>>, val ignoredPoints: List<List<Point2F>>)
+    class RegionSplines(
+            val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>,
+            val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>,
+            val riverEdges: List<List<LineSegment2F>>,
+            val riverPoints: List<List<Point2F>>,
+            val mountainEdges: List<List<LineSegment2F>>,
+            val mountainPoints: List<List<Point2F>>,
+            val ignoredEdges: List<List<LineSegment2F>> = listOf(),
+            val ignoredPoints: List<List<Point2F>> = listOf(),
+            val pendingDeleteEdges: List<List<LineSegment2F>> = listOf(),
+            val pendingDeletePoints: List<List<Point2F>> = listOf())
 
     fun generateRegionSplines(random: Random, regionGraph: Graph, regionMask: Matrix<Byte>, mapScale: Int): RegionSplines {
         val smoothing = (1.0f - (mapScale / 20.0f)).coerceIn(0.0f, 1.0f)
