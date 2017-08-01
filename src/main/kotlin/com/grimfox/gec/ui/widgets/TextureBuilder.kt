@@ -195,7 +195,7 @@ object TextureBuilder {
         return nvgRGBAf(r, g, b, a, color)
     }
 
-    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>>, pendingDeletePolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
+    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>>, pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -241,7 +241,7 @@ object TextureBuilder {
             }
             rgba(220, 100, 210, 255, color)
             nvgStrokeColor(nvg, color)
-            pendingDeletePolygons.forEach {
+            pendingPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }

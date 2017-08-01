@@ -377,12 +377,26 @@ class MeshViewport3D(
 
     fun onMouseRelease(button: Int, x: Int, y: Int) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            isRollOn = false
-            isRotateOn = false
-            if (isFlyModeOn) {
-                isFlyModeOn = false
-                isTranslateOn = true
-                eliminateMovement = true
+            if (brushOn.value) {
+                val width = texAreaX2 - texAreaX1
+                val height = texAreaY2 - texAreaY1
+                val xOff = x - texAreaX1
+                val yOff = y - texAreaY1
+                val tempTexCoordX = xOff.toFloat() / width
+                val tempTexCoordY = yOff.toFloat() / height
+                lastTexCoordX = texCoordX
+                lastTexCoordY = texCoordY
+                texCoordX = tempTexCoordX
+                texCoordY = tempTexCoordY
+                brushListener.value?.onMouseUp(lastTexCoordX, lastTexCoordY, texCoordX, texCoordY)
+            } else {
+                isRollOn = false
+                isRotateOn = false
+                if (isFlyModeOn) {
+                    isFlyModeOn = false
+                    isTranslateOn = true
+                    eliminateMovement = true
+                }
             }
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
             isTranslateOn = false
@@ -1242,5 +1256,8 @@ class MeshViewport3D(
     interface BrushListener: PointPicker {
 
         fun onLine(x1: Float, y1: Float, x2: Float, y2: Float)
+
+        fun onMouseUp(x1: Float, y1: Float, x2: Float, y2: Float)
     }
+
 }

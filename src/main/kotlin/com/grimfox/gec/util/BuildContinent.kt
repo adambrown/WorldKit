@@ -125,9 +125,7 @@ object BuildContinent {
             val mountainEdges: List<List<LineSegment2F>>,
             val mountainPoints: List<List<Point2F>>,
             val ignoredEdges: List<List<LineSegment2F>> = listOf(),
-            val ignoredPoints: List<List<Point2F>> = listOf(),
-            val pendingDeleteEdges: List<List<LineSegment2F>> = listOf(),
-            val pendingDeletePoints: List<List<Point2F>> = listOf())
+            val ignoredPoints: List<List<Point2F>> = listOf())
 
     fun generateRegionSplines(random: Random, regionGraph: Graph, regionMask: Matrix<Byte>, mapScale: Int): RegionSplines {
         val smoothing = (1.0f - (mapScale / 20.0f)).coerceIn(0.0f, 1.0f)
@@ -186,11 +184,27 @@ object BuildContinent {
         return RegionSplines(coastEdges, coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints, emptyList(), emptyList())
     }
 
-    private fun buildOpenEdges(polygon: Polygon2F, smoothing: Float): List<Point2F> {
+    fun buildOpenEdges(polygon: Polygon2F, smoothing: Float): List<Point2F> {
         return buildEdges(getCurvePoints(polygon.points, false, 0.00035f, smoothing), false, true)
     }
 
-    private fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Float): List<Point2F> {
+    fun buildOpenEdges(polygon: Polygon2F, smoothing: Int): List<Point2F> {
+        return buildEdges(getCurvePoints(polygon.points, false, 0.00035f, smoothing), false, true)
+    }
+
+    fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Float): List<Point2F> {
+        val points = ArrayList<Point2F>()
+        if (polygons.size == 1) {
+            points.addAll(buildEdges(getCurvePoints(polygons.first().points, true, 0.00035f, smoothing), true, true))
+        } else {
+            polygons.forEachIndexed { i, it ->
+                points.addAll(buildEdges(getCurvePoints(it.points, false, 0.00035f, smoothing), false, i == 0))
+            }
+        }
+        return points
+    }
+
+    fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Int): List<Point2F> {
         val points = ArrayList<Point2F>()
         if (polygons.size == 1) {
             points.addAll(buildEdges(getCurvePoints(polygons.first().points, true, 0.00035f, smoothing), true, true))
@@ -584,6 +598,11 @@ object BuildContinent {
     }
 
     private fun getCurvePoints(points: List<Point2F>, isClosed: Boolean, segmentSize: Float, smoothing: Float): List<Point2F> {
+        val smoothFactor = Math.round(smoothing * 15).coerceIn(0, 15) + 9
+        return getCurvePoints(points, isClosed, segmentSize, smoothFactor)
+    }
+
+    private fun getCurvePoints(points: List<Point2F>, isClosed: Boolean, segmentSize: Float, smoothFactor: Int): List<Point2F> {
 
         val newPoints = ArrayList<Vector2F>()
         val copyPoints = ArrayList(points)
@@ -617,7 +636,6 @@ object BuildContinent {
         var size = newPoints.size
 
         if (size > 3) {
-            val smoothFactor = Math.round(smoothing * 15).coerceIn(0, 15) + 9
             (1..smoothFactor).forEach { iteration ->
                 input = if (iteration % 2 == 0) {
                     output = newPoints

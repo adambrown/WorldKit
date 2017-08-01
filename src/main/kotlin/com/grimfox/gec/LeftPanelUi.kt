@@ -3,6 +3,7 @@ package com.grimfox.gec
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
+import com.grimfox.gec.model.geometry.Polygon2F
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
@@ -16,6 +17,7 @@ import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.ParameterSet
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.util.BuildContinent.buildBiomeMaps
+import com.grimfox.gec.util.BuildContinent.buildOpenEdges
 import com.grimfox.gec.util.BuildContinent.generateRegionSplines
 import com.grimfox.gec.util.BuildContinent.generateRegions
 import com.grimfox.gec.util.BuildContinent.generateWaterFlows
@@ -90,13 +92,13 @@ class SplineDeletePicker(val currentState: CurrentState, val currentSplines: Reg
                 val mountainPoints = ArrayList<List<Point2F>>()
                 val ignoredEdges = ArrayList<List<LineSegment2F>>()
                 val ignoredPoints = ArrayList<List<Point2F>>()
-                val pendingDeleteEdges = ArrayList<List<LineSegment2F>>()
-                val pendingDeletePoints = ArrayList<List<Point2F>>()
+                val pendingEdges = ArrayList<List<LineSegment2F>>()
+                val pendingPoints = ArrayList<List<Point2F>>()
                 splineMap.put(selectedId, Quintuple(splineToToggle.first, splineToToggle.second, splineToToggle.third, splineToToggle.fourth, !splineToToggle.fifth))
                 splineMap.forEach {
                     if (it.value.fifth) {
-                        pendingDeleteEdges.add(it.value.fourth)
-                        pendingDeletePoints.add(it.value.third)
+                        pendingEdges.add(it.value.fourth)
+                        pendingPoints.add(it.value.third)
                     } else {
                         when (it.value.second) {
                             0 -> {
@@ -114,15 +116,14 @@ class SplineDeletePicker(val currentState: CurrentState, val currentSplines: Reg
                         }
                     }
                 }
-                currentState.regionSplines = RegionSplines(currentSplines.coastEdges, currentSplines.coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints, ignoredEdges, ignoredPoints, pendingDeleteEdges, pendingDeletePoints)
+                currentState.regionSplines = RegionSplines(currentSplines.coastEdges, currentSplines.coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints, ignoredEdges, ignoredPoints)
                 executor.call {
                     if (texture.value.id < 0) {
-                        texture.value = renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingDeletePoints)
+                        texture.value = renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingPoints)
                     } else {
-                        renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingDeletePoints, texture.value)
+                        renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingPoints, texture.value)
                     }
                 }
-
             }
         }
     }
@@ -165,6 +166,8 @@ class PickAndGoDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val b
             }
         }
     }
+
+    override fun onMouseUp(x1: Float, y1: Float, x2: Float, y2: Float) {}
 }
 
 class PreSelectDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val brushSize: Reference<Float>, val texture: MutableReference<TextureId>, val currentValue: Reference<Byte>): BrushListener {
@@ -199,6 +202,110 @@ class PreSelectDrawBrushListener(val graph: Graph, val mask: Matrix<Byte>, val b
                 texture.value = renderRegions(graph, mask)
             } else {
                 renderRegions(graph, mask, texture.value)
+            }
+        }
+    }
+
+    override fun onMouseUp(x1: Float, y1: Float, x2: Float, y2: Float) {}
+}
+
+class SplineDrawBrushListener(val currentState: CurrentState, val currentSplines: RegionSplines, val splineMap: LinkedHashMap<Int, Quadruple<Int, Int, List<Point2F>, List<LineSegment2F>>>, val texture: MutableReference<TextureId>): BrushListener {
+
+    private var currentSpline: MutableList<Point2F>? = null
+
+    override fun onMouseDown(x: Float, y: Float) {
+        currentSpline = ArrayList()
+        onLine(x, y, x, y)
+    }
+
+    override fun onLine(x1: Float, y1: Float, x2: Float, y2: Float) {
+        val currentSpline = currentSpline
+        if (currentSpline != null) {
+            currentSpline.add(Point2F(x2, y2))
+            val riverEdges = ArrayList<List<LineSegment2F>>()
+            val riverPoints = ArrayList<List<Point2F>>()
+            val mountainEdges = ArrayList<List<LineSegment2F>>()
+            val mountainPoints = ArrayList<List<Point2F>>()
+            val ignoredEdges = ArrayList<List<LineSegment2F>>()
+            val ignoredPoints = ArrayList<List<Point2F>>()
+            splineMap.forEach {
+                when (it.value.second) {
+                    0 -> {
+                        riverEdges.add(it.value.fourth)
+                        riverPoints.add(it.value.third)
+                    }
+                    1 -> {
+                        mountainEdges.add(it.value.fourth)
+                        mountainPoints.add(it.value.third)
+                    }
+                    else -> {
+                        ignoredEdges.add(it.value.fourth)
+                        ignoredPoints.add(it.value.third)
+                    }
+                }
+            }
+            val smoothing = round(((1.0f - ((currentState.parameters?.regionsMapScale ?: 4) / 20.0f)).coerceIn(0.0f, 1.0f) * 11) + 13)
+            val pendingPoints = if (currentSpline.size == 1) {
+                listOf(buildOpenEdges(Polygon2F(currentSpline + currentSpline, false), smoothing))
+            } else {
+                listOf(buildOpenEdges(Polygon2F(currentSpline, false), smoothing))
+            }
+            executor.call {
+                if (texture.value.id < 0) {
+                    texture.value = renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingPoints)
+                } else {
+                    renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, pendingPoints, texture.value)
+                }
+            }
+        }
+    }
+
+    override fun onMouseUp(x1: Float, y1: Float, x2: Float, y2: Float) {
+        val currentSpline = currentSpline
+        if (currentSpline != null) {
+            if (x1 in 0.0f..1.0f && y1 in 0.0f..1.0f && x2 in 0.0f..1.0f && y2 in 0.0f..1.0f) {
+                currentSpline.add(Point2F(x2, y2))
+            }
+            val riverEdges = ArrayList<List<LineSegment2F>>()
+            val riverPoints = ArrayList<List<Point2F>>()
+            val mountainEdges = ArrayList<List<LineSegment2F>>()
+            val mountainPoints = ArrayList<List<Point2F>>()
+            val ignoredEdges = ArrayList<List<LineSegment2F>>()
+            val ignoredPoints = ArrayList<List<Point2F>>()
+            splineMap.forEach {
+                when (it.value.second) {
+                    0 -> {
+                        riverEdges.add(it.value.fourth)
+                        riverPoints.add(it.value.third)
+                    }
+                    1 -> {
+                        mountainEdges.add(it.value.fourth)
+                        mountainPoints.add(it.value.third)
+                    }
+                    else -> {
+                        ignoredEdges.add(it.value.fourth)
+                        ignoredPoints.add(it.value.third)
+                    }
+                }
+            }
+            val smoothing = round(((1.0f - ((currentState.parameters?.regionsMapScale ?: 4) / 20.0f)).coerceIn(0.0f, 1.0f) * 11) + 13)
+            val newPoints = if (currentSpline.size == 1) {
+                buildOpenEdges(Polygon2F(currentSpline + currentSpline, false), smoothing)
+            } else {
+                buildOpenEdges(Polygon2F(currentSpline, false), smoothing)
+            }
+            val newEdges = (1..newPoints.size - 1).mapTo(ArrayList()) { LineSegment2F(newPoints[it - 1], newPoints[it]) }
+            ignoredPoints.add(newPoints)
+            ignoredEdges.add(newEdges)
+            splineMap.put(splineMap.size + 1, Quadruple(splineMap.size + 1, 2, newPoints, newEdges))
+            currentState.regionSplines = RegionSplines(currentSplines.coastEdges, currentSplines.coastPoints, riverEdges, riverPoints, mountainEdges, mountainPoints, ignoredEdges, ignoredPoints)
+            this.currentSpline = null
+            executor.call {
+                if (texture.value.id < 0) {
+                    texture.value = renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, listOf())
+                } else {
+                    renderMapImage(currentSplines.coastPoints, riverPoints, mountainPoints, ignoredPoints, listOf(), texture.value)
+                }
             }
         }
     }
@@ -294,6 +401,7 @@ private val useRegionFile = ref(false)
 private val useBiomeFile = ref(false)
 private val allowUnsafe = ref(false)
 private val editRegionsMode = ref(false)
+private val drawSplinesMode = ref(false)
 private val editSplinesMode = ref(false)
 private val deleteSplinesMode = ref(false)
 private val editBiomesMode = ref(false)
@@ -359,6 +467,7 @@ private var forwardBiomesButton = NO_BLOCK
 private var backBiomesLabel = NO_BLOCK
 private var forwardBiomesLabel = NO_BLOCK
 private var editRegionsToggle = NO_BLOCK
+private var drawSplinesToggle = NO_BLOCK
 private var editSplinesToggle = NO_BLOCK
 private var deleteSplinesToggle = NO_BLOCK
 private var editBiomesToggle = NO_BLOCK
@@ -400,6 +509,7 @@ fun disableGenerateButtons() {
     buildButton.isVisible = false
     buildLabel.isVisible = displayBuildLabel
     editRegionsToggle.isVisible = editRegionsMode.value
+    drawSplinesToggle.isVisible = drawSplinesMode.value
     editSplinesToggle.isVisible = editSplinesMode.value
     deleteSplinesToggle.isVisible = deleteSplinesMode.value
     editBiomesToggle.isVisible = editBiomesMode.value
@@ -459,6 +569,7 @@ private fun enableGenerateButtons() {
         }
     }
     editRegionsToggle.isVisible = currentState.regionGraph != null && currentState.regionMask != null && displayMode == DisplayMode.REGIONS
+    drawSplinesToggle.isVisible = currentState.regionSplines != null && displayMode == DisplayMode.MAP
     editSplinesToggle.isVisible = currentState.regionSplines != null && displayMode == DisplayMode.MAP
     deleteSplinesToggle.isVisible = currentState.regionSplines != null && displayMode == DisplayMode.MAP
     editBiomesToggle.isVisible = currentState.biomeGraph != null && currentState.biomeMask != null && displayMode == DisplayMode.BIOMES
@@ -724,6 +835,65 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             editRegionsMode.value = false
+
+
+
+
+
+
+
+            drawSplinesToggle = vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+            drawSplinesToggle.isVisible = false
+            drawSplinesMode.listener { old, new ->
+                if (old != new) {
+                    executor.call {
+                        if (new) {
+                            val currentSplines = currentState.regionSplines
+                            if (currentSplines != null) {
+                                doGenerationStart()
+                                val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, List<Point2F>, List<LineSegment2F>>>()
+                                var index = 0
+                                currentSplines.riverPoints.zip(currentSplines.riverEdges).forEach { (points, edges) ->
+                                    index++
+                                    splineMap.put(index, Quadruple(index, 0, points, edges))
+                                }
+                                currentSplines.mountainPoints.zip(currentSplines.mountainEdges).forEach { (points, edges) ->
+                                    index++
+                                    splineMap.put(index, Quadruple(index, 1, points, edges))
+                                }
+                                currentSplines.ignoredPoints.zip(currentSplines.ignoredEdges).forEach { (points, edges) ->
+                                    index++
+                                    splineMap.put(index, Quadruple(index, 2, points, edges))
+                                }
+                                val textureReference = ref(TextureId(-1))
+                                textureReference.listener { oldTexture, newTexture ->
+                                    if (oldTexture != newTexture) {
+                                        meshViewport.setImage(newTexture)
+                                    }
+                                }
+                                currentEditBrushSize.value = drawSplineBrushSize
+                                brushListener.value = SplineDrawBrushListener(currentState, currentSplines, splineMap, textureReference)
+                                brushOn.value = true
+                            }
+                        } else {
+                            brushListener.value = null
+                            brushOn.value = false
+                            val parameters = extractCurrentParameters()
+                            buildRegionsFun(parameters, true, false)
+                            updateRegionsHistory(parameters)
+                            doGenerationStop()
+                        }
+                    }
+                }
+            }
+            drawSplinesMode.value = false
+
+
+
+
+
+
+
             editSplinesToggle = vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
             editSplinesToggle.isVisible = false
             editSplinesMode.listener { old, new ->
