@@ -1,18 +1,20 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.ui.bInt
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.gInt
 import com.grimfox.gec.ui.rInt
-import com.grimfox.gec.ui.widgets.DynamicTextReference
-import com.grimfox.gec.ui.widgets.MeshViewport3D
-import com.grimfox.gec.ui.widgets.NO_BLOCK
-import com.grimfox.gec.ui.widgets.TextureBuilder
+import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
+import com.grimfox.gec.util.BuildContinent.ParameterSet
 import org.lwjgl.nanovg.NVGColor
 import java.util.*
+
+val DEBUG_BUILD = false
 
 val REGION_COLORS = arrayListOf(
         color(0.0f, 0.0f, 0.0f),
@@ -67,6 +69,14 @@ val heightScaleFunctionInverse = { value: Float ->
     }))
 }
 
+class RegionHistoryItem(val parameters: ParameterSet, val graphSeed: Long, val regionMask: ByteArrayMatrix) {
+
+    fun copy(): RegionHistoryItem {
+        return RegionHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
+    }
+}
+
+val debugWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
 val waterPlaneOn = ref(true)
 val perspectiveOn = ref(true)
@@ -88,6 +98,12 @@ val pointPicker = ref<MeshViewport3D.PointPicker?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
+val historyRegionsBackQueue = HistoryQueue<RegionHistoryItem>(1000)
+val historyRegionsCurrent = ref<RegionHistoryItem?>(null)
+val historyRegionsForwardQueue = HistoryQueue<RegionHistoryItem>(1000)
+val historyBiomesBackQueue = HistoryQueue<ParameterSet>(1000)
+val historyBiomesCurrent = ref<ParameterSet?>(null)
+val historyBiomesForwardQueue = HistoryQueue<ParameterSet>(1000)
 
 val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker)
 
@@ -103,18 +119,18 @@ var brushShapeInner = NO_BLOCK
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
 
-class CurrentState(var parameters: BuildContinent.ParameterSet? = null,
-                           var regionGraph: Graph? = null,
-                           var regionMask: Matrix<Byte>? = null,
-                           var regionSplines: BuildContinent.RegionSplines? = null,
-                           var biomeGraph: Graph? = null,
-                           var biomeMask: Matrix<Byte>? = null,
-                           var biomes: List<Biomes.Biome>? = null,
-                           var heightMapTexture: TextureBuilder.TextureId? = null,
-                           var riverMapTexture: TextureBuilder.TextureId? = null,
-                           var meshScale: Int? = null)
+class CurrentState(var parameters: ParameterSet? = null,
+                   var regionGraph: Graph? = null,
+                   var regionMask: ByteArrayMatrix? = null,
+                   var regionSplines: BuildContinent.RegionSplines? = null,
+                   var biomeGraph: Graph? = null,
+                   var biomeMask: ByteArrayMatrix? = null,
+                   var biomes: List<Biomes.Biome>? = null,
+                   var heightMapTexture: TextureBuilder.TextureId? = null,
+                   var riverMapTexture: TextureBuilder.TextureId? = null,
+                   var meshScale: Int? = null)
 
-val currentState = CurrentState()
+var currentState = CurrentState()
 
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
     return { scale: Float ->
@@ -137,5 +153,42 @@ fun linearClampedScaleFunction(min: Float, max: Float): (Float) -> Float {
 fun linearClampedScaleFunctionInverse(min: Float, max: Float): (Float) -> Float {
     return { value: Float ->
         clamp(Math.abs((value - min) / (max - min)), 0.0f, 1.0f)
+    }
+}
+
+val overwriteWarningDynamic = dynamicParagraph("", 300)
+val overwriteWarningText = overwriteWarningDynamic.text
+val overwriteWarningReference = overwriteWarningDynamic.reference
+
+val errorMessageDynamic = dynamicParagraph("", 600)
+val errorMessageText = errorMessageDynamic.text
+val errorMessageReference = errorMessageDynamic.reference
+
+var overwriteWarningDialog = NO_BLOCK
+var errorMessageDialog = NO_BLOCK
+val noop = {}
+val dialogCallback = mRef(noop)
+
+fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, noop: () -> Unit) {
+    if (currentProject.value != null) {
+        dialogLayer.isVisible = true
+        overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
+        overwriteWarningDialog.isVisible = true
+        dialogCallback.value = {
+            historyRegionsBackQueue.clear()
+            historyRegionsForwardQueue.clear()
+            currentProject.value = Project()
+            currentState = CurrentState()
+            meshViewport.reset()
+            imageMode.value = 3
+            dialogCallback.value = noop
+        }
+    } else {
+        historyRegionsBackQueue.clear()
+        historyRegionsForwardQueue.clear()
+        currentProject.value = Project()
+        currentState = CurrentState()
+        meshViewport.reset()
+        imageMode.value = 3
     }
 }

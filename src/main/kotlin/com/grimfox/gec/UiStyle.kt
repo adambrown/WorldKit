@@ -1132,30 +1132,35 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
     }
 }
 
-fun Block.vExpandPanel(panelName: String, expanded: Boolean = false, panelBuilder: Block.() -> Unit) {
+fun Block.vExpandPanel(panelName: String, expanded: Boolean = false, panelBuilder: Block.() -> Unit): Block {
     val panelNameOpen = "- $panelName"
     val panelNameClosed = "+ $panelName"
     val panelOpen = ref(expanded)
     val panelTitle = DynamicTextReference(if (expanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
-    vExpandableButton(LARGE_ROW_HEIGHT, panelTitle.text, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
-        panelOpen.value = !panelOpen.value
-    }
-    val panelBlock = block {
-        hSizing = RELATIVE
-        vSizing = Sizing.SHRINK
-        layout = Layout.VERTICAL
-        panelBuilder()
-    }
-    panelOpen.listener { _, new ->
-        if (new) {
-            panelTitle.reference.value = panelNameOpen
-            panelBlock.isVisible = true
-        } else {
-            panelTitle.reference.value = panelNameClosed
-            panelBlock.isVisible = false
+    return block {
+        vSizing = SHRINK
+        layout = VERTICAL
+        shape = NO_SHAPE
+        vExpandableButton(LARGE_ROW_HEIGHT, panelTitle.text, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
+            panelOpen.value = !panelOpen.value
         }
+        val panelBlock = block {
+            hSizing = RELATIVE
+            vSizing = Sizing.SHRINK
+            layout = Layout.VERTICAL
+            panelBuilder()
+        }
+        panelOpen.listener { _, new ->
+            if (new) {
+                panelTitle.reference.value = panelNameOpen
+                panelBlock.isVisible = true
+            } else {
+                panelTitle.reference.value = panelNameClosed
+                panelBlock.isVisible = false
+            }
+        }
+        panelOpen.value = expanded
     }
-    panelOpen.value = expanded
 }
 
 fun Block.vButtonRow(height: Float, buttons: Block.() -> Unit): Block {

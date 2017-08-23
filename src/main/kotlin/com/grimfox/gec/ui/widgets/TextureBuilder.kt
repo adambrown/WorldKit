@@ -271,7 +271,7 @@ object TextureBuilder {
         }
     }
 
-    fun renderSplineSelectors(splines: List<Pair<Int, List<Point2F>>>): TextureId {
+    fun renderSplineSelectors(splines: List<Pair<Int, List<Point2F>>>, strokeWidth: Float): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -286,7 +286,7 @@ object TextureBuilder {
             nvgBeginFrame(nvg, width, height, 1.0f)
 
             val color = NVGColor.create()
-            nvgStrokeWidth(nvg, 80.0f)
+            nvgStrokeWidth(nvg, strokeWidth)
             splines.forEach { (index, spline) ->
                 val r = index and 0x000000FF
                 val g = (index shr 8) and 0x000000FF

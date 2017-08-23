@@ -22,7 +22,9 @@ import java.util.concurrent.locks.ReentrantLock
 private val LOG: Logger = LoggerFactory.getLogger(Project::class.java)
 
 data class Project(
-        var file: File? = null)
+        var file: File? = null,
+        var isNew: Boolean = true
+)
 
 private val PROJECT_MOD_LOCK: Lock = ReentrantLock(true)
 
@@ -130,18 +132,20 @@ fun saveProject(project: Project?,
                 overwriteWarningReference: MutableReference<String>,
                 overwriteWarningDialog: Block,
                 dialogCallback: MutableReference<() -> Unit>,
-                errorHandler: ErrorDialog) {
+                errorHandler: ErrorDialog): Boolean {
     if (project != null) {
         val file = project.file
         if (file == null) {
-            saveProjectAs(project, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
+            return saveProjectAs(project, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
         } else {
             file.outputStream().buffered().use {
                 JSON.writeValue(it, project.copy(file = null))
             }
             addProjectToRecentProjects(file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+            return true
         }
     }
+    return false
 }
 
 fun saveProjectAs(project: Project?,
@@ -152,7 +156,7 @@ fun saveProjectAs(project: Project?,
                   overwriteWarningReference: MutableReference<String>,
                   overwriteWarningDialog: Block,
                   dialogCallback: MutableReference<() -> Unit>,
-                  errorHandler: ErrorDialog) {
+                  errorHandler: ErrorDialog): Boolean {
     if (project != null) {
         ui.ignoreInput = true
         dialogLayer.isVisible = true
@@ -167,12 +171,16 @@ fun saveProjectAs(project: Project?,
                 project.file = actualFile
                 addProjectToRecentProjects(actualFile, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                 updateTitle(titleText, project)
+                return true
+            } else {
+                return false
             }
         } finally {
             dialogLayer.isVisible = false
             ui.ignoreInput = false
         }
     }
+    return false
 }
 
 fun openProject(file: File,

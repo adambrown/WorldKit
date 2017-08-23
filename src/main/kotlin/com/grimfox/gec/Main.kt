@@ -9,6 +9,8 @@ import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.mRef
 import nl.komponents.kovenant.task
 import org.lwjgl.opengl.GL11
@@ -30,14 +32,6 @@ object Main {
         }
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
-
-        val overwriteWarningDynamic = dynamicParagraph("", 300)
-        val overwriteWarningText = overwriteWarningDynamic.text
-        val overwriteWarningReference = overwriteWarningDynamic.reference
-
-        val errorMessageDynamic = dynamicParagraph("", 600)
-        val errorMessageText = errorMessageDynamic.text
-        val errorMessageReference = errorMessageDynamic.reference
 
         val uiLayout = layout { ui ->
             val uiLayout = this
@@ -105,14 +99,14 @@ object Main {
                     mainLayer = block {
                         isFallThrough = true
                     }
+                    menuLayer = block {
+                        isFallThrough = true
+                    }
                     panelLayer = block {
                         isFallThrough = false
                         isMouseAware = true
                         isVisible = false
                         shape = FILL_GREY_OUT
-                    }
-                    menuLayer = block {
-                        isFallThrough = true
                     }
                     dropdownLayer = block {
                         isFallThrough = true
@@ -127,10 +121,6 @@ object Main {
                         isFallThrough = true
                     }
                 }
-                var overwriteWarningDialog = NO_BLOCK
-                var errorMessageDialog = NO_BLOCK
-                val noop = {}
-                val dialogCallback = mRef(noop)
                 val errorHandler: ErrorDialog = object : ErrorDialog {
 
                     override fun displayErrorMessage(message: String?) {
@@ -146,9 +136,11 @@ object Main {
                     overwriteWarningDialog = dialog(400.0f, 160.0f, overwriteWarningText, BLOCK_GLYPH_WARNING(60.0f)) {
                         button(text("Yes"), DIALOG_BUTTON_STYLE) {
                             overwriteWarningDialog.isVisible = false
-                            saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
+                            val saved = saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
                             dialogLayer.isVisible = false
-                            dialogCallback.value()
+                            if (saved) {
+                                dialogCallback.value()
+                            }
                         }.with { width = 60.0f }
                         hSpacer(SMALL_SPACER_SIZE)
                         button(text("No"), DIALOG_BUTTON_STYLE) {
@@ -189,20 +181,10 @@ object Main {
                         hSpacer(SMALL_SPACER_SIZE)
                         menuBar(menuLayer, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                             menu("File") {
-                                menuItem("New...", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
-                                    if (currentProject.value != null) {
-                                        dialogLayer.isVisible = true
-                                        overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
-                                        overwriteWarningDialog.isVisible = true
-                                        dialogCallback.value = {
-                                            currentProject.value = Project()
-                                            dialogCallback.value = noop
-                                        }
-                                    } else {
-                                        currentProject.value = Project()
-                                    }
+                                menuItem("New project", "Ctrl+N", BLOCK_GLYPH_NEW_FILE) {
+                                    newProject(overwriteWarningReference, overwriteWarningDialog, dialogCallback, noop)
                                 }
-                                menuItem("Open...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
+                                menuItem("Open project...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
                                     val openFun = {
                                         try {
                                             val openedProject = openProject(dialogLayer, preferences, ui)
@@ -238,6 +220,11 @@ object Main {
                                         overwriteWarningReference.value = "Do you want to save the current project before closing?"
                                         overwriteWarningDialog.isVisible = true
                                         dialogCallback.value = {
+                                            historyRegionsBackQueue.clear()
+                                            historyRegionsForwardQueue.clear()
+                                            currentState = CurrentState()
+                                            meshViewport.reset()
+                                            imageMode.value = 3
                                             currentProject.value = null
                                             dialogCallback.value = noop
                                         }
@@ -461,9 +448,13 @@ object Main {
                     }
                 }
                 brushActive.value = false
+                if (!DEBUG_BUILD) {
+                    debugWidgets.forEach {
+                        it.isVisible = false
+                    }
+                }
             }
         }
-
         ui(uiLayout, preferences.windowState) {
 
         }

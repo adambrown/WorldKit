@@ -27,9 +27,9 @@ object Regions {
         }
     }
 
-    fun buildRegions(parameters: ParameterSet): Pair<Graph, Matrix<Byte>> {
+    fun buildRegions(parameters: ParameterSet): Pair<Graph, ByteArrayMatrix> {
         val random = Random(parameters.regionsSeed)
-        val results = ArrayList<Triple<Graph, Matrix<Byte>, Int>>()
+        val results = ArrayList<Triple<Graph, ByteArrayMatrix, Int>>()
         for (i in 0..parameters.islandDesire) {
             results.add(buildRegions(random, parameters, i))
         }
@@ -37,9 +37,9 @@ object Regions {
         return Pair(winner.first, winner.second)
     }
 
-    private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, Matrix<Byte>, Int> {
+    private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, ByteArrayMatrix, Int> {
         var bestGraphValue = -Float.MAX_VALUE
-        var bestPair: Triple<Graph, Matrix<Byte>, Int>? = null
+        var bestPair: Triple<Graph, ByteArrayMatrix, Int>? = null
         var check1Fails = 0
         var check2Fails = 0
         var check3Fails = 0

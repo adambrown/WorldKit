@@ -261,6 +261,22 @@ class MeshViewport3D(
         modelMatrix.translate(defaultTranslation)
     }
 
+    fun reset() {
+        synchronized(textureLock) {
+            hasHeightmap = false
+            heightmapId = null
+            rivermapId = null
+            heightMapResolution = 0
+            hasRegions = false
+            regionTextureId = null
+            hasBiomes = false
+            biomeTextureId = null
+            splineTextureId = null
+            hasImage = false
+            imageTextureId = null
+        }
+    }
+
     fun setHeightmap(newTexture: Pair<TextureId, TextureId>, resolution: Int) {
         synchronized(textureLock) {
             hasHeightmap = true

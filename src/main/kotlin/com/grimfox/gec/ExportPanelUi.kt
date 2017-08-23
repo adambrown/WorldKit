@@ -75,7 +75,7 @@ fun exportPanel(ui: UserInterface) {
                         val file = File(mapFile.reference.value)
                         val regionSplines = currentState.regionSplines
                         if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && regionSplines != null) {
-                            val textureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints, regionSplines.mountainPoints, regionSplines.ignoredPoints)
+                            val textureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
                             val bytes = TextureBuilder.extractTextureRgbaByte(textureId, 4096)
                             val output = BufferedImage(4096, 4096, BufferedImage.TYPE_4BYTE_ABGR)
                             val raster = output.raster
