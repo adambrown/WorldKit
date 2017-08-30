@@ -128,7 +128,8 @@ class CurrentState(var parameters: ParameterSet? = null,
                    var biomes: List<Biomes.Biome>? = null,
                    var heightMapTexture: TextureBuilder.TextureId? = null,
                    var riverMapTexture: TextureBuilder.TextureId? = null,
-                   var meshScale: Int? = null)
+                   var edgeDetailScale: Int? = null,
+                   var mapDetailScale: Int? = null)
 
 var currentState = CurrentState()
 

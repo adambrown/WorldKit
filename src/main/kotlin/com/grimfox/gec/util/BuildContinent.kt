@@ -36,8 +36,9 @@ object BuildContinent {
     data class ParameterSet(
             var regionsSeed: Long = System.currentTimeMillis(),
             var biomesSeed: Long = System.currentTimeMillis(),
-            var regionsMapScale: Int = 4,
+            var edgeDetailScale: Int = 4,
             var biomesMapScale: Int = 4,
+            var mapDetailScale: Int = 4,
             var stride: Int = 7,
             var regionCount: Int = 8,
             var connectedness: Float = 0.11f,
