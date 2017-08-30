@@ -271,9 +271,9 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     override fun closeWindow() {
         saveRecentProjects()
         if (isMaximized) {
-            saveWindowState(WindowState(window.restoreX, window.restoreY, Math.round(window.width / window.currentMonitor.scaleFactor).toInt(), Math.round(window.height / window.currentMonitor.scaleFactor).toInt(), true))
+            saveWindowState(WindowState(window.restoreX, window.restoreY, Math.round(window.width / window.currentMonitor.scaleFactor).toInt(), Math.round(window.height / window.currentMonitor.scaleFactor).toInt(), true, window.currentMonitorIndex))
         } else {
-            saveWindowState(WindowState(window.x, window.y, Math.round(window.currentWidth / window.currentMonitor.scaleFactor).toInt(), Math.round(window.currentHeight / window.currentMonitor.scaleFactor).toInt(), false))
+            saveWindowState(WindowState(window.x, window.y, Math.round(window.currentWidth / window.currentMonitor.scaleFactor).toInt(), Math.round(window.currentHeight / window.currentMonitor.scaleFactor).toInt(), false, window.currentMonitorIndex))
         }
         glfwSetWindowShouldClose(window.id, true)
     }
@@ -652,6 +652,16 @@ private class WindowContext(
 
 ) {
 
+    val currentMonitorIndex: Int
+        get() {
+            val index = monitors.indexOf(currentMonitor)
+            if (index > 0) {
+                return index
+            } else {
+                return 0
+            }
+        }
+
     internal fun handleFrameInput() {
         if (!ignoreInput) {
             twr(stackPush()) { stack ->
@@ -916,10 +926,16 @@ private class WindowContext(
 private fun createWindow(windowState: WindowState?): WindowContext {
     val width = windowState?.width ?: 1280
     val height = windowState?.height ?: 720
+    val currentStateMonitor = windowState?.monitorIndex
     GLFWErrorCallback.createPrint().set()
     if (!glfwInit()) throw IllegalStateException("Unable to initialize glfw")
     val screens = getScreens()
-    val (monitors, currentMonitor) = getMonitorInfo(screens)
+    val (monitors, currentMouseMonitor) = getMonitorInfo(screens)
+    val currentMonitor = if (currentStateMonitor != null && monitors.size > currentStateMonitor) {
+        monitors[currentStateMonitor]
+    } else {
+        currentMouseMonitor
+    }
     glfwDefaultWindowHints()
     glfwWindowHint(GLFW_RED_BITS, currentMonitor.redBits)
     glfwWindowHint(GLFW_GREEN_BITS, currentMonitor.greenBits)
@@ -1170,7 +1186,7 @@ private fun initializeWindowState(window: WindowContext, windowState: WindowStat
         window.width = window.currentWidth
         window.height = window.currentHeight
         window.monitors.forEach { monitorSpec ->
-            if (window.mouseX >= monitorSpec.mouseSpaceX1 && window.mouseX <= monitorSpec.mouseSpaceX2 && window.mouseY >= monitorSpec.mouseSpaceY1 && window.mouseY <= monitorSpec.mouseSpaceY2) {
+            if (window.x >= monitorSpec.mouseSpaceX1 && window.x <= monitorSpec.mouseSpaceX2 && window.y >= monitorSpec.mouseSpaceY1 && window.y <= monitorSpec.mouseSpaceY2) {
                 adjustForCurrentMonitor(monitorSpec, window)
             }
         }

@@ -44,7 +44,8 @@ data class WindowState(
         var y: Int,
         var width: Int,
         var height: Int,
-        var isMaximized: Boolean
+        var isMaximized: Boolean,
+        var monitorIndex: Int
 )
 
 val threadCount = Runtime.getRuntime().availableProcessors()
