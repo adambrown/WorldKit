@@ -995,7 +995,7 @@ private fun syncParameterValues(parameters: ParameterSet) {
     }
 }
 
-private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionHistoryItem? {
+private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): HistoryItem? {
     return selectFile(dialogLayer, true, ui, preferences.projectDir, "wkr") { file ->
         if (file == null) {
             null
@@ -1007,14 +1007,14 @@ private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: Us
                 val maskBytes = ByteArray(maskWidth * maskWidth)
                 stream.readFully(maskBytes)
                 val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
-                RegionHistoryItem(parameters, graphSeed, regionMask)
+                HistoryItem(parameters, graphSeed, regionMask)
             }
             historyItem
         }
     }
 }
 
-private fun exportRegionsFile(regions: RegionHistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
+private fun exportRegionsFile(regions: HistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
     if (regions != null) {
         ui.ignoreInput = true
         dialogLayer.isVisible = true
@@ -1027,8 +1027,8 @@ private fun exportRegionsFile(regions: RegionHistoryItem?, dialogLayer: Block, p
                     val parameters = JSON.writeValueAsString(regions.parameters)
                     stream.writeUTF(parameters)
                     stream.writeLong(regions.graphSeed)
-                    stream.writeInt(regions.regionMask.width)
-                    stream.write(regions.regionMask.array)
+                    stream.writeInt(regions.mask.width)
+                    stream.write(regions.mask.array)
                 }
                 return true
             } else {
@@ -1062,7 +1062,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             syncParameterValues(historyItem.parameters)
                             currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.regionMask
+                            currentState.regionMask = historyItem.mask
                             buildRegionsFun(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
                         }
@@ -1257,7 +1257,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             syncParameterValues(historyItem.parameters)
                             currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.regionMask
+                            currentState.regionMask = historyItem.mask
                             buildRegionsFun(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
                         }
@@ -1276,7 +1276,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             syncParameterValues(historyItem.parameters)
                             currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.regionMask
+                            currentState.regionMask = historyItem.mask
                             buildRegionsFun(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
                         }
@@ -1729,7 +1729,11 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 brushOn.value = false
                                 val parameters = extractCurrentParameters()
                                 buildBiomesFun(parameters, true)
-                                updateBiomesHistory(parameters)
+                                val currentGraph = currentState.biomeGraph
+                                val currentMask = currentState.biomeMask
+                                if (currentGraph != null && currentMask != null) {
+                                    updateBiomesHistory(parameters, currentGraph, currentMask)
+                                }
                                 editBiomesActivated = false
                                 if (editToggleCurrentPointer.value == editBiomesMode) {
                                     editToggleCurrentPointer.value = null
@@ -1747,7 +1751,11 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     doGeneration {
                         val parameters = extractCurrentParameters()
                         buildBiomesFun(parameters)
-                        updateBiomesHistory(parameters)
+                        val currentGraph = currentState.biomeGraph
+                        val currentMask = currentState.biomeMask
+                        if (currentGraph != null && currentMask != null) {
+                            updateBiomesHistory(parameters, currentGraph, currentMask)
+                        }
                     }
                 }
                 generateBiomesLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -1765,7 +1773,11 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                         val parameters = extractCurrentParameters()
                         buildBiomesFun(parameters)
-                        updateBiomesHistory(parameters)
+                        val currentGraph = currentState.biomeGraph
+                        val currentMask = currentState.biomeMask
+                        if (currentGraph != null && currentMask != null) {
+                            updateBiomesHistory(parameters, currentGraph, currentMask)
+                        }
                     }
                 }
                 generateRandomBiomesLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
@@ -1774,15 +1786,17 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 hSpacer(SMALL_SPACER_SIZE)
                 backBiomesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val parameters = historyBiomesBackQueue.pop()
-                        if (parameters != null) {
+                        val historyItem = historyBiomesBackQueue.pop()
+                        if (historyItem != null) {
                             val historyLast = historyBiomesCurrent.value
                             if (historyLast != null) {
                                 historyBiomesForwardQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(parameters)
-                            buildBiomesFun(parameters)
-                            historyBiomesCurrent.value = parameters.copy()
+                            syncParameterValues(historyItem.parameters)
+                            currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeMask = historyItem.mask
+                            buildBiomesFun(historyItem.parameters, true)
+                            historyBiomesCurrent.value = historyItem.copy()
                         }
                     }
                 }
@@ -1791,15 +1805,17 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 hSpacer(SMALL_SPACER_SIZE)
                 forwardBiomesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
-                        val parameters = historyBiomesForwardQueue.pop()
-                        if (parameters != null) {
+                        val historyItem = historyBiomesForwardQueue.pop()
+                        if (historyItem != null) {
                             val historyLast = historyBiomesCurrent.value
                             if (historyLast != null) {
                                 historyBiomesBackQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(parameters)
-                            buildBiomesFun(parameters)
-                            historyBiomesCurrent.value = parameters.copy()
+                            syncParameterValues(historyItem.parameters)
+                            currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeMask = historyItem.mask
+                            buildBiomesFun(historyItem.parameters, true)
+                            historyBiomesCurrent.value = historyItem.copy()
                         }
                     }
                 }
@@ -1967,23 +1983,23 @@ private fun disableCurrentToggleIfEnabled() {
 private fun updateRegionsHistory(parameters: ParameterSet, graph: Graph, regionMask: ByteArrayMatrix) {
     val historyLast = historyRegionsCurrent.value
     if (historyLast != null) {
-        if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && (parameters != historyLast.parameters || historyLast.graphSeed != graph.seed || !Arrays.equals(historyLast.regionMask.array, regionMask.array))) {
+        if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && (parameters != historyLast.parameters || historyLast.graphSeed != graph.seed || !Arrays.equals(historyLast.mask.array, regionMask.array))) {
             historyRegionsBackQueue.push(historyLast.copy())
         }
     }
     historyRegionsForwardQueue.clear()
-    historyRegionsCurrent.value = RegionHistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
+    historyRegionsCurrent.value = HistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
 }
 
-private fun updateBiomesHistory(parameters: ParameterSet) {
+private fun updateBiomesHistory(parameters: ParameterSet, graph: Graph, biomeMask: ByteArrayMatrix) {
     val historyLast = historyBiomesCurrent.value
     if (historyLast != null) {
-        if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && parameters != historyLast) {
+        if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && (parameters != historyLast.parameters || historyLast.graphSeed != graph.seed || !Arrays.equals(historyLast.mask.array, biomeMask.array))) {
             historyBiomesBackQueue.push(historyLast.copy())
         }
     }
     historyBiomesForwardQueue.clear()
-    historyBiomesCurrent.value = parameters.copy()
+    historyBiomesCurrent.value = HistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(biomeMask.width, biomeMask.array.copyOf()))
 }
 
 private fun extractCurrentParameters(): ParameterSet {

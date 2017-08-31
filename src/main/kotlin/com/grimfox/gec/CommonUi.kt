@@ -3,7 +3,6 @@ package com.grimfox.gec
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.ui.bInt
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.gInt
@@ -69,10 +68,10 @@ val heightScaleFunctionInverse = { value: Float ->
     }))
 }
 
-class RegionHistoryItem(val parameters: ParameterSet, val graphSeed: Long, val regionMask: ByteArrayMatrix) {
+class HistoryItem(val parameters: ParameterSet, val graphSeed: Long, val mask: ByteArrayMatrix) {
 
-    fun copy(): RegionHistoryItem {
-        return RegionHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
+    fun copy(): HistoryItem {
+        return HistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
     }
 }
 
@@ -98,12 +97,12 @@ val pointPicker = ref<MeshViewport3D.PointPicker?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
-val historyRegionsBackQueue = HistoryQueue<RegionHistoryItem>(1000)
-val historyRegionsCurrent = ref<RegionHistoryItem?>(null)
-val historyRegionsForwardQueue = HistoryQueue<RegionHistoryItem>(1000)
-val historyBiomesBackQueue = HistoryQueue<ParameterSet>(1000)
-val historyBiomesCurrent = ref<ParameterSet?>(null)
-val historyBiomesForwardQueue = HistoryQueue<ParameterSet>(1000)
+val historyRegionsBackQueue = HistoryQueue<HistoryItem>(1000)
+val historyRegionsCurrent = ref<HistoryItem?>(null)
+val historyRegionsForwardQueue = HistoryQueue<HistoryItem>(1000)
+val historyBiomesBackQueue = HistoryQueue<HistoryItem>(1000)
+val historyBiomesCurrent = ref<HistoryItem?>(null)
+val historyBiomesForwardQueue = HistoryQueue<HistoryItem>(1000)
 
 val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker)
 
