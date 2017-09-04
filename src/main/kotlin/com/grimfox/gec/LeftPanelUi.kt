@@ -650,6 +650,8 @@ private var deleteSplinesToggle = NO_BLOCK
 private var editBiomesToggle = NO_BLOCK
 private var clearEditsButton = NO_BLOCK
 private var clearEditsLabel = NO_BLOCK
+private var restoreDeletedButton = NO_BLOCK
+private var restoreDeletedLabel = NO_BLOCK
 private var backSplinesButton = NO_BLOCK
 private var forwardSplinesButton = NO_BLOCK
 private var backSplinesLabel = NO_BLOCK
@@ -698,6 +700,8 @@ fun disableGenerateButtons() {
     buildLabel.isVisible = displayBuildLabel
     clearEditsButton.isVisible = false
     clearEditsLabel.isVisible = true
+    restoreDeletedButton.isVisible = false
+    restoreDeletedLabel.isVisible = true
     backSplinesButton.isVisible = false
     backSplinesLabel.isVisible = true
     forwardSplinesButton.isVisible = false
@@ -764,6 +768,9 @@ private fun enableGenerateButtons() {
     val hasSplineEdits = currentState.regionSplines?.hasCustomizations ?: false
     clearEditsButton.isVisible = hasSplineEdits
     clearEditsLabel.isVisible = !hasSplineEdits
+    val hasDeletes = currentState.regionSplines?.deletedOrigins?.isNotEmpty() ?: false
+    restoreDeletedButton.isVisible = hasDeletes
+    restoreDeletedLabel.isVisible = !hasDeletes
     backSplinesButton.isVisible = historySplinesBackQueue.size != 0
     backSplinesLabel.isVisible = historySplinesBackQueue.size == 0
     forwardSplinesButton.isVisible = historySplinesForwardQueue.size != 0
@@ -1678,6 +1685,21 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 clearEditsLabel = button(text("Clear edits"), DISABLED_TEXT_BUTTON_STYLE) {}
                 clearEditsLabel.isMouseAware = false
                 clearEditsLabel.isVisible = false
+                hSpacer(SMALL_SPACER_SIZE)
+                restoreDeletedButton = button(text("Restore deleted"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val parameters = extractCurrentParameters()
+                        currentState.regionSplines = currentState.regionSplines?.copy(deletedOrigins = listOf(), deletedPoints = listOf(), deletedEdges = listOf())
+                        buildRegionsFun(parameters, true, true)
+                        val currentSplines = currentState.regionSplines
+                        if (currentSplines != null) {
+                            updateSplinesHistory(currentSplines)
+                        }
+                    }
+                }
+                restoreDeletedLabel = button(text("Restore deleted"), DISABLED_TEXT_BUTTON_STYLE) {}
+                restoreDeletedLabel.isMouseAware = false
+                restoreDeletedLabel.isVisible = false
                 hSpacer(SMALL_SPACER_SIZE)
                 backSplinesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
                     doGeneration {
