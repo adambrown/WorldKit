@@ -97,6 +97,7 @@ class SplinePointPicker(val currentState: CurrentState, val currentSplines: Regi
                     }
                 }
                 currentState.regionSplines = RegionSplines(
+                        true,
                         currentSplines.coastEdges,
                         currentSplines.coastPoints,
                         riverOrigins,
@@ -204,6 +205,7 @@ class SplineDeletePicker(val currentState: CurrentState, val currentSplines: Reg
                     }
                 }
                 currentState.regionSplines = RegionSplines(
+                        true,
                         currentSplines.coastEdges,
                         currentSplines.coastPoints,
                         riverOrigins,
@@ -448,6 +450,7 @@ class SplineDrawBrushListener(val splineSmoothing: Reference<Int>, val currentSt
             customIgnoredEdges.add(newEdges)
             splineMap.put(splineMap.size + 1, Quadruple(splineMap.size + 1, 5, newPoints to newPoints, newEdges))
             currentState.regionSplines = RegionSplines(
+                    true,
                     currentSplines.coastEdges,
                     currentSplines.coastPoints,
                     riverOrigins,
@@ -645,6 +648,8 @@ private var drawSplinesToggle = NO_BLOCK
 private var editSplinesToggle = NO_BLOCK
 private var deleteSplinesToggle = NO_BLOCK
 private var editBiomesToggle = NO_BLOCK
+private var clearEditsButton = NO_BLOCK
+private var clearEditsLabel = NO_BLOCK
 
 private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
@@ -686,6 +691,8 @@ fun disableGenerateButtons() {
     showMeshLabel.isVisible = !displayBuildLabel
     buildButton.isVisible = false
     buildLabel.isVisible = displayBuildLabel
+    clearEditsButton.isVisible = false
+    clearEditsLabel.isVisible = true
 }
 
 private fun enableGenerateButtons() {
@@ -745,6 +752,9 @@ private fun enableGenerateButtons() {
             buildLabel.isVisible = true
         }
     }
+    val hasSplineEdits = currentState.regionSplines?.hasCustomizations ?: false
+    clearEditsButton.isVisible = hasSplineEdits
+    clearEditsLabel.isVisible = !hasSplineEdits
 }
 
 private fun doGeneration(doWork: () -> Unit) {
@@ -868,6 +878,7 @@ private fun buildRegionsFun(parameters: ParameterSet, refreshOnly: Boolean = fal
                 }
             }
             newSplines = RegionSplines(
+                    hasCustomizations = currentSplines.hasCustomizations,
                     coastEdges = newSplines.coastEdges,
                     coastPoints = newSplines.coastPoints,
                     riverOrigins = newRiverOrigins,
@@ -1290,7 +1301,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             vSpacer(HALF_ROW_HEIGHT)
         }
         regionPanel.isVisible = false
-        val mapPanel = vExpandPanel("Edit map", expanded = true) {
+        val splinePanel = vExpandPanel("Edit splines", expanded = true) {
             drawSplinesToggle = vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
             val drawSplinesBlocks = ArrayList<Block>()
             drawSplinesBlocks.add(vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
@@ -1626,8 +1637,26 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             deleteSplinesMode.value = false
+            vButtonRow(LARGE_ROW_HEIGHT) {
+                clearEditsButton = button(text("Clear edits"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val parameters = extractCurrentParameters()
+                        currentState.regionSplines = null
+                        buildRegionsFun(parameters, true, true)
+                        val currentGraph = currentState.regionGraph
+                        val currentMask = currentState.regionMask
+                        if (currentGraph != null && currentMask != null) {
+                            updateRegionsHistory(parameters, currentGraph, currentMask)
+                        }
+                    }
+                }
+                clearEditsLabel = button(text("Clear edits"), DISABLED_TEXT_BUTTON_STYLE) {}
+                clearEditsLabel.isMouseAware = false
+                clearEditsLabel.isVisible = false
+            }
+            vSpacer(HALF_ROW_HEIGHT)
         }
-        mapPanel.isVisible = false
+        splinePanel.isVisible = false
         val biomePanel = vExpandPanel("Edit biomes", expanded = true) {
             vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                 hSpacer(SMALL_SPACER_SIZE)
@@ -1944,14 +1973,14 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             if (new != null) {
                 newProjectPanel.isVisible = false
                 regionPanel.isVisible = true
-                mapPanel.isVisible = true
+                splinePanel.isVisible = true
                 biomePanel.isVisible = true
                 mapDetailScaleSlider.isVisible = true
                 mainButtonsRow.isVisible = true
                 enableGenerateButtons()
             } else {
                 regionPanel.isVisible = false
-                mapPanel.isVisible = false
+                splinePanel.isVisible = false
                 biomePanel.isVisible = false
                 mapDetailScaleSlider.isVisible = false
                 mainButtonsRow.isVisible = false

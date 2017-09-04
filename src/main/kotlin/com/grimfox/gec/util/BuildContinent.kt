@@ -120,6 +120,7 @@ object BuildContinent {
     }
 
     class RegionSplines(
+            val hasCustomizations: Boolean,
             val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>,
             val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>,
             val riverOrigins: List<List<Point2F>>,
@@ -199,7 +200,7 @@ object BuildContinent {
             mountainEdges.add((1..points.size - 1).mapTo(ArrayList()) { LineSegment2F(points[it - 1], points[it]) })
         }
 
-        return RegionSplines(coastEdges, coastPoints, riverOrigins, riverEdges, riverPoints, mountainOrigins, mountainEdges, mountainPoints)
+        return RegionSplines(false, coastEdges, coastPoints, riverOrigins, riverEdges, riverPoints, mountainOrigins, mountainEdges, mountainPoints)
     }
 
     fun buildOpenEdges(polygon: Polygon2F, smoothing: Float): List<Point2F> {

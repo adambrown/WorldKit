@@ -323,7 +323,7 @@ object TextureBuilder {
             nvgBeginFrame(nvg, width, height, 1.0f)
 
             val color = NVGColor.create()
-            rgba(255, 0, 0, 255, color)
+            rgba(255, 0, 255, 255, color)
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
                 nvgBeginPath(nvg)
@@ -333,8 +333,8 @@ object TextureBuilder {
                 }
                 nvgFill(nvg)
             }
-            nvgStrokeWidth(nvg, 8.0f)
-            rgba(0, 255, 0, 255, color)
+            nvgStrokeWidth(nvg, 15.0f)
+            rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
                 drawShape(nvg, it, false)
@@ -344,30 +344,21 @@ object TextureBuilder {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
-            nvgStrokeWidth(nvg, 4.0f)
-            rgba(255, 255, 0, 255, color)
+            nvgStrokeWidth(nvg, 7.0f)
+            rgba(0, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
+            rgba(255, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
             mountainPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
-            nvgStrokeWidth(nvg, 8.0f)
-            rgba(255, 255, 0, 255, color)
-            nvgStrokeColor(nvg, color)
-            landBodyPolygons.forEach {
-                drawShape(nvg, it.first, true)
-                nvgStroke(nvg)
-                it.second.forEach {
-                    drawShape(nvg, it, true)
-                    nvgStroke(nvg)
-                }
-            }
-            nvgStrokeWidth(nvg, 4.0f)
-            rgba(0, 255, 0, 255, color)
+            nvgStrokeWidth(nvg, 7.0f)
+            rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
                 drawShape(nvg, it.first, true)
