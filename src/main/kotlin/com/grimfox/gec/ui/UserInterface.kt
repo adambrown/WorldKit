@@ -1052,18 +1052,17 @@ private fun createWindow(windowState: WindowState?): WindowContext {
                     val y = cy.get(0)
                     val scale = if (isMac) {
                         1.0
-//                        clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
                     } else {
-                        window.currentMonitor.scaleFactor
+                        clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
                     }
-                    if (mouseIsWithin(window.layout.dragArea, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mouseIsWithin(window.layout.dragArea, scale, x, y)) {
                         startDrag(stack, window)
-                    } else if (mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mouseIsWithin(window.layout.resizeAreaSouthEast, scale, x, y)) {
                         startResize(stack, window, false)
-                    } else if (mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y) && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mouseIsWithin(window.layout.resizeAreaSouthWest, scale, x, y)) {
                         startResize(stack, window, true)
                     }
-                    handleStandardMouseAction(window, action, button, x, y, mods)
+                    handleStandardMouseAction(window, action, button, x, y, mods, scale)
                 }
             } catch (t: Throwable) {
                 LOG.error("fatal error", t)
@@ -1087,16 +1086,17 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     return window
 }
 
-private fun mouseIsWithin(area: Block, scale: Double, x: Double, y: Double): Boolean {
-    val dragAreaX1 = round(area.x * scale)
-    val dragAreaX2 = round(dragAreaX1 + area.width * scale)
-    val dragAreaY1 = round(area.y * scale)
-    val dragAreaY2 = round(dragAreaY1 + area.height * scale)
-    val mouseIsInArea = y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
-    return mouseIsInArea
+private fun mouseIsWithin(area: Block, scale: Double, xRaw: Double, yRaw: Double): Boolean {
+    val x = xRaw / scale
+    val y = yRaw / scale
+    val dragAreaX1 = round(area.x)
+    val dragAreaX2 = round(dragAreaX1 + area.width)
+    val dragAreaY1 = round(area.y)
+    val dragAreaY2 = round(dragAreaY1 + area.height)
+    return y >= dragAreaY1 && y < dragAreaY2 && x >= dragAreaX1 && x < dragAreaX2
 }
 
-private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double, mods: Int) {
+private fun handleStandardMouseAction(window: WindowContext, action: Int, button: Int, x: Double, y: Double, mods: Int, scale: Double) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         window.isDragging = false
         window.hasMoved = false
@@ -1114,12 +1114,6 @@ private fun handleStandardMouseAction(window: WindowContext, action: Int, button
         } else if (action == GLFW_RELEASE) {
             window.isMouse2Down = false
         }
-    }
-    val scale = if (isMac) {
-        1.0f
-//        clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
-    } else {
-        clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
     }
     window.mouseClickHandler(button, Math.round(x / scale).toInt(), Math.round(y / scale).toInt(), action == GLFW_PRESS, mods)
 }
