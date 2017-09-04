@@ -119,7 +119,7 @@ object BuildContinent {
         return biomeGraphFinalFuture.value
     }
 
-    class RegionSplines(
+    data class RegionSplines(
             val hasCustomizations: Boolean,
             val coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>,
             val coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>,
@@ -140,7 +140,61 @@ object BuildContinent {
             val customMountainEdges: List<List<LineSegment2F>> = listOf(),
             val customMountainPoints: List<List<Point2F>> = listOf(),
             val customIgnoredEdges: List<List<LineSegment2F>> = listOf(),
-            val customIgnoredPoints: List<List<Point2F>> = listOf())
+            val customIgnoredPoints: List<List<Point2F>> = listOf()) {
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other?.javaClass != javaClass) return false
+            other as RegionSplines
+            if (hasCustomizations != other.hasCustomizations) return false
+            if (coastEdges != other.coastEdges) return false
+            if (coastPoints != other.coastPoints) return false
+            if (riverOrigins != other.riverOrigins) return false
+            if (riverEdges != other.riverEdges) return false
+            if (riverPoints != other.riverPoints) return false
+            if (mountainOrigins != other.mountainOrigins) return false
+            if (mountainEdges != other.mountainEdges) return false
+            if (mountainPoints != other.mountainPoints) return false
+            if (ignoredOrigins != other.ignoredOrigins) return false
+            if (ignoredEdges != other.ignoredEdges) return false
+            if (ignoredPoints != other.ignoredPoints) return false
+            if (deletedOrigins != other.deletedOrigins) return false
+            if (deletedEdges != other.deletedEdges) return false
+            if (deletedPoints != other.deletedPoints) return false
+            if (customRiverEdges != other.customRiverEdges) return false
+            if (customRiverPoints != other.customRiverPoints) return false
+            if (customMountainEdges != other.customMountainEdges) return false
+            if (customMountainPoints != other.customMountainPoints) return false
+            if (customIgnoredEdges != other.customIgnoredEdges) return false
+            if (customIgnoredPoints != other.customIgnoredPoints) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = hasCustomizations.hashCode()
+            result = 31 * result + coastEdges.hashCode()
+            result = 31 * result + coastPoints.hashCode()
+            result = 31 * result + riverOrigins.hashCode()
+            result = 31 * result + riverEdges.hashCode()
+            result = 31 * result + riverPoints.hashCode()
+            result = 31 * result + mountainOrigins.hashCode()
+            result = 31 * result + mountainEdges.hashCode()
+            result = 31 * result + mountainPoints.hashCode()
+            result = 31 * result + ignoredOrigins.hashCode()
+            result = 31 * result + ignoredEdges.hashCode()
+            result = 31 * result + ignoredPoints.hashCode()
+            result = 31 * result + deletedOrigins.hashCode()
+            result = 31 * result + deletedEdges.hashCode()
+            result = 31 * result + deletedPoints.hashCode()
+            result = 31 * result + customRiverEdges.hashCode()
+            result = 31 * result + customRiverPoints.hashCode()
+            result = 31 * result + customMountainEdges.hashCode()
+            result = 31 * result + customMountainPoints.hashCode()
+            result = 31 * result + customIgnoredEdges.hashCode()
+            result = 31 * result + customIgnoredPoints.hashCode()
+            return result
+        }
+    }
 
     fun generateRegionSplines(random: Random, regionGraph: Graph, regionMask: Matrix<Byte>, mapScale: Int): RegionSplines {
         val smoothing = (1.0f - (mapScale / 20.0f)).coerceIn(0.0f, 1.0f)

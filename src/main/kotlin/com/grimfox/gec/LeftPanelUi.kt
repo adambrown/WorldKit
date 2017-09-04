@@ -650,6 +650,11 @@ private var deleteSplinesToggle = NO_BLOCK
 private var editBiomesToggle = NO_BLOCK
 private var clearEditsButton = NO_BLOCK
 private var clearEditsLabel = NO_BLOCK
+private var backSplinesButton = NO_BLOCK
+private var forwardSplinesButton = NO_BLOCK
+private var backSplinesLabel = NO_BLOCK
+private var forwardSplinesLabel = NO_BLOCK
+
 
 private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
@@ -693,6 +698,10 @@ fun disableGenerateButtons() {
     buildLabel.isVisible = displayBuildLabel
     clearEditsButton.isVisible = false
     clearEditsLabel.isVisible = true
+    backSplinesButton.isVisible = false
+    backSplinesLabel.isVisible = true
+    forwardSplinesButton.isVisible = false
+    forwardSplinesLabel.isVisible = true
 }
 
 private fun enableGenerateButtons() {
@@ -755,6 +764,10 @@ private fun enableGenerateButtons() {
     val hasSplineEdits = currentState.regionSplines?.hasCustomizations ?: false
     clearEditsButton.isVisible = hasSplineEdits
     clearEditsLabel.isVisible = !hasSplineEdits
+    backSplinesButton.isVisible = historySplinesBackQueue.size != 0
+    backSplinesLabel.isVisible = historySplinesBackQueue.size == 0
+    forwardSplinesButton.isVisible = historySplinesForwardQueue.size != 0
+    forwardSplinesLabel.isVisible = historySplinesForwardQueue.size == 0
 }
 
 private fun doGeneration(doWork: () -> Unit) {
@@ -1229,6 +1242,10 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         val currentMask = currentState.regionMask
                         if (currentGraph != null && currentMask != null) {
                             updateRegionsHistory(parameters, currentGraph, currentMask)
+                            val currentSplines = currentState.regionSplines
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
@@ -1251,6 +1268,10 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         val currentMask = currentState.regionMask
                         if (currentGraph != null && currentMask != null) {
                             updateRegionsHistory(parameters, currentGraph, currentMask)
+                            val currentSplines = currentState.regionSplines
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
@@ -1271,6 +1292,10 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             currentState.regionMask = historyItem.mask
                             buildRegionsFun(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
+                            val currentSplines = currentState.regionSplines
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
@@ -1290,6 +1315,10 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             currentState.regionMask = historyItem.mask
                             buildRegionsFun(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
+                            val currentSplines = currentState.regionSplines
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
@@ -1371,10 +1400,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 brushOn.value = false
                                 val parameters = extractCurrentParameters()
                                 buildRegionsFun(parameters, true, false)
-                                val currentGraph = currentState.regionGraph
-                                val currentMask = currentState.regionMask
-                                if (currentGraph != null && currentMask != null) {
-                                    updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
                                 }
                                 drawSplinesActivated = false
                                 if (editToggleCurrentPointer.value == drawSplinesMode) {
@@ -1492,10 +1520,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 pickerOn.value = false
                                 val parameters = extractCurrentParameters()
                                 buildRegionsFun(parameters, true, false)
-                                val currentGraph = currentState.regionGraph
-                                val currentMask = currentState.regionMask
-                                if (currentGraph != null && currentMask != null) {
-                                    updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
                                 }
                                 editSplinesActivated = false
                                 if (editToggleCurrentPointer.value == editSplinesMode) {
@@ -1620,10 +1647,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 pickerOn.value = false
                                 val parameters = extractCurrentParameters()
                                 buildRegionsFun(parameters, true, false)
-                                val currentGraph = currentState.regionGraph
-                                val currentMask = currentState.regionMask
-                                if (currentGraph != null && currentMask != null) {
-                                    updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
                                 }
                                 deleteSplinesActivated = false
                                 if (editToggleCurrentPointer.value == deleteSplinesMode) {
@@ -1643,16 +1669,57 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         val parameters = extractCurrentParameters()
                         currentState.regionSplines = null
                         buildRegionsFun(parameters, true, true)
-                        val currentGraph = currentState.regionGraph
-                        val currentMask = currentState.regionMask
-                        if (currentGraph != null && currentMask != null) {
-                            updateRegionsHistory(parameters, currentGraph, currentMask)
+                        val currentSplines = currentState.regionSplines
+                        if (currentSplines != null) {
+                            updateSplinesHistory(currentSplines)
                         }
                     }
                 }
                 clearEditsLabel = button(text("Clear edits"), DISABLED_TEXT_BUTTON_STYLE) {}
                 clearEditsLabel.isMouseAware = false
                 clearEditsLabel.isVisible = false
+                hSpacer(SMALL_SPACER_SIZE)
+                backSplinesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val historyItem = historySplinesBackQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historySplinesCurrent.value
+                            if (historyLast != null) {
+                                historySplinesForwardQueue.push(historyLast.copy())
+                            }
+                            currentState.regionSplines = historyItem
+                            val parameters = currentState.parameters
+                            if (parameters != null) {
+                                buildRegionsFun(parameters, true, true)
+                            }
+                            historySplinesCurrent.value = historyItem.copy()
+                        }
+                    }
+                }
+                backSplinesLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
+                backSplinesLabel.isMouseAware = false
+                hSpacer(SMALL_SPACER_SIZE)
+                forwardSplinesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val historyItem = historySplinesForwardQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historySplinesCurrent.value
+                            if (historyLast != null) {
+                                historySplinesBackQueue.push(historyLast.copy())
+                            }
+                            currentState.regionSplines = historyItem
+                            val parameters = currentState.parameters
+                            if (parameters != null) {
+                                buildRegionsFun(parameters, true, true)
+                            }
+                            historySplinesCurrent.value = historyItem.copy()
+                        }
+                    }
+                }
+                forwardSplinesLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
+                forwardSplinesLabel.isMouseAware = false
+                backSplinesButton.isVisible = false
+                forwardSplinesButton.isVisible = false
             }
             vSpacer(HALF_ROW_HEIGHT)
         }
@@ -2018,6 +2085,17 @@ private fun updateRegionsHistory(parameters: ParameterSet, graph: Graph, regionM
     }
     historyRegionsForwardQueue.clear()
     historyRegionsCurrent.value = HistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
+}
+
+private fun updateSplinesHistory(splines: RegionSplines) {
+    val historyLast = historySplinesCurrent.value
+    if (historyLast != null) {
+        if ((historySplinesBackQueue.size == 0 || historySplinesBackQueue.peek() != historyLast)) {
+            historySplinesBackQueue.push(historyLast.copy())
+        }
+    }
+    historySplinesForwardQueue.clear()
+    historySplinesCurrent.value = splines
 }
 
 private fun updateBiomesHistory(parameters: ParameterSet, graph: Graph, biomeMask: ByteArrayMatrix) {

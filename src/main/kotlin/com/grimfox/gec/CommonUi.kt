@@ -10,6 +10,7 @@ import com.grimfox.gec.ui.rInt
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.RegionSplines
 import org.lwjgl.nanovg.NVGColor
 import java.util.*
 
@@ -100,6 +101,9 @@ val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT
 val historyRegionsBackQueue = HistoryQueue<HistoryItem>(1000)
 val historyRegionsCurrent = ref<HistoryItem?>(null)
 val historyRegionsForwardQueue = HistoryQueue<HistoryItem>(1000)
+val historySplinesBackQueue = HistoryQueue<RegionSplines>(1000)
+val historySplinesCurrent = ref<RegionSplines?>(null)
+val historySplinesForwardQueue = HistoryQueue<RegionSplines>(1000)
 val historyBiomesBackQueue = HistoryQueue<HistoryItem>(1000)
 val historyBiomesCurrent = ref<HistoryItem?>(null)
 val historyBiomesForwardQueue = HistoryQueue<HistoryItem>(1000)
@@ -121,7 +125,7 @@ var exportPanel = NO_BLOCK
 class CurrentState(var parameters: ParameterSet? = null,
                    var regionGraph: Graph? = null,
                    var regionMask: ByteArrayMatrix? = null,
-                   var regionSplines: BuildContinent.RegionSplines? = null,
+                   var regionSplines: RegionSplines? = null,
                    var biomeGraph: Graph? = null,
                    var biomeMask: ByteArrayMatrix? = null,
                    var biomes: List<Biomes.Biome>? = null,
@@ -175,8 +179,7 @@ fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteW
         overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
         overwriteWarningDialog.isVisible = true
         dialogCallback.value = {
-            historyRegionsBackQueue.clear()
-            historyRegionsForwardQueue.clear()
+            clearHistories()
             currentProject.value = Project()
             currentState = CurrentState()
             meshViewport.reset()
@@ -184,11 +187,22 @@ fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteW
             dialogCallback.value = noop
         }
     } else {
-        historyRegionsBackQueue.clear()
-        historyRegionsForwardQueue.clear()
+        clearHistories()
         currentProject.value = Project()
         currentState = CurrentState()
         meshViewport.reset()
         imageMode.value = 3
     }
+}
+
+private fun clearHistories() {
+    historyRegionsBackQueue.clear()
+    historyRegionsCurrent.value = null
+    historyRegionsForwardQueue.clear()
+    historySplinesBackQueue.clear()
+    historySplinesCurrent.value = null
+    historySplinesForwardQueue.clear()
+    historyBiomesBackQueue.clear()
+    historyBiomesCurrent.value = null
+    historyBiomesForwardQueue.clear()
 }
