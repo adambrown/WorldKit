@@ -122,6 +122,8 @@ var brushShapeInner = NO_BLOCK
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
 
+var onWindowResize: () -> Unit = {}
+
 class CurrentState(var parameters: ParameterSet? = null,
                    var regionGraph: Graph? = null,
                    var regionMask: ByteArrayMatrix? = null,

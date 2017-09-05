@@ -1132,11 +1132,12 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
     }
 }
 
-fun Block.vExpandPanel(panelName: String, expanded: Boolean = false, panelBuilder: Block.() -> Unit): Block {
+fun Block.vExpandPanel(panelName: String, expanded: MonitoredReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
     val panelNameOpen = "- $panelName"
     val panelNameClosed = "+ $panelName"
-    val panelOpen = ref(expanded)
-    val panelTitle = DynamicTextReference(if (expanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
+    val panelOpen = expanded
+    val isExpanded = panelOpen.value
+    val panelTitle = DynamicTextReference(if (isExpanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
     return block {
         vSizing = SHRINK
         layout = VERTICAL
@@ -1159,7 +1160,7 @@ fun Block.vExpandPanel(panelName: String, expanded: Boolean = false, panelBuilde
                 panelBlock.isVisible = false
             }
         }
-        panelOpen.value = expanded
+        panelOpen.value = isExpanded
     }
 }
 

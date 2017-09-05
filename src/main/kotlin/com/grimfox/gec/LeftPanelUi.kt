@@ -1080,188 +1080,57 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
     block {
         hSizing = Sizing.GROW
         layout = Layout.HORIZONTAL
-        val regionPanel = vExpandPanel("Edit regions", expanded = true) {
-            vSpacer(HALF_ROW_HEIGHT)
-            vButtonRow(LARGE_ROW_HEIGHT) {
-                importRegionsButton = button(text("Import regions"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = openRegionsFile(dialogLayer, preferences, ui)
-                        if (historyItem != null) {
-                            val historyLast = historyRegionsCurrent.value
-                            if (historyLast != null) {
-                                historyRegionsBackQueue.push(historyLast.copy())
-                            }
-                            syncParameterValues(historyItem.parameters)
-                            currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.mask
-                            buildRegionsFun(historyItem.parameters, true, true)
-                            historyRegionsCurrent.value = historyItem.copy()
-                        }
-                    }
-                }
-                importRegionsLabel = button(text("Import regions"), DISABLED_TEXT_BUTTON_STYLE) {}
-                importRegionsLabel.isMouseAware = false
-                importRegionsLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                exportRegionsButton = button(text("Export regions"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        exportRegionsFile(historyRegionsCurrent.value, dialogLayer, preferences, ui)
-                    }
-                }
-                exportRegionsLabel = button(text("Import regions"), DISABLED_TEXT_BUTTON_STYLE) {}
-                exportRegionsLabel.isMouseAware = false
-                exportRegionsLabel.isVisible = false
+        val scroller = ref(NO_BLOCK)
+        val resetScroller: () -> Unit = {
+            val scrollerInternal = scroller.value
+            scrollerInternal.onScroll?.invoke(scrollerInternal, 0.0, 0.0)
+        }
+        val resetScrollerListener: (Boolean, Boolean) -> Unit = { old, new ->
+            if (old != new && !new) {
+                resetScroller()
             }
-            vSpacer(HALF_ROW_HEIGHT)
-            vLongInputRow(regionsSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
-                hSpacer(SMALL_SPACER_SIZE)
-                button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
-                    val randomSeed = RANDOM.nextLong()
-                    val randomString = randomSeed.toString()
-                    if (randomString.length > 18) {
-                        regionsSeed.value = randomString.substring(0, 18).toLong()
-                    } else {
-                        regionsSeed.value = randomSeed
-                    }
-                }
-            }
-            vFileRowWithToggle(regionFile, useRegionFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            val regionScaleSlider = vSliderWithValueRow(edgeDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Edge detail:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-            var regionScaleSliderInitial = edgeDetailScale.value
-            val regionScaleSliderMouseDown = regionScaleSlider.onMouseDown
-            regionScaleSlider.onMouseDown { a, b, c, d ->
-                regionScaleSliderMouseDown?.invoke(regionScaleSlider, a, b, c, d)
-                regionScaleSliderInitial = edgeDetailScale.value
-            }
-            val regionScaleSliderMouseRelease = regionScaleSlider.onMouseRelease
-            regionScaleSlider.onMouseRelease { a, b, c, d ->
-                regionScaleSliderMouseRelease?.invoke(regionScaleSlider, a, b, c, d)
-                executor.call {
-                    doGeneration {
-                        val currentGraph = currentState.regionGraph
-                        val currentMask = currentState.regionMask
-                        val currentSplines = currentState.regionSplines
-                        if (edgeDetailScale.value != regionScaleSliderInitial && currentGraph != null && currentMask != null && currentSplines != null) {
-                            val parameters = extractCurrentParameters()
-                            buildRegionsFun(parameters, true, true)
-                            updateRegionsHistory(parameters, currentGraph, currentMask)
-                            val currentRegionSplines = currentState.regionSplines
-                            if (currentRegionSplines != null && displayMode == DisplayMode.MAP) {
-                                val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
-                                meshViewport.setImage(regionTextureId)
-                            }
-                        }
-                    }
-                }
-            }
-            vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Number of regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
-            vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Prefer islands:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
-            debugWidgets.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)))
-            debugWidgets.add(vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), shrinkGroup, MEDIUM_SPACER_SIZE))
-            val unsafeBlocks = ArrayList<Block>()
-            unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value })
-            unsafeBlocks.add(vSliderWithValueRow(startPoints, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start points:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6)).with { isMouseAware = allowUnsafe.value })
-            unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value })
-            unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value })
-            unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value })
-            allowUnsafe.listener { _, new ->
-                if (!new) {
-                    onUpdateParamsFun()
-                }
-                unsafeBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
-                }
-            }
-            allowUnsafe.value = false
-            editRegionsToggle = vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Manual edit:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            val editRegionsBlocks = ArrayList<Block>()
-            editRegionsBlocks.add(vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
-            var regionEditActivated = false
-            editRegionsMode.listener { old, new ->
-                editRegionsBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
-                }
-                if (old != new) {
-                    executor.call {
-                        if (new) {
-                            disableCurrentToggleIfEnabled()
-                            val currentGraph = currentState.regionGraph
-                            val currentMask = currentState.regionMask
-                            if (currentGraph != null && currentMask != null) {
-                                doGenerationStart()
-                                editToggleCurrentPointer.value = editRegionsMode
-                                regionEditActivated = true
-                                val regionTextureId = renderRegions(currentGraph, currentMask)
-                                meshViewport.setRegions(regionTextureId)
-                                imageMode.value = 0
-                                displayMode = DisplayMode.REGIONS
-                                defaultToMap = false
-                                val textureReference = ref(TextureId(-1))
-                                textureReference.listener { oldTexture, newTexture ->
-                                    if (oldTexture != newTexture) {
-                                        meshViewport.setRegions(newTexture)
-                                    }
+        }
+        scroller.value = block {
+            receiveChildEvents = true
+            vSizing = Sizing.SHRINK
+            layout = Layout.VERTICAL
+            val regionPanelExpanded = ref(true)
+            val regionPanel = vExpandPanel("Edit regions", expanded = regionPanelExpanded) {
+                vSpacer(HALF_ROW_HEIGHT)
+                vButtonRow(LARGE_ROW_HEIGHT) {
+                    importRegionsButton = button(text("Import regions"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = openRegionsFile(dialogLayer, preferences, ui)
+                            if (historyItem != null) {
+                                val historyLast = historyRegionsCurrent.value
+                                if (historyLast != null) {
+                                    historyRegionsBackQueue.push(historyLast.copy())
                                 }
-                                currentEditBrushSize.value = regionEditBrushSize
-                                brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
-                                brushOn.value = true
-                            } else {
-                                editRegionsMode.value = false
-                            }
-                        } else {
-                            if (regionEditActivated) {
-                                brushListener.value = null
-                                brushOn.value = false
-                                val parameters = extractCurrentParameters()
-                                buildRegionsFun(parameters, true)
-                                val currentRegionSplines = currentState.regionSplines
-                                val currentGraph = currentState.regionGraph
-                                val currentMask = currentState.regionMask
-                                if (currentRegionSplines != null && currentGraph != null && currentMask != null) {
-                                    updateRegionsHistory(parameters, currentGraph, currentMask)
-                                    val mapTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
-                                    meshViewport.setImage(mapTextureId)
-                                    imageMode.value = 1
-                                    displayMode = DisplayMode.MAP
-                                    defaultToMap = true
-                                }
-                                regionEditActivated = false
-                                if (editToggleCurrentPointer.value == editRegionsMode) {
-                                    editToggleCurrentPointer.value = null
-                                }
-                                doGenerationStop()
-                            }
-                            editToggleLatch.value?.countDown()
-                        }
-                    }
-                }
-            }
-            editRegionsMode.value = false
-            vSpacer(HALF_ROW_HEIGHT)
-            vButtonRow(LARGE_ROW_HEIGHT) {
-                generateRegionsButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val parameters = extractCurrentParameters()
-                        buildRegionsFun(parameters)
-                        val currentGraph = currentState.regionGraph
-                        val currentMask = currentState.regionMask
-                        if (currentGraph != null && currentMask != null) {
-                            updateRegionsHistory(parameters, currentGraph, currentMask)
-                            val currentSplines = currentState.regionSplines
-                            if (historySplinesCurrent.value == null && currentSplines != null) {
-                                updateSplinesHistory(currentSplines)
+                                syncParameterValues(historyItem.parameters)
+                                currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                                currentState.regionMask = historyItem.mask
+                                buildRegionsFun(historyItem.parameters, true, true)
+                                historyRegionsCurrent.value = historyItem.copy()
                             }
                         }
                     }
+                    importRegionsLabel = button(text("Import regions"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    importRegionsLabel.isMouseAware = false
+                    importRegionsLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    exportRegionsButton = button(text("Export regions"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            exportRegionsFile(historyRegionsCurrent.value, dialogLayer, preferences, ui)
+                        }
+                    }
+                    exportRegionsLabel = button(text("Import regions"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    exportRegionsLabel.isMouseAware = false
+                    exportRegionsLabel.isVisible = false
                 }
-                generateRegionsLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
-                generateRegionsLabel.isMouseAware = false
-                generateRegionsLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                generateRandomRegionsButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
+                vSpacer(HALF_ROW_HEIGHT)
+                vLongInputRow(regionsSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
+                    hSpacer(SMALL_SPACER_SIZE)
+                    button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
                         val randomSeed = RANDOM.nextLong()
                         val randomString = randomSeed.toString()
                         if (randomString.length > 18) {
@@ -1269,619 +1138,637 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         } else {
                             regionsSeed.value = randomSeed
                         }
-                        val parameters = extractCurrentParameters()
-                        buildRegionsFun(parameters)
-                        val currentGraph = currentState.regionGraph
-                        val currentMask = currentState.regionMask
-                        if (currentGraph != null && currentMask != null) {
-                            updateRegionsHistory(parameters, currentGraph, currentMask)
-                            val currentSplines = currentState.regionSplines
-                            if (historySplinesCurrent.value == null && currentSplines != null) {
-                                updateSplinesHistory(currentSplines)
-                            }
-                        }
                     }
                 }
-                generateRandomRegionsLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
-                generateRandomRegionsLabel.isMouseAware = false
-                generateRandomRegionsLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                backRegionsButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historyRegionsBackQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historyRegionsCurrent.value
-                            if (historyLast != null) {
-                                historyRegionsForwardQueue.push(historyLast.copy())
-                            }
-                            syncParameterValues(historyItem.parameters)
-                            currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.mask
-                            buildRegionsFun(historyItem.parameters, true, true)
-                            historyRegionsCurrent.value = historyItem.copy()
-                            val currentSplines = currentState.regionSplines
-                            if (historySplinesCurrent.value == null && currentSplines != null) {
-                                updateSplinesHistory(currentSplines)
-                            }
-                        }
-                    }
+                vFileRowWithToggle(regionFile, useRegionFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+                val regionScaleSlider = vSliderWithValueRow(edgeDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Edge detail:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+                var regionScaleSliderInitial = edgeDetailScale.value
+                val regionScaleSliderMouseDown = regionScaleSlider.onMouseDown
+                regionScaleSlider.onMouseDown { a, b, c, d ->
+                    regionScaleSliderMouseDown?.invoke(regionScaleSlider, a, b, c, d)
+                    regionScaleSliderInitial = edgeDetailScale.value
                 }
-                backRegionsLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
-                backRegionsLabel.isMouseAware = false
-                hSpacer(SMALL_SPACER_SIZE)
-                forwardRegionsButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historyRegionsForwardQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historyRegionsCurrent.value
-                            if (historyLast != null) {
-                                historyRegionsBackQueue.push(historyLast.copy())
-                            }
-                            syncParameterValues(historyItem.parameters)
-                            currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.regionMask = historyItem.mask
-                            buildRegionsFun(historyItem.parameters, true, true)
-                            historyRegionsCurrent.value = historyItem.copy()
-                            val currentSplines = currentState.regionSplines
-                            if (historySplinesCurrent.value == null && currentSplines != null) {
-                                updateSplinesHistory(currentSplines)
-                            }
-                        }
-                    }
-                }
-                forwardRegionsLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
-                forwardRegionsLabel.isMouseAware = false
-                backRegionsButton.isVisible = false
-                forwardRegionsButton.isVisible = false
-            }
-            vSpacer(HALF_ROW_HEIGHT)
-        }
-        regionPanel.isVisible = false
-        val splinePanel = vExpandPanel("Edit splines", expanded = true) {
-            drawSplinesToggle = vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            val drawSplinesBlocks = ArrayList<Block>()
-            drawSplinesBlocks.add(vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
-            var drawSplinesActivated = false
-            drawSplinesMode.listener { old, new ->
-                drawSplinesBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
-                }
-                if (old != new) {
+                val regionScaleSliderMouseRelease = regionScaleSlider.onMouseRelease
+                regionScaleSlider.onMouseRelease { a, b, c, d ->
+                    regionScaleSliderMouseRelease?.invoke(regionScaleSlider, a, b, c, d)
                     executor.call {
-                        if (new) {
-                            disableCurrentToggleIfEnabled()
+                        doGeneration {
+                            val currentGraph = currentState.regionGraph
+                            val currentMask = currentState.regionMask
                             val currentSplines = currentState.regionSplines
-                            if (currentSplines != null) {
-                                doGenerationStart()
-                                editToggleCurrentPointer.value = drawSplinesMode
-                                drawSplinesActivated = true
-                                val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
-                                var index = 0
-                                currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 0, pair, edges))
-                                }
-                                currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 1, pair, edges))
-                                }
-                                currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 2, pair, edges))
-                                }
-                                currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 3, points to points, edges))
-                                }
-                                currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 4, points to points, edges))
-                                }
-                                currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 5, points to points, edges))
-                                }
-                                if (displayMode != DisplayMode.MAP) {
-                                    val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                                    meshViewport.setImage(mapTextureId)
-                                    imageMode.value = 1
-                                    displayMode = DisplayMode.MAP
-                                    defaultToMap = true
-                                }
-                                val textureReference = ref(TextureId(-1))
-                                textureReference.listener { oldTexture, newTexture ->
-                                    if (oldTexture != newTexture) {
-                                        meshViewport.setImage(newTexture)
-                                    }
-                                }
-                                currentEditBrushSize.value = drawSplineBrushSize
-                                brushListener.value = SplineDrawBrushListener(splineSmoothing, currentState, currentSplines, splineMap, textureReference)
-                                brushOn.value = true
-                            } else {
-                                drawSplinesMode.value = false
-                            }
-                        } else {
-                            if (drawSplinesActivated) {
-                                brushListener.value = null
-                                brushOn.value = false
+                            if (edgeDetailScale.value != regionScaleSliderInitial && currentGraph != null && currentMask != null && currentSplines != null) {
                                 val parameters = extractCurrentParameters()
-                                buildRegionsFun(parameters, true, false)
-                                val currentSplines = currentState.regionSplines
-                                if (currentSplines != null) {
-                                    updateSplinesHistory(currentSplines)
-                                }
-                                drawSplinesActivated = false
-                                if (editToggleCurrentPointer.value == drawSplinesMode) {
-                                    editToggleCurrentPointer.value = null
-                                }
-                                doGenerationStop()
-                            }
-                            editToggleLatch.value?.countDown()
-                        }
-                    }
-                }
-            }
-            drawSplinesMode.value = false
-            editSplinesToggle = vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            val editSplinesBlocks = ArrayList<Block>()
-            val splineEditRadiusSlider = vSliderRow(editSplinesSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
-            editSplinesBlocks.add(splineEditRadiusSlider)
-            var splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
-            val splineEditRadiusSliderMouseDown = splineEditRadiusSlider.onMouseDown
-            splineEditRadiusSlider.onMouseDown { a, b, c, d ->
-                splineEditRadiusSliderMouseDown?.invoke(splineEditRadiusSlider, a, b, c, d)
-                splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
-            }
-            var splineEditSelectorMap: LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>? = null
-            var splineEditSelectorMatrix: ShortArrayMatrix? = null
-            val splineEditRadiusSliderMouseRelease = splineEditRadiusSlider.onMouseRelease
-            splineEditRadiusSlider.onMouseRelease { a, b, c, d ->
-                splineEditRadiusSliderMouseRelease?.invoke(splineEditRadiusSlider, a, b, c, d)
-                executor.call {
-                    val splineMap = splineEditSelectorMap
-                    val selectorMatrix = splineEditSelectorMatrix
-                    if (editSplinesSelectionRadius.value != splineEditRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
-                        val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
-                        for (i in 0..16777215) {
-                            var offset = i * 4
-                            val r = splineSelectors[offset++].toInt() and 0x000000FF
-                            val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
-                            selectorMatrix[i] = (r or g).toShort()
-                        }
-                    }
-                }
-            }
-            var editSplinesActivated = false
-            editSplinesMode.listener { old, new ->
-                editSplinesBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
-                }
-                if (old != new) {
-                    executor.call {
-                        if (new) {
-                            disableCurrentToggleIfEnabled()
-                            val currentSplines = currentState.regionSplines
-                            if (currentSplines != null) {
-                                doGenerationStart()
-                                editToggleCurrentPointer.value = editSplinesMode
-                                editSplinesActivated = true
-                                val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
-                                var index = 0
-                                currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 0, pair, edges))
-                                }
-                                currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 1, pair, edges))
-                                }
-                                currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 2, pair, edges))
-                                }
-                                currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 3, points to points, edges))
-                                }
-                                currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 4, points to points, edges))
-                                }
-                                currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quadruple(index, 5, points to points, edges))
-                                }
-                                splineEditSelectorMap = splineMap
-                                if (displayMode != DisplayMode.MAP) {
-                                    val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                                    meshViewport.setImage(mapTextureId)
-                                    imageMode.value = 1
-                                    displayMode = DisplayMode.MAP
-                                    defaultToMap = true
-                                }
-                                val textureReference = ref(TextureId(-1))
-                                textureReference.listener { oldTexture, newTexture ->
-                                    if (oldTexture != newTexture) {
-                                        meshViewport.setImage(newTexture)
-                                    }
-                                }
-                                val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
-                                val selectorMatrix = ShortArrayMatrix(4096) { i ->
-                                    var offset = i * 4
-                                    val r = splineSelectors[offset++].toInt() and 0x000000FF
-                                    val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
-                                    (r or g).toShort()
-                                }
-                                splineEditSelectorMatrix = selectorMatrix
-                                pointPicker.value = SplinePointPicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
-                                pickerOn.value = true
-                            } else {
-                                editSplinesMode.value = false
-                            }
-                        } else {
-                            if (editSplinesActivated) {
-                                splineEditSelectorMatrix = null
-                                pointPicker.value = null
-                                pickerOn.value = false
-                                val parameters = extractCurrentParameters()
-                                buildRegionsFun(parameters, true, false)
-                                val currentSplines = currentState.regionSplines
-                                if (currentSplines != null) {
-                                    updateSplinesHistory(currentSplines)
-                                }
-                                editSplinesActivated = false
-                                if (editToggleCurrentPointer.value == editSplinesMode) {
-                                    editToggleCurrentPointer.value = null
-                                }
-                                doGenerationStop()
-                            }
-                            editToggleLatch.value?.countDown()
-                        }
-                    }
-                }
-            }
-            editSplinesMode.value = false
-            deleteSplinesToggle = vToggleRow(deleteSplinesMode, LARGE_ROW_HEIGHT, text("Delete splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            val deleteSplineBlocks = ArrayList<Block>()
-            val splineDeleteRadiusSlider = vSliderRow(deleteSplineSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
-            deleteSplineBlocks.add(splineDeleteRadiusSlider)
-            var splineDeleteRadiusSliderInitial = deleteSplineSelectionRadius.value
-            val splineDeleteRadiusSliderMouseDown = splineDeleteRadiusSlider.onMouseDown
-            splineDeleteRadiusSlider.onMouseDown { a, b, c, d ->
-                splineDeleteRadiusSliderMouseDown?.invoke(splineDeleteRadiusSlider, a, b, c, d)
-                splineDeleteRadiusSliderInitial = deleteSplineSelectionRadius.value
-            }
-            var splineDeleteSelectorMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>? = null
-            var splineDeleteSelectorMatrix: ShortArrayMatrix? = null
-            val splineDeleteRadiusSliderMouseRelease = splineDeleteRadiusSlider.onMouseRelease
-            splineDeleteRadiusSlider.onMouseRelease { a, b, c, d ->
-                splineDeleteRadiusSliderMouseRelease?.invoke(splineDeleteRadiusSlider, a, b, c, d)
-                executor.call {
-                    val splineMap = splineDeleteSelectorMap
-                    val selectorMatrix = splineDeleteSelectorMatrix
-                    if (deleteSplineSelectionRadius.value != splineDeleteRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
-                        val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, deleteSplineSelectionRadius.value.toFloat()), 4096)
-                        for (i in 0..16777215) {
-                            var offset = i * 4
-                            val r = splineSelectors[offset++].toInt() and 0x000000FF
-                            val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
-                            selectorMatrix[i] = (r or g).toShort()
-                        }
-                    }
-                }
-            }
-            var deleteSplinesActivated = false
-            deleteSplinesMode.listener { old, new ->
-                deleteSplineBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
-                }
-                if (old != new) {
-                    executor.call {
-                        if (new) {
-                            disableCurrentToggleIfEnabled()
-                            val currentSplines = currentState.regionSplines
-                            if (currentSplines != null) {
-                                doGenerationStart()
-                                editToggleCurrentPointer.value = deleteSplinesMode
-                                deleteSplinesActivated = true
-                                val splineMap = LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>()
-                                var index = 0
-                                currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 0, pair, edges, false))
-                                }
-                                currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 1, pair, edges, false))
-                                }
-                                currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 2, pair, edges, false))
-                                }
-                                currentSplines.deletedOrigins.zip(currentSplines.deletedPoints).zip(currentSplines.deletedEdges).forEach { (pair, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 2, pair, edges, true))
-                                }
-                                currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 3, points to points, edges, false))
-                                }
-                                currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 4, points to points, edges, false))
-                                }
-                                currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                                    index++
-                                    splineMap.put(index, Quintuple(index, 5, points to points, edges, false))
-                                }
-                                splineDeleteSelectorMap = splineMap
-                                if (displayMode != DisplayMode.MAP) {
-                                    val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                                    meshViewport.setImage(mapTextureId)
-                                    imageMode.value = 1
-                                    displayMode = DisplayMode.MAP
-                                    defaultToMap = true
-                                }
-                                val textureReference = ref(TextureId(-1))
-                                textureReference.listener { oldTexture, newTexture ->
-                                    if (oldTexture != newTexture) {
-                                        meshViewport.setImage(newTexture)
-                                    }
-                                }
-                                executor.call {
-                                    textureReference.value = renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
-                                }
-                                val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, 80.0f), 4096)
-                                val selectorMatrix = ShortArrayMatrix(4096) { i ->
-                                    var offset = i * 4
-                                    val r = splineSelectors[offset++].toInt() and 0x000000FF
-                                    val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
-                                    (r or g).toShort()
-                                }
-                                splineDeleteSelectorMatrix = selectorMatrix
-                                pointPicker.value = SplineDeletePicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
-                                pickerOn.value = true
-                            } else {
-                                deleteSplinesMode.value = false
-                            }
-                        } else {
-                            if (deleteSplinesActivated) {
-                                splineDeleteSelectorMatrix = null
-                                pointPicker.value = null
-                                pickerOn.value = false
-                                val parameters = extractCurrentParameters()
-                                buildRegionsFun(parameters, true, false)
-                                val currentSplines = currentState.regionSplines
-                                if (currentSplines != null) {
-                                    updateSplinesHistory(currentSplines)
-                                }
-                                deleteSplinesActivated = false
-                                if (editToggleCurrentPointer.value == deleteSplinesMode) {
-                                    editToggleCurrentPointer.value = null
-                                }
-                                doGenerationStop()
-                            }
-                            editToggleLatch.value?.countDown()
-                        }
-                    }
-                }
-            }
-            deleteSplinesMode.value = false
-            vButtonRow(LARGE_ROW_HEIGHT) {
-                clearEditsButton = button(text("Clear edits"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val parameters = extractCurrentParameters()
-                        currentState.regionSplines = null
-                        buildRegionsFun(parameters, true, true)
-                        val currentSplines = currentState.regionSplines
-                        if (currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
-                        }
-                    }
-                }
-                clearEditsLabel = button(text("Clear edits"), DISABLED_TEXT_BUTTON_STYLE) {}
-                clearEditsLabel.isMouseAware = false
-                clearEditsLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                restoreDeletedButton = button(text("Restore deleted"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val parameters = extractCurrentParameters()
-                        currentState.regionSplines = currentState.regionSplines?.copy(deletedOrigins = listOf(), deletedPoints = listOf(), deletedEdges = listOf())
-                        buildRegionsFun(parameters, true, true)
-                        val currentSplines = currentState.regionSplines
-                        if (currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
-                        }
-                    }
-                }
-                restoreDeletedLabel = button(text("Restore deleted"), DISABLED_TEXT_BUTTON_STYLE) {}
-                restoreDeletedLabel.isMouseAware = false
-                restoreDeletedLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                backSplinesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historySplinesBackQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historySplinesCurrent.value
-                            if (historyLast != null) {
-                                historySplinesForwardQueue.push(historyLast.copy())
-                            }
-                            currentState.regionSplines = historyItem
-                            val parameters = currentState.parameters
-                            if (parameters != null) {
                                 buildRegionsFun(parameters, true, true)
-                            }
-                            historySplinesCurrent.value = historyItem.copy()
-                        }
-                    }
-                }
-                backSplinesLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
-                backSplinesLabel.isMouseAware = false
-                hSpacer(SMALL_SPACER_SIZE)
-                forwardSplinesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historySplinesForwardQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historySplinesCurrent.value
-                            if (historyLast != null) {
-                                historySplinesBackQueue.push(historyLast.copy())
-                            }
-                            currentState.regionSplines = historyItem
-                            val parameters = currentState.parameters
-                            if (parameters != null) {
-                                buildRegionsFun(parameters, true, true)
-                            }
-                            historySplinesCurrent.value = historyItem.copy()
-                        }
-                    }
-                }
-                forwardSplinesLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
-                forwardSplinesLabel.isMouseAware = false
-                backSplinesButton.isVisible = false
-                forwardSplinesButton.isVisible = false
-            }
-            vSpacer(HALF_ROW_HEIGHT)
-        }
-        splinePanel.isVisible = false
-        val biomePanel = vExpandPanel("Edit biomes", expanded = true) {
-            vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
-                hSpacer(SMALL_SPACER_SIZE)
-                button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
-                    val randomSeed = RANDOM.nextLong()
-                    val randomString = randomSeed.toString()
-                    if (randomString.length > 18) {
-                        biomesSeed.value = randomString.substring(0, 18).toLong()
-                    } else {
-                        biomesSeed.value = randomSeed
-                    }
-                }
-            }
-            vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-            vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
-            val biomeRows = block {
-                vAlign = VerticalAlignment.TOP
-                hAlign = HorizontalAlignment.LEFT
-                layout = Layout.VERTICAL
-                hSizing = Sizing.RELATIVE
-                vSizing = Sizing.SHRINK
-            }
-            biomeCount.listener { oldBiomeCount, newBiomeCount ->
-                if (oldBiomeCount != newBiomeCount) {
-                    val newBiomes = ArrayList(biomes.value)
-                    if (biomeRows.layoutChildren.size > newBiomeCount) {
-                        for (i in 1..biomeRows.layoutChildren.size - newBiomeCount) {
-                            val removeAt = biomeRows.layoutChildren.size - 1
-                            biomeRows.layoutChildren.removeAt(removeAt)
-                            biomeRows.renderChildren.removeAt(removeAt)
-                            newBiomes.removeAt(removeAt)
-                        }
-                    } else if (biomeRows.layoutChildren.size < newBiomeCount) {
-                        for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
-                            val index = newBiomes.size
-                            val selectedValue = selectedBiomes[index]
-                            biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
-                            newBiomes.add(selectedValue.value)
-                            selectedValue.listener { oldBiomeId, newBiomeId ->
-                                if (oldBiomeId != newBiomeId) {
-                                    val changedBiomes = ArrayList(biomes.value)
-                                    changedBiomes[index] = newBiomeId
-                                    biomes.value = changedBiomes
+                                updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentRegionSplines = currentState.regionSplines
+                                if (currentRegionSplines != null && displayMode == DisplayMode.MAP) {
+                                    val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                    meshViewport.setImage(regionTextureId)
                                 }
                             }
                         }
                     }
-                    biomes.value = newBiomes
                 }
-            }
-            biomeCount.value = 6
-            editBiomesToggle = vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-            val editBlocks = ArrayList<Block>()
-            editBlocks.add(vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
-            var editBiomesActivated = false
-            editBiomesMode.listener { old, new ->
-                editBlocks.forEach {
-                    it.isMouseAware = new
-                    it.isVisible = new
+                vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Number of regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+                vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Prefer islands:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
+                debugWidgets.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)))
+                debugWidgets.add(vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), shrinkGroup, MEDIUM_SPACER_SIZE))
+                val unsafeBlocks = ArrayList<Block>()
+                unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(startPoints, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start points:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value })
+                allowUnsafe.listener { _, new ->
+                    if (!new) {
+                        onUpdateParamsFun()
+                    }
+                    unsafeBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
                 }
-                if (old != new) {
-                    executor.call {
-                        if (new) {
-                            disableCurrentToggleIfEnabled()
-                            val currentBiomeGraph = currentState.biomeGraph
-                            val currentBiomeMask = currentState.biomeMask
-                            if (currentBiomeGraph != null && currentBiomeMask != null) {
-                                doGenerationStart()
-                                editToggleCurrentPointer.value = editBiomesMode
-                                editBiomesActivated = true
-                                if (displayMode != DisplayMode.BIOMES) {
-                                    val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
-                                    val currentSplines = currentState.regionSplines
-                                    val splineTextureId = if (currentSplines != null) {
-                                        TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
-                                    } else {
-                                        TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
-                                    }
-                                    meshViewport.setBiomes(biomeTextureId, splineTextureId)
-                                    imageMode.value = 2
-                                    displayMode = DisplayMode.BIOMES
-                                }
-                                val textureReference = ref(TextureId(-1))
-                                textureReference.listener { oldTexture, newTexture ->
-                                    if (oldTexture != newTexture) {
-                                        meshViewport.setBiomes(newTexture)
-                                    }
-                                }
-                                currentEditBrushSize.value = biomeEditBrushSize
-                                brushListener.value = PreSelectDrawBrushListener(currentBiomeGraph, currentBiomeMask, biomeEditBrushSize, textureReference, currentBiomeBrushValue)
-                                brushOn.value = true
-                            } else {
-                                editBiomesMode.value = false
-                            }
-                        } else {
-                            if (editBiomesActivated) {
-                                brushListener.value = null
-                                brushOn.value = false
-                                val parameters = extractCurrentParameters()
-                                buildBiomesFun(parameters, true)
-                                val currentGraph = currentState.biomeGraph
-                                val currentMask = currentState.biomeMask
+                allowUnsafe.value = false
+                editRegionsToggle = vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Manual edit:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                val editRegionsBlocks = ArrayList<Block>()
+                editRegionsBlocks.add(vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+                var regionEditActivated = false
+                editRegionsMode.listener { old, new ->
+                    editRegionsBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
+                    if (old != new) {
+                        executor.call {
+                            if (new) {
+                                disableCurrentToggleIfEnabled()
+                                val currentGraph = currentState.regionGraph
+                                val currentMask = currentState.regionMask
                                 if (currentGraph != null && currentMask != null) {
-                                    updateBiomesHistory(parameters, currentGraph, currentMask)
+                                    doGenerationStart()
+                                    editToggleCurrentPointer.value = editRegionsMode
+                                    regionEditActivated = true
+                                    val regionTextureId = renderRegions(currentGraph, currentMask)
+                                    meshViewport.setRegions(regionTextureId)
+                                    imageMode.value = 0
+                                    displayMode = DisplayMode.REGIONS
+                                    defaultToMap = false
+                                    val textureReference = ref(TextureId(-1))
+                                    textureReference.listener { oldTexture, newTexture ->
+                                        if (oldTexture != newTexture) {
+                                            meshViewport.setRegions(newTexture)
+                                        }
+                                    }
+                                    currentEditBrushSize.value = regionEditBrushSize
+                                    brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
+                                    brushOn.value = true
+                                } else {
+                                    editRegionsMode.value = false
                                 }
-                                editBiomesActivated = false
-                                if (editToggleCurrentPointer.value == editBiomesMode) {
-                                    editToggleCurrentPointer.value = null
+                            } else {
+                                if (regionEditActivated) {
+                                    brushListener.value = null
+                                    brushOn.value = false
+                                    val parameters = extractCurrentParameters()
+                                    buildRegionsFun(parameters, true)
+                                    val currentRegionSplines = currentState.regionSplines
+                                    val currentGraph = currentState.regionGraph
+                                    val currentMask = currentState.regionMask
+                                    if (currentRegionSplines != null && currentGraph != null && currentMask != null) {
+                                        updateRegionsHistory(parameters, currentGraph, currentMask)
+                                        val mapTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                        meshViewport.setImage(mapTextureId)
+                                        imageMode.value = 1
+                                        displayMode = DisplayMode.MAP
+                                        defaultToMap = true
+                                    }
+                                    regionEditActivated = false
+                                    if (editToggleCurrentPointer.value == editRegionsMode) {
+                                        editToggleCurrentPointer.value = null
+                                    }
+                                    doGenerationStop()
                                 }
-                                doGenerationStop()
+                                editToggleLatch.value?.countDown()
                             }
-                            editToggleLatch.value?.countDown()
                         }
                     }
                 }
+                editRegionsMode.value = false
+                vSpacer(HALF_ROW_HEIGHT)
+                vButtonRow(LARGE_ROW_HEIGHT) {
+                    generateRegionsButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val parameters = extractCurrentParameters()
+                            buildRegionsFun(parameters)
+                            val currentGraph = currentState.regionGraph
+                            val currentMask = currentState.regionMask
+                            if (currentGraph != null && currentMask != null) {
+                                updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentSplines = currentState.regionSplines
+                                if (historySplinesCurrent.value == null && currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
+                                }
+                            }
+                        }
+                    }
+                    generateRegionsLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    generateRegionsLabel.isMouseAware = false
+                    generateRegionsLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    generateRandomRegionsButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val randomSeed = RANDOM.nextLong()
+                            val randomString = randomSeed.toString()
+                            if (randomString.length > 18) {
+                                regionsSeed.value = randomString.substring(0, 18).toLong()
+                            } else {
+                                regionsSeed.value = randomSeed
+                            }
+                            val parameters = extractCurrentParameters()
+                            buildRegionsFun(parameters)
+                            val currentGraph = currentState.regionGraph
+                            val currentMask = currentState.regionMask
+                            if (currentGraph != null && currentMask != null) {
+                                updateRegionsHistory(parameters, currentGraph, currentMask)
+                                val currentSplines = currentState.regionSplines
+                                if (historySplinesCurrent.value == null && currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
+                                }
+                            }
+                        }
+                    }
+                    generateRandomRegionsLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    generateRandomRegionsLabel.isMouseAware = false
+                    generateRandomRegionsLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    backRegionsButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historyRegionsBackQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historyRegionsCurrent.value
+                                if (historyLast != null) {
+                                    historyRegionsForwardQueue.push(historyLast.copy())
+                                }
+                                syncParameterValues(historyItem.parameters)
+                                currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                                currentState.regionMask = historyItem.mask
+                                buildRegionsFun(historyItem.parameters, true, true)
+                                historyRegionsCurrent.value = historyItem.copy()
+                                val currentSplines = currentState.regionSplines
+                                if (historySplinesCurrent.value == null && currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
+                                }
+                            }
+                        }
+                    }
+                    backRegionsLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    backRegionsLabel.isMouseAware = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    forwardRegionsButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historyRegionsForwardQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historyRegionsCurrent.value
+                                if (historyLast != null) {
+                                    historyRegionsBackQueue.push(historyLast.copy())
+                                }
+                                syncParameterValues(historyItem.parameters)
+                                currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                                currentState.regionMask = historyItem.mask
+                                buildRegionsFun(historyItem.parameters, true, true)
+                                historyRegionsCurrent.value = historyItem.copy()
+                                val currentSplines = currentState.regionSplines
+                                if (historySplinesCurrent.value == null && currentSplines != null) {
+                                    updateSplinesHistory(currentSplines)
+                                }
+                            }
+                        }
+                    }
+                    forwardRegionsLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    forwardRegionsLabel.isMouseAware = false
+                    backRegionsButton.isVisible = false
+                    forwardRegionsButton.isVisible = false
+                }
+                vSpacer(HALF_ROW_HEIGHT)
             }
-            editBiomesMode.value = false
-            vButtonRow(LARGE_ROW_HEIGHT) {
-                generateBiomesButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val parameters = extractCurrentParameters()
-                        buildBiomesFun(parameters)
-                        val currentGraph = currentState.biomeGraph
-                        val currentMask = currentState.biomeMask
-                        if (currentGraph != null && currentMask != null) {
-                            updateBiomesHistory(parameters, currentGraph, currentMask)
+            regionPanel.isVisible = false
+            regionPanelExpanded.listeners.add(resetScrollerListener)
+            val splinePanelExpanded = ref(true)
+            val splinePanel = vExpandPanel("Edit splines", expanded = splinePanelExpanded) {
+                drawSplinesToggle = vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                val drawSplinesBlocks = ArrayList<Block>()
+                drawSplinesBlocks.add(vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
+                var drawSplinesActivated = false
+                drawSplinesMode.listener { old, new ->
+                    drawSplinesBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
+                    if (old != new) {
+                        executor.call {
+                            if (new) {
+                                disableCurrentToggleIfEnabled()
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    doGenerationStart()
+                                    editToggleCurrentPointer.value = drawSplinesMode
+                                    drawSplinesActivated = true
+                                    val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
+                                    var index = 0
+                                    currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 0, pair, edges))
+                                    }
+                                    currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 1, pair, edges))
+                                    }
+                                    currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 2, pair, edges))
+                                    }
+                                    currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 3, points to points, edges))
+                                    }
+                                    currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 4, points to points, edges))
+                                    }
+                                    currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 5, points to points, edges))
+                                    }
+                                    if (displayMode != DisplayMode.MAP) {
+                                        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+                                        meshViewport.setImage(mapTextureId)
+                                        imageMode.value = 1
+                                        displayMode = DisplayMode.MAP
+                                        defaultToMap = true
+                                    }
+                                    val textureReference = ref(TextureId(-1))
+                                    textureReference.listener { oldTexture, newTexture ->
+                                        if (oldTexture != newTexture) {
+                                            meshViewport.setImage(newTexture)
+                                        }
+                                    }
+                                    currentEditBrushSize.value = drawSplineBrushSize
+                                    brushListener.value = SplineDrawBrushListener(splineSmoothing, currentState, currentSplines, splineMap, textureReference)
+                                    brushOn.value = true
+                                } else {
+                                    drawSplinesMode.value = false
+                                }
+                            } else {
+                                if (drawSplinesActivated) {
+                                    brushListener.value = null
+                                    brushOn.value = false
+                                    val parameters = extractCurrentParameters()
+                                    buildRegionsFun(parameters, true, false)
+                                    val currentSplines = currentState.regionSplines
+                                    if (currentSplines != null) {
+                                        updateSplinesHistory(currentSplines)
+                                    }
+                                    drawSplinesActivated = false
+                                    if (editToggleCurrentPointer.value == drawSplinesMode) {
+                                        editToggleCurrentPointer.value = null
+                                    }
+                                    doGenerationStop()
+                                }
+                                editToggleLatch.value?.countDown()
+                            }
                         }
                     }
                 }
-                generateBiomesLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
-                generateBiomesLabel.isMouseAware = false
-                generateBiomesLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                generateRandomBiomesButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
+                drawSplinesMode.value = false
+                editSplinesToggle = vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                val editSplinesBlocks = ArrayList<Block>()
+                val splineEditRadiusSlider = vSliderRow(editSplinesSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
+                editSplinesBlocks.add(splineEditRadiusSlider)
+                var splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
+                val splineEditRadiusSliderMouseDown = splineEditRadiusSlider.onMouseDown
+                splineEditRadiusSlider.onMouseDown { a, b, c, d ->
+                    splineEditRadiusSliderMouseDown?.invoke(splineEditRadiusSlider, a, b, c, d)
+                    splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
+                }
+                var splineEditSelectorMap: LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>? = null
+                var splineEditSelectorMatrix: ShortArrayMatrix? = null
+                val splineEditRadiusSliderMouseRelease = splineEditRadiusSlider.onMouseRelease
+                splineEditRadiusSlider.onMouseRelease { a, b, c, d ->
+                    splineEditRadiusSliderMouseRelease?.invoke(splineEditRadiusSlider, a, b, c, d)
+                    executor.call {
+                        val splineMap = splineEditSelectorMap
+                        val selectorMatrix = splineEditSelectorMatrix
+                        if (editSplinesSelectionRadius.value != splineEditRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
+                            val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
+                            for (i in 0..16777215) {
+                                var offset = i * 4
+                                val r = splineSelectors[offset++].toInt() and 0x000000FF
+                                val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
+                                selectorMatrix[i] = (r or g).toShort()
+                            }
+                        }
+                    }
+                }
+                var editSplinesActivated = false
+                editSplinesMode.listener { old, new ->
+                    editSplinesBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
+                    if (old != new) {
+                        executor.call {
+                            if (new) {
+                                disableCurrentToggleIfEnabled()
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    doGenerationStart()
+                                    editToggleCurrentPointer.value = editSplinesMode
+                                    editSplinesActivated = true
+                                    val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
+                                    var index = 0
+                                    currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 0, pair, edges))
+                                    }
+                                    currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 1, pair, edges))
+                                    }
+                                    currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 2, pair, edges))
+                                    }
+                                    currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 3, points to points, edges))
+                                    }
+                                    currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 4, points to points, edges))
+                                    }
+                                    currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quadruple(index, 5, points to points, edges))
+                                    }
+                                    splineEditSelectorMap = splineMap
+                                    if (displayMode != DisplayMode.MAP) {
+                                        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+                                        meshViewport.setImage(mapTextureId)
+                                        imageMode.value = 1
+                                        displayMode = DisplayMode.MAP
+                                        defaultToMap = true
+                                    }
+                                    val textureReference = ref(TextureId(-1))
+                                    textureReference.listener { oldTexture, newTexture ->
+                                        if (oldTexture != newTexture) {
+                                            meshViewport.setImage(newTexture)
+                                        }
+                                    }
+                                    val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
+                                    val selectorMatrix = ShortArrayMatrix(4096) { i ->
+                                        var offset = i * 4
+                                        val r = splineSelectors[offset++].toInt() and 0x000000FF
+                                        val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
+                                        (r or g).toShort()
+                                    }
+                                    splineEditSelectorMatrix = selectorMatrix
+                                    pointPicker.value = SplinePointPicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
+                                    pickerOn.value = true
+                                } else {
+                                    editSplinesMode.value = false
+                                }
+                            } else {
+                                if (editSplinesActivated) {
+                                    splineEditSelectorMatrix = null
+                                    pointPicker.value = null
+                                    pickerOn.value = false
+                                    val parameters = extractCurrentParameters()
+                                    buildRegionsFun(parameters, true, false)
+                                    val currentSplines = currentState.regionSplines
+                                    if (currentSplines != null) {
+                                        updateSplinesHistory(currentSplines)
+                                    }
+                                    editSplinesActivated = false
+                                    if (editToggleCurrentPointer.value == editSplinesMode) {
+                                        editToggleCurrentPointer.value = null
+                                    }
+                                    doGenerationStop()
+                                }
+                                editToggleLatch.value?.countDown()
+                            }
+                        }
+                    }
+                }
+                editSplinesMode.value = false
+                deleteSplinesToggle = vToggleRow(deleteSplinesMode, LARGE_ROW_HEIGHT, text("Delete splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                val deleteSplineBlocks = ArrayList<Block>()
+                val splineDeleteRadiusSlider = vSliderRow(deleteSplineSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
+                deleteSplineBlocks.add(splineDeleteRadiusSlider)
+                var splineDeleteRadiusSliderInitial = deleteSplineSelectionRadius.value
+                val splineDeleteRadiusSliderMouseDown = splineDeleteRadiusSlider.onMouseDown
+                splineDeleteRadiusSlider.onMouseDown { a, b, c, d ->
+                    splineDeleteRadiusSliderMouseDown?.invoke(splineDeleteRadiusSlider, a, b, c, d)
+                    splineDeleteRadiusSliderInitial = deleteSplineSelectionRadius.value
+                }
+                var splineDeleteSelectorMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>? = null
+                var splineDeleteSelectorMatrix: ShortArrayMatrix? = null
+                val splineDeleteRadiusSliderMouseRelease = splineDeleteRadiusSlider.onMouseRelease
+                splineDeleteRadiusSlider.onMouseRelease { a, b, c, d ->
+                    splineDeleteRadiusSliderMouseRelease?.invoke(splineDeleteRadiusSlider, a, b, c, d)
+                    executor.call {
+                        val splineMap = splineDeleteSelectorMap
+                        val selectorMatrix = splineDeleteSelectorMatrix
+                        if (deleteSplineSelectionRadius.value != splineDeleteRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
+                            val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, deleteSplineSelectionRadius.value.toFloat()), 4096)
+                            for (i in 0..16777215) {
+                                var offset = i * 4
+                                val r = splineSelectors[offset++].toInt() and 0x000000FF
+                                val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
+                                selectorMatrix[i] = (r or g).toShort()
+                            }
+                        }
+                    }
+                }
+                var deleteSplinesActivated = false
+                deleteSplinesMode.listener { old, new ->
+                    deleteSplineBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
+                    if (old != new) {
+                        executor.call {
+                            if (new) {
+                                disableCurrentToggleIfEnabled()
+                                val currentSplines = currentState.regionSplines
+                                if (currentSplines != null) {
+                                    doGenerationStart()
+                                    editToggleCurrentPointer.value = deleteSplinesMode
+                                    deleteSplinesActivated = true
+                                    val splineMap = LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>()
+                                    var index = 0
+                                    currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 0, pair, edges, false))
+                                    }
+                                    currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 1, pair, edges, false))
+                                    }
+                                    currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 2, pair, edges, false))
+                                    }
+                                    currentSplines.deletedOrigins.zip(currentSplines.deletedPoints).zip(currentSplines.deletedEdges).forEach { (pair, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 2, pair, edges, true))
+                                    }
+                                    currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 3, points to points, edges, false))
+                                    }
+                                    currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 4, points to points, edges, false))
+                                    }
+                                    currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
+                                        index++
+                                        splineMap.put(index, Quintuple(index, 5, points to points, edges, false))
+                                    }
+                                    splineDeleteSelectorMap = splineMap
+                                    if (displayMode != DisplayMode.MAP) {
+                                        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+                                        meshViewport.setImage(mapTextureId)
+                                        imageMode.value = 1
+                                        displayMode = DisplayMode.MAP
+                                        defaultToMap = true
+                                    }
+                                    val textureReference = ref(TextureId(-1))
+                                    textureReference.listener { oldTexture, newTexture ->
+                                        if (oldTexture != newTexture) {
+                                            meshViewport.setImage(newTexture)
+                                        }
+                                    }
+                                    executor.call {
+                                        textureReference.value = renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+                                    }
+                                    val splineSelectors = extractTextureRgbaByte(renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, 80.0f), 4096)
+                                    val selectorMatrix = ShortArrayMatrix(4096) { i ->
+                                        var offset = i * 4
+                                        val r = splineSelectors[offset++].toInt() and 0x000000FF
+                                        val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
+                                        (r or g).toShort()
+                                    }
+                                    splineDeleteSelectorMatrix = selectorMatrix
+                                    pointPicker.value = SplineDeletePicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
+                                    pickerOn.value = true
+                                } else {
+                                    deleteSplinesMode.value = false
+                                }
+                            } else {
+                                if (deleteSplinesActivated) {
+                                    splineDeleteSelectorMatrix = null
+                                    pointPicker.value = null
+                                    pickerOn.value = false
+                                    val parameters = extractCurrentParameters()
+                                    buildRegionsFun(parameters, true, false)
+                                    val currentSplines = currentState.regionSplines
+                                    if (currentSplines != null) {
+                                        updateSplinesHistory(currentSplines)
+                                    }
+                                    deleteSplinesActivated = false
+                                    if (editToggleCurrentPointer.value == deleteSplinesMode) {
+                                        editToggleCurrentPointer.value = null
+                                    }
+                                    doGenerationStop()
+                                }
+                                editToggleLatch.value?.countDown()
+                            }
+                        }
+                    }
+                }
+                deleteSplinesMode.value = false
+                vButtonRow(LARGE_ROW_HEIGHT) {
+                    clearEditsButton = button(text("Clear edits"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val parameters = extractCurrentParameters()
+                            currentState.regionSplines = null
+                            buildRegionsFun(parameters, true, true)
+                            val currentSplines = currentState.regionSplines
+                            if (currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
+                        }
+                    }
+                    clearEditsLabel = button(text("Clear edits"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    clearEditsLabel.isMouseAware = false
+                    clearEditsLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    restoreDeletedButton = button(text("Restore deleted"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val parameters = extractCurrentParameters()
+                            currentState.regionSplines = currentState.regionSplines?.copy(deletedOrigins = listOf(), deletedPoints = listOf(), deletedEdges = listOf())
+                            buildRegionsFun(parameters, true, true)
+                            val currentSplines = currentState.regionSplines
+                            if (currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
+                        }
+                    }
+                    restoreDeletedLabel = button(text("Restore deleted"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    restoreDeletedLabel.isMouseAware = false
+                    restoreDeletedLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    backSplinesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historySplinesBackQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historySplinesCurrent.value
+                                if (historyLast != null) {
+                                    historySplinesForwardQueue.push(historyLast.copy())
+                                }
+                                currentState.regionSplines = historyItem
+                                val parameters = currentState.parameters
+                                if (parameters != null) {
+                                    buildRegionsFun(parameters, true, true)
+                                }
+                                historySplinesCurrent.value = historyItem.copy()
+                            }
+                        }
+                    }
+                    backSplinesLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    backSplinesLabel.isMouseAware = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    forwardSplinesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historySplinesForwardQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historySplinesCurrent.value
+                                if (historyLast != null) {
+                                    historySplinesBackQueue.push(historyLast.copy())
+                                }
+                                currentState.regionSplines = historyItem
+                                val parameters = currentState.parameters
+                                if (parameters != null) {
+                                    buildRegionsFun(parameters, true, true)
+                                }
+                                historySplinesCurrent.value = historyItem.copy()
+                            }
+                        }
+                    }
+                    forwardSplinesLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    forwardSplinesLabel.isMouseAware = false
+                    backSplinesButton.isVisible = false
+                    forwardSplinesButton.isVisible = false
+                }
+                vSpacer(HALF_ROW_HEIGHT)
+            }
+            splinePanel.isVisible = false
+            splinePanelExpanded.listeners.add(resetScrollerListener)
+            val biomePanelExpanded = ref(true)
+            val biomePanel = vExpandPanel("Edit biomes", expanded = biomePanelExpanded) {
+                vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
+                    hSpacer(SMALL_SPACER_SIZE)
+                    button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
                         val randomSeed = RANDOM.nextLong()
                         val randomString = randomSeed.toString()
                         if (randomString.length > 18) {
@@ -1889,195 +1776,351 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         } else {
                             biomesSeed.value = randomSeed
                         }
-                        val parameters = extractCurrentParameters()
-                        buildBiomesFun(parameters)
-                        val currentGraph = currentState.biomeGraph
-                        val currentMask = currentState.biomeMask
-                        if (currentGraph != null && currentMask != null) {
-                            updateBiomesHistory(parameters, currentGraph, currentMask)
-                        }
                     }
                 }
-                generateRandomBiomesLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
-                generateRandomBiomesLabel.isMouseAware = false
-                generateRandomBiomesLabel.isVisible = false
-                hSpacer(SMALL_SPACER_SIZE)
-                backBiomesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historyBiomesBackQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historyBiomesCurrent.value
-                            if (historyLast != null) {
-                                historyBiomesForwardQueue.push(historyLast.copy())
+                vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+                vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+                vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+                val biomeRows = block {
+                    vAlign = VerticalAlignment.TOP
+                    hAlign = HorizontalAlignment.LEFT
+                    layout = Layout.VERTICAL
+                    hSizing = Sizing.RELATIVE
+                    vSizing = Sizing.SHRINK
+                }
+                biomeCount.listener { oldBiomeCount, newBiomeCount ->
+                    if (oldBiomeCount != newBiomeCount) {
+                        val newBiomes = ArrayList(biomes.value)
+                        if (biomeRows.layoutChildren.size > newBiomeCount) {
+                            for (i in 1..biomeRows.layoutChildren.size - newBiomeCount) {
+                                val removeAt = biomeRows.layoutChildren.size - 1
+                                biomeRows.layoutChildren.removeAt(removeAt)
+                                biomeRows.renderChildren.removeAt(removeAt)
+                                newBiomes.removeAt(removeAt)
                             }
-                            syncParameterValues(historyItem.parameters)
-                            currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.biomeMask = historyItem.mask
-                            buildBiomesFun(historyItem.parameters, true)
-                            historyBiomesCurrent.value = historyItem.copy()
-                        }
-                    }
-                }
-                backBiomesLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
-                backBiomesLabel.isMouseAware = false
-                hSpacer(SMALL_SPACER_SIZE)
-                forwardBiomesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
-                    doGeneration {
-                        val historyItem = historyBiomesForwardQueue.pop()
-                        if (historyItem != null) {
-                            val historyLast = historyBiomesCurrent.value
-                            if (historyLast != null) {
-                                historyBiomesBackQueue.push(historyLast.copy())
+                        } else if (biomeRows.layoutChildren.size < newBiomeCount) {
+                            for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
+                                val index = newBiomes.size
+                                val selectedValue = selectedBiomes[index]
+                                biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
+                                newBiomes.add(selectedValue.value)
+                                selectedValue.listener { oldBiomeId, newBiomeId ->
+                                    if (oldBiomeId != newBiomeId) {
+                                        val changedBiomes = ArrayList(biomes.value)
+                                        changedBiomes[index] = newBiomeId
+                                        biomes.value = changedBiomes
+                                    }
+                                }
                             }
-                            syncParameterValues(historyItem.parameters)
-                            currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                            currentState.biomeMask = historyItem.mask
-                            buildBiomesFun(historyItem.parameters, true)
-                            historyBiomesCurrent.value = historyItem.copy()
+                        }
+                        biomes.value = newBiomes
+                    }
+                }
+                biomeCount.value = 6
+                editBiomesToggle = vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                val editBlocks = ArrayList<Block>()
+                editBlocks.add(vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+                var editBiomesActivated = false
+                editBiomesMode.listener { old, new ->
+                    editBlocks.forEach {
+                        it.isMouseAware = new
+                        it.isVisible = new
+                    }
+                    if (old != new) {
+                        executor.call {
+                            if (new) {
+                                disableCurrentToggleIfEnabled()
+                                val currentBiomeGraph = currentState.biomeGraph
+                                val currentBiomeMask = currentState.biomeMask
+                                if (currentBiomeGraph != null && currentBiomeMask != null) {
+                                    doGenerationStart()
+                                    editToggleCurrentPointer.value = editBiomesMode
+                                    editBiomesActivated = true
+                                    if (displayMode != DisplayMode.BIOMES) {
+                                        val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
+                                        val currentSplines = currentState.regionSplines
+                                        val splineTextureId = if (currentSplines != null) {
+                                            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+                                        } else {
+                                            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                                        }
+                                        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+                                        imageMode.value = 2
+                                        displayMode = DisplayMode.BIOMES
+                                    }
+                                    val textureReference = ref(TextureId(-1))
+                                    textureReference.listener { oldTexture, newTexture ->
+                                        if (oldTexture != newTexture) {
+                                            meshViewport.setBiomes(newTexture)
+                                        }
+                                    }
+                                    currentEditBrushSize.value = biomeEditBrushSize
+                                    brushListener.value = PreSelectDrawBrushListener(currentBiomeGraph, currentBiomeMask, biomeEditBrushSize, textureReference, currentBiomeBrushValue)
+                                    brushOn.value = true
+                                } else {
+                                    editBiomesMode.value = false
+                                }
+                            } else {
+                                if (editBiomesActivated) {
+                                    brushListener.value = null
+                                    brushOn.value = false
+                                    val parameters = extractCurrentParameters()
+                                    buildBiomesFun(parameters, true)
+                                    val currentGraph = currentState.biomeGraph
+                                    val currentMask = currentState.biomeMask
+                                    if (currentGraph != null && currentMask != null) {
+                                        updateBiomesHistory(parameters, currentGraph, currentMask)
+                                    }
+                                    editBiomesActivated = false
+                                    if (editToggleCurrentPointer.value == editBiomesMode) {
+                                        editToggleCurrentPointer.value = null
+                                    }
+                                    doGenerationStop()
+                                }
+                                editToggleLatch.value?.countDown()
+                            }
                         }
                     }
                 }
-                forwardBiomesLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
-                forwardBiomesLabel.isMouseAware = false
-                backBiomesButton.isVisible = false
-                forwardBiomesButton.isVisible = false
-            }
-            vSpacer(HALF_ROW_HEIGHT)
-        }
-        biomePanel.isVisible = false
-        val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-        mapDetailScaleSlider.isVisible = false
-        mapDetailScale.listener { old, new ->
-            if (old != new) {
-                doGeneration {
-                    currentState.mapDetailScale = mapDetailScale.value
-                    currentState.heightMapTexture = null
-                    currentState.riverMapTexture = null
-                }
-            }
-        }
-        val mainButtonsRow = vButtonRow(LARGE_ROW_HEIGHT) {
-            showRegionsButton = button(text("Show regions"), NORMAL_TEXT_BUTTON_STYLE) {
-                doGeneration {
-                    val currentRegionGraph = currentState.regionGraph
-                    val currentRegionMask = currentState.regionMask
-                    if (currentRegionGraph != null && currentRegionMask != null) {
-                        val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
-                        meshViewport.setRegions(regionTextureId)
-                        imageMode.value = 0
-                        displayMode = DisplayMode.REGIONS
-                        defaultToMap = false
-                    }
-                }
-            }
-            showRegionsLabel = button(text("Show regions"), DISABLED_TEXT_BUTTON_STYLE) {}
-            showRegionsLabel.isMouseAware = false
-            showRegionsLabel.isVisible = false
-            showMapButton = button(text("Show map"), NORMAL_TEXT_BUTTON_STYLE) {
-                doGeneration {
-                    val currentRegionSplines = currentState.regionSplines
-                    if (currentRegionSplines != null) {
-                        val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
-                        meshViewport.setImage(regionTextureId)
-                        imageMode.value = 1
-                        displayMode = DisplayMode.MAP
-                        defaultToMap = true
-                    }
-                }
-            }
-            showMapLabel = button(text("Show map"), DISABLED_TEXT_BUTTON_STYLE) {}
-            showMapLabel.isMouseAware = false
-            showMapLabel.isVisible = false
-            showBiomesButton = button(text("Show biomes"), NORMAL_TEXT_BUTTON_STYLE) {
-                doGeneration {
-                    val currentBiomeGraph = currentState.biomeGraph
-                    val currentBiomeMask = currentState.biomeMask
-                    val currentSplines = currentState.regionSplines
-                    if (currentBiomeGraph != null && currentBiomeMask != null) {
-                        val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
-                        val splineTextureId = if (currentSplines != null) {
-                            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
-                        } else {
-                            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                editBiomesMode.value = false
+                vButtonRow(LARGE_ROW_HEIGHT) {
+                    generateBiomesButton = button(text("Generate"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val parameters = extractCurrentParameters()
+                            buildBiomesFun(parameters)
+                            val currentGraph = currentState.biomeGraph
+                            val currentMask = currentState.biomeMask
+                            if (currentGraph != null && currentMask != null) {
+                                updateBiomesHistory(parameters, currentGraph, currentMask)
+                            }
                         }
-                        meshViewport.setBiomes(biomeTextureId, splineTextureId)
-                        imageMode.value = 2
-                        displayMode = DisplayMode.BIOMES
+                    }
+                    generateBiomesLabel = button(text("Generate"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    generateBiomesLabel.isMouseAware = false
+                    generateBiomesLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    generateRandomBiomesButton = button(text("Generate random"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val randomSeed = RANDOM.nextLong()
+                            val randomString = randomSeed.toString()
+                            if (randomString.length > 18) {
+                                biomesSeed.value = randomString.substring(0, 18).toLong()
+                            } else {
+                                biomesSeed.value = randomSeed
+                            }
+                            val parameters = extractCurrentParameters()
+                            buildBiomesFun(parameters)
+                            val currentGraph = currentState.biomeGraph
+                            val currentMask = currentState.biomeMask
+                            if (currentGraph != null && currentMask != null) {
+                                updateBiomesHistory(parameters, currentGraph, currentMask)
+                            }
+                        }
+                    }
+                    generateRandomBiomesLabel = button(text("Generate random"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    generateRandomBiomesLabel.isMouseAware = false
+                    generateRandomBiomesLabel.isVisible = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    backBiomesButton = button(text("Back"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historyBiomesBackQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historyBiomesCurrent.value
+                                if (historyLast != null) {
+                                    historyBiomesForwardQueue.push(historyLast.copy())
+                                }
+                                syncParameterValues(historyItem.parameters)
+                                currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                                currentState.biomeMask = historyItem.mask
+                                buildBiomesFun(historyItem.parameters, true)
+                                historyBiomesCurrent.value = historyItem.copy()
+                            }
+                        }
+                    }
+                    backBiomesLabel = button(text("Back"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    backBiomesLabel.isMouseAware = false
+                    hSpacer(SMALL_SPACER_SIZE)
+                    forwardBiomesButton = button(text("Forward"), NORMAL_TEXT_BUTTON_STYLE) {
+                        doGeneration {
+                            val historyItem = historyBiomesForwardQueue.pop()
+                            if (historyItem != null) {
+                                val historyLast = historyBiomesCurrent.value
+                                if (historyLast != null) {
+                                    historyBiomesBackQueue.push(historyLast.copy())
+                                }
+                                syncParameterValues(historyItem.parameters)
+                                currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                                currentState.biomeMask = historyItem.mask
+                                buildBiomesFun(historyItem.parameters, true)
+                                historyBiomesCurrent.value = historyItem.copy()
+                            }
+                        }
+                    }
+                    forwardBiomesLabel = button(text("Forward"), DISABLED_TEXT_BUTTON_STYLE) {}
+                    forwardBiomesLabel.isMouseAware = false
+                    backBiomesButton.isVisible = false
+                    forwardBiomesButton.isVisible = false
+                }
+                vSpacer(HALF_ROW_HEIGHT)
+            }
+            biomePanel.isVisible = false
+            biomePanelExpanded.listeners.add(resetScrollerListener)
+            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+            mapDetailScaleSlider.isVisible = false
+            mapDetailScale.listener { old, new ->
+                if (old != new) {
+                    doGeneration {
+                        currentState.mapDetailScale = mapDetailScale.value
+                        currentState.heightMapTexture = null
+                        currentState.riverMapTexture = null
                     }
                 }
             }
-            showBiomesLabel = button(text("Show biomes"), DISABLED_TEXT_BUTTON_STYLE) {}
-            showBiomesLabel.isMouseAware = false
-            showBiomesLabel.isVisible = false
-            buildButton = button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
-                doGeneration {
-                    val currentParameters = currentState.parameters
-                    val currentRegionGraph = currentState.regionGraph
-                    val currentRegionMask = currentState.regionMask
-                    val currentRegionSplines = currentState.regionSplines
-                    val currentBiomeGraph = currentState.biomeGraph
-                    val currentBiomeMask = currentState.biomeMask
-                    val currentBiomes = currentState.biomes
-                    val currentMapScale = currentState.mapDetailScale
-                    if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null && currentMapScale != null) {
-                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(currentParameters, currentRegionSplines, currentBiomeGraph, currentBiomeMask, currentBiomes, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor, currentMapScale)
-                        meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
-                        currentState.heightMapTexture = heightMapTexId
-                        currentState.riverMapTexture = riverMapTexId
-                        val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
-                        heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
-                        imageMode.value = 3
-                        displayMode = DisplayMode.MESH
+            val mainButtonsRow = vButtonRow(LARGE_ROW_HEIGHT) {
+                showRegionsButton = button(text("Show regions"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val currentRegionGraph = currentState.regionGraph
+                        val currentRegionMask = currentState.regionMask
+                        if (currentRegionGraph != null && currentRegionMask != null) {
+                            val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
+                            meshViewport.setRegions(regionTextureId)
+                            imageMode.value = 0
+                            displayMode = DisplayMode.REGIONS
+                            defaultToMap = false
+                        }
+                    }
+                }
+                showRegionsLabel = button(text("Show regions"), DISABLED_TEXT_BUTTON_STYLE) {}
+                showRegionsLabel.isMouseAware = false
+                showRegionsLabel.isVisible = false
+                showMapButton = button(text("Show map"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val currentRegionSplines = currentState.regionSplines
+                        if (currentRegionSplines != null) {
+                            val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                            meshViewport.setImage(regionTextureId)
+                            imageMode.value = 1
+                            displayMode = DisplayMode.MAP
+                            defaultToMap = true
+                        }
+                    }
+                }
+                showMapLabel = button(text("Show map"), DISABLED_TEXT_BUTTON_STYLE) {}
+                showMapLabel.isMouseAware = false
+                showMapLabel.isVisible = false
+                showBiomesButton = button(text("Show biomes"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val currentBiomeGraph = currentState.biomeGraph
+                        val currentBiomeMask = currentState.biomeMask
+                        val currentSplines = currentState.regionSplines
+                        if (currentBiomeGraph != null && currentBiomeMask != null) {
+                            val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
+                            val splineTextureId = if (currentSplines != null) {
+                                TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+                            } else {
+                                TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                            }
+                            meshViewport.setBiomes(biomeTextureId, splineTextureId)
+                            imageMode.value = 2
+                            displayMode = DisplayMode.BIOMES
+                        }
+                    }
+                }
+                showBiomesLabel = button(text("Show biomes"), DISABLED_TEXT_BUTTON_STYLE) {}
+                showBiomesLabel.isMouseAware = false
+                showBiomesLabel.isVisible = false
+                buildButton = button(text("Build mesh"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val currentParameters = currentState.parameters
+                        val currentRegionGraph = currentState.regionGraph
+                        val currentRegionMask = currentState.regionMask
+                        val currentRegionSplines = currentState.regionSplines
+                        val currentBiomeGraph = currentState.biomeGraph
+                        val currentBiomeMask = currentState.biomeMask
+                        val currentBiomes = currentState.biomes
+                        val currentMapScale = currentState.mapDetailScale
+                        if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null && currentMapScale != null) {
+                            val (heightMapTexId, riverMapTexId) = generateWaterFlows(currentParameters, currentRegionSplines, currentBiomeGraph, currentBiomeMask, currentBiomes, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor, currentMapScale)
+                            meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
+                            currentState.heightMapTexture = heightMapTexId
+                            currentState.riverMapTexture = riverMapTexId
+                            val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
+                            heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+                            imageMode.value = 3
+                            displayMode = DisplayMode.MESH
+                        }
+                    }
+                }
+                buildLabel = button(text("Build mesh"), DISABLED_TEXT_BUTTON_STYLE) {}
+                buildLabel.isMouseAware = false
+                buildLabel.isVisible = false
+                showMeshButton = button(text("Show mesh"), NORMAL_TEXT_BUTTON_STYLE) {
+                    doGeneration {
+                        val currentHeightMap = currentState.heightMapTexture
+                        val currentRiverMap = currentState.riverMapTexture
+                        if (currentHeightMap != null && currentRiverMap != null) {
+                            meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
+                            imageMode.value = 3
+                            displayMode = DisplayMode.MESH
+                        }
+                    }
+                }
+                showMeshLabel = button(text("Show mesh"), DISABLED_TEXT_BUTTON_STYLE) {}
+                showMeshLabel.isMouseAware = false
+                showMeshLabel.isVisible = false
+            }
+            mainButtonsRow.isVisible = false
+            val newProjectPanel = block {
+                layout = Layout.ABSOLUTE
+                vSizing = Sizing.SHRINK
+                vSpacer(HALF_ROW_HEIGHT)
+                vButtonRow(LARGE_ROW_HEIGHT) {
+                    button(text("New project"), NORMAL_TEXT_BUTTON_STYLE) {
+                        newProject(overwriteWarningReference, overwriteWarningDialog, dialogCallback, noop)
                     }
                 }
             }
-            buildLabel = button(text("Build mesh"), DISABLED_TEXT_BUTTON_STYLE) {}
-            buildLabel.isMouseAware = false
-            buildLabel.isVisible = false
-            showMeshButton = button(text("Show mesh"), NORMAL_TEXT_BUTTON_STYLE) {
-                doGeneration {
-                    val currentHeightMap = currentState.heightMapTexture
-                    val currentRiverMap = currentState.riverMapTexture
-                    if (currentHeightMap != null && currentRiverMap != null) {
-                        meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
-                        imageMode.value = 3
-                        displayMode = DisplayMode.MESH
-                    }
+            currentProject.listener { _, new ->
+                if (new != null) {
+                    newProjectPanel.isVisible = false
+                    regionPanel.isVisible = true
+                    splinePanel.isVisible = true
+                    biomePanel.isVisible = true
+                    mapDetailScaleSlider.isVisible = true
+                    mainButtonsRow.isVisible = true
+                    resetScroller()
+                    enableGenerateButtons()
+                } else {
+                    regionPanel.isVisible = false
+                    splinePanel.isVisible = false
+                    biomePanel.isVisible = false
+                    mapDetailScaleSlider.isVisible = false
+                    mainButtonsRow.isVisible = false
+                    newProjectPanel.isVisible = true
+                    resetScroller()
+                    enableGenerateButtons()
                 }
             }
-            showMeshLabel = button(text("Show mesh"), DISABLED_TEXT_BUTTON_STYLE) {}
-            showMeshLabel.isMouseAware = false
-            showMeshLabel.isVisible = false
+            enableGenerateButtons()
         }
-        mainButtonsRow.isVisible = false
-        val newProjectPanel = block {
-            vSpacer(HALF_ROW_HEIGHT)
-            vButtonRow(LARGE_ROW_HEIGHT) {
-                button(text("New project"), NORMAL_TEXT_BUTTON_STYLE) {
-                    newProject(overwriteWarningReference, overwriteWarningDialog, dialogCallback, noop)
-                }
-            }
-        }
-        currentProject.listener { _, new ->
-            if (new != null) {
-                newProjectPanel.isVisible = false
-                regionPanel.isVisible = true
-                splinePanel.isVisible = true
-                biomePanel.isVisible = true
-                mapDetailScaleSlider.isVisible = true
-                mainButtonsRow.isVisible = true
-                enableGenerateButtons()
+        scroller.value.onScroll { _, y ->
+            val internalScroller = scroller.value
+            val scrollerHeight = internalScroller.height
+            val parentHeight = internalScroller.parent.height
+            if (scrollerHeight > parentHeight) {
+                val diff = parentHeight - scrollerHeight
+                val newOffset = internalScroller.yOffset + y * LARGE_ROW_HEIGHT * 3
+                val clampedOffset = Math.max(diff.toDouble(), Math.min(0.0, newOffset)).toFloat()
+                internalScroller.yOffset = clampedOffset
             } else {
-                regionPanel.isVisible = false
-                splinePanel.isVisible = false
-                biomePanel.isVisible = false
-                mapDetailScaleSlider.isVisible = false
-                mainButtonsRow.isVisible = false
-                newProjectPanel.isVisible = true
-                enableGenerateButtons()
+                internalScroller.yOffset = 0.0f
             }
         }
-        enableGenerateButtons()
+        val oldWindowResize = onWindowResize
+        onWindowResize = {
+            oldWindowResize()
+            resetScroller()
+        }
     }
 }
 

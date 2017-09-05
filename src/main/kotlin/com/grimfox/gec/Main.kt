@@ -9,9 +9,6 @@ import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
-import com.grimfox.gec.util.MonitoredReference
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.mRef
 import nl.komponents.kovenant.task
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
@@ -455,8 +452,30 @@ object Main {
                 }
             }
         }
+        var wasResizing = false
+        var wasMinimized = true
+        var wasJustMaximized = false
         ui(uiLayout, preferences.windowState) {
-
+            if (isResizing) {
+                wasResizing = true
+            } else {
+                if (wasResizing) {
+                    onWindowResize()
+                }
+                wasResizing = false
+            }
+            if (wasJustMaximized) {
+                onWindowResize()
+                wasJustMaximized = false
+            }
+            if (isMaximized) {
+                if (wasMinimized) {
+                    wasJustMaximized = true
+                }
+                wasMinimized = false
+            } else {
+                wasMinimized = true
+            }
         }
     }
 }

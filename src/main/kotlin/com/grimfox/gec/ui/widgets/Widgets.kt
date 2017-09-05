@@ -611,6 +611,7 @@ abstract class Block {
     abstract var text: Text
     abstract var lastBlock: Block?
     abstract var isMouseAware: Boolean
+    abstract var receiveChildEvents: Boolean
     abstract var isFallThrough: Boolean
     abstract var canOverflow: Boolean
     abstract var overflowCount: Int
@@ -627,6 +628,7 @@ abstract class Block {
     abstract var onTick: (Block.(mouseX: Int, mouseY: Int) -> Unit)?
     abstract var inputOverride: Block?
     protected abstract var mouseOver: Block?
+    protected abstract var mouseOverParents: List<Block>?
     protected abstract var lastMouseOver: Block?
     protected abstract var awaitingRelease: MutableList<Triple<Int, Block, Int>>
     protected abstract var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>>
@@ -639,66 +641,69 @@ abstract class Block {
 
     fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) {
         if (this === root) {
-            do {
-                reprocess = false
-                val mouseOver = mouseOver
-                if (mouseOver != null) {
-                    if (isDown) {
-                        val mouseDownFun = mouseOver.onMouseDown
-                        if (mouseDownFun != null) {
-                            mouseOver.mouseDownFun(button, x, y, mods)
-                        }
-                        val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
-                        var needToAdd = true
-                        awaitingMouseDownOverOther.forEach {
-                            if (it.first == button) {
-                                if (it.second == mouseOver) {
-                                    needToAdd = false
-                                } else {
-                                    val mouseDownOverOtherFun = it.second.onMouseDownOverOther
-                                    if (mouseDownOverOtherFun != null) {
-                                        it.second.mouseDownOverOtherFun(button, x, y, mods)
+            val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
+            itemsToProcess.forEach { itemToProcess ->
+                do {
+                    reprocess = false
+                    val mouseOver = itemToProcess
+                    if (mouseOver != null) {
+                        if (isDown) {
+                            val mouseDownFun = mouseOver.onMouseDown
+                            if (mouseDownFun != null) {
+                                mouseOver.mouseDownFun(button, x, y, mods)
+                            }
+                            val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
+                            var needToAdd = true
+                            awaitingMouseDownOverOther.forEach {
+                                if (it.first == button) {
+                                    if (it.second == mouseOver) {
+                                        needToAdd = false
+                                    } else {
+                                        val mouseDownOverOtherFun = it.second.onMouseDownOverOther
+                                        if (mouseDownOverOtherFun != null) {
+                                            it.second.mouseDownOverOtherFun(button, x, y, mods)
+                                        }
+                                    }
+                                }
+                            }
+                            awaitingMouseDownOverOther.removeAll(toRemove)
+                            val pair = Triple(button, mouseOver, mods)
+                            awaitingRelease.add(pair)
+                            if (needToAdd) {
+                                awaitingMouseDownOverOther.add(pair)
+                            }
+                        } else {
+                            val mouseUpFun = mouseOver.onMouseUp
+                            if (mouseUpFun != null) {
+                                mouseOver.mouseUpFun(button, x, y, mods)
+                            }
+                            awaitingRelease.forEach {
+                                if (it.first == button && it.second == mouseOver) {
+                                    val mouseClickFun = mouseOver.onMouseClick
+                                    if (mouseClickFun != null) {
+                                        mouseOver.mouseClickFun(button, x, y, mods)
                                     }
                                 }
                             }
                         }
-                        awaitingMouseDownOverOther.removeAll(toRemove)
-                        val pair = Triple(button, mouseOver, mods)
-                        awaitingRelease.add(pair)
-                        if (needToAdd) {
-                            awaitingMouseDownOverOther.add(pair)
-                        }
-                    } else {
-                        val mouseUpFun = mouseOver.onMouseUp
-                        if (mouseUpFun != null) {
-                            mouseOver.mouseUpFun(button, x, y, mods)
-                        }
-                        awaitingRelease.forEach {
-                            if (it.first == button && it.second == mouseOver) {
-                                val mouseClickFun = mouseOver.onMouseClick
-                                if (mouseClickFun != null) {
-                                    mouseOver.mouseClickFun(button, x, y, mods)
+                    }
+                    if (!isDown) {
+                        for (i in awaitingRelease.size - 1 downTo 0) {
+                            val it = awaitingRelease[i]
+                            if (it.first == button) {
+                                awaitingRelease.removeAt(i)
+                                val mouseReleaseFun = it.second.onMouseRelease
+                                if (mouseReleaseFun != null) {
+                                    it.second.mouseReleaseFun(button, x, y, mods)
                                 }
                             }
                         }
                     }
-                }
-                if (!isDown) {
-                    for (i in awaitingRelease.size - 1 downTo 0) {
-                        val it = awaitingRelease[i]
-                        if (it.first == button) {
-                            awaitingRelease.removeAt(i)
-                            val mouseReleaseFun = it.second.onMouseRelease
-                            if (mouseReleaseFun != null) {
-                                it.second.mouseReleaseFun(button, x, y, mods)
-                            }
-                        }
+                    if (reprocess) {
+                        handleNewMousePosition(nvg, x, y)
                     }
-                }
-                if (reprocess) {
-                    handleNewMousePosition(nvg, x , y)
-                }
-            } while (reprocess)
+                } while (reprocess)
+            }
         } else {
             root.handleMouseAction(button, x, y, isDown, mods)
         }
@@ -707,10 +712,13 @@ abstract class Block {
     fun handleScroll(scrollX: Double, scrollY: Double) {
         if (this === root) {
             reprocess = false
-            val mouseOver = mouseOver
-            val scrollFun = mouseOver?.onScroll
-            if (mouseOver != null && scrollFun != null) {
-                mouseOver.scrollFun(scrollX, scrollY)
+            val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
+            itemsToProcess.forEach { itemToProcess ->
+                val mouseOver = itemToProcess
+                val scrollFun = mouseOver?.onScroll
+                if (mouseOver != null && scrollFun != null) {
+                    mouseOver.scrollFun(scrollX, scrollY)
+                }
             }
         } else {
             root.handleScroll(scrollX, scrollY)
@@ -720,10 +728,13 @@ abstract class Block {
     fun handleDrop(strings: List<String>) {
         if (this === root) {
             reprocess = false
-            val mouseOver = mouseOver
-            val dropFun = mouseOver?.onDrop
-            if (mouseOver != null && dropFun != null) {
-                mouseOver.dropFun(strings)
+            val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
+            itemsToProcess.forEach { itemToProcess ->
+                val mouseOver = itemToProcess
+                val dropFun = mouseOver?.onDrop
+                if (mouseOver != null && dropFun != null) {
+                    mouseOver.dropFun(strings)
+                }
             }
         } else {
             root.handleDrop(strings)
@@ -736,12 +747,13 @@ abstract class Block {
             do {
                 reprocess = false
                 lastMouseOver = mouseOver
-                mouseOver = if (inputOverride != null) {
+                val mouseOverPair = if (inputOverride != null) {
                     getMouseOverBlock(nvg, mouseX, mouseY)
-                    inputOverride
+                    inputOverride to emptyList<Block>()
                 } else {
                     getMouseOverBlock(nvg, mouseX, mouseY)
                 }
+                mouseOver = mouseOverPair?.first
                 if (mouseOver != lastMouseOver) {
                     val mouseOutFun = lastMouseOver?.onMouseOut
                     if (mouseOutFun != null) {
@@ -752,6 +764,7 @@ abstract class Block {
                         mouseOver?.mouseOverFun()
                     }
                 }
+                mouseOverParents = mouseOverPair?.second
                 awaitingRelease.forEach {
                     val mouseDragFun = it.second.onMouseDrag
                     if (mouseDragFun != null) {
@@ -765,7 +778,7 @@ abstract class Block {
         }
     }
 
-    private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Block? {
+    private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Pair<Block, List<Block>>? {
         if (isVisible) {
             this.nvg = nvg
             val onTicks: MutableList<Block.(Int, Int) -> Unit> = ArrayList()
@@ -780,18 +793,22 @@ abstract class Block {
         return null
     }
 
-    private fun getMouseOverBlock(mouseX: Int, mouseY: Int): Block? {
+    private fun getMouseOverBlock(mouseX: Int, mouseY: Int): Pair<Block, List<Block>>? {
         if (isVisible) {
+            val parentsNeedUpdates = ArrayList<Block>()
+            if (receiveChildEvents) {
+                parentsNeedUpdates.add(this)
+            }
             if (!isMouseAware || ((mouseX < x || mouseX > x + width || mouseY < y || mouseY > y + height) && !isFallThrough)) {
                 return null
             }
             (renderChildren.size - 1 downTo 0)
                     .mapNotNull { renderChildren[it].getMouseOverBlock(mouseX, mouseY) }
-                    .forEach { return it }
+                    .forEach { return it.first to it.second + parentsNeedUpdates }
             if (isFallThrough) {
                 return null
             }
-            return this
+            return this to emptyList()
         }
         return null
     }
@@ -997,6 +1014,10 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = true
         set(value) {
         }
+    override var receiveChildEvents: Boolean
+        get() = false
+        set(value) {
+        }
     override var isFallThrough: Boolean
         get() = false
         set(value) {
@@ -1056,6 +1077,7 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
     override var inputOverride: Block? = null
     override var awaitingRelease: MutableList<Triple<Int, Block, Int>> = ArrayList()
     override var mouseOver: Block? = null
+    override var mouseOverParents: List<Block>? = null
     override var lastMouseOver: Block? = null
     override var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>> = ArrayList()
 }
@@ -1099,6 +1121,7 @@ private class DefaultBlock(
         override var overflowCount: Int = -1,
         override var lastBlock: Block? = null,
         override var isMouseAware: Boolean = parent.isMouseAware,
+        override var receiveChildEvents: Boolean = false,
         override var isFallThrough: Boolean = false,
         override var onMouseOver: (Block.() -> Unit)? = null,
         override var onMouseOut: (Block.() -> Unit)? = null,
@@ -1124,6 +1147,10 @@ private class DefaultBlock(
         }
 
     override var mouseOver: Block?
+        get() = null
+        set(value) {
+        }
+    override var mouseOverParents: List<Block>?
         get() = null
         set(value) {
         }

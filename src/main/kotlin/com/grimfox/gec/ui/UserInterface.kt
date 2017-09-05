@@ -130,6 +130,7 @@ interface UserInterface {
     val isMinimized: Boolean
     val isMouse1Down: Boolean
     val isMouse2Down: Boolean
+    val isResizing: Boolean
     var ignoreInput: Boolean
     var mouseClickHandler: (button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) -> Unit
     var scrollHandler: (x: Double, y: Double) -> Unit
@@ -213,6 +214,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     override val scrollY: Float get() = window.scrollY
     override val isMouse1Down: Boolean get() = window.isMouse1Down
     override val isMouse2Down: Boolean get() = window.isMouse2Down
+    override val isResizing: Boolean get() = window.isResizing
     override var ignoreInput: Boolean
         get() = window.ignoreInput
         set(value) {
