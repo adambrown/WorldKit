@@ -1273,3 +1273,77 @@ fun Block.resizeArea(direction: ShapeTriangle.Direction): Block {
         supplantEvents(grabber)
     }
 }
+
+interface DisableSet {
+
+    fun hide()
+
+    fun disable()
+
+    fun enable()
+}
+
+fun disablePair(enabled: Block, disabled: Block, shouldDisable: () -> Boolean = { false }) : DisableSet {
+
+    return object: DisableSet {
+
+        override fun hide() {
+            enabled.isVisible = false
+            disabled.isVisible = false
+        }
+
+        override fun disable() {
+            enabled.isVisible = false
+            disabled.isVisible = true
+        }
+
+        override fun enable() {
+            if (shouldDisable()) {
+                disable()
+            } else {
+                disabled.isVisible = false
+                enabled.isVisible = true
+            }
+        }
+    }
+}
+
+fun disableSet(selector: () -> Int, vararg sets: DisableSet) : DisableSet {
+
+    return object: DisableSet {
+
+        override fun hide() = sets.forEach(DisableSet::hide)
+
+        override fun disable() {
+            val selected = selector()
+            sets.forEachIndexed { i, it ->
+                if (i == selected) {
+                    it.disable()
+                } else {
+                    it.hide()
+                }
+            }
+        }
+
+        override fun enable() {
+            val selected = selector()
+            sets.forEachIndexed { i, it ->
+                if (i == selected) {
+                    it.enable()
+                } else {
+                    it.hide()
+                }
+            }
+        }
+    }
+}
+
+fun Block.disableButton(label: String, disableCondition: () -> Boolean = { false }, onClick: () -> Unit = {}): DisableSet {
+    val enabledButton = button(text(label), NORMAL_TEXT_BUTTON_STYLE, onClick)
+    enabledButton.isMouseAware = true
+    enabledButton.isVisible = true
+    val disabledButton = button(text(label), DISABLED_TEXT_BUTTON_STYLE) {}
+    disabledButton.isMouseAware = false
+    disabledButton.isVisible = false
+    return disablePair(enabledButton, disabledButton, disableCondition)
+}
