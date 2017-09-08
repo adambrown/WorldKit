@@ -8,17 +8,14 @@ import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.widgets.MeshViewport3D
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
-import com.grimfox.gec.util.BuildContinent
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.Quadruple
-import com.grimfox.gec.util.call
+import com.grimfox.gec.util.*
 import java.lang.Math.round
 import java.util.*
 
 class SplinePointPicker(
         val currentState: CurrentState,
         val currentSplines: BuildContinent.RegionSplines,
-        val splineMap: LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>,
+        val splineMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>,
         val mask: Matrix<Short>,
         val texture: MutableReference<TextureId>) : MeshViewport3D.PointPicker {
 
@@ -30,11 +27,12 @@ class SplinePointPicker(
         if (selectedId > 0) {
             val splineToToggle = splineMap[selectedId]
             if (splineToToggle != null) {
-                splineMap.put(selectedId, Quadruple(
+                splineMap.put(selectedId, Quintuple(
                         splineToToggle.first,
                         if (splineToToggle.second < 3) (splineToToggle.second + 1) % 3 else ((splineToToggle.second - 2) % 3) + 3,
                         splineToToggle.third,
-                        splineToToggle.fourth))
+                        splineToToggle.fourth,
+                        false))
                 val riverOrigins = ArrayList<List<Point2F>>()
                 val riverEdges = ArrayList<List<LineSegment2F>>()
                 val riverPoints = ArrayList<List<Point2F>>()
@@ -51,33 +49,35 @@ class SplinePointPicker(
                 val customIgnoredEdges = ArrayList<List<LineSegment2F>>()
                 val customIgnoredPoints = ArrayList<List<Point2F>>()
                 splineMap.forEach {
-                    when (it.value.second) {
-                        0 -> {
-                            riverOrigins.add(it.value.third.first)
-                            riverEdges.add(it.value.fourth)
-                            riverPoints.add(it.value.third.second)
-                        }
-                        1 -> {
-                            mountainOrigins.add(it.value.third.first)
-                            mountainEdges.add(it.value.fourth)
-                            mountainPoints.add(it.value.third.second)
-                        }
-                        2 -> {
-                            ignoredOrigins.add(it.value.third.first)
-                            ignoredEdges.add(it.value.fourth)
-                            ignoredPoints.add(it.value.third.second)
-                        }
-                        3 -> {
-                            customRiverEdges.add(it.value.fourth)
-                            customRiverPoints.add(it.value.third.second)
-                        }
-                        4 -> {
-                            customMountainEdges.add(it.value.fourth)
-                            customMountainPoints.add(it.value.third.second)
-                        }
-                        else -> {
-                            customIgnoredEdges.add(it.value.fourth)
-                            customIgnoredPoints.add(it.value.third.second)
+                    if (!it.value.fifth) {
+                        when (it.value.second) {
+                            0 -> {
+                                riverOrigins.add(it.value.third.first)
+                                riverEdges.add(it.value.fourth)
+                                riverPoints.add(it.value.third.second)
+                            }
+                            1 -> {
+                                mountainOrigins.add(it.value.third.first)
+                                mountainEdges.add(it.value.fourth)
+                                mountainPoints.add(it.value.third.second)
+                            }
+                            2 -> {
+                                ignoredOrigins.add(it.value.third.first)
+                                ignoredEdges.add(it.value.fourth)
+                                ignoredPoints.add(it.value.third.second)
+                            }
+                            3 -> {
+                                customRiverEdges.add(it.value.fourth)
+                                customRiverPoints.add(it.value.third.second)
+                            }
+                            4 -> {
+                                customMountainEdges.add(it.value.fourth)
+                                customMountainPoints.add(it.value.third.second)
+                            }
+                            else -> {
+                                customIgnoredEdges.add(it.value.fourth)
+                                customIgnoredPoints.add(it.value.third.second)
+                            }
                         }
                     }
                 }

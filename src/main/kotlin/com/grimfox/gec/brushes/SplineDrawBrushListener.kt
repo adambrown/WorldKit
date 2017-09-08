@@ -8,12 +8,9 @@ import com.grimfox.gec.model.geometry.Polygon2F
 import com.grimfox.gec.ui.widgets.MeshViewport3D
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
+import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.util.BuildContinent.buildOpenEdges
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.Quadruple
-import com.grimfox.gec.util.Reference
-import com.grimfox.gec.util.call
 import java.lang.Math.round
 import java.util.*
 
@@ -21,7 +18,7 @@ class SplineDrawBrushListener(
         val splineSmoothing: Reference<Int>,
         val currentState: CurrentState,
         val currentSplines: RegionSplines,
-        val splineMap: LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>,
+        val splineMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>,
         val texture: MutableReference<TextureId>) : MeshViewport3D.BrushListener {
 
     private var currentSpline: MutableList<Point2F>? = null
@@ -48,30 +45,32 @@ class SplineDrawBrushListener(
             val customIgnoredEdges = ArrayList<List<LineSegment2F>>()
             val customIgnoredPoints = ArrayList<List<Point2F>>()
             splineMap.forEach {
-                when (it.value.second) {
-                    0 -> {
-                        riverEdges.add(it.value.fourth)
-                        riverPoints.add(it.value.third.second)
-                    }
-                    1 -> {
-                        mountainEdges.add(it.value.fourth)
-                        mountainPoints.add(it.value.third.second)
-                    }
-                    2 -> {
-                        ignoredEdges.add(it.value.fourth)
-                        ignoredPoints.add(it.value.third.second)
-                    }
-                    3 -> {
-                        customRiverEdges.add(it.value.fourth)
-                        customRiverPoints.add(it.value.third.second)
-                    }
-                    4 -> {
-                        customMountainEdges.add(it.value.fourth)
-                        customMountainPoints.add(it.value.third.second)
-                    }
-                    else -> {
-                        customIgnoredEdges.add(it.value.fourth)
-                        customIgnoredPoints.add(it.value.third.second)
+                if (!it.value.fifth) {
+                    when (it.value.second) {
+                        0 -> {
+                            riverEdges.add(it.value.fourth)
+                            riverPoints.add(it.value.third.second)
+                        }
+                        1 -> {
+                            mountainEdges.add(it.value.fourth)
+                            mountainPoints.add(it.value.third.second)
+                        }
+                        2 -> {
+                            ignoredEdges.add(it.value.fourth)
+                            ignoredPoints.add(it.value.third.second)
+                        }
+                        3 -> {
+                            customRiverEdges.add(it.value.fourth)
+                            customRiverPoints.add(it.value.third.second)
+                        }
+                        4 -> {
+                            customMountainEdges.add(it.value.fourth)
+                            customMountainPoints.add(it.value.third.second)
+                        }
+                        else -> {
+                            customIgnoredEdges.add(it.value.fourth)
+                            customIgnoredPoints.add(it.value.third.second)
+                        }
                     }
                 }
             }
@@ -124,33 +123,35 @@ class SplineDrawBrushListener(
             val customIgnoredEdges = ArrayList<List<LineSegment2F>>()
             val customIgnoredPoints = ArrayList<List<Point2F>>()
             splineMap.forEach {
-                when (it.value.second) {
-                    0 -> {
-                        riverOrigins.add(it.value.third.first)
-                        riverEdges.add(it.value.fourth)
-                        riverPoints.add(it.value.third.second)
-                    }
-                    1 -> {
-                        mountainOrigins.add(it.value.third.first)
-                        mountainEdges.add(it.value.fourth)
-                        mountainPoints.add(it.value.third.second)
-                    }
-                    2 -> {
-                        ignoredOrigins.add(it.value.third.first)
-                        ignoredEdges.add(it.value.fourth)
-                        ignoredPoints.add(it.value.third.second)
-                    }
-                    3 -> {
-                        customRiverEdges.add(it.value.fourth)
-                        customRiverPoints.add(it.value.third.second)
-                    }
-                    4 -> {
-                        customMountainEdges.add(it.value.fourth)
-                        customMountainPoints.add(it.value.third.second)
-                    }
-                    else -> {
-                        customIgnoredEdges.add(it.value.fourth)
-                        customIgnoredPoints.add(it.value.third.second)
+                if (!it.value.fifth) {
+                    when (it.value.second) {
+                        0 -> {
+                            riverOrigins.add(it.value.third.first)
+                            riverEdges.add(it.value.fourth)
+                            riverPoints.add(it.value.third.second)
+                        }
+                        1 -> {
+                            mountainOrigins.add(it.value.third.first)
+                            mountainEdges.add(it.value.fourth)
+                            mountainPoints.add(it.value.third.second)
+                        }
+                        2 -> {
+                            ignoredOrigins.add(it.value.third.first)
+                            ignoredEdges.add(it.value.fourth)
+                            ignoredPoints.add(it.value.third.second)
+                        }
+                        3 -> {
+                            customRiverEdges.add(it.value.fourth)
+                            customRiverPoints.add(it.value.third.second)
+                        }
+                        4 -> {
+                            customMountainEdges.add(it.value.fourth)
+                            customMountainPoints.add(it.value.third.second)
+                        }
+                        else -> {
+                            customIgnoredEdges.add(it.value.fourth)
+                            customIgnoredPoints.add(it.value.third.second)
+                        }
                     }
                 }
             }
@@ -163,7 +164,7 @@ class SplineDrawBrushListener(
             val newEdges = (1..newPoints.size - 1).mapTo(ArrayList()) { LineSegment2F(newPoints[it - 1], newPoints[it]) }
             customIgnoredPoints.add(newPoints)
             customIgnoredEdges.add(newEdges)
-            splineMap.put(splineMap.size + 1, Quadruple(splineMap.size + 1, 5, newPoints to newPoints, newEdges))
+            splineMap.put(splineMap.size + 1, Quintuple(splineMap.size + 1, 5, newPoints to newPoints, newEdges, false))
             currentState.regionSplines = RegionSplines(
                     true,
                     currentSplines.coastEdges,

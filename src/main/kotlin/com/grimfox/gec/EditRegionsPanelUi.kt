@@ -332,32 +332,7 @@ fun Block.editMapPanel(
                     val currentSplines = currentState.regionSplines
                     if (currentSplines != null) {
                         generationLock.lock()
-                        val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
-                        var index = 0
-                        currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 0, pair, edges))
-                        }
-                        currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 1, pair, edges))
-                        }
-                        currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 2, pair, edges))
-                        }
-                        currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 3, points to points, edges))
-                        }
-                        currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 4, points to points, edges))
-                        }
-                        currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 5, points to points, edges))
-                        }
+                        val splineMap = buildSplineMap(currentSplines)
                         if (displayMode.value != DisplayMode.MAP) {
                             val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
                             meshViewport.setImage(mapTextureId)
@@ -400,7 +375,7 @@ fun Block.editMapPanel(
             splineEditRadiusSliderMouseDown?.invoke(splineEditRadiusSlider, a, b, c, d)
             splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
         }
-        var splineEditSelectorMap: LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>? = null
+        var splineEditSelectorMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>? = null
         var splineEditSelectorMatrix: ShortArrayMatrix? = null
         val splineEditRadiusSliderMouseRelease = splineEditRadiusSlider.onMouseRelease
         splineEditRadiusSlider.onMouseRelease { a, b, c, d ->
@@ -424,32 +399,7 @@ fun Block.editMapPanel(
                     val currentSplines = currentState.regionSplines
                     if (currentSplines != null) {
                         generationLock.lock()
-                        val splineMap = LinkedHashMap<Int, Quadruple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>>>()
-                        var index = 0
-                        currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 0, pair, edges))
-                        }
-                        currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 1, pair, edges))
-                        }
-                        currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 2, pair, edges))
-                        }
-                        currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 3, points to points, edges))
-                        }
-                        currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 4, points to points, edges))
-                        }
-                        currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quadruple(index, 5, points to points, edges))
-                        }
+                        val splineMap = buildSplineMap(currentSplines)
                         splineEditSelectorMap = splineMap
                         if (displayMode.value != DisplayMode.MAP) {
                             val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
@@ -525,36 +475,7 @@ fun Block.editMapPanel(
                     val currentSplines = currentState.regionSplines
                     if (currentSplines != null) {
                         generationLock.lock()
-                        val splineMap = LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>()
-                        var index = 0
-                        currentSplines.riverOrigins.zip(currentSplines.riverPoints).zip(currentSplines.riverEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 0, pair, edges, false))
-                        }
-                        currentSplines.mountainOrigins.zip(currentSplines.mountainPoints).zip(currentSplines.mountainEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 1, pair, edges, false))
-                        }
-                        currentSplines.ignoredOrigins.zip(currentSplines.ignoredPoints).zip(currentSplines.ignoredEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 2, pair, edges, false))
-                        }
-                        currentSplines.deletedOrigins.zip(currentSplines.deletedPoints).zip(currentSplines.deletedEdges).forEach { (pair, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 2, pair, edges, true))
-                        }
-                        currentSplines.customRiverPoints.zip(currentSplines.customRiverEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 3, points to points, edges, false))
-                        }
-                        currentSplines.customMountainPoints.zip(currentSplines.customMountainEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 4, points to points, edges, false))
-                        }
-                        currentSplines.customIgnoredPoints.zip(currentSplines.customIgnoredEdges).forEach { (points, edges) ->
-                            index++
-                            splineMap.put(index, Quintuple(index, 5, points to points, edges, false))
-                        }
+                        val splineMap = buildSplineMap(currentSplines)
                         splineDeleteSelectorMap = splineMap
                         if (displayMode.value != DisplayMode.MAP) {
                             val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
@@ -664,6 +585,37 @@ fun Block.editMapPanel(
         vSpacer(HALF_ROW_HEIGHT)
     }
     return splinePanel
+}
+
+private fun buildSplineMap(currentSplines: BuildContinent.RegionSplines): LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>> {
+    val splineMap = LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>()
+    var index = 0
+    index = addSplinesToMap(currentSplines.riverOrigins, currentSplines.riverPoints, currentSplines.riverEdges, index, 0, false, splineMap)
+    index = addSplinesToMap(currentSplines.mountainOrigins, currentSplines.mountainPoints, currentSplines.mountainEdges, index, 1, false, splineMap)
+    index = addSplinesToMap(currentSplines.ignoredOrigins, currentSplines.ignoredPoints, currentSplines.ignoredEdges, index, 2, false, splineMap)
+    index = addSplinesToMap(currentSplines.deletedOrigins, currentSplines.deletedPoints, currentSplines.deletedEdges, index, 2, true, splineMap)
+    index = addSplinesToMap(currentSplines.customRiverPoints, currentSplines.customRiverEdges, index, 3, false, splineMap)
+    index = addSplinesToMap(currentSplines.customMountainPoints, currentSplines.customMountainEdges, index, 4, false, splineMap)
+    addSplinesToMap(currentSplines.customIgnoredPoints, currentSplines.customIgnoredEdges, index, 5, false, splineMap)
+    return splineMap
+}
+
+fun addSplinesToMap(origins: List<List<Point2F>>, points: List<List<Point2F>>, edges: List<List<LineSegment2F>>, index: Int, type: Int, deleted: Boolean, splineMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>): Int {
+    var nextIndex = index
+    origins.zip(points).zip(edges).forEach { (pair, edges) ->
+        nextIndex++
+        splineMap.put(nextIndex, Quintuple(nextIndex, type, pair, edges, deleted))
+    }
+    return nextIndex
+}
+
+fun addSplinesToMap(points: List<List<Point2F>>, riverEdges: List<List<LineSegment2F>>, index: Int, type: Int, deleted: Boolean, splineMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>): Int {
+    var nextIndex = index
+    points.zip(riverEdges).forEach { (points, edges) ->
+        nextIndex++
+        splineMap.put(nextIndex, Quintuple(nextIndex, type, points to points, edges, deleted))
+    }
+    return nextIndex
 }
 
 private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionsHistoryItem? {
