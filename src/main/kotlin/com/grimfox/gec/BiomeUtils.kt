@@ -4,6 +4,7 @@ import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.ui.widgets.DynamicTextReference
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.util.*
+import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import java.io.File
 import java.lang.Math.*
 import javax.imageio.ImageIO
@@ -13,7 +14,7 @@ class BiomesBuilder(
         val useBiomeFile: MonitoredReference<Boolean>,
         val displayMode: MonitoredReference<DisplayMode>) {
 
-    fun build(parameters: BuildContinent.ParameterSet, refreshOnly: Boolean = false) {
+    fun build(parameters: BiomeParameters, refreshOnly: Boolean = false) {
         val currentBiomeGraph = currentState.biomeGraph
         val currentBiomeMask = currentState.biomeMask
         val (biomeGraph, biomeMask) = if (refreshOnly && currentBiomeGraph != null && currentBiomeMask != null) {

@@ -1,25 +1,20 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.ui.JSON
-import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.DynamicTextReference
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.util.*
-import java.io.DataInputStream
-import java.io.DataOutputStream
 import java.io.File
 import java.util.*
 import javax.imageio.ImageIO
 
 class RegionsBuilder(
         val regionFile: DynamicTextReference,
-        val useRegionFile: MonitoredReference<Boolean>,
+        val useRegionFile: Reference<Boolean>,
         val displayMode: MonitoredReference<DisplayMode>,
         val defaultToMap: MonitoredReference<Boolean>) {
 
-    fun build(parameters: BuildContinent.ParameterSet, refreshOnly: Boolean = false, rebuildSplines: Boolean = true) {
+    fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true) {
         val currentRegionGraph = currentState.regionGraph
         val currentRegionMask = currentState.regionMask
         val (regionGraph, regionMask) = if (refreshOnly && currentRegionGraph != null && currentRegionMask != null) {
@@ -123,7 +118,6 @@ class RegionsBuilder(
         currentState.regionMask = regionMask
         currentState.regionSplines = regionSplines
         currentState.edgeDetailScale = parameters.edgeDetailScale
-        currentState.mapDetailScale = parameters.mapDetailScale
         currentState.heightMapTexture = null
         currentState.riverMapTexture = null
         if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {
@@ -172,51 +166,4 @@ class RegionsBuilder(
             (colorMap[bufferedImage.getRGB(Math.round((((i % 128) + 0.5f) / 128.0f) * widthM1), Math.round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
         }
     }
-}
-
-fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): HistoryItem? {
-    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkr") { file ->
-        if (file == null) {
-            null
-        } else {
-            val historyItem = DataInputStream(file.inputStream().buffered()).use { stream ->
-                val parameters = JSON.readValue(stream.readUTF(), BuildContinent.ParameterSet::class.java)
-                val graphSeed = stream.readLong()
-                val maskWidth = stream.readInt()
-                val maskBytes = ByteArray(maskWidth * maskWidth)
-                stream.readFully(maskBytes)
-                val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
-                HistoryItem(parameters, graphSeed, regionMask)
-            }
-            historyItem
-        }
-    }
-}
-
-fun exportRegionsFile(regions: HistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
-    if (regions != null) {
-        ui.ignoreInput = true
-        dialogLayer.isVisible = true
-        try {
-            val saveFile = FileDialogs.saveFileDialog(preferences.projectDir, "wkr")
-            if (saveFile != null) {
-                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkr")}.wkr"
-                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                DataOutputStream(actualFile.outputStream().buffered()).use { stream ->
-                    val parameters = JSON.writeValueAsString(regions.parameters)
-                    stream.writeUTF(parameters)
-                    stream.writeLong(regions.graphSeed)
-                    stream.writeInt(regions.mask.width)
-                    stream.write(regions.mask.array)
-                }
-                return true
-            } else {
-                return false
-            }
-        } finally {
-            dialogLayer.isVisible = false
-            ui.ignoreInput = false
-        }
-    }
-    return false
 }

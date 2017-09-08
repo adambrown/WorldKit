@@ -1,10 +1,9 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.util.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertex
-import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F.Companion.getConnectedEdgeSegments
 import com.grimfox.gec.model.geometry.Point2F
@@ -27,7 +26,7 @@ object Regions {
         }
     }
 
-    fun buildRegions(parameters: ParameterSet): Pair<Graph, ByteArrayMatrix> {
+    fun buildRegions(parameters: RegionParameters): Pair<Graph, ByteArrayMatrix> {
         val random = Random(parameters.regionsSeed)
         val results = ArrayList<Triple<Graph, ByteArrayMatrix, Int>>()
         for (i in 0..parameters.islandDesire) {
@@ -37,7 +36,7 @@ object Regions {
         return Pair(winner.first, winner.second)
     }
 
-    private fun buildRegions(random: Random, parameters: ParameterSet, islandDesire: Int): Triple<Graph, ByteArrayMatrix, Int> {
+    private fun buildRegions(random: Random, parameters: RegionParameters, islandDesire: Int): Triple<Graph, ByteArrayMatrix, Int> {
         var bestGraphValue = -Float.MAX_VALUE
         var bestPair: Triple<Graph, ByteArrayMatrix, Int>? = null
         var check1Fails = 0
@@ -121,7 +120,7 @@ object Regions {
         return bestPair!!
     }
 
-    private fun findInteriorVertices(graph: Graph, random: Random, parameters: ParameterSet, islandDesire: Int, islandTries: Int): Pair<HashMap<Int, Vertex>, Int> {
+    private fun findInteriorVertices(graph: Graph, random: Random, parameters: RegionParameters, islandDesire: Int, islandTries: Int): Pair<HashMap<Int, Vertex>, Int> {
         val desires = ArrayList<Pair<Int, Int>>()
         if (islandDesire > 0) {
             var maxIterations = islandTries

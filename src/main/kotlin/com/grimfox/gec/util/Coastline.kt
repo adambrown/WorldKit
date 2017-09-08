@@ -1,6 +1,6 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.util.BuildContinent.Parameters
+import com.grimfox.gec.util.BuildContinent.RegionIterationParameters
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Graph.Cell
 import com.grimfox.gec.model.Graph.Vertices
@@ -20,14 +20,14 @@ object Coastline {
 
     const val BYTE_ZERO: Byte = 0
 
-    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, parameters: Parameters) {
+    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, parameters: RegionIterationParameters) {
         val borderPoints = buildBorderPoints(graph)
         val water = extractWaterFromIds(graph, idMask)
         applyBorderConstraintsToWater(water, borderPoints, idMask)
         refineCoastline(graph, random, idMask, water, borderPoints, parameters)
     }
 
-    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, water: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, parameters: Parameters) {
+    fun refineCoastline(graph: Graph, random: Random, idMask: Matrix<Byte>, water: LinkedHashSet<Int>, borderPoints: LinkedHashSet<Int>, parameters: RegionIterationParameters) {
         val pointsPerRegion = Math.round(parameters.minRegionSize / (1.0f / graph.vertices.size))
         val offLimitPoints = getOffLimitPoints(graph, idMask, water, parameters.protectedInset, parameters.protectedRadius)
         erodeCoastline(graph, water, borderPoints, idMask, random, offLimitPoints, parameters.landPercent, parameters.smallIsland, parameters.largeIsland, parameters.minPerturbation, parameters.maxIterations, pointsPerRegion)

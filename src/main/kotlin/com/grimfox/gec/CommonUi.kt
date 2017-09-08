@@ -9,12 +9,13 @@ import com.grimfox.gec.ui.gInt
 import com.grimfox.gec.ui.rInt
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
-import com.grimfox.gec.util.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.BiomeParameters
+import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import org.lwjgl.nanovg.NVGColor
 import java.util.*
 
-val DEBUG_BUILD = false
+val EXPERIMENTAL_BUILD = false
 
 val REGION_COLORS = arrayListOf(
         color(0.0f, 0.0f, 0.0f),
@@ -69,14 +70,21 @@ val heightScaleFunctionInverse = { value: Float ->
     }))
 }
 
-class HistoryItem(val parameters: ParameterSet, val graphSeed: Long, val mask: ByteArrayMatrix) {
+class RegionsHistoryItem(val parameters: RegionParameters, val graphSeed: Long, val mask: ByteArrayMatrix) {
 
-    fun copy(): HistoryItem {
-        return HistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
+    fun copy(): RegionsHistoryItem {
+        return RegionsHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
     }
 }
 
-val debugWidgets: MutableList<Block> = ArrayList()
+class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, val mask: ByteArrayMatrix) {
+
+    fun copy(): BiomesHistoryItem {
+        return BiomesHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
+    }
+}
+
+val experimentalWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
 val waterPlaneOn = ref(true)
 val perspectiveOn = ref(true)
@@ -98,15 +106,17 @@ val pointPicker = ref<MeshViewport3D.PointPicker?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
-val historyRegionsBackQueue = HistoryQueue<HistoryItem>(1000)
-val historyRegionsCurrent = ref<HistoryItem?>(null)
-val historyRegionsForwardQueue = HistoryQueue<HistoryItem>(1000)
+val historyRegionsBackQueue = HistoryQueue<RegionsHistoryItem>(1000)
+val historyRegionsCurrent = ref<RegionsHistoryItem?>(null)
+val historyRegionsForwardQueue = HistoryQueue<RegionsHistoryItem>(1000)
 val historySplinesBackQueue = HistoryQueue<RegionSplines>(1000)
 val historySplinesCurrent = ref<RegionSplines?>(null)
 val historySplinesForwardQueue = HistoryQueue<RegionSplines>(1000)
-val historyBiomesBackQueue = HistoryQueue<HistoryItem>(1000)
-val historyBiomesCurrent = ref<HistoryItem?>(null)
-val historyBiomesForwardQueue = HistoryQueue<HistoryItem>(1000)
+val historyBiomesBackQueue = HistoryQueue<BiomesHistoryItem>(1000)
+val historyBiomesCurrent = ref<BiomesHistoryItem?>(null)
+val historyBiomesForwardQueue = HistoryQueue<BiomesHistoryItem>(1000)
+val displayMode = ref(DisplayMode.MAP)
+val defaultToMap = ref(true)
 
 val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker)
 
@@ -124,7 +134,7 @@ var exportPanel = NO_BLOCK
 
 var onWindowResize: () -> Unit = {}
 
-class CurrentState(var parameters: ParameterSet? = null,
+class CurrentState(var parameters: RegionParameters? = null,
                    var regionGraph: Graph? = null,
                    var regionMask: ByteArrayMatrix? = null,
                    var regionSplines: RegionSplines? = null,
@@ -133,8 +143,7 @@ class CurrentState(var parameters: ParameterSet? = null,
                    var biomes: List<Biomes.Biome>? = null,
                    var heightMapTexture: TextureBuilder.TextureId? = null,
                    var riverMapTexture: TextureBuilder.TextureId? = null,
-                   var edgeDetailScale: Int? = null,
-                   var mapDetailScale: Int? = null)
+                   var edgeDetailScale: Int? = null)
 
 var currentState = CurrentState()
 
@@ -195,6 +204,39 @@ fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteW
         meshViewport.reset()
         imageMode.value = 3
     }
+}
+
+fun updateRegionsHistory(parameters: RegionParameters, graph: Graph, regionMask: ByteArrayMatrix) {
+    val historyLast = historyRegionsCurrent.value
+    if (historyLast != null) {
+        if ((historyRegionsBackQueue.size == 0 || historyRegionsBackQueue.peek() != historyLast) && (parameters != historyLast.parameters || historyLast.graphSeed != graph.seed || !Arrays.equals(historyLast.mask.array, regionMask.array))) {
+            historyRegionsBackQueue.push(historyLast.copy())
+        }
+    }
+    historyRegionsForwardQueue.clear()
+    historyRegionsCurrent.value = RegionsHistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(regionMask.width, regionMask.array.copyOf()))
+}
+
+fun updateSplinesHistory(splines: BuildContinent.RegionSplines) {
+    val historyLast = historySplinesCurrent.value
+    if (historyLast != null) {
+        if ((historySplinesBackQueue.size == 0 || historySplinesBackQueue.peek() != historyLast)) {
+            historySplinesBackQueue.push(historyLast.copy())
+        }
+    }
+    historySplinesForwardQueue.clear()
+    historySplinesCurrent.value = splines
+}
+
+fun updateBiomesHistory(parameters: BiomeParameters, graph: Graph, biomeMask: ByteArrayMatrix) {
+    val historyLast = historyBiomesCurrent.value
+    if (historyLast != null) {
+        if ((historyBiomesBackQueue.size == 0 || historyBiomesBackQueue.peek() != historyLast) && (parameters != historyLast.parameters || historyLast.graphSeed != graph.seed || !Arrays.equals(historyLast.mask.array, biomeMask.array))) {
+            historyBiomesBackQueue.push(historyLast.copy())
+        }
+    }
+    historyBiomesForwardQueue.clear()
+    historyBiomesCurrent.value = BiomesHistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(biomeMask.width, biomeMask.array.copyOf()))
 }
 
 private fun clearHistories() {

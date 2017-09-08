@@ -2,7 +2,7 @@ package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.util.BuildContinent.ParameterSet
+import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.generateRegions
 import com.grimfox.gec.util.loadTexture2D
 import com.grimfox.gec.ui.widgets.*
@@ -25,7 +25,7 @@ object Main {
         val preferences = preferences
 
         for (i in 1..2) {
-            task { generateRegions(ParameterSet(regionsSeed = i.toLong()), executor) }
+            task { generateRegions(RegionParameters(regionsSeed = i.toLong()), executor) }
         }
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
@@ -445,8 +445,8 @@ object Main {
                     }
                 }
                 brushActive.value = false
-                if (!DEBUG_BUILD) {
-                    debugWidgets.forEach {
+                if (!EXPERIMENTAL_BUILD) {
+                    experimentalWidgets.forEach {
                         it.isVisible = false
                     }
                 }

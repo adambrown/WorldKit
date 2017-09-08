@@ -22,7 +22,7 @@ import kotlin.collections.LinkedHashSet
 
 object BuildContinent {
 
-    data class Parameters(
+    data class RegionIterationParameters(
             var stride: Int,
             var landPercent: Float,
             var minPerturbation: Float,
@@ -33,12 +33,9 @@ object BuildContinent {
             var largeIsland: Float,
             var smallIsland: Float)
 
-    data class ParameterSet(
+    data class RegionParameters(
             var regionsSeed: Long = System.currentTimeMillis(),
-            var biomesSeed: Long = System.currentTimeMillis(),
             var edgeDetailScale: Int = 4,
-            var biomesMapScale: Int = 4,
-            var mapDetailScale: Int = 4,
             var stride: Int = 7,
             var regionCount: Int = 8,
             var connectedness: Float = 0.11f,
@@ -48,19 +45,23 @@ object BuildContinent {
             var maxRegionTries: Int = 50,
             var maxIslandTries: Int = 500,
             var islandDesire: Int = 1,
-            var parameters: ArrayList<Parameters> = arrayListOf(
-                    Parameters(24, 0.40f, 0.1f, 8, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
-                    Parameters(32, 0.40f, 0.2f, 6, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+            var parameters: ArrayList<RegionIterationParameters> = arrayListOf(
+                    RegionIterationParameters(24, 0.40f, 0.1f, 8, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    RegionIterationParameters(32, 0.40f, 0.2f, 6, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
 //                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f)
-                    Parameters(64, 0.40f, 0.1f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
-                    Parameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+                    RegionIterationParameters(64, 0.40f, 0.1f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
+                    RegionIterationParameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
             ),
-            var currentIteration: Int = 0,
+            var currentIteration: Int = 0)
+
+    data class BiomeParameters(
+            var biomesSeed: Long = System.currentTimeMillis(),
+            var biomesMapScale: Int = 4,
             var biomes: List<Int> = arrayListOf(0))
 
-    fun generateRegions(parameterSet: ParameterSet = ParameterSet(), executor: ExecutorService): Pair<Graph, ByteArrayMatrix> {
+    fun generateRegions(parameterSet: RegionParameters = RegionParameters(), executor: ExecutorService): Pair<Graph, ByteArrayMatrix> {
         return timeIt("generated regions in") {
             val random = Random(parameterSet.regionsSeed)
             var (graph, regionMask) = buildRegions(parameterSet)
@@ -747,7 +748,7 @@ object BuildContinent {
         return output.map { Point2F(it.a, 1.0f - it.b) }
     }
 
-    fun generateWaterFlows(parameterSet: ParameterSet, regionSplines: RegionSplines, biomeGraph: Graph, biomeMask: Matrix<Byte>, biomes: List<Biome>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, mapScale: Int): Pair<TextureId, TextureId> {
+    fun generateWaterFlows(parameterSet: RegionParameters, regionSplines: RegionSplines, biomeGraph: Graph, biomeMask: Matrix<Byte>, biomes: List<Biome>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, mapScale: Int): Pair<TextureId, TextureId> {
         return timeIt("generated water flow in") {
             generateWaterFlows(Random(parameterSet.regionsSeed), regionSplines, biomeGraph, biomeMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, executor, 4096, mapScale, biomes)
         }
