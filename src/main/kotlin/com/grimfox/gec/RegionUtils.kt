@@ -17,8 +17,7 @@ class RegionsBuilder(
         val regionFile: DynamicTextReference,
         val useRegionFile: MonitoredReference<Boolean>,
         val displayMode: MonitoredReference<DisplayMode>,
-        val defaultToMap: MonitoredReference<Boolean>
-) {
+        val defaultToMap: MonitoredReference<Boolean>) {
 
     fun build(parameters: BuildContinent.ParameterSet, refreshOnly: Boolean = false, rebuildSplines: Boolean = true) {
         val currentRegionGraph = currentState.regionGraph

@@ -16,14 +16,11 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.renderSplineSelectors
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.ParameterSet
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import com.grimfox.gec.util.BuildContinent.buildBiomeMaps
 import com.grimfox.gec.util.BuildContinent.generateWaterFlows
 import com.grimfox.gec.util.Rendering.renderRegions
 import org.lwjgl.glfw.GLFW
-import java.io.File
 import java.lang.Math.round
 import java.util.*
-import javax.imageio.ImageIO
 import kotlin.collections.LinkedHashMap
 
 private val biomeValues = linkedMapOf(
@@ -41,7 +38,7 @@ private val cachedGraph512 = preferences.cachedGraph512!!
 
 private val cachedGraph1024 = preferences.cachedGraph1024!!
 
-private val shrinkGroup = hShrinkGroup()
+private val leftPanelLabelShrinkGroup = hShrinkGroup()
 private val regionFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useRegionFile = ref(false)
@@ -65,6 +62,7 @@ private val regionSize = ref(0.034f)
 private val iterations = ref(5)
 private val currentBiomeBrushValue = ref(1.toByte())
 private val mapDetailScale = ref(4)
+
 private val onUpdateParamsFun = {
     if (!allowUnsafe.value) {
         stride.value = ((regions.value + 3) / 4) + 5
@@ -83,63 +81,13 @@ private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
 
 enum class DisplayMode { REGIONS, MAP, BIOMES, MESH }
-
 private val displayMode = ref(DisplayMode.MAP)
 private val defaultToMap = ref(true)
 
 private val regionsBuilder = RegionsBuilder(regionFile, useRegionFile, displayMode, defaultToMap)
-
+private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val generationLock = DisableSetLock()
-
 private val editToggleSet = ToggleSet(executor)
-
-private fun buildBiomesFun(parameters: ParameterSet, refreshOnly: Boolean = false) {
-    val currentBiomeGraph = currentState.biomeGraph
-    val currentBiomeMask = currentState.biomeMask
-    val (biomeGraph, biomeMask) = if (refreshOnly && currentBiomeGraph != null && currentBiomeMask != null) {
-        currentBiomeGraph to currentBiomeMask
-    } else {
-        val finalBiomeFile = biomeFile.reference.value
-        if (useBiomeFile.value && finalBiomeFile.isNotBlank()) {
-            val mask = loadBiomeMaskFromImage(File(finalBiomeFile))
-            for (i in 0..mask.size.toInt() - 1) {
-                mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
-            }
-            val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
-            Pair(graph, mask)
-        } else {
-            val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
-            val biomeScale = round(scale * 21) + 7
-            val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
-            buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
-        }
-    }
-    currentState.biomeGraph = biomeGraph
-    currentState.biomeMask = biomeMask
-    currentState.biomes = parameters.biomes.map {
-        when (it) {
-            0 -> Biomes.MOUNTAINS_BIOME
-            1 -> Biomes.COASTAL_MOUNTAINS_BIOME
-            2 -> Biomes.FOOTHILLS_BIOME
-            3 -> Biomes.ROLLING_HILLS_BIOME
-            4 -> Biomes.PLATEAU_BIOME
-            5 -> Biomes.PLAINS_BIOME
-            else -> Biomes.MOUNTAINS_BIOME
-        }
-    }
-    currentState.heightMapTexture = null
-    currentState.riverMapTexture = null
-    val biomeTextureId = renderRegions(biomeGraph, biomeMask)
-    val currentSplines = currentState.regionSplines
-    val splineTextureId = if (currentSplines != null) {
-        TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
-    } else {
-        TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
-    }
-    meshViewport.setBiomes(biomeTextureId, splineTextureId)
-    imageMode.value = 2
-    displayMode.value = DisplayMode.BIOMES
-}
 
 private fun syncParameterValues(parameters: ParameterSet) {
     var randomSeed = parameters.regionsSeed
@@ -311,7 +259,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     }
                 }
                 vSpacer(HALF_ROW_HEIGHT)
-                vLongInputRow(regionsSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
+                vLongInputRow(regionsSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                     hSpacer(SMALL_SPACER_SIZE)
                     button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
                         val randomSeed = RANDOM.nextLong()
@@ -323,8 +271,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                     }
                 }
-                vFileRowWithToggle(regionFile, useRegionFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-                val regionScaleSlider = vSliderWithValueRow(edgeDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Edge detail:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+                vFileRowWithToggle(regionFile, useRegionFile, LARGE_ROW_HEIGHT, text("Region file:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+                val regionScaleSlider = vSliderWithValueRow(edgeDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Edge detail:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
                 var regionScaleSliderInitial = edgeDetailScale.value
                 val regionScaleSliderMouseDown = regionScaleSlider.onMouseDown
                 regionScaleSlider.onMouseDown { a, b, c, d ->
@@ -352,16 +300,16 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                     }
                 }
-                vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Number of regions:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
-                vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Prefer islands:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
-                debugWidgets.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)))
-                debugWidgets.add(vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), shrinkGroup, MEDIUM_SPACER_SIZE))
+                vSliderWithValueRow(regions, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Number of regions:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+                vSliderWithValueRow(islands, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Prefer islands:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..5), linearClampedScaleFunctionInverse(0..5))
+                debugWidgets.add(vSliderRow(iterations, LARGE_ROW_HEIGHT, text("Iterations:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(2..30), linearClampedScaleFunctionInverse(2..30)))
+                debugWidgets.add(vToggleRow(allowUnsafe, LARGE_ROW_HEIGHT, text("Unsafe mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE))
                 val unsafeBlocks = ArrayList<Block>()
-                unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value })
-                unsafeBlocks.add(vSliderWithValueRow(startPoints, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start points:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6)).with { isMouseAware = allowUnsafe.value })
-                unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value })
-                unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value })
-                unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(stride, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Stride:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(5..10), linearClampedScaleFunctionInverse(5..10)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(startPoints, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start points:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowUnsafe.value })
+                unsafeBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowUnsafe.value })
                 allowUnsafe.listener { _, new ->
                     if (!new) {
                         onUpdateParamsFun()
@@ -373,7 +321,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
                 allowUnsafe.value = false
                 val editRegionsMode = ref(false)
-                vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Manual edit:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Manual edit:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                 editToggleSet.add(editRegionsMode,
                         {
                             val currentGraph = currentState.regionGraph
@@ -417,7 +365,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             generationLock.unlock()
                         },
-                        vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+                        vSliderRow(regionEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
                 vSpacer(HALF_ROW_HEIGHT)
                 vButtonRow(LARGE_ROW_HEIGHT) {
                     generationLock.disableOnLockButton(this, "Generate") {
@@ -508,7 +456,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             val splinePanelExpanded = ref(true)
             val splinePanel = vExpandPanel("Edit splines", expanded = splinePanelExpanded) {
                 val drawSplinesMode = ref(false)
-                vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                 editToggleSet.add(drawSplinesMode,
                         {
                             val currentSplines = currentState.regionSplines
@@ -572,10 +520,10 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             generationLock.unlock()
                         },
-                        vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
+                        vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
                 val editSplinesMode = ref(false)
-                vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                val splineEditRadiusSlider = vSliderRow(editSplinesSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
+                vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+                val splineEditRadiusSlider = vSliderRow(editSplinesSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
                 var splineEditRadiusSliderInitial = editSplinesSelectionRadius.value
                 val splineEditRadiusSliderMouseDown = splineEditRadiusSlider.onMouseDown
                 splineEditRadiusSlider.onMouseDown { a, b, c, d ->
@@ -675,8 +623,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         },
                         splineEditRadiusSlider)
                 val deleteSplinesMode = ref(false)
-                vToggleRow(deleteSplinesMode, LARGE_ROW_HEIGHT, text("Delete splines:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                val splineDeleteRadiusSlider = vSliderRow(deleteSplineSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
+                vToggleRow(deleteSplinesMode, LARGE_ROW_HEIGHT, text("Delete splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+                val splineDeleteRadiusSlider = vSliderRow(deleteSplineSelectionRadius, LARGE_ROW_HEIGHT, text("Selection radius:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(10..500), linearClampedScaleFunctionInverse(10..500))
                 var splineDeleteRadiusSliderInitial = deleteSplineSelectionRadius.value
                 val splineDeleteRadiusSliderMouseDown = splineDeleteRadiusSlider.onMouseDown
                 splineDeleteRadiusSlider.onMouseDown { a, b, c, d ->
@@ -849,7 +797,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             splinePanelExpanded.listeners.add(resetScrollerListener)
             val biomePanelExpanded = ref(true)
             val biomePanel = vExpandPanel("Edit biomes", expanded = biomePanelExpanded) {
-                vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
+                vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
                     hSpacer(SMALL_SPACER_SIZE)
                     button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
                         val randomSeed = RANDOM.nextLong()
@@ -861,9 +809,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                     }
                 }
-                vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-                vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-                vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+                vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+                vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+                vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
                 val biomeRows = block {
                     vAlign = VerticalAlignment.TOP
                     hAlign = HorizontalAlignment.LEFT
@@ -886,7 +834,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
                                 val index = newBiomes.size
                                 val selectedValue = selectedBiomes[index]
-                                biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, shrinkGroup, MEDIUM_SPACER_SIZE)
+                                biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                                 newBiomes.add(selectedValue.value)
                                 selectedValue.listener { oldBiomeId, newBiomeId ->
                                     if (oldBiomeId != newBiomeId) {
@@ -901,7 +849,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     }
                 }
                 biomeCount.value = 6
-                vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                 editToggleSet.add(editBiomesMode,
                         {
                             val currentBiomeGraph = currentState.biomeGraph
@@ -938,7 +886,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             brushListener.value = null
                             brushOn.value = false
                             val parameters = extractCurrentParameters()
-                            buildBiomesFun(parameters, true)
+                            biomesBuilder.build(parameters, true)
                             val currentGraph = currentState.biomeGraph
                             val currentMask = currentState.biomeMask
                             if (currentGraph != null && currentMask != null) {
@@ -946,12 +894,12 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             }
                             generationLock.unlock()
                         },
-                        vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
+                        vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
                 vButtonRow(LARGE_ROW_HEIGHT) {
                     generationLock.disableOnLockButton(this, "Generate") {
                         generationLock.doWithLock {
                             val parameters = extractCurrentParameters()
-                            buildBiomesFun(parameters)
+                            biomesBuilder.build(parameters)
                             val currentGraph = currentState.biomeGraph
                             val currentMask = currentState.biomeMask
                             if (currentGraph != null && currentMask != null) {
@@ -970,7 +918,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 biomesSeed.value = randomSeed
                             }
                             val parameters = extractCurrentParameters()
-                            buildBiomesFun(parameters)
+                            biomesBuilder.build(parameters)
                             val currentGraph = currentState.biomeGraph
                             val currentMask = currentState.biomeMask
                             if (currentGraph != null && currentMask != null) {
@@ -990,7 +938,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 syncParameterValues(historyItem.parameters)
                                 currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                                 currentState.biomeMask = historyItem.mask
-                                buildBiomesFun(historyItem.parameters, true)
+                                biomesBuilder.build(historyItem.parameters, true)
                                 historyBiomesCurrent.value = historyItem.copy()
                             }
                         }
@@ -1007,7 +955,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                 syncParameterValues(historyItem.parameters)
                                 currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                                 currentState.biomeMask = historyItem.mask
-                                buildBiomesFun(historyItem.parameters, true)
+                                biomesBuilder.build(historyItem.parameters, true)
                                 historyBiomesCurrent.value = historyItem.copy()
                             }
                         }
@@ -1017,7 +965,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             }
             biomePanel.isVisible = false
             biomePanelExpanded.listeners.add(resetScrollerListener)
-            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
             mapDetailScaleSlider.isVisible = false
             mapDetailScale.listener { old, new ->
                 if (old != new) {
@@ -1194,36 +1142,4 @@ private fun updateBiomesHistory(parameters: ParameterSet, graph: Graph, biomeMas
     }
     historyBiomesForwardQueue.clear()
     historyBiomesCurrent.value = HistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(biomeMask.width, biomeMask.array.copyOf()))
-}
-
-private fun loadBiomeMaskFromImage(file: File): ByteArrayMatrix {
-    val colorMap = LinkedHashMap<Int, Int>(16)
-    val bufferedImage = ImageIO.read(file)
-    val widthM1 = bufferedImage.width - 1
-    val heightM1 = bufferedImage.height - 1
-    var unknownColors = false
-    for (y in 0..127) {
-        for (x in 0..127) {
-            val actualX = round(((x + 0.5f) / 128.0f) * widthM1)
-            val actualY = round(((y + 0.5f) / 128.0f) * heightM1)
-            val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
-            val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
-            if (!unknownColors && curVal == null) {
-                if (!REGION_COLOR_INTS.contains(imageValue)) {
-                    unknownColors = true
-                }
-            }
-        }
-    }
-    if (unknownColors) {
-        colorMap.map { it.key to it.value }.sortedByDescending { it.first and 0x00FF0000 ushr 16 }.forEachIndexed { i, (first) -> colorMap[first] = i }
-    } else {
-        colorMap.clear()
-        REGION_COLOR_INTS.forEachIndexed { i, value ->
-            colorMap[value] = i - 1
-        }
-    }
-    return ByteArrayMatrix(128) { i ->
-        (colorMap[bufferedImage.getRGB(round((((i % 128) + 0.5f) / 128.0f) * widthM1), round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
-    }
 }
