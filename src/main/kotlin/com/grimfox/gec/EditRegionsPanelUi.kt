@@ -18,6 +18,8 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.util.*
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 private val allowExperimental = ref(false)
 private val regionsSeed = ref(1L)
@@ -92,9 +94,9 @@ fun Block.editRegionsPanel(
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
-        dialogLayer: Block,
         ui: UserInterface,
-        uiLayout: UiLayout): Block {
+        uiLayout: UiLayout,
+        dialogLayer: Block): Block {
     onUpdateParamsFun()
     regions.listener { _, _ -> onUpdateParamsFun() }
     islands.listener { _, _ -> onUpdateParamsFun() }
@@ -623,7 +625,7 @@ private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: Us
         if (file == null) {
             null
         } else {
-            val historyItem = DataInputStream(file.inputStream().buffered()).use { stream ->
+            val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
                 val parameters = JSON.readValue(stream.readUTF(), RegionParameters::class.java)
                 val graphSeed = stream.readLong()
                 val maskWidth = stream.readInt()
@@ -646,7 +648,7 @@ private fun exportRegionsFile(regions: RegionsHistoryItem?, dialogLayer: Block, 
             if (saveFile != null) {
                 val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkr")}.wkr"
                 val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                DataOutputStream(actualFile.outputStream().buffered()).use { stream ->
+                DataOutputStream(GZIPOutputStream(actualFile.outputStream()).buffered()).use { stream ->
                     val parameters = JSON.writeValueAsString(regions.parameters)
                     stream.writeUTF(parameters)
                     stream.writeLong(regions.graphSeed)

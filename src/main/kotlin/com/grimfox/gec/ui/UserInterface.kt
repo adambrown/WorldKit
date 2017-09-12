@@ -1,6 +1,7 @@
 package com.grimfox.gec.ui
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include.*
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.*
@@ -34,7 +35,7 @@ import java.nio.IntBuffer
 import java.util.*
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
-val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(NON_NULL)
+val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(ALWAYS).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
 private val isMac = System.getProperty("os.name").toLowerCase().contains("mac")
 private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsScreenInfoFetcher()
