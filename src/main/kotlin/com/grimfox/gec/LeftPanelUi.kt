@@ -111,7 +111,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             regionPanel.isVisible = false
             regionPanelExpanded.listeners.add(resetScrollerListener)
             val splinePanelExpanded = ref(true)
-            val splinePanel = editMapPanel(splinePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup)
+            val splinePanel = editMapPanel(splinePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, ui, dialogLayer)
             splinePanel.isVisible = false
             splinePanelExpanded.listeners.add(resetScrollerListener)
             val biomePanelExpanded = ref(true)
