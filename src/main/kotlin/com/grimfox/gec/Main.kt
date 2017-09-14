@@ -236,7 +236,16 @@ object Main {
                                 }
                                 menuDivider()
                                 menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {
-                                    closeWindow()
+                                    if (currentProject.value != null) {
+                                        dialogLayer.isVisible = true
+                                        overwriteWarningReference.value = "Do you want to save the current project before exiting?"
+                                        overwriteWarningDialog.isVisible = true
+                                        dialogCallback.value = {
+                                            closeWindow()
+                                        }
+                                    } else {
+                                        closeWindow()
+                                    }
                                 }
                             }
                             menu("Settings") {
@@ -295,7 +304,18 @@ object Main {
                         hSpacer(SMALL_SPACER_SIZE)
                         button(glyph(GLYPH_MINIMIZE), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
-                        button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) { closeWindow() }
+                        button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) {
+                            if (currentProject.value != null) {
+                                dialogLayer.isVisible = true
+                                overwriteWarningReference.value = "Do you want to save the current project before exiting?"
+                                overwriteWarningDialog.isVisible = true
+                                dialogCallback.value = {
+                                    closeWindow()
+                                }
+                            } else {
+                                closeWindow()
+                            }
+                        }
                     }
                     loadRecentProjects(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                     block {
