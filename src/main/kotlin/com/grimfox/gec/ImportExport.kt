@@ -7,8 +7,8 @@ import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.util.BuildContinent
-import com.grimfox.gec.util.FileDialogs
+import com.grimfox.gec.util.*
+import com.grimfox.gec.util.BuildContinent.RegionSplines
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -17,7 +17,61 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 fun importProjectFile(file: File): Project? {
-return null
+    return DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
+        val currentState = CurrentState()
+        val hasRegionState = stream.readBoolean()
+        if (hasRegionState) {
+            val currentRegionState = stream.readRegionsHistoryItem()
+            currentState.regionParameters = currentRegionState.parameters
+            currentState.regionGraph = Graphs.generateGraph(128, currentRegionState.graphSeed, 0.8)
+            currentState.regionMask = currentRegionState.mask
+        }
+        val hasSplineState = stream.readBoolean()
+        if (hasSplineState) {
+            val currentSplineState = stream.readRegionSplines()
+            currentState.regionSplines = currentSplineState
+        }
+        val hasBiomeState = stream.readBoolean()
+        if (hasBiomeState) {
+            val currentBiomeState = stream.readBiomesHistoryItem()
+            currentState.biomeParameters = currentBiomeState.parameters
+            currentState.biomeGraph = Graphs.generateGraph(128, currentBiomeState.graphSeed, 0.8)
+            currentState.biomeMask = currentBiomeState.mask
+            currentState.biomes = currentBiomeState.parameters.biomes.map { ordinalToBiome(it) }
+        }
+        val historyRegionsBackQueue = stream.readHistoryQueue { readRegionsHistoryItem() }
+        val historyRegionsCurrentValue = if (stream.readBoolean()) {
+            stream.readRegionsHistoryItem()
+        } else {
+            null
+        }
+        val historyRegionsForwardQueue = stream.readHistoryQueue { readRegionsHistoryItem() }
+        val historySplinesBackQueue = stream.readHistoryQueue { readRegionSplines() }
+        val historySplinesCurrentValue = if (stream.readBoolean()) {
+            stream.readRegionSplines()
+        } else {
+            null
+        }
+        val historySplinesForwardQueue = stream.readHistoryQueue { readRegionSplines() }
+        val historyBiomesBackQueue = stream.readHistoryQueue { readBiomesHistoryItem() }
+        val historyBiomesCurrentValue = if (stream.readBoolean()) {
+            stream.readBiomesHistoryItem()
+        } else {
+            null
+        }
+        val historyBiomesForwardQueue = stream.readHistoryQueue { readBiomesHistoryItem() }
+        Project(
+                currentState = currentState,
+                historyRegionsBackQueue = historyRegionsBackQueue,
+                historyRegionsCurrent = ref(historyRegionsCurrentValue),
+                historyRegionsForwardQueue = historyRegionsForwardQueue,
+                historySplinesBackQueue = historySplinesBackQueue,
+                historySplinesCurrent = ref(historySplinesCurrentValue),
+                historySplinesForwardQueue = historySplinesForwardQueue,
+                historyBiomesBackQueue = historyBiomesBackQueue,
+                historyBiomesCurrent = ref(historyBiomesCurrentValue),
+                historyBiomesForwardQueue = historyBiomesForwardQueue)
+    }
 }
 
 fun exportProjectFile(project: Project, file: File) {
@@ -91,36 +145,13 @@ fun exportProjectFile(project: Project, file: File) {
     }
 }
 
-private fun <T> DataOutputStream.writeHistoryQueue(queue: HistoryQueue<T>, serializer: DataOutputStream.(T) -> Unit) {
-    val (buffer, head, tail, size, limit) = queue.serializableData()
-    writeInt(head)
-    writeInt(tail)
-    writeInt(size)
-    writeInt(limit)
-    buffer.forEach {
-        if (it == null) {
-            writeBoolean(false)
-        } else {
-            writeBoolean(true)
-            serializer(it)
-        }
-    }
-}
-
 fun importRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionsHistoryItem? {
     return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkr") { file ->
         if (file == null) {
             null
         } else {
             val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                stream.readInt()
-                val parameters = JSON.readValue(stream.readUTF(), BuildContinent.RegionParameters::class.java)
-                val graphSeed = stream.readLong()
-                val maskWidth = stream.readInt()
-                val maskBytes = ByteArray(maskWidth * maskWidth)
-                stream.readFully(maskBytes)
-                val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
-                RegionsHistoryItem(parameters, graphSeed, regionMask)
+                stream.readRegionsHistoryItem()
             }
             historyItem
         }
@@ -151,52 +182,20 @@ fun exportRegionsFile(regions: RegionsHistoryItem?, dialogLayer: Block, preferen
     return false
 }
 
-private fun DataOutputStream.writeRegionsHistoryItem(regions: RegionsHistoryItem) {
-    writeInt(1)
-    val parameters = JSON.writeValueAsString(regions.parameters)
-    writeUTF(parameters)
-    writeLong(regions.graphSeed)
-    writeInt(regions.mask.width)
-    write(regions.mask.array)
-}
-
-fun importSplinesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): BuildContinent.RegionSplines? {
+fun importSplinesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionSplines? {
     return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wks") { file ->
         if (file == null) {
             null
         } else {
             val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                stream.readInt()
-                BuildContinent.RegionSplines(
-                        hasCustomizations = stream.readBoolean(),
-                        coastEdges = stream.readCoastEdges(),
-                        coastPoints = stream.readCoastPoints(),
-                        riverOrigins = stream.readPoint2FListList(),
-                        riverEdges = stream.readLineSegment2FListList(),
-                        riverPoints = stream.readPoint2FListList(),
-                        mountainOrigins = stream.readPoint2FListList(),
-                        mountainEdges = stream.readLineSegment2FListList(),
-                        mountainPoints = stream.readPoint2FListList(),
-                        ignoredOrigins = stream.readPoint2FListList(),
-                        ignoredEdges = stream.readLineSegment2FListList(),
-                        ignoredPoints = stream.readPoint2FListList(),
-                        deletedOrigins = stream.readPoint2FListList(),
-                        deletedEdges = stream.readLineSegment2FListList(),
-                        deletedPoints = stream.readPoint2FListList(),
-                        customRiverEdges = stream.readLineSegment2FListList(),
-                        customRiverPoints = stream.readPoint2FListList(),
-                        customMountainEdges = stream.readLineSegment2FListList(),
-                        customMountainPoints = stream.readPoint2FListList(),
-                        customIgnoredEdges = stream.readLineSegment2FListList(),
-                        customIgnoredPoints = stream.readPoint2FListList()
-                )
+                stream.readRegionSplines()
             }
             historyItem
         }
     }
 }
 
-fun exportSplinesFile(splines: BuildContinent.RegionSplines?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
+fun exportSplinesFile(splines: RegionSplines?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
     if (splines != null) {
         ui.ignoreInput = true
         dialogLayer.isVisible = true
@@ -220,45 +219,13 @@ fun exportSplinesFile(splines: BuildContinent.RegionSplines?, dialogLayer: Block
     return false
 }
 
-private fun DataOutputStream.writeRegionSplines(splines: BuildContinent.RegionSplines) {
-    writeInt(1)
-    writeBoolean(splines.hasCustomizations)
-    writeCoastEdges(splines.coastEdges)
-    writeCoastPoints(splines.coastPoints)
-    writePoint2FListList(splines.riverOrigins)
-    writeLineSegment2FListList(splines.riverEdges)
-    writePoint2FListList(splines.riverPoints)
-    writePoint2FListList(splines.mountainOrigins)
-    writeLineSegment2FListList(splines.mountainEdges)
-    writePoint2FListList(splines.mountainPoints)
-    writePoint2FListList(splines.ignoredOrigins)
-    writeLineSegment2FListList(splines.ignoredEdges)
-    writePoint2FListList(splines.ignoredPoints)
-    writePoint2FListList(splines.deletedOrigins)
-    writeLineSegment2FListList(splines.deletedEdges)
-    writePoint2FListList(splines.deletedPoints)
-    writeLineSegment2FListList(splines.customRiverEdges)
-    writePoint2FListList(splines.customRiverPoints)
-    writeLineSegment2FListList(splines.customMountainEdges)
-    writePoint2FListList(splines.customMountainPoints)
-    writeLineSegment2FListList(splines.customIgnoredEdges)
-    writePoint2FListList(splines.customIgnoredPoints)
-}
-
 fun importBiomesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): BiomesHistoryItem? {
     return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkb") { file ->
         if (file == null) {
             null
         } else {
             val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                stream.readInt()
-                val parameters = JSON.readValue(stream.readUTF(), BuildContinent.BiomeParameters::class.java)
-                val graphSeed = stream.readLong()
-                val maskWidth = stream.readInt()
-                val maskBytes = ByteArray(maskWidth * maskWidth)
-                stream.readFully(maskBytes)
-                val biomesMask = ByteArrayMatrix(maskWidth, maskBytes)
-                BiomesHistoryItem(parameters, graphSeed, biomesMask)
+                stream.readBiomesHistoryItem()
             }
             historyItem
         }
@@ -289,6 +256,112 @@ fun exportBiomesFile(biomes: BiomesHistoryItem?, dialogLayer: Block, preferences
     return false
 }
 
+private fun <T> DataOutputStream.writeHistoryQueue(queue: HistoryQueue<T>, serializer: DataOutputStream.(T) -> Unit) {
+    val (buffer, head, tail, size, limit) = queue.serializableData()
+    writeInt(head)
+    writeInt(tail)
+    writeInt(size)
+    writeInt(limit)
+    writeInt(buffer.size)
+    buffer.forEach {
+        if (it == null) {
+            writeBoolean(false)
+        } else {
+            writeBoolean(true)
+            serializer(it)
+        }
+    }
+}
+
+private fun <T> DataInputStream.readHistoryQueue(deserializer: DataInputStream.() -> T): HistoryQueue<T> {
+    val head = readInt()
+    val tail = readInt()
+    val size = readInt()
+    val limit = readInt()
+    val bufferSize = readInt()
+    val buffer = ArrayList<T?>(bufferSize)
+    for (i in 1..bufferSize) {
+        if(readBoolean()) {
+            buffer.add(deserializer())
+        } else {
+            buffer.add(null)
+        }
+    }
+    return HistoryQueue.deserialize(buffer, head, tail, size, limit)
+}
+
+private fun DataOutputStream.writeRegionsHistoryItem(regions: RegionsHistoryItem) {
+    writeInt(1)
+    val parameters = JSON.writeValueAsString(regions.parameters)
+    writeUTF(parameters)
+    writeLong(regions.graphSeed)
+    writeInt(regions.mask.width)
+    write(regions.mask.array)
+}
+
+private fun DataInputStream.readRegionsHistoryItem(): RegionsHistoryItem {
+    readInt()
+    val parameters = JSON.readValue(readUTF(), BuildContinent.RegionParameters::class.java)
+    val graphSeed = readLong()
+    val maskWidth = readInt()
+    val maskBytes = ByteArray(maskWidth * maskWidth)
+    readFully(maskBytes)
+    val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
+    return RegionsHistoryItem(parameters, graphSeed, regionMask)
+}
+
+private fun DataOutputStream.writeRegionSplines(splines: RegionSplines) {
+    writeInt(1)
+    writeBoolean(splines.hasCustomizations)
+    writeCoastEdges(splines.coastEdges)
+    writeCoastPoints(splines.coastPoints)
+    writePoint2FListList(splines.riverOrigins)
+    writeLineSegment2FListList(splines.riverEdges)
+    writePoint2FListList(splines.riverPoints)
+    writePoint2FListList(splines.mountainOrigins)
+    writeLineSegment2FListList(splines.mountainEdges)
+    writePoint2FListList(splines.mountainPoints)
+    writePoint2FListList(splines.ignoredOrigins)
+    writeLineSegment2FListList(splines.ignoredEdges)
+    writePoint2FListList(splines.ignoredPoints)
+    writePoint2FListList(splines.deletedOrigins)
+    writeLineSegment2FListList(splines.deletedEdges)
+    writePoint2FListList(splines.deletedPoints)
+    writeLineSegment2FListList(splines.customRiverEdges)
+    writePoint2FListList(splines.customRiverPoints)
+    writeLineSegment2FListList(splines.customMountainEdges)
+    writePoint2FListList(splines.customMountainPoints)
+    writeLineSegment2FListList(splines.customIgnoredEdges)
+    writePoint2FListList(splines.customIgnoredPoints)
+}
+
+private fun DataInputStream.readRegionSplines(): RegionSplines {
+    readInt()
+    return RegionSplines(
+            hasCustomizations = readBoolean(),
+            coastEdges = readCoastEdges(),
+            coastPoints = readCoastPoints(),
+            riverOrigins = readPoint2FListList(),
+            riverEdges = readLineSegment2FListList(),
+            riverPoints = readPoint2FListList(),
+            mountainOrigins = readPoint2FListList(),
+            mountainEdges = readLineSegment2FListList(),
+            mountainPoints = readPoint2FListList(),
+            ignoredOrigins = readPoint2FListList(),
+            ignoredEdges = readLineSegment2FListList(),
+            ignoredPoints = readPoint2FListList(),
+            deletedOrigins = readPoint2FListList(),
+            deletedEdges = readLineSegment2FListList(),
+            deletedPoints = readPoint2FListList(),
+            customRiverEdges = readLineSegment2FListList(),
+            customRiverPoints = readPoint2FListList(),
+            customMountainEdges = readLineSegment2FListList(),
+            customMountainPoints = readPoint2FListList(),
+            customIgnoredEdges = readLineSegment2FListList(),
+            customIgnoredPoints = readPoint2FListList()
+    )
+}
+
 private fun DataOutputStream.writeBiomesHistoryItem(biomes: BiomesHistoryItem) {
     writeInt(1)
     val parameters = JSON.writeValueAsString(biomes.parameters)
@@ -296,6 +369,17 @@ private fun DataOutputStream.writeBiomesHistoryItem(biomes: BiomesHistoryItem) {
     writeLong(biomes.graphSeed)
     writeInt(biomes.mask.width)
     write(biomes.mask.array)
+}
+
+private fun DataInputStream.readBiomesHistoryItem(): BiomesHistoryItem {
+    readInt()
+    val parameters = JSON.readValue(readUTF(), BuildContinent.BiomeParameters::class.java)
+    val graphSeed = readLong()
+    val maskWidth = readInt()
+    val maskBytes = ByteArray(maskWidth * maskWidth)
+    readFully(maskBytes)
+    val biomesMask = ByteArrayMatrix(maskWidth, maskBytes)
+    return BiomesHistoryItem(parameters, graphSeed, biomesMask)
 }
 
 private fun DataOutputStream.writeCoastEdges(coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>) {

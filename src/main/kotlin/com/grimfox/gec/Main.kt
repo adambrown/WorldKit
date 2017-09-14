@@ -183,6 +183,7 @@ object Main {
                                             val openedProject = openProject(dialogLayer, preferences, ui)
                                             if (openedProject != null) {
                                                 currentProject.value = openedProject
+                                                afterProjectOpen()
                                             }
                                         } catch (e: JsonParseException) {
                                             errorHandler.displayErrorMessage("The selected file is not a valid project.")

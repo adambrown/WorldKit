@@ -38,17 +38,7 @@ class BiomesBuilder(
         currentState.biomeParameters = parameters
         currentState.biomeGraph = biomeGraph
         currentState.biomeMask = biomeMask
-        currentState.biomes = parameters.biomes.map {
-            when (it) {
-                0 -> Biomes.MOUNTAINS_BIOME
-                1 -> Biomes.COASTAL_MOUNTAINS_BIOME
-                2 -> Biomes.FOOTHILLS_BIOME
-                3 -> Biomes.ROLLING_HILLS_BIOME
-                4 -> Biomes.PLATEAU_BIOME
-                5 -> Biomes.PLAINS_BIOME
-                else -> Biomes.MOUNTAINS_BIOME
-            }
-        }
+        currentState.biomes = parameters.biomes.map { ordinalToBiome(it) }
         currentState.heightMapTexture = null
         currentState.riverMapTexture = null
         val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)

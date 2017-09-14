@@ -7,14 +7,6 @@ import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import java.util.ArrayList
 
-private val biomeValues = linkedMapOf(
-        "Mountains" to 0,
-        "Coastal mountains" to 1,
-        "Foothills" to 2,
-        "Rolling hills" to 3,
-        "Plateaus" to 4,
-        "Plains" to 5
-)
 private val biomesSeed = ref(1L)
 private val biomesMapScale = ref(4)
 private val biomeCount = ref(1)
@@ -23,7 +15,7 @@ private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useBiomeFile = ref(false)
 private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val biomes = ref(emptyList<Int>())
-private val selectedBiomes = Array(16) { ref(it % biomeValues.size) }.toList()
+private val selectedBiomes = Array(16) { ref(it % BIOME_NAMES.size) }.toList()
 
 private fun syncParameterValues(parameters: BuildContinent.BiomeParameters) {
     val randomSeed = parameters.biomesSeed
@@ -117,7 +109,7 @@ fun Block.editBiomesPanel(
                     for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
                         val index = newBiomes.size
                         val selectedValue = selectedBiomes[index]
-                        biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], biomeValues.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+                        biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                         newBiomes.add(selectedValue.value)
                         selectedValue.listener { oldBiomeId, newBiomeId ->
                             if (oldBiomeId != newBiomeId) {

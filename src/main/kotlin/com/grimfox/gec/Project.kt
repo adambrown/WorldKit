@@ -62,7 +62,7 @@ fun loadRecentProjects(dialogLayer: Block, overwriteWarningReference: MutableRef
     if (RECENT_PROJECTS_FILE.isFile && RECENT_PROJECTS_FILE.canRead()) {
         RECENT_PROJECTS_FILE.inputStream().buffered().use {
             JSON.readValue(it, RecentProjects::class.java)
-        }?.recentProjects?.map(::File)?.forEach {
+        }?.recentProjects?.map(::File)?.reversed()?.forEach {
             addProjectToRecentProjects(it, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
         }
     }
@@ -103,6 +103,7 @@ fun addProjectToRecentProjects(folder: File?, dialogLayer: Block, overwriteWarni
                     val openedProject = openProject(finalFolder, dialogLayer, ui)
                     if (openedProject != null) {
                         currentProject.value = openedProject
+                        afterProjectOpen()
                     }
                 } catch (e: JsonParseException) {
                     errorHandler.displayErrorMessage("The selected file is not a valid project.")

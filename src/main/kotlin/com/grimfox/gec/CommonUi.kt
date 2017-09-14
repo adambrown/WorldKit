@@ -7,11 +7,9 @@ import com.grimfox.gec.ui.bInt
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.gInt
 import com.grimfox.gec.ui.rInt
-import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.ui.widgets.DynamicTextReference
-import com.grimfox.gec.ui.widgets.MeshViewport3D
-import com.grimfox.gec.ui.widgets.NO_BLOCK
+import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
+import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
@@ -49,6 +47,28 @@ val REGION_COLOR_INTS = Array(REGION_COLORS.size) { i ->
     colorToInt(i)
 }.toList()
 
+val BIOME_NAMES = linkedMapOf(
+        "Mountains" to 0,
+        "Coastal mountains" to 1,
+        "Foothills" to 2,
+        "Rolling hills" to 3,
+        "Plateaus" to 4,
+        "Plains" to 5
+)
+
+val BIOME_ORDINALS = linkedMapOf(*BIOME_NAMES.map { it.value  to it.key }.toTypedArray())
+
+fun ordinalToBiome(it: Int): Biome {
+    return when (it) {
+        0 -> Biomes.MOUNTAINS_BIOME
+        1 -> Biomes.COASTAL_MOUNTAINS_BIOME
+        2 -> Biomes.FOOTHILLS_BIOME
+        3 -> Biomes.ROLLING_HILLS_BIOME
+        4 -> Biomes.PLATEAU_BIOME
+        5 -> Biomes.PLAINS_BIOME
+        else -> Biomes.MOUNTAINS_BIOME
+    }
+}
 
 val RANDOM = Random()
 val DEFAULT_HEIGHT_SCALE = 50.0f
@@ -225,4 +245,30 @@ fun updateBiomesHistory(parameters: BiomeParameters, graph: Graph, biomeMask: By
     }
     historyBiomesForwardQueue.clear()
     historyBiomesCurrent.value = BiomesHistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(biomeMask.width, biomeMask.array.copyOf()))
+}
+
+fun afterProjectOpen() {
+    val currentBiomeGraph = currentState.biomeGraph
+    val currentBiomeMask = currentState.biomeMask
+    val currentSplines = currentState.regionSplines
+    if (currentBiomeGraph != null && currentBiomeMask != null) {
+        val biomeTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
+        val splineTextureId = if (currentSplines != null) {
+            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+        } else {
+            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+        }
+        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+        imageMode.value = 2
+        displayMode.value = DisplayMode.BIOMES
+    } else {
+        val currentRegionSplines = currentState.regionSplines
+        if (currentRegionSplines != null) {
+            val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+            meshViewport.setImage(regionTextureId)
+            imageMode.value = 1
+            displayMode.value = DisplayMode.MAP
+            defaultToMap.value = true
+        }
+    }
 }
