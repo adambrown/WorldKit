@@ -35,6 +35,7 @@ class BiomesBuilder(
                 BuildContinent.buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
             }
         }
+        currentState.biomeParameters = parameters
         currentState.biomeGraph = biomeGraph
         currentState.biomeMask = biomeMask
         currentState.biomes = parameters.biomes.map {

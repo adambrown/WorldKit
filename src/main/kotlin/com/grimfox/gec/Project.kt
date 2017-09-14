@@ -1,16 +1,19 @@
 package com.grimfox.gec
 
 import com.fasterxml.jackson.core.JsonParseException
+import com.grimfox.gec.model.ByteArrayMatrix
+import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.ui.widgets.DropdownList
-import com.grimfox.gec.ui.widgets.DynamicTextReference
-import com.grimfox.gec.ui.widgets.ErrorDialog
+import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import com.grimfox.gec.util.*
+import com.grimfox.gec.util.BuildContinent.BiomeParameters
+import com.grimfox.gec.util.BuildContinent.RegionParameters
+import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.saveFileDialog
-import com.grimfox.gec.util.MutableReference
-import com.grimfox.gec.util.ref
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -21,10 +24,29 @@ import java.util.concurrent.locks.ReentrantLock
 
 private val LOG: Logger = LoggerFactory.getLogger(Project::class.java)
 
+class CurrentState(var regionParameters: RegionParameters? = null,
+                   var regionGraph: Graph? = null,
+                   var regionMask: ByteArrayMatrix? = null,
+                   var regionSplines: RegionSplines? = null,
+                   var biomeParameters: BiomeParameters? = null,
+                   var biomeGraph: Graph? = null,
+                   var biomeMask: ByteArrayMatrix? = null,
+                   var biomes: List<Biomes.Biome>? = null,
+                   var heightMapTexture: TextureId? = null,
+                   var riverMapTexture: TextureId? = null)
+
 data class Project(
         var file: File? = null,
-        var isNew: Boolean = true
-)
+        var currentState: CurrentState = CurrentState(),
+        val historyRegionsBackQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
+        val historyRegionsCurrent: MonitoredReference<RegionsHistoryItem?> = ref(null),
+        val historyRegionsForwardQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
+        val historySplinesBackQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
+        val historySplinesCurrent: MonitoredReference<RegionSplines?> = ref(null),
+        val historySplinesForwardQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
+        val historyBiomesBackQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000),
+        val historyBiomesCurrent: MonitoredReference<BiomesHistoryItem?> = ref(null),
+        val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000))
 
 private val PROJECT_MOD_LOCK: Lock = ReentrantLock(true)
 
@@ -138,9 +160,7 @@ fun saveProject(project: Project?,
         if (file == null) {
             return saveProjectAs(project, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
         } else {
-            file.outputStream().buffered().use {
-                JSON.writeValue(it, project.copy(file = null))
-            }
+            exportProjectFile(project, file)
             addProjectToRecentProjects(file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
             return true
         }
@@ -165,9 +185,7 @@ fun saveProjectAs(project: Project?,
             if (saveFile != null) {
                 val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkp")}.wkp"
                 val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                actualFile.outputStream().buffered().use {
-                    JSON.writeValue(it, project.copy(file = null))
-                }
+                exportProjectFile(project, actualFile)
                 project.file = actualFile
                 addProjectToRecentProjects(actualFile, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                 updateTitle(titleText, project)
@@ -189,9 +207,7 @@ fun openProject(file: File,
     ui.ignoreInput = true
     dialogLayer.isVisible = true
     try {
-        val project = file.inputStream().buffered().use {
-            JSON.readValue(it, Project::class.java)
-        }
+        val project = importProjectFile(file)
         if (project != null) {
             project.file = file
         }
@@ -212,9 +228,7 @@ fun openProject(dialogLayer: Block,
         if (file == null) {
             null
         } else {
-            val project = file.inputStream().buffered().use {
-                JSON.readValue(it, Project::class.java)
-            }
+            val project = importProjectFile(file)
             if (project != null) {
                 project.file = file
             }

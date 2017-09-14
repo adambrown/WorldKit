@@ -4,23 +4,16 @@ import com.grimfox.gec.brushes.PickAndGoDrawBrushListener
 import com.grimfox.gec.brushes.SplineDeletePicker
 import com.grimfox.gec.brushes.SplineDrawBrushListener
 import com.grimfox.gec.brushes.SplinePointPicker
-import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.ShortArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
 import java.util.*
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 
 private val allowExperimental = ref(false)
 private val regionsSeed = ref(1L)
@@ -106,7 +99,7 @@ fun Block.editRegionsPanel(
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import regions") {
                 generationLock.doWithLock {
-                    val historyItem = openRegionsFile(dialogLayer, preferences, ui)
+                    val historyItem = importRegionsFile(dialogLayer, preferences, ui)
                     if (historyItem != null) {
                         val historyLast = historyRegionsCurrent.value
                         if (historyLast != null) {
@@ -334,14 +327,14 @@ fun Block.editMapPanel(
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import splines") {
                 generationLock.doWithLock {
-                    val historyItem = openSplinesFile(dialogLayer, preferences, ui)
+                    val historyItem = importSplinesFile(dialogLayer, preferences, ui)
                     if (historyItem != null) {
                         val historyLast = historySplinesCurrent.value
                         if (historyLast != null) {
                             historySplinesBackQueue.push(historyLast.copy())
                         }
                         currentState.regionSplines = historyItem
-                        val currentParameters = currentState.parameters
+                        val currentParameters = currentState.regionParameters
                         if (currentParameters != null) {
                             regionsBuilder.build(currentParameters, true, true)
                         }
@@ -587,7 +580,7 @@ fun Block.editMapPanel(
                             historySplinesForwardQueue.push(historyLast.copy())
                         }
                         currentState.regionSplines = historyItem
-                        val parameters = currentState.parameters
+                        val parameters = currentState.regionParameters
                         if (parameters != null) {
                             regionsBuilder.build(parameters, true, true)
                         }
@@ -605,7 +598,7 @@ fun Block.editMapPanel(
                             historySplinesBackQueue.push(historyLast.copy())
                         }
                         currentState.regionSplines = historyItem
-                        val parameters = currentState.parameters
+                        val parameters = currentState.regionParameters
                         if (parameters != null) {
                             regionsBuilder.build(parameters, true, true)
                         }
@@ -649,248 +642,3 @@ fun addSplinesToMap(points: List<List<Point2F>>, riverEdges: List<List<LineSegme
     }
     return nextIndex
 }
-
-private fun openRegionsFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionsHistoryItem? {
-    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkr") { file ->
-        if (file == null) {
-            null
-        } else {
-            val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                val parameters = JSON.readValue(stream.readUTF(), RegionParameters::class.java)
-                val graphSeed = stream.readLong()
-                val maskWidth = stream.readInt()
-                val maskBytes = ByteArray(maskWidth * maskWidth)
-                stream.readFully(maskBytes)
-                val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
-                RegionsHistoryItem(parameters, graphSeed, regionMask)
-            }
-            historyItem
-        }
-    }
-}
-
-private fun exportRegionsFile(regions: RegionsHistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
-    if (regions != null) {
-        ui.ignoreInput = true
-        dialogLayer.isVisible = true
-        try {
-            val saveFile = FileDialogs.saveFileDialog(preferences.projectDir, "wkr")
-            if (saveFile != null) {
-                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkr")}.wkr"
-                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                DataOutputStream(GZIPOutputStream(actualFile.outputStream()).buffered()).use { stream ->
-                    val parameters = JSON.writeValueAsString(regions.parameters)
-                    stream.writeUTF(parameters)
-                    stream.writeLong(regions.graphSeed)
-                    stream.writeInt(regions.mask.width)
-                    stream.write(regions.mask.array)
-                }
-                return true
-            } else {
-                return false
-            }
-        } finally {
-            dialogLayer.isVisible = false
-            ui.ignoreInput = false
-        }
-    }
-    return false
-}
-
-private fun openSplinesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): RegionSplines? {
-    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wks") { file ->
-        if (file == null) {
-            null
-        } else {
-            val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                stream.readInt()
-                RegionSplines(
-                        hasCustomizations = stream.readBoolean(),
-                        coastEdges = stream.readCoastEdges(),
-                        coastPoints = stream.readCoastPoints(),
-                        riverOrigins = stream.readPoint2FListList(),
-                        riverEdges = stream.readLineSegment2FListList(),
-                        riverPoints = stream.readPoint2FListList(),
-                        mountainOrigins = stream.readPoint2FListList(),
-                        mountainEdges = stream.readLineSegment2FListList(),
-                        mountainPoints = stream.readPoint2FListList(),
-                        ignoredOrigins = stream.readPoint2FListList(),
-                        ignoredEdges = stream.readLineSegment2FListList(),
-                        ignoredPoints = stream.readPoint2FListList(),
-                        deletedOrigins = stream.readPoint2FListList(),
-                        deletedEdges = stream.readLineSegment2FListList(),
-                        deletedPoints = stream.readPoint2FListList(),
-                        customRiverEdges = stream.readLineSegment2FListList(),
-                        customRiverPoints = stream.readPoint2FListList(),
-                        customMountainEdges = stream.readLineSegment2FListList(),
-                        customMountainPoints = stream.readPoint2FListList(),
-                        customIgnoredEdges = stream.readLineSegment2FListList(),
-                        customIgnoredPoints = stream.readPoint2FListList()
-                )
-            }
-            historyItem
-        }
-    }
-}
-
-private fun exportSplinesFile(splines: RegionSplines?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
-    if (splines != null) {
-        ui.ignoreInput = true
-        dialogLayer.isVisible = true
-        try {
-            val saveFile = FileDialogs.saveFileDialog(preferences.projectDir, "wks")
-            if (saveFile != null) {
-                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wks")}.wks"
-                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                DataOutputStream(GZIPOutputStream(actualFile.outputStream()).buffered()).use { stream ->
-                    stream.writeInt(1)
-                    stream.writeBoolean(splines.hasCustomizations)
-                    stream.writeCoastEdges(splines.coastEdges)
-                    stream.writeCoastPoints(splines.coastPoints)
-                    stream.writePoint2FListList(splines.riverOrigins)
-                    stream.writeLineSegment2FListList(splines.riverEdges)
-                    stream.writePoint2FListList(splines.riverPoints)
-                    stream.writePoint2FListList(splines.mountainOrigins)
-                    stream.writeLineSegment2FListList(splines.mountainEdges)
-                    stream.writePoint2FListList(splines.mountainPoints)
-                    stream.writePoint2FListList(splines.ignoredOrigins)
-                    stream.writeLineSegment2FListList(splines.ignoredEdges)
-                    stream.writePoint2FListList(splines.ignoredPoints)
-                    stream.writePoint2FListList(splines.deletedOrigins)
-                    stream.writeLineSegment2FListList(splines.deletedEdges)
-                    stream.writePoint2FListList(splines.deletedPoints)
-                    stream.writeLineSegment2FListList(splines.customRiverEdges)
-                    stream.writePoint2FListList(splines.customRiverPoints)
-                    stream.writeLineSegment2FListList(splines.customMountainEdges)
-                    stream.writePoint2FListList(splines.customMountainPoints)
-                    stream.writeLineSegment2FListList(splines.customIgnoredEdges)
-                    stream.writePoint2FListList(splines.customIgnoredPoints)
-                }
-                return true
-            } else {
-                return false
-            }
-        } finally {
-            dialogLayer.isVisible = false
-            ui.ignoreInput = false
-        }
-    }
-    return false
-}
-
-private fun DataOutputStream.writeCoastEdges(coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>) {
-    writeInt(coastEdges.size)
-    coastEdges.forEach {
-        writeLineSegment2FList(it.first)
-        writeLineSegment2FListList(it.second)
-    }
-}
-
-private fun DataOutputStream.writeCoastPoints(coastPoints: List<Pair<List<Point2F>, List<List<Point2F>>>>) {
-    writeInt(coastPoints.size)
-    coastPoints.forEach {
-        writePoint2FList(it.first)
-        writePoint2FListList(it.second)
-    }
-}
-
-private fun DataOutputStream.writeLineSegment2FListList(lines: List<List<LineSegment2F>>) {
-    writeInt(lines.size)
-    lines.forEach {
-        writeLineSegment2FList(it)
-    }
-}
-
-private fun DataOutputStream.writeLineSegment2FList(lines: List<LineSegment2F>) {
-    writeInt(lines.size)
-    lines.forEach {
-        writeLineSegment2F(it)
-    }
-}
-
-private fun DataOutputStream.writePoint2FListList(points: List<List<Point2F>>) {
-    writeInt(points.size)
-    points.forEach {
-        writePoint2FList(it)
-    }
-}
-
-private fun DataOutputStream.writePoint2FList(points: List<Point2F>) {
-    writeInt(points.size)
-    points.forEach {
-        writePoint2F(it)
-    }
-}
-
-private fun DataOutputStream.writeLineSegment2F(line: LineSegment2F) {
-    writePoint2F(line.a)
-    writePoint2F(line.b)
-}
-
-private fun DataOutputStream.writePoint2F(point: Point2F) {
-    writeFloat(point.x)
-    writeFloat(point.y)
-}
-
-private fun DataInputStream.readCoastEdges(): List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>> {
-    val size = readInt()
-    val coastEdges = ArrayList<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>(size)
-    for (i in 1..size) {
-        coastEdges.add(readLineSegment2FList() to readLineSegment2FListList())
-    }
-    return coastEdges
-}
-
-private fun DataInputStream.readCoastPoints(): List<Pair<List<Point2F>, List<List<Point2F>>>> {
-    val size = readInt()
-    val coastPoints = ArrayList<Pair<List<Point2F>, List<List<Point2F>>>>(size)
-    for (i in 1..size) {
-        coastPoints.add(readPoint2FList() to readPoint2FListList())
-    }
-    return coastPoints
-}
-
-private fun DataInputStream.readLineSegment2FListList(): List<List<LineSegment2F>> {
-    val size = readInt()
-    val lines = ArrayList<List<LineSegment2F>>(size)
-    for (i in 1..size) {
-        lines.add(readLineSegment2FList())
-    }
-    return lines
-}
-
-private fun DataInputStream.readLineSegment2FList(): List<LineSegment2F> {
-    val size = readInt()
-    val lines = ArrayList<LineSegment2F>(size)
-    for (i in 1..size) {
-        lines.add(readLineSegment2F())
-    }
-    return lines
-}
-
-private fun DataInputStream.readPoint2FListList(): List<List<Point2F>> {
-    val size = readInt()
-    val points = ArrayList<List<Point2F>>(size)
-    for (i in 1..size) {
-        points.add(readPoint2FList())
-    }
-    return points
-}
-
-private fun DataInputStream.readPoint2FList(): List<Point2F> {
-    val size = readInt()
-    val points = ArrayList<Point2F>(size)
-    for (i in 1..size) {
-        points.add(readPoint2F())
-    }
-    return points
-}
-
-private fun DataInputStream.readLineSegment2F(): LineSegment2F {
-    return (LineSegment2F(readPoint2F(), readPoint2F()))
-}
-
-private fun DataInputStream.readPoint2F(): Point2F {
-    return Point2F(readFloat(), readFloat())
-}
-

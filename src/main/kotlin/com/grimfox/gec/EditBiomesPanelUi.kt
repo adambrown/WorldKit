@@ -1,18 +1,11 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.brushes.PreSelectDrawBrushListener
-import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
 import java.util.ArrayList
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 
 private val biomeValues = linkedMapOf(
         "Mountains" to 0,
@@ -65,7 +58,7 @@ fun Block.editBiomesPanel(
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import biomes") {
                 generationLock.doWithLock {
-                    val historyItem = openBiomesFile(dialogLayer, preferences, ui)
+                    val historyItem = importBiomesFile(dialogLayer, preferences, ui)
                     if (historyItem != null) {
                         val historyLast = historyBiomesCurrent.value
                         if (historyLast != null) {
@@ -254,51 +247,4 @@ fun Block.editBiomesPanel(
         vSpacer(HALF_ROW_HEIGHT)
     }
     return biomePanel
-}
-
-private fun openBiomesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): BiomesHistoryItem? {
-    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkb") { file ->
-        if (file == null) {
-            null
-        } else {
-            val historyItem = DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
-                val parameters = JSON.readValue(stream.readUTF(), BuildContinent.BiomeParameters::class.java)
-                val graphSeed = stream.readLong()
-                val maskWidth = stream.readInt()
-                val maskBytes = ByteArray(maskWidth * maskWidth)
-                stream.readFully(maskBytes)
-                val biomesMask = ByteArrayMatrix(maskWidth, maskBytes)
-                BiomesHistoryItem(parameters, graphSeed, biomesMask)
-            }
-            historyItem
-        }
-    }
-}
-
-private fun exportBiomesFile(biomes: BiomesHistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
-    if (biomes != null) {
-        ui.ignoreInput = true
-        dialogLayer.isVisible = true
-        try {
-            val saveFile = FileDialogs.saveFileDialog(preferences.projectDir, "wkb")
-            if (saveFile != null) {
-                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkb")}.wkb"
-                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
-                DataOutputStream(GZIPOutputStream(actualFile.outputStream()).buffered()).use { stream ->
-                    val parameters = JSON.writeValueAsString(biomes.parameters)
-                    stream.writeUTF(parameters)
-                    stream.writeLong(biomes.graphSeed)
-                    stream.writeInt(biomes.mask.width)
-                    stream.write(biomes.mask.array)
-                }
-                return true
-            } else {
-                return false
-            }
-        } finally {
-            dialogLayer.isVisible = false
-            ui.ignoreInput = false
-        }
-    }
-    return false
 }

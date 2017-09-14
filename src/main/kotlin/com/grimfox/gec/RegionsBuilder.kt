@@ -113,11 +113,10 @@ class RegionsBuilder(
         } else {
             currentSplines
         }
-        currentState.parameters = parameters.copy()
+        currentState.regionParameters = parameters.copy()
         currentState.regionGraph = regionGraph
         currentState.regionMask = regionMask
         currentState.regionSplines = regionSplines
-        currentState.edgeDetailScale = parameters.edgeDetailScale
         currentState.heightMapTexture = null
         currentState.riverMapTexture = null
         if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {

@@ -7,7 +7,10 @@ import com.grimfox.gec.ui.bInt
 import com.grimfox.gec.ui.color
 import com.grimfox.gec.ui.gInt
 import com.grimfox.gec.ui.rInt
-import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.ui.widgets.Block
+import com.grimfox.gec.ui.widgets.DynamicTextReference
+import com.grimfox.gec.ui.widgets.MeshViewport3D
+import com.grimfox.gec.ui.widgets.NO_BLOCK
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
@@ -84,6 +87,8 @@ class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, va
     }
 }
 
+val currentState: CurrentState get() = currentProject.value?.currentState ?: CurrentState()
+
 val experimentalWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
 val waterPlaneOn = ref(true)
@@ -106,15 +111,15 @@ val pointPicker = ref<MeshViewport3D.PointPicker?>(null)
 val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
-val historyRegionsBackQueue = HistoryQueue<RegionsHistoryItem>(1000)
-val historyRegionsCurrent = ref<RegionsHistoryItem?>(null)
-val historyRegionsForwardQueue = HistoryQueue<RegionsHistoryItem>(1000)
-val historySplinesBackQueue = HistoryQueue<RegionSplines>(1000)
-val historySplinesCurrent = ref<RegionSplines?>(null)
-val historySplinesForwardQueue = HistoryQueue<RegionSplines>(1000)
-val historyBiomesBackQueue = HistoryQueue<BiomesHistoryItem>(1000)
-val historyBiomesCurrent = ref<BiomesHistoryItem?>(null)
-val historyBiomesForwardQueue = HistoryQueue<BiomesHistoryItem>(1000)
+val historyRegionsBackQueue get() = currentProject.value?.historyRegionsBackQueue ?: HistoryQueue(0)
+val historyRegionsCurrent: MonitoredReference<RegionsHistoryItem?> get() = currentProject.value?.historyRegionsCurrent ?: ref<RegionsHistoryItem?>(null)
+val historyRegionsForwardQueue get() = currentProject.value?.historyRegionsForwardQueue ?: HistoryQueue(0)
+val historySplinesBackQueue get() = currentProject.value?.historySplinesBackQueue ?: HistoryQueue(0)
+val historySplinesCurrent: MonitoredReference<RegionSplines?> get() = currentProject.value?.historySplinesCurrent ?: ref<RegionSplines?>(null)
+val historySplinesForwardQueue get() = currentProject.value?.historySplinesForwardQueue ?: HistoryQueue(0)
+val historyBiomesBackQueue get() = currentProject.value?.historyBiomesBackQueue ?: HistoryQueue(0)
+val historyBiomesCurrent: MonitoredReference<BiomesHistoryItem?> get() = currentProject.value?.historyBiomesCurrent ?: ref<BiomesHistoryItem?>(null)
+val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForwardQueue ?: HistoryQueue(0)
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 
@@ -133,19 +138,6 @@ var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
 
 var onWindowResize: () -> Unit = {}
-
-class CurrentState(var parameters: RegionParameters? = null,
-                   var regionGraph: Graph? = null,
-                   var regionMask: ByteArrayMatrix? = null,
-                   var regionSplines: RegionSplines? = null,
-                   var biomeGraph: Graph? = null,
-                   var biomeMask: ByteArrayMatrix? = null,
-                   var biomes: List<Biomes.Biome>? = null,
-                   var heightMapTexture: TextureBuilder.TextureId? = null,
-                   var riverMapTexture: TextureBuilder.TextureId? = null,
-                   var edgeDetailScale: Int? = null)
-
-var currentState = CurrentState()
 
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
     return { scale: Float ->
@@ -190,17 +182,13 @@ fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteW
         overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
         overwriteWarningDialog.isVisible = true
         dialogCallback.value = {
-            clearHistories()
             currentProject.value = Project()
-            currentState = CurrentState()
             meshViewport.reset()
             imageMode.value = 3
             dialogCallback.value = noop
         }
     } else {
-        clearHistories()
         currentProject.value = Project()
-        currentState = CurrentState()
         meshViewport.reset()
         imageMode.value = 3
     }
@@ -237,16 +225,4 @@ fun updateBiomesHistory(parameters: BiomeParameters, graph: Graph, biomeMask: By
     }
     historyBiomesForwardQueue.clear()
     historyBiomesCurrent.value = BiomesHistoryItem(parameters.copy(), graph.seed, ByteArrayMatrix(biomeMask.width, biomeMask.array.copyOf()))
-}
-
-private fun clearHistories() {
-    historyRegionsBackQueue.clear()
-    historyRegionsCurrent.value = null
-    historyRegionsForwardQueue.clear()
-    historySplinesBackQueue.clear()
-    historySplinesCurrent.value = null
-    historySplinesForwardQueue.clear()
-    historyBiomesBackQueue.clear()
-    historyBiomesCurrent.value = null
-    historyBiomesForwardQueue.clear()
 }

@@ -175,7 +175,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 generationLock.disableOnLockSet({ if (currentState.heightMapTexture != null && currentState.riverMapTexture != null) 1 else 0 },
                         disableButton("Build mesh", { currentState.regionGraph == null || currentState.regionMask == null || currentState.regionSplines == null || currentState.biomeGraph == null || currentState.biomeGraph == null }) {
                             generationLock.doWithLock {
-                                val currentParameters = currentState.parameters
+                                val currentParameters = currentState.regionParameters
                                 val currentRegionGraph = currentState.regionGraph
                                 val currentRegionMask = currentState.regionMask
                                 val currentRegionSplines = currentState.regionSplines

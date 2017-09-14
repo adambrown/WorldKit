@@ -1,11 +1,29 @@
 package com.grimfox.gec.model
 
+import com.grimfox.gec.util.Quadruple
+import com.grimfox.gec.util.Quintuple
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
 class HistoryQueue<T>(val limit: Int) {
 
-    private val buffer = ArrayList<T>(limit)
+    companion object {
+
+        fun <T> deserialize(bufferData: List<T?>, head: Int, tail: Int, size: Int, limit: Int): HistoryQueue<T> {
+            val newQueue = HistoryQueue<T>(limit)
+            newQueue.buffer.addAll(bufferData)
+            newQueue.head = head
+            newQueue.tail = tail
+            newQueue._size = size
+            return newQueue
+        }
+    }
+
+    fun serializableData(): Quintuple<List<T?>, Int, Int, Int, Int> {
+        return Quintuple(ArrayList(buffer), head, tail, _size, limit)
+    }
+
+    private val buffer = ArrayList<T?>(limit)
 
     private var head = 0
     private var tail = 0
@@ -51,7 +69,9 @@ class HistoryQueue<T>(val limit: Int) {
             }
             tail = ((tail - 1) + limit) % limit
             _size--
-            return buffer[tail]
+            val temp = buffer[tail]
+            buffer[tail] = null
+            return temp
         } finally {
             lock.unlock()
         }
@@ -63,7 +83,7 @@ class HistoryQueue<T>(val limit: Int) {
             if (_size < 1) {
                 throw IllegalStateException("Calling peek on empty queue.")
             }
-            return buffer[((tail - 1) + limit) % limit]
+            return buffer[((tail - 1) + limit) % limit]!!
         } finally {
             lock.unlock()
         }
@@ -75,6 +95,7 @@ class HistoryQueue<T>(val limit: Int) {
             head = 0
             tail = 0
             _size = 0
+            buffer.clear()
         } finally {
             lock.unlock()
         }

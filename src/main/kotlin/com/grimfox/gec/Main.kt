@@ -88,10 +88,6 @@ object Main {
 
                 meshViewport.init()
 
-                var topBar = NO_BLOCK
-                var contentPanel = NO_BLOCK
-                var rightPanel = NO_BLOCK
-
                 root {
                     mainLayer = block {
                         isFallThrough = true
@@ -170,7 +166,7 @@ object Main {
                 preferencesPanel(ui)
                 exportPanel(ui)
                 mainLayer {
-                    topBar = block {
+                    block {
                         vSizing = STATIC
                         height = MEDIUM_ROW_HEIGHT
                         layout = VERTICAL
@@ -217,9 +213,6 @@ object Main {
                                         overwriteWarningReference.value = "Do you want to save the current project before closing?"
                                         overwriteWarningDialog.isVisible = true
                                         dialogCallback.value = {
-                                            historyRegionsBackQueue.clear()
-                                            historyRegionsForwardQueue.clear()
-                                            currentState = CurrentState()
                                             meshViewport.reset()
                                             imageMode.value = 3
                                             currentProject.value = null
@@ -304,12 +297,12 @@ object Main {
                         button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) { closeWindow() }
                     }
                     loadRecentProjects(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
-                    contentPanel = block {
+                    block {
                         vSizing = GROW
                         layout = VERTICAL
                         hAlign = LEFT
                         leftPanel(ui, uiLayout, dialogLayer)
-                        rightPanel = block {
+                        block {
                             hSizing = GROW
                             layout = HORIZONTAL
                             hAlign = LEFT
