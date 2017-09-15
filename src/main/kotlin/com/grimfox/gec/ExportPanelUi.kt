@@ -41,7 +41,7 @@ fun exportPanel(ui: UserInterface) {
                 button(text("Export"), DIALOG_BUTTON_STYLE) {
                     if (useRegionFile.value) {
                         val file = File(regionFile.reference.value)
-                        val regionMask = currentState.regionMask
+                        val regionMask = currentState.regionMask.value
                         if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && regionMask != null) {
                             val output = BufferedImage(regionMask.width, regionMask.width, BufferedImage.TYPE_4BYTE_ABGR)
                             val raster = output.raster
@@ -57,7 +57,7 @@ fun exportPanel(ui: UserInterface) {
                     }
                     if (useBiomeFile.value) {
                         val file = File(biomeFile.reference.value)
-                        val biomeMask = currentState.biomeMask
+                        val biomeMask = currentState.biomeMask.value
                         if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && biomeMask != null) {
                             val output = BufferedImage(biomeMask.width, biomeMask.width, BufferedImage.TYPE_4BYTE_ABGR)
                             val raster = output.raster
@@ -73,7 +73,7 @@ fun exportPanel(ui: UserInterface) {
                     }
                     if (useMapFile.value) {
                         val file = File(mapFile.reference.value)
-                        val regionSplines = currentState.regionSplines
+                        val regionSplines = currentState.regionSplines.value
                         if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && regionSplines != null) {
                             val textureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
                             val bytes = TextureBuilder.extractTextureRgbaByte(textureId, 4096)
@@ -93,7 +93,7 @@ fun exportPanel(ui: UserInterface) {
                     }
                     if (useHeightFile.value) {
                         val file = File(heightFile.reference.value)
-                        val heightMap = currentState.heightMapTexture
+                        val heightMap = currentState.heightMapTexture.value
                         if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && heightMap != null) {
                             val shorts = TextureBuilder.extractTextureRedShort(heightMap, 4096)
                             val output = BufferedImage(4096, 4096, BufferedImage.TYPE_USHORT_GRAY)

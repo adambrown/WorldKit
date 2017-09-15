@@ -15,8 +15,8 @@ class RegionsBuilder(
         val defaultToMap: MonitoredReference<Boolean>) {
 
     fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true) {
-        val currentRegionGraph = currentState.regionGraph
-        val currentRegionMask = currentState.regionMask
+        val currentRegionGraph = currentState.regionGraph.value
+        val currentRegionMask = currentState.regionMask.value
         val (regionGraph, regionMask) = if (refreshOnly && currentRegionGraph != null && currentRegionMask != null) {
             currentRegionGraph to currentRegionMask
         } else {
@@ -38,7 +38,7 @@ class RegionsBuilder(
                 BuildContinent.generateRegions(parameters.copy(), executor)
             }
         }
-        val currentSplines = currentState.regionSplines
+        val currentSplines = currentState.regionSplines.value
         val regionSplines = if (rebuildSplines || currentSplines == null) {
             var newSplines = BuildContinent.generateRegionSplines(Random(parameters.regionsSeed), regionGraph, regionMask, parameters.edgeDetailScale)
             if (currentSplines != null) {
@@ -113,12 +113,12 @@ class RegionsBuilder(
         } else {
             currentSplines
         }
-        currentState.regionParameters = parameters.copy()
-        currentState.regionGraph = regionGraph
-        currentState.regionMask = regionMask
-        currentState.regionSplines = regionSplines
-        currentState.heightMapTexture = null
-        currentState.riverMapTexture = null
+        currentState.regionParameters.value = parameters.copy()
+        currentState.regionGraph.value = regionGraph
+        currentState.regionMask.value = regionMask
+        currentState.regionSplines.value = regionSplines
+        currentState.heightMapTexture.value = null
+        currentState.riverMapTexture.value = null
         if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {
             val mapTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
             meshViewport.setImage(mapTextureId)

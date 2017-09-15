@@ -163,6 +163,9 @@ object Main {
                         addProjectToRecentProjects(new.file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                     }
                 }
+                currentProjectHasModifications.listener { _, new ->
+                    updateTitle(titleText, currentProject.value, new)
+                }
                 preferencesPanel(ui)
                 exportPanel(ui)
                 mainLayer {
@@ -193,7 +196,7 @@ object Main {
                                             errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
                                         }
                                     }
-                                    if (currentProject.value != null) {
+                                    if (currentProject.value != null && currentProjectHasModifications.value) {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
                                         overwriteWarningDialog.isVisible = true
@@ -202,14 +205,14 @@ object Main {
                                         openFun()
                                     }
                                 }
-                                menuItem("Save", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
+                                menuItem("Save", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = currentProjectHasModifications) {
                                     saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
                                 }
                                 menuItem("Save as...", "Shift+Ctrl+S", BLOCK_GLYPH_SAVE, isActive = doesActiveProjectExist) {
                                     saveProjectAs(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
                                 }
                                 menuItem("Close", isActive = doesActiveProjectExist) {
-                                    if (currentProject.value != null) {
+                                    if (currentProject.value != null && currentProjectHasModifications.value) {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before closing?"
                                         overwriteWarningDialog.isVisible = true
@@ -236,7 +239,7 @@ object Main {
                                 }
                                 menuDivider()
                                 menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {
-                                    if (currentProject.value != null) {
+                                    if (currentProject.value != null && currentProjectHasModifications.value) {
                                         dialogLayer.isVisible = true
                                         overwriteWarningReference.value = "Do you want to save the current project before exiting?"
                                         overwriteWarningDialog.isVisible = true
@@ -305,7 +308,7 @@ object Main {
                         button(glyph(GLYPH_MINIMIZE), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
                         button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) {
-                            if (currentProject.value != null) {
+                            if (currentProject.value != null && currentProjectHasModifications.value) {
                                 dialogLayer.isVisible = true
                                 overwriteWarningReference.value = "Do you want to save the current project before exiting?"
                                 overwriteWarningDialog.isVisible = true

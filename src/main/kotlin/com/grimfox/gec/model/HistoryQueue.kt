@@ -1,11 +1,13 @@
 package com.grimfox.gec.model
 
-import com.grimfox.gec.util.Quadruple
 import com.grimfox.gec.util.Quintuple
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
+import com.grimfox.gec.model.HistoryQueue.ModificationEvent.*
 
 class HistoryQueue<T>(val limit: Int) {
+
+    enum class ModificationEvent { PUSH, POP, CLEAR }
 
     companion object {
 
@@ -30,6 +32,8 @@ class HistoryQueue<T>(val limit: Int) {
     private var _size = 0
     private val lock = ReentrantLock()
 
+    val listeners: MutableList<(ModificationEvent) -> Unit> = ArrayList()
+
     val size: Int get() {
         lock.lock()
         try {
@@ -37,6 +41,10 @@ class HistoryQueue<T>(val limit: Int) {
         } finally {
             lock.unlock()
         }
+    }
+
+    fun listener(listener: (ModificationEvent) -> Unit) {
+        listeners.add(listener)
     }
 
     fun push(value: T) {
@@ -56,6 +64,7 @@ class HistoryQueue<T>(val limit: Int) {
                 head = (head + 1) % limit
                 tail = (tail + 1) % limit
             }
+            listeners.forEach { it(PUSH) }
         } finally {
             lock.unlock()
         }
@@ -71,6 +80,7 @@ class HistoryQueue<T>(val limit: Int) {
             _size--
             val temp = buffer[tail]
             buffer[tail] = null
+            listeners.forEach { it(POP) }
             return temp
         } finally {
             lock.unlock()
@@ -96,6 +106,7 @@ class HistoryQueue<T>(val limit: Int) {
             tail = 0
             _size = 0
             buffer.clear()
+            listeners.forEach { it(CLEAR) }
         } finally {
             lock.unlock()
         }

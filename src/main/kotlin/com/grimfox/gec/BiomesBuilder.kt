@@ -15,8 +15,8 @@ class BiomesBuilder(
         val displayMode: MonitoredReference<DisplayMode>) {
 
     fun build(parameters: BiomeParameters, refreshOnly: Boolean = false) {
-        val currentBiomeGraph = currentState.biomeGraph
-        val currentBiomeMask = currentState.biomeMask
+        val currentBiomeGraph = currentState.biomeGraph.value
+        val currentBiomeMask = currentState.biomeMask.value
         val (biomeGraph, biomeMask) = if (refreshOnly && currentBiomeGraph != null && currentBiomeMask != null) {
             currentBiomeGraph to currentBiomeMask
         } else {
@@ -35,14 +35,14 @@ class BiomesBuilder(
                 BuildContinent.buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
             }
         }
-        currentState.biomeParameters = parameters
-        currentState.biomeGraph = biomeGraph
-        currentState.biomeMask = biomeMask
-        currentState.biomes = parameters.biomes.map { ordinalToBiome(it) }
-        currentState.heightMapTexture = null
-        currentState.riverMapTexture = null
+        currentState.biomeParameters.value = parameters
+        currentState.biomeGraph.value = biomeGraph
+        currentState.biomeMask.value = biomeMask
+        currentState.biomes.value = parameters.biomes.map { ordinalToBiome(it) }
+        currentState.heightMapTexture.value = null
+        currentState.riverMapTexture.value = null
         val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
-        val currentSplines = currentState.regionSplines
+        val currentSplines = currentState.regionSplines.value
         val splineTextureId = if (currentSplines != null) {
             TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
         } else {

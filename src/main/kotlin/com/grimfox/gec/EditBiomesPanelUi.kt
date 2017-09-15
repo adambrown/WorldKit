@@ -49,25 +49,29 @@ fun Block.editBiomesPanel(
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import biomes") {
-                generationLock.doWithLock {
-                    val historyItem = importBiomesFile(dialogLayer, preferences, ui)
-                    if (historyItem != null) {
-                        val historyLast = historyBiomesCurrent.value
-                        if (historyLast != null) {
-                            historyBiomesBackQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = importBiomesFile(dialogLayer, preferences, ui)
+                        if (historyItem != null) {
+                            val historyLast = historyBiomesCurrent.value
+                            if (historyLast != null) {
+                                historyBiomesBackQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeMask.value = historyItem.mask
+                            biomesBuilder.build(historyItem.parameters, true)
+                            historyBiomesCurrent.value = historyItem.copy()
                         }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.biomeMask = historyItem.mask
-                        biomesBuilder.build(historyItem.parameters, true)
-                        historyBiomesCurrent.value = historyItem.copy()
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Export biomes", { historyBiomesCurrent.value == null }) {
-                generationLock.doWithLock {
-                    exportBiomesFile(historyBiomesCurrent.value, dialogLayer, preferences, ui)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        exportBiomesFile(historyBiomesCurrent.value, dialogLayer, preferences, ui)
+                    }
                 }
             }
         }
@@ -127,13 +131,13 @@ fun Block.editBiomesPanel(
         vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(editBiomesMode,
                 {
-                    val currentBiomeGraph = currentState.biomeGraph
-                    val currentBiomeMask = currentState.biomeMask
+                    val currentBiomeGraph = currentState.biomeGraph.value
+                    val currentBiomeMask = currentState.biomeMask.value
                     if (currentBiomeGraph != null && currentBiomeMask != null) {
                         generationLock.lock()
                         if (displayMode.value != DisplayMode.BIOMES) {
                             val biomeTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
-                            val currentSplines = currentState.regionSplines
+                            val currentSplines = currentState.regionSplines.value
                             val splineTextureId = if (currentSplines != null) {
                                 TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
                             } else {
@@ -162,8 +166,8 @@ fun Block.editBiomesPanel(
                     brushOn.value = false
                     val parameters = extractCurrentParameters()
                     biomesBuilder.build(parameters, true)
-                    val currentGraph = currentState.biomeGraph
-                    val currentMask = currentState.biomeMask
+                    val currentGraph = currentState.biomeGraph.value
+                    val currentMask = currentState.biomeMask.value
                     if (currentGraph != null && currentMask != null) {
                         updateBiomesHistory(parameters, currentGraph, currentMask)
                     }
@@ -172,66 +176,74 @@ fun Block.editBiomesPanel(
                 vSliderRow(biomeEditBrushSize, LARGE_ROW_HEIGHT, text("Brush size:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.015625f, 0.15625f), linearClampedScaleFunctionInverse(0.015625f, 0.15625f)))
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Generate") {
-                generationLock.doWithLock {
-                    val parameters = extractCurrentParameters()
-                    biomesBuilder.build(parameters)
-                    val currentGraph = currentState.biomeGraph
-                    val currentMask = currentState.biomeMask
-                    if (currentGraph != null && currentMask != null) {
-                        updateBiomesHistory(parameters, currentGraph, currentMask)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val parameters = extractCurrentParameters()
+                        biomesBuilder.build(parameters)
+                        val currentGraph = currentState.biomeGraph.value
+                        val currentMask = currentState.biomeMask.value
+                        if (currentGraph != null && currentMask != null) {
+                            updateBiomesHistory(parameters, currentGraph, currentMask)
+                        }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Generate random") {
-                generationLock.doWithLock {
-                    val randomSeed = RANDOM.nextLong()
-                    val randomString = randomSeed.toString()
-                    if (randomString.length > 18) {
-                        biomesSeed.value = randomString.substring(0, 18).toLong()
-                    } else {
-                        biomesSeed.value = randomSeed
-                    }
-                    val parameters = extractCurrentParameters()
-                    biomesBuilder.build(parameters)
-                    val currentGraph = currentState.biomeGraph
-                    val currentMask = currentState.biomeMask
-                    if (currentGraph != null && currentMask != null) {
-                        updateBiomesHistory(parameters, currentGraph, currentMask)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val randomSeed = RANDOM.nextLong()
+                        val randomString = randomSeed.toString()
+                        if (randomString.length > 18) {
+                            biomesSeed.value = randomString.substring(0, 18).toLong()
+                        } else {
+                            biomesSeed.value = randomSeed
+                        }
+                        val parameters = extractCurrentParameters()
+                        biomesBuilder.build(parameters)
+                        val currentGraph = currentState.biomeGraph.value
+                        val currentMask = currentState.biomeMask.value
+                        if (currentGraph != null && currentMask != null) {
+                            updateBiomesHistory(parameters, currentGraph, currentMask)
+                        }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Back", { historyBiomesBackQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historyBiomesBackQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historyBiomesCurrent.value
-                        if (historyLast != null) {
-                            historyBiomesForwardQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historyBiomesBackQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historyBiomesCurrent.value
+                            if (historyLast != null) {
+                                historyBiomesForwardQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeMask.value = historyItem.mask
+                            biomesBuilder.build(historyItem.parameters, true)
+                            historyBiomesCurrent.value = historyItem.copy()
                         }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.biomeMask = historyItem.mask
-                        biomesBuilder.build(historyItem.parameters, true)
-                        historyBiomesCurrent.value = historyItem.copy()
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Forward", { historyBiomesForwardQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historyBiomesForwardQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historyBiomesCurrent.value
-                        if (historyLast != null) {
-                            historyBiomesBackQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historyBiomesForwardQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historyBiomesCurrent.value
+                            if (historyLast != null) {
+                                historyBiomesBackQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeMask.value = historyItem.mask
+                            biomesBuilder.build(historyItem.parameters, true)
+                            historyBiomesCurrent.value = historyItem.copy()
                         }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.biomeGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.biomeMask = historyItem.mask
-                        biomesBuilder.build(historyItem.parameters, true)
-                        historyBiomesCurrent.value = historyItem.copy()
                     }
                 }
             }

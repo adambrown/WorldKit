@@ -12,6 +12,7 @@ class ToggleSet(val executor: ExecutorService) {
 
     private val currentPointer = ref<MutableReference<Boolean>?>(null)
     private val latch = ref<CountDownLatch?>(null)
+    private var enabled = true
 
     private fun disableCurrentToggleIfEnabled() {
         val currentToggle = currentPointer.value
@@ -30,6 +31,21 @@ class ToggleSet(val executor: ExecutorService) {
         }
     }
 
+    fun disable() {
+        disableCurrentToggleIfEnabled()
+        enabled = false
+    }
+
+    fun enable() {
+        enabled = true
+    }
+
+    fun suspend(work: () -> Unit) {
+        disable()
+        work()
+        enable()
+    }
+
     fun add(reference: MonitoredReference<Boolean>, onToggleOn: () -> Boolean, onToggleOff: () -> Unit, vararg dependents: Block) {
         var toggleActivated = false
         reference.listener { old, new ->
@@ -38,29 +54,33 @@ class ToggleSet(val executor: ExecutorService) {
                 it.isVisible = new
             }
             if (old != new) {
-                executor.call<Unit> {
-                    if (new) {
-                        disableCurrentToggleIfEnabled()
-                        currentPointer.value = reference
-                        if (onToggleOn()) {
-                            toggleActivated = true
+                if (enabled) {
+                    executor.call<Unit> {
+                        if (new) {
+                            disableCurrentToggleIfEnabled()
+                            currentPointer.value = reference
+                            if (onToggleOn()) {
+                                toggleActivated = true
+                            } else {
+                                toggleActivated = false
+                                if (currentPointer.value == reference) {
+                                    currentPointer.value = null
+                                }
+                                reference.value = false
+                            }
                         } else {
-                            toggleActivated = false
-                            if (currentPointer.value == reference) {
-                                currentPointer.value = null
+                            if (toggleActivated) {
+                                onToggleOff()
+                                toggleActivated = false
+                                if (currentPointer.value == reference) {
+                                    currentPointer.value = null
+                                }
                             }
-                            reference.value = false
+                            latch.value?.countDown()
                         }
-                    } else {
-                        if (toggleActivated) {
-                            onToggleOff()
-                            toggleActivated = false
-                            if (currentPointer.value == reference) {
-                                currentPointer.value = null
-                            }
-                        }
-                        latch.value?.countDown()
                     }
+                } else {
+                    reference.value = false
                 }
             }
         }

@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
+import com.grimfox.gec.model.HistoryQueue.ModificationEvent
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
+import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
@@ -24,20 +26,21 @@ import java.util.concurrent.locks.ReentrantLock
 
 private val LOG: Logger = LoggerFactory.getLogger(Project::class.java)
 
-class CurrentState(var regionParameters: RegionParameters? = null,
-                   var regionGraph: Graph? = null,
-                   var regionMask: ByteArrayMatrix? = null,
-                   var regionSplines: RegionSplines? = null,
-                   var biomeParameters: BiomeParameters? = null,
-                   var biomeGraph: Graph? = null,
-                   var biomeMask: ByteArrayMatrix? = null,
-                   var biomes: List<Biomes.Biome>? = null,
-                   var heightMapTexture: TextureId? = null,
-                   var riverMapTexture: TextureId? = null)
+class CurrentState(var regionParameters: MonitoredReference<RegionParameters?> = ref(null),
+                   var regionGraph: MonitoredReference<Graph?> = ref(null),
+                   var regionMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
+                   var regionSplines: MonitoredReference<RegionSplines?> = ref(null),
+                   var biomeParameters: MonitoredReference<BiomeParameters?> = ref(null),
+                   var biomeGraph: MonitoredReference<Graph?> = ref(null),
+                   var biomeMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
+                   var biomes: MonitoredReference<List<Biome>?> = ref(null),
+                   var heightMapTexture: MonitoredReference<TextureId?> = ref(null),
+                   var riverMapTexture: MonitoredReference<TextureId?> = ref(null))
 
 data class Project(
         var file: File? = null,
-        var currentState: CurrentState = CurrentState(),
+        var isModifiedSinceSave: MonitoredReference<Boolean> = ref(false),
+        var currentState: MonitoredReference<CurrentState> = ref(CurrentState()),
         val historyRegionsBackQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
         val historyRegionsCurrent: MonitoredReference<RegionsHistoryItem?> = ref(null),
         val historyRegionsForwardQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
@@ -46,14 +49,58 @@ data class Project(
         val historySplinesForwardQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
         val historyBiomesBackQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000),
         val historyBiomesCurrent: MonitoredReference<BiomesHistoryItem?> = ref(null),
-        val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000))
+        val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000)) {
+
+    private val valueModifiedListener: (Any?, Any?) -> Unit = { old, new ->
+        if (old != new) {
+            isModifiedSinceSave.value = true
+        }
+    }
+
+    private val queueModifiedListener: (ModificationEvent) -> Unit = {
+        isModifiedSinceSave.value = true
+    }
+
+    init {
+        historyRegionsBackQueue.listener(queueModifiedListener)
+        historyRegionsCurrent.listener(valueModifiedListener)
+        historyRegionsForwardQueue.listener(queueModifiedListener)
+        historySplinesBackQueue.listener(queueModifiedListener)
+        historySplinesCurrent.listener(valueModifiedListener)
+        historySplinesForwardQueue.listener(queueModifiedListener)
+        historyBiomesBackQueue.listener(queueModifiedListener)
+        historyBiomesCurrent.listener(valueModifiedListener)
+        historyBiomesForwardQueue.listener(queueModifiedListener)
+        currentState.value.regionParameters.listener(valueModifiedListener)
+        currentState.value.regionGraph.listener(valueModifiedListener)
+        currentState.value.regionMask.listener(valueModifiedListener)
+        currentState.value.regionSplines.listener(valueModifiedListener)
+        currentState.value.biomeParameters.listener(valueModifiedListener)
+        currentState.value.biomeGraph.listener(valueModifiedListener)
+        currentState.value.biomeMask.listener(valueModifiedListener)
+    }
+}
 
 private val PROJECT_MOD_LOCK: Lock = ReentrantLock(true)
 
 val recentProjects = ArrayList<Pair<File, Block>>()
 val recentProjectsDropdown = ref<DropdownList?>(null)
 val recentProjectsAvailable = ref(false)
-val currentProject = ref<Project?>(null)
+val currentProjectHasModifications = ref(false)
+val currentProject = ref<Project?>(null).listener { old, new ->
+    if (old != new) {
+        if (new == null) {
+            currentProjectHasModifications.value = false
+        } else {
+            currentProjectHasModifications.value = new.isModifiedSinceSave.value
+            new.isModifiedSinceSave.listener { lastModified, nowModified ->
+                if (lastModified != nowModified) {
+                    currentProjectHasModifications.value = nowModified
+                }
+            }
+        }
+    }
+}
 val doesActiveProjectExist = ref(false)
 
 private class RecentProjects(val recentProjects: List<String>)
@@ -113,7 +160,7 @@ fun addProjectToRecentProjects(folder: File?, dialogLayer: Block, overwriteWarni
                     errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
                 }
             }
-            if (currentProject.value != null) {
+            if (currentProject.value != null && currentProjectHasModifications.value) {
                 dialogLayer.isVisible = true
                 overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
                 overwriteWarningDialog.isVisible = true
@@ -238,16 +285,24 @@ fun openProject(dialogLayer: Block,
     }
 }
 
-fun updateTitle(titleText: DynamicTextReference, new: Project?) {
+fun updateTitle(titleText: DynamicTextReference, new: Project?, modified: Boolean = false) {
     val name = if (new == null) {
         "No project"
     } else {
-        new.file?.canonicalPath ?: "New unsaved project"
+        new.file?.canonicalPath ?: "New unsaved project *"
     }
     val showPath = if (name.length < 55) {
-        name
+        if (modified) {
+            "$name *"
+        } else {
+            name
+        }
     } else {
-        "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
+        if (modified) {
+            "${name.substring(0, 25)} ... ${name.substring(name.length - 25)} *"
+        } else {
+            "${name.substring(0, 25)} ... ${name.substring(name.length - 25)}"
+        }
     }
     titleText.reference.value = "WorldKit - $showPath"
 }

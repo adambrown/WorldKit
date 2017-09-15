@@ -165,7 +165,7 @@ class SplineDrawBrushListener(
             customIgnoredPoints.add(newPoints)
             customIgnoredEdges.add(newEdges)
             splineMap.put(splineMap.size + 1, Quintuple(splineMap.size + 1, 5, newPoints to newPoints, newEdges, false))
-            currentState.regionSplines = RegionSplines(
+            currentState.regionSplines.value = RegionSplines(
                     true,
                     currentSplines.coastEdges,
                     currentSplines.coastPoints,
@@ -178,9 +178,9 @@ class SplineDrawBrushListener(
                     ignoredOrigins,
                     ignoredEdges,
                     ignoredPoints,
-                    currentState.regionSplines?.deletedOrigins ?: listOf(),
-                    currentState.regionSplines?.deletedEdges ?: listOf(),
-                    currentState.regionSplines?.deletedPoints ?: listOf(),
+                    currentState.regionSplines.value?.deletedOrigins ?: listOf(),
+                    currentState.regionSplines.value?.deletedEdges ?: listOf(),
+                    currentState.regionSplines.value?.deletedPoints ?: listOf(),
                     customRiverEdges,
                     customRiverPoints,
                     customMountainEdges,

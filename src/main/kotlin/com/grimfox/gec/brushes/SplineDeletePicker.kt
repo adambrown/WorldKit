@@ -99,7 +99,7 @@ class SplineDeletePicker(
                         }
                     }
                 }
-                currentState.regionSplines = BuildContinent.RegionSplines(
+                currentState.regionSplines.value = BuildContinent.RegionSplines(
                         true,
                         currentSplines.coastEdges,
                         currentSplines.coastPoints,

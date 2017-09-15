@@ -17,9 +17,6 @@ private val mapDetailScale = ref(4)
 
 enum class DisplayMode { REGIONS, MAP, BIOMES, MESH }
 
-private val generationLock = DisableSetLock()
-private val editToggleSet = ToggleSet(executor)
-
 fun Block.leftPanel(ui: UserInterface, uiLayout: UiLayout, dialogLayer: Block): Block {
     return block {
         val leftPanel = this
@@ -122,87 +119,99 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             mapDetailScaleSlider.isVisible = false
             mapDetailScale.listener { old, new ->
                 if (old != new) {
-                    generationLock.doWithLock {
-                        currentState.heightMapTexture = null
-                        currentState.riverMapTexture = null
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            currentState.heightMapTexture.value = null
+                            currentState.riverMapTexture.value = null
+                        }
                     }
                 }
             }
             val mainButtonsRow = vButtonRow(LARGE_ROW_HEIGHT) {
-                generationLock.disableOnLockButton(this, "Show regions", { currentState.regionGraph == null || currentState.regionMask == null || displayMode.value == DisplayMode.REGIONS }) {
-                    generationLock.doWithLock {
-                        val currentRegionGraph = currentState.regionGraph
-                        val currentRegionMask = currentState.regionMask
-                        if (currentRegionGraph != null && currentRegionMask != null) {
-                            val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
-                            meshViewport.setRegions(regionTextureId)
-                            imageMode.value = 0
-                            displayMode.value = DisplayMode.REGIONS
-                            defaultToMap.value = false
-                        }
-                    }
-                }
-                generationLock.disableOnLockButton(this, "Show map", { currentState.regionSplines == null || displayMode.value == DisplayMode.MAP }) {
-                    generationLock.doWithLock {
-                        val currentRegionSplines = currentState.regionSplines
-                        if (currentRegionSplines != null) {
-                            val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
-                            meshViewport.setImage(regionTextureId)
-                            imageMode.value = 1
-                            displayMode.value = DisplayMode.MAP
-                            defaultToMap.value = true
-                        }
-                    }
-                }
-                generationLock.disableOnLockButton(this, "Show biomes", { currentState.biomeGraph == null || currentState.biomeMask == null || displayMode.value == DisplayMode.BIOMES }) {
-                    generationLock.doWithLock {
-                        val currentBiomeGraph = currentState.biomeGraph
-                        val currentBiomeMask = currentState.biomeMask
-                        val currentSplines = currentState.regionSplines
-                        if (currentBiomeGraph != null && currentBiomeMask != null) {
-                            val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
-                            val splineTextureId = if (currentSplines != null) {
-                                TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
-                            } else {
-                                TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                generationLock.disableOnLockButton(this, "Show regions", { currentState.regionGraph.value == null || currentState.regionMask.value == null || displayMode.value == DisplayMode.REGIONS }) {
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            val currentRegionGraph = currentState.regionGraph.value
+                            val currentRegionMask = currentState.regionMask.value
+                            if (currentRegionGraph != null && currentRegionMask != null) {
+                                val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
+                                meshViewport.setRegions(regionTextureId)
+                                imageMode.value = 0
+                                displayMode.value = DisplayMode.REGIONS
+                                defaultToMap.value = false
                             }
-                            meshViewport.setBiomes(biomeTextureId, splineTextureId)
-                            imageMode.value = 2
-                            displayMode.value = DisplayMode.BIOMES
                         }
                     }
                 }
-                generationLock.disableOnLockSet({ if (currentState.heightMapTexture != null && currentState.riverMapTexture != null) 1 else 0 },
-                        disableButton("Build mesh", { currentState.regionGraph == null || currentState.regionMask == null || currentState.regionSplines == null || currentState.biomeGraph == null || currentState.biomeGraph == null }) {
-                            generationLock.doWithLock {
-                                val currentParameters = currentState.regionParameters
-                                val currentRegionGraph = currentState.regionGraph
-                                val currentRegionMask = currentState.regionMask
-                                val currentRegionSplines = currentState.regionSplines
-                                val currentBiomeGraph = currentState.biomeGraph
-                                val currentBiomeMask = currentState.biomeMask
-                                val currentBiomes = currentState.biomes
-                                val currentMapScale = mapDetailScale.value
-                                if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
-                                    val (heightMapTexId, riverMapTexId) = generateWaterFlows(currentParameters, currentRegionSplines, currentBiomeGraph, currentBiomeMask, currentBiomes, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor, currentMapScale)
-                                    meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
-                                    currentState.heightMapTexture = heightMapTexId
-                                    currentState.riverMapTexture = riverMapTexId
-                                    val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
-                                    heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
-                                    imageMode.value = 3
-                                    displayMode.value = DisplayMode.MESH
+                generationLock.disableOnLockButton(this, "Show map", { currentState.regionSplines.value == null || displayMode.value == DisplayMode.MAP }) {
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            val currentRegionSplines = currentState.regionSplines.value
+                            if (currentRegionSplines != null) {
+                                val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                meshViewport.setImage(regionTextureId)
+                                imageMode.value = 1
+                                displayMode.value = DisplayMode.MAP
+                                defaultToMap.value = true
+                            }
+                        }
+                    }
+                }
+                generationLock.disableOnLockButton(this, "Show biomes", { currentState.biomeGraph.value == null || currentState.biomeMask.value == null || displayMode.value == DisplayMode.BIOMES }) {
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            val currentBiomeGraph = currentState.biomeGraph.value
+                            val currentBiomeMask = currentState.biomeMask.value
+                            val currentSplines = currentState.regionSplines.value
+                            if (currentBiomeGraph != null && currentBiomeMask != null) {
+                                val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
+                                val splineTextureId = if (currentSplines != null) {
+                                    TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+                                } else {
+                                    TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                                }
+                                meshViewport.setBiomes(biomeTextureId, splineTextureId)
+                                imageMode.value = 2
+                                displayMode.value = DisplayMode.BIOMES
+                            }
+                        }
+                    }
+                }
+                generationLock.disableOnLockSet({ if (currentState.heightMapTexture.value != null && currentState.riverMapTexture.value != null) 1 else 0 },
+                        disableButton("Build mesh", { currentState.regionGraph.value == null || currentState.regionMask.value == null || currentState.regionSplines.value == null || currentState.biomeGraph.value == null || currentState.biomeGraph.value == null }) {
+                            editToggleSet.suspend {
+                                generationLock.doWithLock {
+                                    val currentParameters = currentState.regionParameters.value
+                                    val currentRegionGraph = currentState.regionGraph.value
+                                    val currentRegionMask = currentState.regionMask.value
+                                    val currentRegionSplines = currentState.regionSplines.value
+                                    val currentBiomeGraph = currentState.biomeGraph.value
+                                    val currentBiomeMask = currentState.biomeMask.value
+                                    val currentBiomes = currentState.biomes.value
+                                    val currentMapScale = mapDetailScale.value
+                                    if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
+                                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(currentParameters, currentRegionSplines, currentBiomeGraph, currentBiomeMask, currentBiomes, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor, currentMapScale)
+                                        meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
+                                        currentState.heightMapTexture.value = heightMapTexId
+                                        currentState.riverMapTexture.value = riverMapTexId
+                                        val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
+                                        heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+                                        imageMode.value = 3
+                                        displayMode.value = DisplayMode.MESH
+                                    }
                                 }
                             }
                         },
                         disableButton("Show mesh", { displayMode.value == DisplayMode.MESH }) {
-                            generationLock.doWithLock {
-                                val currentHeightMap = currentState.heightMapTexture
-                                val currentRiverMap = currentState.riverMapTexture
-                                if (currentHeightMap != null && currentRiverMap != null) {
-                                    meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
-                                    imageMode.value = 3
-                                    displayMode.value = DisplayMode.MESH
+                            editToggleSet.suspend {
+                                generationLock.doWithLock {
+                                    val currentHeightMap = currentState.heightMapTexture.value
+                                    val currentRiverMap = currentState.riverMapTexture.value
+                                    if (currentHeightMap != null && currentRiverMap != null) {
+                                        meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
+                                        imageMode.value = 3
+                                        displayMode.value = DisplayMode.MESH
+                                    }
                                 }
                             }
                         }

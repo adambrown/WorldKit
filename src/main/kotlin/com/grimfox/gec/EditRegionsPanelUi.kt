@@ -98,25 +98,29 @@ fun Block.editRegionsPanel(
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import regions") {
-                generationLock.doWithLock {
-                    val historyItem = importRegionsFile(dialogLayer, preferences, ui)
-                    if (historyItem != null) {
-                        val historyLast = historyRegionsCurrent.value
-                        if (historyLast != null) {
-                            historyRegionsBackQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = importRegionsFile(dialogLayer, preferences, ui)
+                        if (historyItem != null) {
+                            val historyLast = historyRegionsCurrent.value
+                            if (historyLast != null) {
+                                historyRegionsBackQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionMask.value = historyItem.mask
+                            regionsBuilder.build(historyItem.parameters, true, true)
+                            historyRegionsCurrent.value = historyItem.copy()
                         }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.regionMask = historyItem.mask
-                        regionsBuilder.build(historyItem.parameters, true, true)
-                        historyRegionsCurrent.value = historyItem.copy()
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Export regions", { historyRegionsCurrent.value == null }) {
-                generationLock.doWithLock {
-                    exportRegionsFile(historyRegionsCurrent.value, dialogLayer, preferences, ui)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        exportRegionsFile(historyRegionsCurrent.value, dialogLayer, preferences, ui)
+                    }
                 }
             }
         }
@@ -145,18 +149,20 @@ fun Block.editRegionsPanel(
         regionScaleSlider.onMouseRelease { a, b, c, d ->
             regionScaleSliderMouseRelease?.invoke(regionScaleSlider, a, b, c, d)
             executor.call {
-                generationLock.doWithLock {
-                    val currentGraph = currentState.regionGraph
-                    val currentMask = currentState.regionMask
-                    val currentSplines = currentState.regionSplines
-                    if (edgeDetailScale.value != regionScaleSliderInitial && currentGraph != null && currentMask != null && currentSplines != null) {
-                        val parameters = extractCurrentParameters()
-                        regionsBuilder.build(parameters, true, true)
-                        updateRegionsHistory(parameters, currentGraph, currentMask)
-                        val currentRegionSplines = currentState.regionSplines
-                        if (currentRegionSplines != null && displayMode.value == DisplayMode.MAP) {
-                            val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
-                            meshViewport.setImage(regionTextureId)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val currentGraph = currentState.regionGraph.value
+                        val currentMask = currentState.regionMask.value
+                        val currentSplines = currentState.regionSplines.value
+                        if (edgeDetailScale.value != regionScaleSliderInitial && currentGraph != null && currentMask != null && currentSplines != null) {
+                            val parameters = extractCurrentParameters()
+                            regionsBuilder.build(parameters, true, true)
+                            updateRegionsHistory(parameters, currentGraph, currentMask)
+                            val currentRegionSplines = currentState.regionSplines.value
+                            if (currentRegionSplines != null && displayMode.value == DisplayMode.MAP) {
+                                val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                meshViewport.setImage(regionTextureId)
+                            }
                         }
                     }
                 }
@@ -186,8 +192,8 @@ fun Block.editRegionsPanel(
         vToggleRow(editRegionsMode, LARGE_ROW_HEIGHT, text("Manual edit:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(editRegionsMode,
                 {
-                    val currentGraph = currentState.regionGraph
-                    val currentMask = currentState.regionMask
+                    val currentGraph = currentState.regionGraph.value
+                    val currentMask = currentState.regionMask.value
                     if (currentGraph != null && currentMask != null) {
                         generationLock.lock()
                         val regionTextureId = Rendering.renderRegions(currentGraph, currentMask)
@@ -214,9 +220,9 @@ fun Block.editRegionsPanel(
                     brushOn.value = false
                     val parameters = extractCurrentParameters()
                     regionsBuilder.build(parameters, true)
-                    val currentRegionSplines = currentState.regionSplines
-                    val currentGraph = currentState.regionGraph
-                    val currentMask = currentState.regionMask
+                    val currentRegionSplines = currentState.regionSplines.value
+                    val currentGraph = currentState.regionGraph.value
+                    val currentMask = currentState.regionMask.value
                     if (currentRegionSplines != null && currentGraph != null && currentMask != null) {
                         updateRegionsHistory(parameters, currentGraph, currentMask)
                         val mapTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
@@ -231,81 +237,89 @@ fun Block.editRegionsPanel(
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Generate") {
-                generationLock.doWithLock {
-                    val parameters = extractCurrentParameters()
-                    regionsBuilder.build(parameters)
-                    val currentGraph = currentState.regionGraph
-                    val currentMask = currentState.regionMask
-                    if (currentGraph != null && currentMask != null) {
-                        updateRegionsHistory(parameters, currentGraph, currentMask)
-                        val currentSplines = currentState.regionSplines
-                        if (historySplinesCurrent.value == null && currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val parameters = extractCurrentParameters()
+                        regionsBuilder.build(parameters)
+                        val currentGraph = currentState.regionGraph.value
+                        val currentMask = currentState.regionMask.value
+                        if (currentGraph != null && currentMask != null) {
+                            updateRegionsHistory(parameters, currentGraph, currentMask)
+                            val currentSplines = currentState.regionSplines.value
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Generate random") {
-                generationLock.doWithLock {
-                    val randomSeed = RANDOM.nextLong()
-                    val randomString = randomSeed.toString()
-                    if (randomString.length > 18) {
-                        regionsSeed.value = randomString.substring(0, 18).toLong()
-                    } else {
-                        regionsSeed.value = randomSeed
-                    }
-                    val parameters = extractCurrentParameters()
-                    regionsBuilder.build(parameters)
-                    val currentGraph = currentState.regionGraph
-                    val currentMask = currentState.regionMask
-                    if (currentGraph != null && currentMask != null) {
-                        updateRegionsHistory(parameters, currentGraph, currentMask)
-                        val currentSplines = currentState.regionSplines
-                        if (historySplinesCurrent.value == null && currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val randomSeed = RANDOM.nextLong()
+                        val randomString = randomSeed.toString()
+                        if (randomString.length > 18) {
+                            regionsSeed.value = randomString.substring(0, 18).toLong()
+                        } else {
+                            regionsSeed.value = randomSeed
+                        }
+                        val parameters = extractCurrentParameters()
+                        regionsBuilder.build(parameters)
+                        val currentGraph = currentState.regionGraph.value
+                        val currentMask = currentState.regionMask.value
+                        if (currentGraph != null && currentMask != null) {
+                            updateRegionsHistory(parameters, currentGraph, currentMask)
+                            val currentSplines = currentState.regionSplines.value
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Back", { historyRegionsBackQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historyRegionsBackQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historyRegionsCurrent.value
-                        if (historyLast != null) {
-                            historyRegionsForwardQueue.push(historyLast.copy())
-                        }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.regionMask = historyItem.mask
-                        regionsBuilder.build(historyItem.parameters, true, true)
-                        historyRegionsCurrent.value = historyItem.copy()
-                        val currentSplines = currentState.regionSplines
-                        if (historySplinesCurrent.value == null && currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historyRegionsBackQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historyRegionsCurrent.value
+                            if (historyLast != null) {
+                                historyRegionsForwardQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionMask.value = historyItem.mask
+                            regionsBuilder.build(historyItem.parameters, true, true)
+                            historyRegionsCurrent.value = historyItem.copy()
+                            val currentSplines = currentState.regionSplines.value
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Forward", { historyRegionsForwardQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historyRegionsForwardQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historyRegionsCurrent.value
-                        if (historyLast != null) {
-                            historyRegionsBackQueue.push(historyLast.copy())
-                        }
-                        syncParameterValues(historyItem.parameters)
-                        currentState.regionGraph = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
-                        currentState.regionMask = historyItem.mask
-                        regionsBuilder.build(historyItem.parameters, true, true)
-                        historyRegionsCurrent.value = historyItem.copy()
-                        val currentSplines = currentState.regionSplines
-                        if (historySplinesCurrent.value == null && currentSplines != null) {
-                            updateSplinesHistory(currentSplines)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historyRegionsForwardQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historyRegionsCurrent.value
+                            if (historyLast != null) {
+                                historyRegionsBackQueue.push(historyLast.copy())
+                            }
+                            syncParameterValues(historyItem.parameters)
+                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionMask.value = historyItem.mask
+                            regionsBuilder.build(historyItem.parameters, true, true)
+                            historyRegionsCurrent.value = historyItem.copy()
+                            val currentSplines = currentState.regionSplines.value
+                            if (historySplinesCurrent.value == null && currentSplines != null) {
+                                updateSplinesHistory(currentSplines)
+                            }
                         }
                     }
                 }
@@ -326,26 +340,30 @@ fun Block.editMapPanel(
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import splines") {
-                generationLock.doWithLock {
-                    val historyItem = importSplinesFile(dialogLayer, preferences, ui)
-                    if (historyItem != null) {
-                        val historyLast = historySplinesCurrent.value
-                        if (historyLast != null) {
-                            historySplinesBackQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = importSplinesFile(dialogLayer, preferences, ui)
+                        if (historyItem != null) {
+                            val historyLast = historySplinesCurrent.value
+                            if (historyLast != null) {
+                                historySplinesBackQueue.push(historyLast.copy())
+                            }
+                            currentState.regionSplines.value = historyItem
+                            val currentParameters = currentState.regionParameters.value
+                            if (currentParameters != null) {
+                                regionsBuilder.build(currentParameters, true, true)
+                            }
+                            historySplinesCurrent.value = historyItem.copy()
                         }
-                        currentState.regionSplines = historyItem
-                        val currentParameters = currentState.regionParameters
-                        if (currentParameters != null) {
-                            regionsBuilder.build(currentParameters, true, true)
-                        }
-                        historySplinesCurrent.value = historyItem.copy()
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Export splines", { historySplinesCurrent.value == null }) {
-                generationLock.doWithLock {
-                    exportSplinesFile(historySplinesCurrent.value, dialogLayer, preferences, ui)
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        exportSplinesFile(historySplinesCurrent.value, dialogLayer, preferences, ui)
+                    }
                 }
             }
         }
@@ -354,7 +372,7 @@ fun Block.editMapPanel(
         vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(drawSplinesMode,
                 {
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
@@ -384,7 +402,7 @@ fun Block.editMapPanel(
                     brushOn.value = false
                     val parameters = extractCurrentParameters()
                     regionsBuilder.build(parameters, true, false)
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         updateSplinesHistory(currentSplines)
                     }
@@ -421,7 +439,7 @@ fun Block.editMapPanel(
         }
         editToggleSet.add(editSplinesMode,
                 {
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
@@ -460,7 +478,7 @@ fun Block.editMapPanel(
                     pickerOn.value = false
                     val parameters = extractCurrentParameters()
                     regionsBuilder.build(parameters, true, false)
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         updateSplinesHistory(currentSplines)
                     }
@@ -497,7 +515,7 @@ fun Block.editMapPanel(
         }
         editToggleSet.add(deleteSplinesMode,
                 {
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
@@ -539,7 +557,7 @@ fun Block.editMapPanel(
                     pickerOn.value = false
                     val parameters = extractCurrentParameters()
                     regionsBuilder.build(parameters, true, false)
-                    val currentSplines = currentState.regionSplines
+                    val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         updateSplinesHistory(currentSplines)
                     }
@@ -547,62 +565,70 @@ fun Block.editMapPanel(
                 },
                 splineDeleteRadiusSlider)
         vButtonRow(LARGE_ROW_HEIGHT) {
-            generationLock.disableOnLockButton(this, "Clear edits", { !(currentState.regionSplines?.hasCustomizations ?: false) }) {
-                generationLock.doWithLock {
-                    val parameters = extractCurrentParameters()
-                    currentState.regionSplines = null
-                    regionsBuilder.build(parameters, true, true)
-                    val currentSplines = currentState.regionSplines
-                    if (currentSplines != null) {
-                        updateSplinesHistory(currentSplines)
+            generationLock.disableOnLockButton(this, "Clear edits", { !(currentState.regionSplines.value?.hasCustomizations ?: false) }) {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val parameters = extractCurrentParameters()
+                        currentState.regionSplines.value = null
+                        regionsBuilder.build(parameters, true, true)
+                        val currentSplines = currentState.regionSplines.value
+                        if (currentSplines != null) {
+                            updateSplinesHistory(currentSplines)
+                        }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
-            generationLock.disableOnLockButton(this, "Restore deleted", { currentState.regionSplines?.deletedOrigins?.isEmpty() ?: true }) {
-                generationLock.doWithLock {
-                    val parameters = extractCurrentParameters()
-                    currentState.regionSplines = currentState.regionSplines?.copy(deletedOrigins = listOf(), deletedPoints = listOf(), deletedEdges = listOf())
-                    regionsBuilder.build(parameters, true, true)
-                    val currentSplines = currentState.regionSplines
-                    if (currentSplines != null) {
-                        updateSplinesHistory(currentSplines)
+            generationLock.disableOnLockButton(this, "Restore deleted", { currentState.regionSplines.value?.deletedOrigins?.isEmpty() ?: true }) {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val parameters = extractCurrentParameters()
+                        currentState.regionSplines.value = currentState.regionSplines.value?.copy(deletedOrigins = listOf(), deletedPoints = listOf(), deletedEdges = listOf())
+                        regionsBuilder.build(parameters, true, true)
+                        val currentSplines = currentState.regionSplines.value
+                        if (currentSplines != null) {
+                            updateSplinesHistory(currentSplines)
+                        }
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Back", { historySplinesBackQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historySplinesBackQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historySplinesCurrent.value
-                        if (historyLast != null) {
-                            historySplinesForwardQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historySplinesBackQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historySplinesCurrent.value
+                            if (historyLast != null) {
+                                historySplinesForwardQueue.push(historyLast.copy())
+                            }
+                            currentState.regionSplines.value = historyItem
+                            val parameters = currentState.regionParameters.value
+                            if (parameters != null) {
+                                regionsBuilder.build(parameters, true, true)
+                            }
+                            historySplinesCurrent.value = historyItem.copy()
                         }
-                        currentState.regionSplines = historyItem
-                        val parameters = currentState.regionParameters
-                        if (parameters != null) {
-                            regionsBuilder.build(parameters, true, true)
-                        }
-                        historySplinesCurrent.value = historyItem.copy()
                     }
                 }
             }
             hSpacer(SMALL_SPACER_SIZE)
             generationLock.disableOnLockButton(this, "Forward", { historySplinesForwardQueue.size == 0 }) {
-                generationLock.doWithLock {
-                    val historyItem = historySplinesForwardQueue.pop()
-                    if (historyItem != null) {
-                        val historyLast = historySplinesCurrent.value
-                        if (historyLast != null) {
-                            historySplinesBackQueue.push(historyLast.copy())
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val historyItem = historySplinesForwardQueue.pop()
+                        if (historyItem != null) {
+                            val historyLast = historySplinesCurrent.value
+                            if (historyLast != null) {
+                                historySplinesBackQueue.push(historyLast.copy())
+                            }
+                            currentState.regionSplines.value = historyItem
+                            val parameters = currentState.regionParameters.value
+                            if (parameters != null) {
+                                regionsBuilder.build(parameters, true, true)
+                            }
+                            historySplinesCurrent.value = historyItem.copy()
                         }
-                        currentState.regionSplines = historyItem
-                        val parameters = currentState.regionParameters
-                        if (parameters != null) {
-                            regionsBuilder.build(parameters, true, true)
-                        }
-                        historySplinesCurrent.value = historyItem.copy()
                     }
                 }
             }

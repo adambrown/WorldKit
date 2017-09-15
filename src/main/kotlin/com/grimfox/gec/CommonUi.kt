@@ -107,7 +107,7 @@ class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, va
     }
 }
 
-val currentState: CurrentState get() = currentProject.value?.currentState ?: CurrentState()
+val currentState: CurrentState get() = currentProject.value?.currentState?.value ?: CurrentState()
 
 val experimentalWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
@@ -159,6 +159,9 @@ var exportPanel = NO_BLOCK
 
 var onWindowResize: () -> Unit = {}
 
+val generationLock = DisableSetLock()
+val editToggleSet = ToggleSet(executor)
+
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
     return { scale: Float ->
         clamp(Math.round(scale * (range.last - range.first)) + range.first, range.first, range.last)
@@ -197,18 +200,18 @@ val noop = {}
 val dialogCallback = mRef(noop)
 
 fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, noop: () -> Unit) {
-    if (currentProject.value != null) {
+    if (currentProject.value != null && currentProjectHasModifications.value) {
         dialogLayer.isVisible = true
         overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"
         overwriteWarningDialog.isVisible = true
         dialogCallback.value = {
-            currentProject.value = Project()
+            currentProject.value = Project(isModifiedSinceSave = ref(true))
             meshViewport.reset()
             imageMode.value = 3
             dialogCallback.value = noop
         }
     } else {
-        currentProject.value = Project()
+        currentProject.value = Project(isModifiedSinceSave = ref(true))
         meshViewport.reset()
         imageMode.value = 3
     }
@@ -248,9 +251,9 @@ fun updateBiomesHistory(parameters: BiomeParameters, graph: Graph, biomeMask: By
 }
 
 fun afterProjectOpen() {
-    val currentBiomeGraph = currentState.biomeGraph
-    val currentBiomeMask = currentState.biomeMask
-    val currentSplines = currentState.regionSplines
+    val currentBiomeGraph = currentState.biomeGraph.value
+    val currentBiomeMask = currentState.biomeMask.value
+    val currentSplines = currentState.regionSplines.value
     if (currentBiomeGraph != null && currentBiomeMask != null) {
         val biomeTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
         val splineTextureId = if (currentSplines != null) {
@@ -262,7 +265,7 @@ fun afterProjectOpen() {
         imageMode.value = 2
         displayMode.value = DisplayMode.BIOMES
     } else {
-        val currentRegionSplines = currentState.regionSplines
+        val currentRegionSplines = currentState.regionSplines.value
         if (currentRegionSplines != null) {
             val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
             meshViewport.setImage(regionTextureId)

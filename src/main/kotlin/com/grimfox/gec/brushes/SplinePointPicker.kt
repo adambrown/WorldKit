@@ -81,7 +81,7 @@ class SplinePointPicker(
                         }
                     }
                 }
-                currentState.regionSplines = BuildContinent.RegionSplines(
+                currentState.regionSplines.value = BuildContinent.RegionSplines(
                         true,
                         currentSplines.coastEdges,
                         currentSplines.coastPoints,
@@ -94,9 +94,9 @@ class SplinePointPicker(
                         ignoredOrigins,
                         ignoredEdges,
                         ignoredPoints,
-                        currentState.regionSplines?.deletedOrigins ?: listOf(),
-                        currentState.regionSplines?.deletedEdges ?: listOf(),
-                        currentState.regionSplines?.deletedPoints ?: listOf(),
+                        currentState.regionSplines.value?.deletedOrigins ?: listOf(),
+                        currentState.regionSplines.value?.deletedEdges ?: listOf(),
+                        currentState.regionSplines.value?.deletedPoints ?: listOf(),
                         customRiverEdges,
                         customRiverPoints,
                         customMountainEdges,

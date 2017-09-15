@@ -22,22 +22,22 @@ fun importProjectFile(file: File): Project? {
         val hasRegionState = stream.readBoolean()
         if (hasRegionState) {
             val currentRegionState = stream.readRegionsHistoryItem()
-            currentState.regionParameters = currentRegionState.parameters
-            currentState.regionGraph = Graphs.generateGraph(128, currentRegionState.graphSeed, 0.8)
-            currentState.regionMask = currentRegionState.mask
+            currentState.regionParameters.value = currentRegionState.parameters
+            currentState.regionGraph.value = Graphs.generateGraph(128, currentRegionState.graphSeed, 0.8)
+            currentState.regionMask.value = currentRegionState.mask
         }
         val hasSplineState = stream.readBoolean()
         if (hasSplineState) {
             val currentSplineState = stream.readRegionSplines()
-            currentState.regionSplines = currentSplineState
+            currentState.regionSplines.value = currentSplineState
         }
         val hasBiomeState = stream.readBoolean()
         if (hasBiomeState) {
             val currentBiomeState = stream.readBiomesHistoryItem()
-            currentState.biomeParameters = currentBiomeState.parameters
-            currentState.biomeGraph = Graphs.generateGraph(128, currentBiomeState.graphSeed, 0.8)
-            currentState.biomeMask = currentBiomeState.mask
-            currentState.biomes = currentBiomeState.parameters.biomes.map { ordinalToBiome(it) }
+            currentState.biomeParameters.value = currentBiomeState.parameters
+            currentState.biomeGraph.value = Graphs.generateGraph(128, currentBiomeState.graphSeed, 0.8)
+            currentState.biomeMask.value = currentBiomeState.mask
+            currentState.biomes.value = currentBiomeState.parameters.biomes.map { ordinalToBiome(it) }
         }
         val historyRegionsBackQueue = stream.readHistoryQueue { readRegionsHistoryItem() }
         val historyRegionsCurrentValue = if (stream.readBoolean()) {
@@ -61,7 +61,7 @@ fun importProjectFile(file: File): Project? {
         }
         val historyBiomesForwardQueue = stream.readHistoryQueue { readBiomesHistoryItem() }
         Project(
-                currentState = currentState,
+                currentState = ref(currentState),
                 historyRegionsBackQueue = historyRegionsBackQueue,
                 historyRegionsCurrent = ref(historyRegionsCurrentValue),
                 historyRegionsForwardQueue = historyRegionsForwardQueue,
@@ -75,72 +75,77 @@ fun importProjectFile(file: File): Project? {
 }
 
 fun exportProjectFile(project: Project, file: File) {
-    DataOutputStream(GZIPOutputStream(file.outputStream()).buffered()).use { stream ->
-        val currentState = project.currentState
-        val regionParameters = currentState.regionParameters
-        val regionGraph = currentState.regionGraph
-        val regionMask = currentState.regionMask
-        if (regionParameters != null && regionGraph != null && regionMask != null) {
-            stream.writeBoolean(true)
-            stream.writeRegionsHistoryItem(RegionsHistoryItem(regionParameters, regionGraph.seed, regionMask))
-        } else {
-            stream.writeBoolean(false)
-        }
-        val regionSplines = currentState.regionSplines
-        if (regionSplines != null) {
-            stream.writeBoolean(true)
-            stream.writeRegionSplines(regionSplines)
-        } else {
-            stream.writeBoolean(false)
-        }
-        val biomeParameters = currentState.biomeParameters
-        val biomeGraph = currentState.biomeGraph
-        val biomeMask = currentState.biomeMask
-        if (biomeParameters != null && biomeGraph != null && biomeMask != null) {
-            stream.writeBoolean(true)
-            stream.writeBiomesHistoryItem(BiomesHistoryItem(biomeParameters, biomeGraph.seed, biomeMask))
-        } else {
-            stream.writeBoolean(false)
-        }
-        stream.writeHistoryQueue(project.historyRegionsBackQueue) {
-            writeRegionsHistoryItem(it)
-        }
-        val regionsCurrentValue = project.historyRegionsCurrent.value
-        if (regionsCurrentValue == null) {
-            stream.writeBoolean(false)
-        } else {
-            stream.writeBoolean(true)
-            stream.writeRegionsHistoryItem(regionsCurrentValue)
-        }
-        stream.writeHistoryQueue(project.historyRegionsForwardQueue) {
-            writeRegionsHistoryItem(it)
-        }
-        stream.writeHistoryQueue(project.historySplinesBackQueue) {
-            writeRegionSplines(it)
-        }
-        val splinesCurrentValue = project.historySplinesCurrent.value
-        if (splinesCurrentValue == null) {
-            stream.writeBoolean(false)
-        } else {
-            stream.writeBoolean(true)
-            stream.writeRegionSplines(splinesCurrentValue)
-        }
-        stream.writeHistoryQueue(project.historySplinesForwardQueue) {
-            writeRegionSplines(it)
-        }
+    editToggleSet.suspend {
+        generationLock.doWithLock {
+            DataOutputStream(GZIPOutputStream(file.outputStream()).buffered()).use { stream ->
+                val currentState = project.currentState.value
+                val regionParameters = currentState.regionParameters.value
+                val regionGraph = currentState.regionGraph.value
+                val regionMask = currentState.regionMask.value
+                if (regionParameters != null && regionGraph != null && regionMask != null) {
+                    stream.writeBoolean(true)
+                    stream.writeRegionsHistoryItem(RegionsHistoryItem(regionParameters, regionGraph.seed, regionMask))
+                } else {
+                    stream.writeBoolean(false)
+                }
+                val regionSplines = currentState.regionSplines.value
+                if (regionSplines != null) {
+                    stream.writeBoolean(true)
+                    stream.writeRegionSplines(regionSplines)
+                } else {
+                    stream.writeBoolean(false)
+                }
+                val biomeParameters = currentState.biomeParameters.value
+                val biomeGraph = currentState.biomeGraph.value
+                val biomeMask = currentState.biomeMask.value
+                if (biomeParameters != null && biomeGraph != null && biomeMask != null) {
+                    stream.writeBoolean(true)
+                    stream.writeBiomesHistoryItem(BiomesHistoryItem(biomeParameters, biomeGraph.seed, biomeMask))
+                } else {
+                    stream.writeBoolean(false)
+                }
+                stream.writeHistoryQueue(project.historyRegionsBackQueue) {
+                    writeRegionsHistoryItem(it)
+                }
+                val regionsCurrentValue = project.historyRegionsCurrent.value
+                if (regionsCurrentValue == null) {
+                    stream.writeBoolean(false)
+                } else {
+                    stream.writeBoolean(true)
+                    stream.writeRegionsHistoryItem(regionsCurrentValue)
+                }
+                stream.writeHistoryQueue(project.historyRegionsForwardQueue) {
+                    writeRegionsHistoryItem(it)
+                }
+                stream.writeHistoryQueue(project.historySplinesBackQueue) {
+                    writeRegionSplines(it)
+                }
+                val splinesCurrentValue = project.historySplinesCurrent.value
+                if (splinesCurrentValue == null) {
+                    stream.writeBoolean(false)
+                } else {
+                    stream.writeBoolean(true)
+                    stream.writeRegionSplines(splinesCurrentValue)
+                }
+                stream.writeHistoryQueue(project.historySplinesForwardQueue) {
+                    writeRegionSplines(it)
+                }
 
-        stream.writeHistoryQueue(project.historyBiomesBackQueue) {
-            writeBiomesHistoryItem(it)
-        }
-        val biomesCurrentValue = project.historyBiomesCurrent.value
-        if (biomesCurrentValue == null) {
-            stream.writeBoolean(false)
-        } else {
-            stream.writeBoolean(true)
-            stream.writeBiomesHistoryItem(biomesCurrentValue)
-        }
-        stream.writeHistoryQueue(project.historyBiomesForwardQueue) {
-            writeBiomesHistoryItem(it)
+                stream.writeHistoryQueue(project.historyBiomesBackQueue) {
+                    writeBiomesHistoryItem(it)
+                }
+                val biomesCurrentValue = project.historyBiomesCurrent.value
+                if (biomesCurrentValue == null) {
+                    stream.writeBoolean(false)
+                } else {
+                    stream.writeBoolean(true)
+                    stream.writeBiomesHistoryItem(biomesCurrentValue)
+                }
+                stream.writeHistoryQueue(project.historyBiomesForwardQueue) {
+                    writeBiomesHistoryItem(it)
+                }
+            }
+            project.isModifiedSinceSave.value = false
         }
     }
 }
