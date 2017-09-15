@@ -1,22 +1,21 @@
 package com.grimfox.gec
 
-import com.fasterxml.jackson.core.JsonParseException
-import com.grimfox.gec.ui.*
-import com.grimfox.gec.util.BuildContinent.RegionParameters
-import com.grimfox.gec.util.BuildContinent.generateRegions
-import com.grimfox.gec.util.loadTexture2D
+import com.grimfox.gec.ui.HotkeyHandler
+import com.grimfox.gec.ui.layout
+import com.grimfox.gec.ui.set
+import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.*
-import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.Sizing.GROW
+import com.grimfox.gec.ui.widgets.Sizing.STATIC
+import com.grimfox.gec.util.BuildContinent.RegionParameters
+import com.grimfox.gec.util.BuildContinent.generateRegions
+import com.grimfox.gec.util.loadTexture2D
 import nl.komponents.kovenant.task
+import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
-import java.awt.Desktop
-import java.io.IOException
-import java.net.URI
-import java.net.URISyntaxException
-import java.net.URL
 
 object Main {
 
@@ -181,29 +180,7 @@ object Main {
                                     newProject(overwriteWarningReference, overwriteWarningDialog, dialogCallback, noop)
                                 }
                                 menuItem("Open project...", "Ctrl+O", BLOCK_GLYPH_OPEN_FOLDER) {
-                                    val openFun = {
-                                        try {
-                                            val openedProject = openProject(dialogLayer, preferences, ui)
-                                            if (openedProject != null) {
-                                                currentProject.value = openedProject
-                                                afterProjectOpen()
-                                            }
-                                        } catch (e: JsonParseException) {
-                                            errorHandler.displayErrorMessage("The selected file is not a valid project.")
-                                        } catch (e: IOException) {
-                                            errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
-                                        } catch (e: Exception) {
-                                            errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
-                                        }
-                                    }
-                                    if (currentProject.value != null && currentProjectHasModifications.value) {
-                                        dialogLayer.isVisible = true
-                                        overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
-                                        overwriteWarningDialog.isVisible = true
-                                        dialogCallback.value = openFun
-                                    } else {
-                                        openFun()
-                                    }
+                                    openProject(ui, errorHandler)
                                 }
                                 menuItem("Save", "Ctrl+S", BLOCK_GLYPH_SAVE, isActive = currentProjectHasModifications) {
                                     saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
@@ -234,27 +211,16 @@ object Main {
                                 }
                                 menuDivider()
                                 menuItem("Export maps...", "Ctrl+E", isActive = doesActiveProjectExist) {
-                                    panelLayer.isVisible = true
-                                    exportPanel.isVisible = true
+                                    exportMaps()
                                 }
                                 menuDivider()
-                                menuItem("Exit", "Alt+F4", BLOCK_GLYPH_CLOSE) {
-                                    if (currentProject.value != null && currentProjectHasModifications.value) {
-                                        dialogLayer.isVisible = true
-                                        overwriteWarningReference.value = "Do you want to save the current project before exiting?"
-                                        overwriteWarningDialog.isVisible = true
-                                        dialogCallback.value = {
-                                            closeWindow()
-                                        }
-                                    } else {
-                                        closeWindow()
-                                    }
+                                menuItem("Exit", "Ctrl+Q", BLOCK_GLYPH_CLOSE) {
+                                    closeWindowSafely()
                                 }
                             }
                             menu("Settings") {
                                 menuItem("Preferences", "Ctrl+P", BLOCK_GLYPH_GEAR) {
-                                    panelLayer.isVisible = true
-                                    preferencesPanel.isVisible = true
+                                    openPreferences()
                                 }
                                 menuItem("Restore default preferences") {
                                     val defaults = Preferences()
@@ -269,11 +235,7 @@ object Main {
                             }
                             menu("Help") {
                                 menuItem("Help", "Ctrl+F1", BLOCK_GLYPH_HELP) {
-                                    if (OFFLINE_HELP_INDEX_FILE.isFile && OFFLINE_HELP_INDEX_FILE.canRead()) {
-                                        openWebPage(OFFLINE_HELP_INDEX_FILE.toURI(), errorHandler)
-                                    } else {
-                                        errorHandler.displayErrorMessage("The offline help files are not currently installed. Please install the offline help files, or select one of the online help options.")
-                                    }
+                                    openHelp(errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("Getting started") {
@@ -308,16 +270,7 @@ object Main {
                         button(glyph(GLYPH_MINIMIZE), WINDOW_DECORATE_BUTTON_STYLE) { minimizeWindow() }
                         button(glyph(maxRestoreGlyph), WINDOW_DECORATE_BUTTON_STYLE) { toggleMaximized() }
                         button(glyph(GLYPH_CLOSE), WINDOW_DECORATE_BUTTON_STYLE) {
-                            if (currentProject.value != null && currentProjectHasModifications.value) {
-                                dialogLayer.isVisible = true
-                                overwriteWarningReference.value = "Do you want to save the current project before exiting?"
-                                overwriteWarningDialog.isVisible = true
-                                dialogCallback.value = {
-                                    closeWindow()
-                                }
-                            } else {
-                                closeWindow()
-                            }
+                            closeWindowSafely()
                         }
                     }
                     loadRecentProjects(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
@@ -467,6 +420,55 @@ object Main {
                         it.isVisible = false
                     }
                 }
+                hotkeyHandler = HotkeyHandler { key, _, action, mods ->
+                    if (action == GLFW.GLFW_PRESS) {
+                        val ctrl = GLFW.GLFW_MOD_CONTROL and mods != 0
+                        val shift = GLFW.GLFW_MOD_SHIFT and mods != 0
+                        if (ctrl) {
+                            when (key) {
+                                GLFW.GLFW_KEY_N -> {
+                                    task { newProject(overwriteWarningReference, overwriteWarningDialog, dialogCallback, noop) }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_O -> {
+                                    task { openProject(ui, errorHandler) }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_S -> {
+                                    if (shift) {
+                                        task { saveProjectAs(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler) }
+                                    } else {
+                                        task { saveProject(currentProject.value, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler) }
+                                    }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_E -> {
+                                    task { exportMaps() }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_Q -> {
+                                    task { closeWindowSafely() }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_P -> {
+                                    task { openPreferences() }
+                                    true
+                                }
+                                GLFW.GLFW_KEY_F1 -> {
+                                    task { openHelp(errorHandler) }
+                                    false
+                                }
+                                else -> {
+                                    false
+                                }
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
             }
         }
         var wasResizing = false
@@ -494,35 +496,5 @@ object Main {
                 wasMinimized = true
             }
         }
-    }
-}
-
-private fun openWebPage(uri: URI, onError: ErrorDialog? = null) {
-    val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
-    if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
-        try {
-            desktop.browse(uri)
-        } catch (e: Exception) {
-            LOG.error("Unable to open web page: $uri", e)
-            onError?.displayErrorMessage(e.message)
-        }
-    }
-}
-
-private fun openWebPage(url: URL, onError: ErrorDialog? = null) {
-    try {
-        openWebPage(url.toURI(), onError)
-    } catch (e: URISyntaxException) {
-        LOG.error("Unable to open web page: $url", e)
-        onError?.displayErrorMessage(e.message)
-    }
-}
-
-private fun openWebPage(url: String, onError: ErrorDialog? = null) {
-    try {
-        openWebPage(URL(url), onError)
-    } catch (e: Exception) {
-        LOG.error("Unable to open web page: $url", e)
-        onError?.displayErrorMessage(e.message)
     }
 }

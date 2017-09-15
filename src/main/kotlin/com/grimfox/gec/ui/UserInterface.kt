@@ -1,35 +1,42 @@
 package com.grimfox.gec.ui
 
-import com.fasterxml.jackson.annotation.JsonInclude.Include.*
+import com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.grimfox.gec.*
-import com.grimfox.gec.util.Biomes
-import com.grimfox.gec.util.call
-import com.grimfox.gec.util.twr
-import com.grimfox.gec.util.loadImagePixels
+import com.grimfox.gec.WindowState
+import com.grimfox.gec.executor
+import com.grimfox.gec.saveRecentProjects
+import com.grimfox.gec.saveWindowState
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import org.lwjgl.BufferUtils
-import org.lwjgl.glfw.*
+import org.lwjgl.glfw.Callbacks
 import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.glfw.GLFWDropCallback
+import org.lwjgl.glfw.GLFWErrorCallback
+import org.lwjgl.glfw.GLFWImage
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
-import org.lwjgl.opengl.*
-import org.lwjgl.opengl.GL.*
+import org.lwjgl.opengl.ARBDebugOutput
+import org.lwjgl.opengl.GL.createCapabilities
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
-import org.lwjgl.opengl.GLUtil.*
-import org.lwjgl.system.*
-import org.lwjgl.system.MemoryStack.*
-import org.lwjgl.system.MemoryUtil.*
+import org.lwjgl.opengl.GL43
+import org.lwjgl.opengl.GLUtil.setupDebugMessageCallback
+import org.lwjgl.opengl.KHRDebug
+import org.lwjgl.system.Callback
+import org.lwjgl.system.Configuration
+import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryStack.stackPush
+import org.lwjgl.system.MemoryUtil.NULL
+import org.lwjgl.system.Platform
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.PrintStream
-import java.lang.Math.*
-import java.lang.Thread.*
+import java.lang.Math.round
+import java.lang.Thread.sleep
 import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
@@ -113,6 +120,8 @@ interface UiLayout {
 
 class KeyboardHandler(var onChar: ((codePoint: Int) -> Unit)?, var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Unit)?)
 
+class HotkeyHandler(var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Boolean)?)
+
 interface UserInterface {
 
     val layout: UiLayout
@@ -138,6 +147,7 @@ interface UserInterface {
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
+    var hotkeyHandler: HotkeyHandler?
     var keyboardHandler: KeyboardHandler?
     var dropHandler: (List<String>) -> Unit
 
@@ -245,6 +255,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         get() = window.restoreHandler
         set(value) {
             window.restoreHandler = value
+        }
+
+    override var hotkeyHandler: HotkeyHandler?
+        get() = window.hotkeyHandler
+        set(value) {
+            window.hotkeyHandler = value
         }
 
     override var keyboardHandler: KeyboardHandler?
@@ -649,6 +665,7 @@ private class WindowContext(
         var minimizeHandler: () -> Unit = {},
         var restoreHandler: () -> Unit = {},
 
+        var hotkeyHandler: HotkeyHandler? = null,
         var keyboardHandler: KeyboardHandler? = null,
 
         var dropHandler: (List<String>) -> Unit = {}
@@ -1035,7 +1052,9 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     glfwSetKeyCallback(window.id) { _, key, scanCode, action, mods ->
         if (!window.ignoreInput) {
             try {
-                window.keyboardHandler?.onKey?.invoke(key, scanCode, action, mods)
+                if (!(window.hotkeyHandler?.onKey?.invoke(key, scanCode, action, mods) ?: false)) {
+                    window.keyboardHandler?.onKey?.invoke(key, scanCode, action, mods)
+                }
             } catch (t: Throwable) {
                 LOG.error("fatal error", t)
                 println("")

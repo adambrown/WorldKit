@@ -7,15 +7,20 @@ import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.HistoryQueue.ModificationEvent
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.widgets.*
+import com.grimfox.gec.ui.widgets.Block
+import com.grimfox.gec.ui.widgets.DropdownList
+import com.grimfox.gec.ui.widgets.DynamicTextReference
+import com.grimfox.gec.ui.widgets.ErrorDialog
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
-import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.saveFileDialog
+import com.grimfox.gec.util.FileDialogs.selectFile
+import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.MutableReference
+import com.grimfox.gec.util.ref
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -208,9 +213,15 @@ fun saveProject(project: Project?,
         if (file == null) {
             return saveProjectAs(project, dialogLayer, preferences, ui, titleText, overwriteWarningReference, overwriteWarningDialog, dialogCallback, errorHandler)
         } else {
-            exportProjectFile(project, file)
-            addProjectToRecentProjects(file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
-            return true
+            ui.ignoreInput = true
+            try {
+                exportProjectFile(project, file)
+                addProjectToRecentProjects(file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                return true
+            } finally {
+                dialogLayer.isVisible = false
+                ui.ignoreInput = false
+            }
         }
     }
     return false

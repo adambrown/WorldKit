@@ -1,12 +1,10 @@
 package com.grimfox.gec
 
+import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.ui.bInt
-import com.grimfox.gec.ui.color
-import com.grimfox.gec.ui.gInt
-import com.grimfox.gec.ui.rInt
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Biomes.Biome
@@ -14,6 +12,11 @@ import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import org.lwjgl.nanovg.NVGColor
+import java.awt.Desktop
+import java.io.IOException
+import java.net.URI
+import java.net.URISyntaxException
+import java.net.URL
 import java.util.*
 
 val EXPERIMENTAL_BUILD = false
@@ -217,6 +220,63 @@ fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteW
     }
 }
 
+fun openProject(ui: UserInterface, errorHandler: ErrorDialog) {
+    val openFun = {
+        try {
+            val openedProject = openProject(dialogLayer, preferences, ui)
+            if (openedProject != null) {
+                currentProject.value = openedProject
+                afterProjectOpen()
+            }
+        } catch (e: JsonParseException) {
+            errorHandler.displayErrorMessage("The selected file is not a valid project.")
+        } catch (e: IOException) {
+            errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
+        } catch (e: Exception) {
+            errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
+        }
+    }
+    if (currentProject.value != null && currentProjectHasModifications.value) {
+        dialogLayer.isVisible = true
+        overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
+        overwriteWarningDialog.isVisible = true
+        dialogCallback.value = openFun
+    } else {
+        openFun()
+    }
+}
+
+fun exportMaps() {
+    panelLayer.isVisible = true
+    exportPanel.isVisible = true
+}
+
+fun UserInterface.closeWindowSafely() {
+    if (currentProject.value != null && currentProjectHasModifications.value) {
+        dialogLayer.isVisible = true
+        overwriteWarningReference.value = "Do you want to save the current project before exiting?"
+        overwriteWarningDialog.isVisible = true
+        dialogCallback.value = {
+            closeWindow()
+        }
+    } else {
+        closeWindow()
+    }
+}
+
+fun openPreferences() {
+    panelLayer.isVisible = true
+    preferencesPanel.isVisible = true
+}
+
+fun openHelp(errorHandler: ErrorDialog) {
+    if (OFFLINE_HELP_INDEX_FILE.isFile && OFFLINE_HELP_INDEX_FILE.canRead()) {
+        openWebPage(OFFLINE_HELP_INDEX_FILE.toURI(), errorHandler)
+    } else {
+        errorHandler.displayErrorMessage("The offline help files are not currently installed. Please install the offline help files, or select one of the online help options.")
+    }
+}
+
 fun updateRegionsHistory(parameters: RegionParameters, graph: Graph, regionMask: ByteArrayMatrix) {
     val historyLast = historyRegionsCurrent.value
     if (historyLast != null) {
@@ -273,5 +333,35 @@ fun afterProjectOpen() {
             displayMode.value = DisplayMode.MAP
             defaultToMap.value = true
         }
+    }
+}
+
+fun openWebPage(uri: URI, onError: ErrorDialog? = null) {
+    val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
+    if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
+        try {
+            desktop.browse(uri)
+        } catch (e: Exception) {
+            LOG.error("Unable to open web page: $uri", e)
+            onError?.displayErrorMessage(e.message)
+        }
+    }
+}
+
+fun openWebPage(url: URL, onError: ErrorDialog? = null) {
+    try {
+        openWebPage(url.toURI(), onError)
+    } catch (e: URISyntaxException) {
+        LOG.error("Unable to open web page: $url", e)
+        onError?.displayErrorMessage(e.message)
+    }
+}
+
+fun openWebPage(url: String, onError: ErrorDialog? = null) {
+    try {
+        openWebPage(URL(url), onError)
+    } catch (e: Exception) {
+        LOG.error("Unable to open web page: $url", e)
+        onError?.displayErrorMessage(e.message)
     }
 }
