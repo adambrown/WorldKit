@@ -37,7 +37,9 @@ data class Preferences(
         var cachedGraph256: Future<Graph>? = null,
         var cachedGraph512: Future<Graph>? = null,
         var cachedGraph1024: Future<Graph>? = null
-)
+) {
+    val autosaveDir: File get() = File(projectDir, "autosaves").canonicalFile
+}
 
 data class WindowState(
         var x: Int,
@@ -45,7 +47,8 @@ data class WindowState(
         var width: Int,
         var height: Int,
         var isMaximized: Boolean,
-        var monitorIndex: Int
+        var monitorIndex: Int,
+        var autoSaveIndex: Int = 0
 )
 
 val threadCount = Runtime.getRuntime().availableProcessors()

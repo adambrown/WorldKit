@@ -16,6 +16,7 @@ import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
+import java.util.*
 
 object Main {
 
@@ -156,14 +157,18 @@ object Main {
 
                 }
                 currentProject.listener { _, new ->
-                    updateTitle(titleText, new)
-                    doesActiveProjectExist.value = new != null
-                    if (new != null) {
-                        addProjectToRecentProjects(new.file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                    doOnMainThread {
+                        updateTitle(titleText, new)
+                        doesActiveProjectExist.value = new != null
+                        if (new != null) {
+                            addProjectToRecentProjects(new.file, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                        }
                     }
                 }
                 currentProjectHasModifications.listener { _, new ->
-                    updateTitle(titleText, currentProject.value, new)
+                    doOnMainThread {
+                        updateTitle(titleText, currentProject.value, new)
+                    }
                 }
                 preferencesPanel(ui)
                 exportPanel(ui)
@@ -204,6 +209,8 @@ object Main {
                                 menuDivider()
                                 subMenu("Open recent", isActive = recentProjectsAvailable) {
                                     recentProjectsDropdown.value = this
+                                    recentAutosavesDivider.value = menuDivider()
+                                    recentAutosavesDivider.value?.isVisible = false
                                     menuDivider()
                                     menuItem("Clear recent file list", isActive = recentProjectsAvailable) {
                                         clearRecentProjects()
@@ -274,6 +281,7 @@ object Main {
                         }
                     }
                     loadRecentProjects(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                    loadRecentAutosaves(dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
                     block {
                         vSizing = GROW
                         layout = VERTICAL
@@ -469,6 +477,17 @@ object Main {
                         false
                     }
                 }
+                val autosaveTimer = Timer(true)
+                autosaveTimer.schedule(object: TimerTask() {
+                    override fun run() {
+                        if (currentProjectHasModifications.value) {
+                            task {
+                                autosave(currentProject.value, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
+                                ui.saveWindowState()
+                            }
+                        }
+                    }
+                }, 30000, 30000)
             }
         }
         var wasResizing = false
@@ -495,6 +514,7 @@ object Main {
             } else {
                 wasMinimized = true
             }
+            performMainThreadTasks()
         }
     }
 }

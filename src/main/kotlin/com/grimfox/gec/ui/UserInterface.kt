@@ -157,6 +157,8 @@ interface UserInterface {
 
     fun hide()
 
+    fun saveWindowState()
+
     fun closeWindow()
 
     fun minimizeWindow()
@@ -287,13 +289,17 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         glfwHideWindow(window.id)
     }
 
-    override fun closeWindow() {
+    override fun saveWindowState() {
         saveRecentProjects()
         if (isMaximized) {
             saveWindowState(WindowState(window.restoreX, window.restoreY, Math.round(window.width / window.currentMonitor.scaleFactor).toInt(), Math.round(window.height / window.currentMonitor.scaleFactor).toInt(), true, window.currentMonitorIndex))
         } else {
             saveWindowState(WindowState(window.x, window.y, Math.round(window.currentWidth / window.currentMonitor.scaleFactor).toInt(), Math.round(window.currentHeight / window.currentMonitor.scaleFactor).toInt(), false, window.currentMonitorIndex))
         }
+    }
+
+    override fun closeWindow() {
+        saveWindowState()
         glfwSetWindowShouldClose(window.id, true)
     }
 

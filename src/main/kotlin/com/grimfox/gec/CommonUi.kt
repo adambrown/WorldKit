@@ -18,6 +18,7 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.URL
 import java.util.*
+import java.util.concurrent.CountDownLatch
 
 val EXPERIMENTAL_BUILD = false
 
@@ -201,6 +202,54 @@ var overwriteWarningDialog = NO_BLOCK
 var errorMessageDialog = NO_BLOCK
 val noop = {}
 val dialogCallback = mRef(noop)
+
+class MainThreadTask<T>(val latch: CountDownLatch? = null, val work: () -> T) {
+
+    var returnVal: T? = null
+    var error: Throwable? = null
+
+    fun perform() {
+        try {
+            returnVal = work()
+        } catch (t: Throwable) {
+            error = t
+        } finally {
+            latch?.countDown()
+        }
+    }
+}
+
+private var mainThreadTasks = Collections.synchronizedList(ArrayList<MainThreadTask<*>>())
+
+fun performMainThreadTasks() {
+    synchronized(mainThreadTasks) {
+        mainThreadTasks.forEach(MainThreadTask<*>::perform)
+        mainThreadTasks.clear()
+    }
+}
+
+fun <T> doOnMainThreadAndWait(callable: () -> T): T {
+    val latch = CountDownLatch(1)
+    val task = MainThreadTask(latch, callable)
+    synchronized(mainThreadTasks) {
+        mainThreadTasks.add(task)
+    }
+    while (latch.count > 0) {
+        latch.await()
+    }
+    val error = task.error
+    if (error != null) {
+        throw error
+    } else {
+        return task.returnVal!!
+    }
+}
+
+fun doOnMainThread(callable: () -> Unit) {
+    synchronized(mainThreadTasks) {
+        mainThreadTasks.add(MainThreadTask(null, callable))
+    }
+}
 
 fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, noop: () -> Unit) {
     if (currentProject.value != null && currentProjectHasModifications.value) {

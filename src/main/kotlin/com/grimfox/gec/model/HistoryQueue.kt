@@ -25,6 +25,15 @@ class HistoryQueue<T>(val limit: Int) {
         return Quintuple(ArrayList(buffer), head, tail, _size, limit)
     }
 
+    fun copy(): HistoryQueue<T> {
+        val newQueue = HistoryQueue<T>(limit)
+        newQueue.buffer.addAll(ArrayList(buffer))
+        newQueue.head = head
+        newQueue.tail = tail
+        newQueue._size = _size
+        return newQueue
+    }
+
     private val buffer = ArrayList<T?>(limit)
 
     private var head = 0
