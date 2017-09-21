@@ -19,7 +19,7 @@ void main() {
     float minBorderDistInverse = 1.0 - minBorderDist;
     if (riverBorderDistance > minBorderDistInverse) {
         float rawHeight = texture(noiseMask1, VertexIn.uv * textureScale).r * 0.3;
-        float height = (((minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 50 + 0.00000015) * rawHeight) * 0.4;
+        float height = (((minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 50 + 0.00000015) * rawHeight) / 300.0;
         colorOut = vec4(height, height, height, 1.0);
     } else {
         minBorderDist = borderDistanceScale * 0.030;
@@ -27,16 +27,16 @@ void main() {
         float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
         if (mountainBorderDistance > minBorderDistInverse) {
             float multiplier = (mountainBorderDistance - minBorderDistInverse) * 35 + 0.05;
-            float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * multiplier) * 0.4;
+            float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * multiplier) / 300.0;
             colorOut = vec4(height, height, height, 1.0);
         } else {
             minBorderDist = borderDistanceScale * 0.004;
             minBorderDistInverse = 1.0 - minBorderDist;
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > minBorderDistInverse) {
-                colorOut = vec4(0.002, 0.002, 0.002, 1.0);
+                colorOut = vec4(0.000016666, 0.000016666, 0.000016666, 1.0);
             } else {
-                float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.275) * 0.4;
+                float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.275) / 300.0;
                 colorOut = vec4(height, height, height, 1.0);
             }
         }

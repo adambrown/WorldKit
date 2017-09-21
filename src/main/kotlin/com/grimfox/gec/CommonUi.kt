@@ -57,7 +57,8 @@ val BIOME_NAMES = linkedMapOf(
         "Foothills" to 2,
         "Rolling hills" to 3,
         "Plateaus" to 4,
-        "Plains" to 5
+        "Sharp plateaus" to 5,
+        "Plains" to 6
 )
 
 val BIOME_ORDINALS = linkedMapOf(*BIOME_NAMES.map { it.value  to it.key }.toTypedArray())
@@ -69,7 +70,8 @@ fun ordinalToBiome(it: Int): Biome {
         2 -> Biomes.FOOTHILLS_BIOME
         3 -> Biomes.ROLLING_HILLS_BIOME
         4 -> Biomes.PLATEAU_BIOME
-        5 -> Biomes.PLAINS_BIOME
+        5 -> Biomes.SHARP_PLATEAU_BIOME
+        6 -> Biomes.PLAINS_BIOME
         else -> Biomes.MOUNTAINS_BIOME
     }
 }

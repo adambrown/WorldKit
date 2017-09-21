@@ -18,18 +18,18 @@ void main() {
     float minBorderDist = borderDistanceScale * 0.013;
     float minBorderDistInverse = 1.0 - minBorderDist;
     if (riverBorderDistance > minBorderDistInverse) {
-        float height = (minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 35 + 0.00001;
+        float height = ((minBorderDist - (riverBorderDistance - minBorderDistInverse)) * 35 + 0.00001) * 0.9;
         colorOut = vec4(height, height, height, 1.0);
     } else {
         float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
         if (mountainBorderDistance > minBorderDistInverse) {
-            colorOut = vec4(1.0, 1.0, 1.0, 1.0);
+            colorOut = vec4(0.9, 0.9, 0.9, 1.0);
         } else {
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
-                colorOut = vec4(0.4, 0.4, 0.4, 1.0);
+                colorOut = vec4(0.36, 0.36, 0.36, 1.0);
             } else {
-                float height = texture(noiseMask1, VertexIn.uv * textureScale).r;
+                float height = (texture(noiseMask1, VertexIn.uv * textureScale).r) * 0.9;
                 colorOut = vec4(height, height, height, 1.0);
             }
         }

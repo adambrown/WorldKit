@@ -30,12 +30,14 @@ object Biomes {
 
     }
 
-    interface UpliftShader {
+    interface Shader {
 
         val positionAttribute: ShaderAttribute
 
-        fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId)
+        fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId)
     }
+
+    private val TALUS_ANGLES_UNRESTRICTIVE = buildParabolicTalusAngles(88.9, 0.1, 0.0)
 
     private val TALUS_ANGLES_NO_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.0)
 
@@ -158,6 +160,22 @@ object Biomes {
         }
     }
 
+    interface TerraceFunction {
+
+        fun apply(input: Float): Float
+    }
+
+    class BasicTerraceFunction(val implementation: (Float) -> Float) : TerraceFunction {
+
+        override fun apply(input: Float): Float {
+            return implementation(input)
+        }
+    }
+
+    fun terraceFunction(apply: (Float) -> Float): TerraceFunction {
+        return BasicTerraceFunction(apply)
+    }
+
     class RegionData(
             val land: List<Int>,
             val water: List<Int>,
@@ -172,16 +190,17 @@ object Biomes {
 
     class ErosionLevel(
             val upliftMultiplier: Float,
-            val erosionSettings: List<ErosionSettings>)
+            val previousTierBlendWeight: Float,
+            val erosionSettings: List<ErosionSettings>,
+            val terraceFunction: ((Float, Float) -> TerraceFunction)? = null)
 
     class Biome(
-            val minUplift: Float,
-            val deltaUplift: Float,
             val bootstrapSettings: ErosionSettings,
             val erosionLowSettings: ErosionLevel,
             val erosionMidSettings: ErosionLevel,
             val erosionHighSettings: ErosionLevel,
-            val upliftShader: UpliftShader)
+            val upliftShader: Shader,
+            val startingHeightShader: Shader)
 
     private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): Future<TextureId> {
         return executor.call {
@@ -232,6 +251,14 @@ object Biomes {
 
     private fun levels(height: Double, inMin: Double, gamma: Double, inMax: Double): Short {
         return 65535.coerceAtMost(0.coerceAtLeast((pow((height - inMin) / (inMax - inMin), gamma) * 65535).toInt())).toShort()
+    }
+
+    private val basicNoise = { width: Int, buffer: ShortBuffer ->
+        for (y in 0..width - 1) {
+            for (x in 0..width - 1) {
+                buffer.put(y * width + x, (((noise(x * 0.5f, y * 0.5f) + 1.0f) / 2.0f) * 65535).toInt().toShort())
+            }
+        }
     }
 
     private val rollingHillsNoise = { width: Int, buffer: ShortBuffer ->
@@ -437,12 +464,15 @@ object Biomes {
         }
     }
 
+    private val basicNoiseTextureFuture = loadTexture("basic-noise", basicNoise, 2048)
     private val rollingHillsNoiseTextureFuture = loadTexture("rolling-hills-noise", rollingHillsNoise, 2048)
     private val foothillsNoiseTextureFuture = loadTexture("foothills-noise", foothillsNoise, 2048)
     private val mountainsNoiseTextureFuture = loadTexture("mountains-noise", mountainsNoise, 2048)
     private val plainsNoiseTextureFuture = loadTexture("plains-noise", plainsNoise, 2048)
 
-    private val coastalMountainsUpliftShader = object : UpliftShader {
+    val basicNoiseTexture by lazy { basicNoiseTextureFuture.value }
+
+    private val coastalMountainsUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -477,7 +507,7 @@ object Biomes {
             }
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -493,10 +523,64 @@ object Biomes {
         }
     }
 
+    private val coastalMountainsStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram: TextureBuilder.ShaderProgramId
+        init {
+            try {
+                shaderProgram = TextureBuilder.buildShaderProgram {
+                    val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome.vert"))
+                    val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/coastal-mountains-biome-starting-heights.frag"))
+                    createAndLinkProgram(
+                            listOf(vertexShader, fragmentShader),
+                            listOf(positionAttribute),
+                            listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                throw e
+            }
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+        }
+    }
+
     val COASTAL_MOUNTAINS_BIOME = Biome(
-            minUplift = 0.000004f,
-            deltaUplift = 0.00045f,
             upliftShader = coastalMountainsUpliftShader,
+            startingHeightShader = coastalMountainsStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -505,6 +589,7 @@ object Biomes {
                     erosionPower = 0.0000006f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 1,
@@ -526,6 +611,7 @@ object Biomes {
                                     erosionPower = 0.0000006f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -535,6 +621,7 @@ object Biomes {
                                     erosionPower = 0.0000017f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -546,7 +633,7 @@ object Biomes {
 
     val rollingHillsNoiseTexture by lazy { rollingHillsNoiseTextureFuture.value }
 
-    private val rollingHillsUpliftShader = object : UpliftShader {
+    private val rollingHillsUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -575,7 +662,56 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(textureScaleUniform.location, textureScale)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, rollingHillsNoiseTexture.id)
+        }
+    }
+
+    private val rollingHillsStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val textureScaleUniform = ShaderUniform("textureScale")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/rolling-hills-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -596,9 +732,8 @@ object Biomes {
     }
 
     val ROLLING_HILLS_BIOME = Biome(
-            minUplift = 0.000001f,
-            deltaUplift = 0.0002f,
             upliftShader = rollingHillsUpliftShader,
+            startingHeightShader = rollingHillsStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -607,6 +742,7 @@ object Biomes {
                     erosionPower = 0.000000561f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 1,
@@ -628,6 +764,7 @@ object Biomes {
                                     erosionPower = 0.000004488f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 0.4f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -637,6 +774,7 @@ object Biomes {
                                     erosionPower = 0.000002244f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 0.4f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -648,7 +786,7 @@ object Biomes {
 
     val foothillsNoiseTexture by lazy { foothillsNoiseTextureFuture.value }
 
-    private val foothillsUpliftShader = object : UpliftShader {
+    private val foothillsUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -677,7 +815,7 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -697,11 +835,58 @@ object Biomes {
         }
     }
 
+    private val foothillsStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val textureScaleUniform = ShaderUniform("textureScale")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/foothills-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/foothills-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(textureScaleUniform.location, textureScale)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, foothillsNoiseTexture.id)
+        }
+    }
 
     val FOOTHILLS_BIOME = Biome(
-            minUplift = 0.0000001f,
-            deltaUplift = 0.0003f,
             upliftShader = foothillsUpliftShader,
+            startingHeightShader = foothillsStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -710,6 +895,7 @@ object Biomes {
                     erosionPower = 0.0000006f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 50,
@@ -719,6 +905,7 @@ object Biomes {
                                     erosionPower = 0.000002f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 0.5f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -728,6 +915,7 @@ object Biomes {
                                     erosionPower = 0.000001f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 0.25f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -739,7 +927,7 @@ object Biomes {
 
     val mountainsNoiseTexture by lazy { mountainsNoiseTextureFuture.value }
 
-    private val mountainsUpliftShader = object : UpliftShader {
+    private val mountainsUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -768,7 +956,56 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(textureScaleUniform.location, textureScale)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
+        }
+    }
+
+    private val mountainsStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val textureScaleUniform = ShaderUniform("textureScale")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/mountains-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/mountains-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -789,9 +1026,8 @@ object Biomes {
     }
 
     val MOUNTAINS_BIOME = Biome(
-            minUplift = 0.0000001f,
-            deltaUplift = 0.0004519f,
             upliftShader = mountainsUpliftShader,
+            startingHeightShader = mountainsStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -800,6 +1036,7 @@ object Biomes {
                     erosionPower = 0.000000561f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 1,
@@ -821,6 +1058,7 @@ object Biomes {
                                     erosionPower = 0.000000561f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 0.5f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -830,6 +1068,7 @@ object Biomes {
                                     erosionPower = 0.000000561f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 0.2f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 9,
@@ -847,7 +1086,7 @@ object Biomes {
 
     val plainsNoiseTexture by lazy { plainsNoiseTextureFuture.value }
 
-    private val plainsUpliftShader = object : UpliftShader {
+    private val plainsUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -876,7 +1115,56 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(textureScaleUniform.location, textureScale)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, plainsNoiseTexture.id)
+        }
+    }
+
+    private val plainsStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val textureScaleUniform = ShaderUniform("textureScale")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plains-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plains-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -897,9 +1185,8 @@ object Biomes {
     }
 
     val PLAINS_BIOME = Biome(
-            minUplift = 0.0000015f,
-            deltaUplift = 0.000025f,
             upliftShader = plainsUpliftShader,
+            startingHeightShader = plainsStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -908,6 +1195,7 @@ object Biomes {
                     erosionPower = 0.000000561f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 1,
@@ -929,6 +1217,7 @@ object Biomes {
                                     erosionPower = 0.000004f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -938,6 +1227,7 @@ object Biomes {
                                     erosionPower = 0.000004f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -947,7 +1237,7 @@ object Biomes {
                                     erosionPower = 0.0000028f)))
     )
 
-    private val plateauBiomeUpliftShader = object : UpliftShader {
+    private val plateauBiomeUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -974,7 +1264,7 @@ object Biomes {
                     listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -990,10 +1280,56 @@ object Biomes {
         }
     }
 
+    private val plateauBiomeStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val mountainBorderDistanceTextureUniform = ShaderUniform("mountainBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/plateau-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/plateau-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(mountainBorderDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, mountainBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 3)
+            glActiveTexture(GL_TEXTURE3)
+            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+        }
+    }
+
     val PLATEAU_BIOME = Biome(
-            minUplift = 0.000001f,
-            deltaUplift = 0.00001f,
             upliftShader = plateauBiomeUpliftShader,
+            startingHeightShader = plateauBiomeStartingHeightsShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -1002,6 +1338,7 @@ object Biomes {
                     erosionPower = 0.0000004f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 50,
@@ -1011,6 +1348,7 @@ object Biomes {
                                     erosionPower = 0.0000004f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 0.9f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -1020,6 +1358,7 @@ object Biomes {
                                     erosionPower = 0.0000001f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 0.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -1029,7 +1368,168 @@ object Biomes {
                                     erosionPower = 0.0000004f)))
     )
 
-    private val underWaterUpliftShader = object : UpliftShader {
+    private val sharpPlateauBiomeUpliftShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/sharp-plateau-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/sharp-plateau-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, coastDistanceTextureUniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+        }
+    }
+
+    private val sharpPlateauBiomeStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val borderDistanceScaleUniform = ShaderUniform("borderDistanceScale")
+        val heightScaleUniform = ShaderUniform("heightScale")
+        val riverBorderDistanceTextureUniform = ShaderUniform("riverBorderDistanceMask")
+        val coastDistanceTextureUniform = ShaderUniform("coastDistanceMask")
+        val noiseTexture1Uniform = ShaderUniform("noiseMask1")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/sharp-plateau-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/sharp-plateau-biome-starting-heights.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, borderDistanceScaleUniform, heightScaleUniform, riverBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
+        }
+
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
+            glUniform1f(heightScaleUniform.location, heightScale)
+            glUniform1i(riverBorderDistanceTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, riverBorderMask.id)
+            glUniform1i(coastDistanceTextureUniform.location, 1)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
+            glUniform1i(noiseTexture1Uniform.location, 2)
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+        }
+    }
+
+    val SHARP_PLATEAU_BIOME = Biome(
+            upliftShader = sharpPlateauBiomeUpliftShader,
+            startingHeightShader = sharpPlateauBiomeStartingHeightsShader,
+            bootstrapSettings = ErosionSettings(
+                    iterations = 1,
+                    deltaTime = 10000.0f,
+                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
+                    heightMultiplier = 1.0f,
+                    erosionPower = 0.00000007f),
+            erosionLowSettings = ErosionLevel(
+                    upliftMultiplier = 0.7f,
+                    previousTierBlendWeight = 1.0f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 50,
+                                    deltaTime = 250000.0f,
+                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.00000007f))),
+            erosionMidSettings = ErosionLevel(
+                    upliftMultiplier = 0.5f,
+                    previousTierBlendWeight = 0.4f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 25,
+                                    deltaTime = 250000.0f,
+                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.00000005f))),
+            erosionHighSettings = ErosionLevel(
+                    upliftMultiplier = 0.4f,
+                    previousTierBlendWeight = 0.15f,
+                    erosionSettings = arrayListOf(
+                            ErosionSettings(
+                                    iterations = 25,
+                                    deltaTime = 50000.0f,
+                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
+                                    heightMultiplier = 1.0f,
+                                    erosionPower = 0.0000004f)),
+                    terraceFunction = { min, max ->
+                        val delta = max - min
+                        val steps = listOf(
+                                addTerraceStep(0.22f, 0.32f, 0.1f, min, delta),
+                                addTerraceStep(0.50f, 0.24f, 0.1f, min, delta),
+                                addTerraceStep(0.70f, 0.16f, 0.2f, min, delta),
+                                addTerraceStep(0.81f, 0.06f, 0.35f, min, delta))
+                        terraceFunction { input ->
+                            applyTerrace(input, steps)
+                        }
+                    })
+    )
+
+    private fun applyTerrace(input: Float, steps: List<(Float) -> Float?>): Float {
+        steps.forEach {
+            val output = it(input)
+            if (output != null) {
+                return output
+            }
+        }
+        return input
+    }
+
+    private fun addTerraceStep(height: Float, coverage: Float, compression: Float, min: Float, delta: Float): (Float) -> Float? {
+        val midpoint = height * delta + min
+        val adjustedCoverage = coverage * delta
+        val halfCoverage = adjustedCoverage * 0.5f
+        val minExtreme = midpoint - halfCoverage
+        val maxExtreme = midpoint + halfCoverage
+        return { input ->
+            if (input > minExtreme && input <= maxExtreme) {
+                ((input - minExtreme) * compression) + midpoint
+            } else {
+                null
+            }
+        }
+    }
+
+    private val underWaterUpliftShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -1057,7 +1557,7 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, coastDistanceTextureUniform, landMaskTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -1076,9 +1576,8 @@ object Biomes {
     }
 
     val UNDER_WATER_BIOME = Biome(
-            minUplift = 0.0f,
-            deltaUplift = 0.0f,
             upliftShader = underWaterUpliftShader,
+            startingHeightShader = underWaterUpliftShader,
             bootstrapSettings = ErosionSettings(
                     iterations = 1,
                     deltaTime = 85000.0f,
@@ -1087,6 +1586,7 @@ object Biomes {
                     erosionPower = 0.000000005f),
             erosionLowSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 50,
@@ -1096,6 +1596,7 @@ object Biomes {
                                     erosionPower = 0.000000012f))),
             erosionMidSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
@@ -1105,6 +1606,7 @@ object Biomes {
                                     erosionPower = 0.000000016f))),
             erosionHighSettings = ErosionLevel(
                     upliftMultiplier = 1.0f,
+                    previousTierBlendWeight = 1.0f,
                     erosionSettings = arrayListOf(
                             ErosionSettings(
                                     iterations = 25,
