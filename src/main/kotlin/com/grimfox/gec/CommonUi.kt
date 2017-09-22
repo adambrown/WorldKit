@@ -362,6 +362,14 @@ fun updateBiomesHistory(parameters: BiomeParameters, graph: Graph, biomeMask: By
 }
 
 fun afterProjectOpen() {
+    val currentBiomeParameters = currentState.biomeParameters.value
+    if (currentBiomeParameters != null) {
+        syncBiomeParameterValues(currentBiomeParameters)
+    }
+    val currentRegionParameters = currentState.regionParameters.value
+    if (currentRegionParameters != null) {
+        syncRegionParameterValues(currentRegionParameters)
+    }
     val currentBiomeGraph = currentState.biomeGraph.value
     val currentBiomeMask = currentState.biomeMask.value
     val currentSplines = currentState.regionSplines.value

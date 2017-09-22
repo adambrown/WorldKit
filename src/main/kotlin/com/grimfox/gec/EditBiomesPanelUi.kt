@@ -17,7 +17,7 @@ private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val biomes = ref(emptyList<Int>())
 private val selectedBiomes = Array(16) { ref(it % BIOME_NAMES.size) }.toList()
 
-private fun syncParameterValues(parameters: BuildContinent.BiomeParameters) {
+fun syncBiomeParameterValues(parameters: BuildContinent.BiomeParameters) {
     val randomSeed = parameters.biomesSeed
     val randomString = randomSeed.toString()
     if (randomString.length > 18) {
@@ -26,6 +26,7 @@ private fun syncParameterValues(parameters: BuildContinent.BiomeParameters) {
         biomesSeed.value = randomSeed
     }
     biomesMapScale.value = parameters.biomesMapScale
+    biomeCount.value = parameters.biomes.size
     biomes.value = parameters.biomes
     biomes.value.forEachIndexed { i, id ->
         selectedBiomes[i].value = id
@@ -57,7 +58,7 @@ fun Block.editBiomesPanel(
                             if (historyLast != null) {
                                 historyBiomesBackQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)
@@ -219,7 +220,7 @@ fun Block.editBiomesPanel(
                             if (historyLast != null) {
                                 historyBiomesForwardQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)
@@ -238,7 +239,7 @@ fun Block.editBiomesPanel(
                             if (historyLast != null) {
                                 historyBiomesBackQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)

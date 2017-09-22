@@ -48,7 +48,7 @@ private val regionFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useRegionFile = ref(false)
 private val regionsBuilder = RegionsBuilder(regionFile, useRegionFile, displayMode, defaultToMap)
 
-private fun syncParameterValues(parameters: RegionParameters) {
+fun syncRegionParameterValues(parameters: RegionParameters) {
     val randomSeed = parameters.regionsSeed
     val randomString = randomSeed.toString()
     if (randomString.length > 18) {
@@ -106,7 +106,7 @@ fun Block.editRegionsPanel(
                             if (historyLast != null) {
                                 historyRegionsBackQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncRegionParameterValues(historyItem.parameters)
                             currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
@@ -288,7 +288,7 @@ fun Block.editRegionsPanel(
                             if (historyLast != null) {
                                 historyRegionsForwardQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncRegionParameterValues(historyItem.parameters)
                             currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
@@ -311,7 +311,7 @@ fun Block.editRegionsPanel(
                             if (historyLast != null) {
                                 historyRegionsBackQueue.push(historyLast.copy())
                             }
-                            syncParameterValues(historyItem.parameters)
+                            syncRegionParameterValues(historyItem.parameters)
                             currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
