@@ -642,6 +642,7 @@ abstract class Block {
     fun handleMouseAction(button: Int, x: Int, y: Int, isDown: Boolean, mods: Int) {
         if (this === root) {
             val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
+            var onlyOnFirst = true
             itemsToProcess.forEach { itemToProcess ->
                 do {
                     reprocess = false
@@ -652,21 +653,24 @@ abstract class Block {
                             if (mouseDownFun != null) {
                                 mouseOver.mouseDownFun(button, x, y, mods)
                             }
-                            val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
                             var needToAdd = true
-                            awaitingMouseDownOverOther.forEach {
-                                if (it.first == button) {
-                                    if (it.second == mouseOver) {
-                                        needToAdd = false
-                                    } else {
-                                        val mouseDownOverOtherFun = it.second.onMouseDownOverOther
-                                        if (mouseDownOverOtherFun != null) {
-                                            it.second.mouseDownOverOtherFun(button, x, y, mods)
+                            if (onlyOnFirst) {
+                                val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
+                                awaitingMouseDownOverOther.forEach {
+                                    if (it.first == button) {
+                                        if (it.second == mouseOver) {
+                                            needToAdd = false
+                                        } else {
+                                            val mouseDownOverOtherFun = it.second.onMouseDownOverOther
+                                            if (mouseDownOverOtherFun != null) {
+                                                it.second.mouseDownOverOtherFun(button, x, y, mods)
+                                            }
                                         }
                                     }
                                 }
+                                awaitingMouseDownOverOther.removeAll(toRemove)
+                                onlyOnFirst = false
                             }
-                            awaitingMouseDownOverOther.removeAll(toRemove)
                             val pair = Triple(button, mouseOver, mods)
                             awaitingRelease.add(pair)
                             if (needToAdd) {
@@ -677,13 +681,16 @@ abstract class Block {
                             if (mouseUpFun != null) {
                                 mouseOver.mouseUpFun(button, x, y, mods)
                             }
-                            awaitingRelease.forEach {
-                                if (it.first == button && it.second == mouseOver) {
-                                    val mouseClickFun = mouseOver.onMouseClick
-                                    if (mouseClickFun != null) {
-                                        mouseOver.mouseClickFun(button, x, y, mods)
+                            if (onlyOnFirst) {
+                                awaitingRelease.forEach {
+                                    if (it.first == button && it.second == mouseOver) {
+                                        val mouseClickFun = mouseOver.onMouseClick
+                                        if (mouseClickFun != null) {
+                                            mouseOver.mouseClickFun(button, x, y, mods)
+                                        }
                                     }
                                 }
+                                onlyOnFirst = false
                             }
                         }
                     }
