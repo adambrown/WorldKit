@@ -15,6 +15,7 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedFloat
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.util.Biomes.DEGREES_TO_SLOPES
 import com.grimfox.gec.util.Biomes.UNDER_WATER_BIOME
 import com.grimfox.gec.util.Rendering.renderEdges
 import com.grimfox.gec.util.Rendering.renderRegionBorders
@@ -918,7 +919,9 @@ object WaterFlows {
                 val numerator = node.height + (settings.deltaTime * (node.uplift + (erosion * parentHeight)))
                 node.height = (numerator / denominator).toFloat()
                 val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
-                val talus = settings.talusAngles[(Math.min(1023, Math.max(0, Math.round(node.height * settings.heightMultiplier))) * 256) + Math.round((variance + 1) * 128)]
+                val (talusSet, talusVarianceSet) = settings.talusAngles
+                val heightIndex = Math.round(node.height * settings.heightMultiplier).coerceIn(0, 1023)
+                val talus = DEGREES_TO_SLOPES[Math.round((talusSet[heightIndex] + talusVarianceSet[heightIndex] * variance) * 65535.0f).coerceIn(0, 65535)]
                 if ((node.height - parent.height) / node.distanceToParent > talus) {
                     node.height = (node.distanceToParent * talus) + parent.height
                 }

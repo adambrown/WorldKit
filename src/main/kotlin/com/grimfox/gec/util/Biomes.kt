@@ -37,83 +37,90 @@ object Biomes {
         fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId)
     }
 
-    private val TALUS_ANGLES_UNRESTRICTIVE = buildParabolicTalusAngles(88.9, 0.1, 0.0)
+    val DEGREES_TO_SLOPES = degreesToSlopes()
 
-    private val TALUS_ANGLES_NO_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.0)
+    private val TALUS_ANGLES_UNRESTRICTIVE = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)
 
-    private val TALUS_ANGLES_LOW_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.1)
+    private val TALUS_ANGLES_NO_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.0f)
 
-    private val TALUS_ANGLES_MEDIUM_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.3)
+    private val TALUS_ANGLES_LOW_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.1f)
 
-    private val TALUS_ANGLES_HIGH_VARIANCE = buildParabolicTalusAngles(15.0, 30.0, 0.5)
+    private val TALUS_ANGLES_MEDIUM_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.3f)
 
-    private val TALUS_ANGLES_HIGH_NO_VARIANCE = buildParabolicTalusAngles(30.0, 15.0, 0.0)
+    private val TALUS_ANGLES_HIGH_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.5f)
 
-    private val TALUS_ANGLES_HIGH_LOW_VARIANCE = buildParabolicTalusAngles(30.0, 15.0, 0.1)
+    private val TALUS_ANGLES_HIGH_NO_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.0f)
 
-    private val TALUS_ANGLES_HIGH_MEDIUM_VARIANCE = buildParabolicTalusAngles(30.0, 15.0, 0.2)
+    private val TALUS_ANGLES_HIGH_LOW_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.1f)
 
-    private val TALUS_ANGLES_HIGH_HIGH_VARIANCE = buildParabolicTalusAngles(30.0, 15.0, 0.5)
+    private val TALUS_ANGLES_HIGH_MEDIUM_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.2f)
 
-    private val TALUS_ANGLES_NORMAL_DISTRIBUTION = buildNormalTalusAngles(30000.0, 270.0, 512.0, 0.05)
+    private val TALUS_ANGLES_HIGH_HIGH_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.5f)
 
-    private val TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT = buildNormalTalusAngles(20000.0, 310.0, 512.0, 0.005)
+    private val TALUS_ANGLES_NORMAL_DISTRIBUTION = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
+
+    private val TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT = buildNormalTalusAngles(20000.0f, 310.0f, 512.0f, 0.005f)
 
     private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
 
-    private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0, 15.0, 0.0)
+    private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0f, 15.0f, 0.0f)
 
-    private fun buildPlateauTalusAngles(): FloatArray {
-        val profiles = arrayOf(
-                arrayOf(240 to 30.0,
-                        520 to 89.0,
-                        760 to 45.0,
-                        990 to 89.0,
-                        2000 to 0.05))
-        return FloatArray(1024 * 256) { computeNevadaTalusAngle(it, profiles) }
+    private fun buildPlateauTalusAngles(): Pair<FloatArray, FloatArray> {
+        val profile = arrayOf(
+                240 to 30.0f,
+                520 to 89.0f,
+                760 to 45.0f,
+                990 to 89.0f,
+                2000 to 0.05f)
+        return FloatArray(1024) { computePlateauTalusAngle(it, profile) } to FloatArray(1024) { 0.0f }
     }
 
-    private fun computeNevadaTalusAngle(i: Int, profiles: Array<Array<Pair<Int, Double>>>): Float {
-        val height = i / 256
-        val variance = i % 256
-        val profile = profiles[Math.round(variance / 255.0f * (profiles.size - 1))]
+    private fun computePlateauTalusAngle(i: Int, profile: Array<Pair<Int, Float>>): Float {
         var currentLayer = profile.last()
         for (layer in profile) {
-            if (height < layer.first) {
+            if (i < layer.first) {
                 currentLayer = layer
                 break
             }
         }
-        return tan(toRadians(currentLayer.second)).toFloat()
+        return (currentLayer.second / 90.0f).coerceIn(0.0f, 1.0f)
     }
 
-    private fun buildParabolicTalusAngles(minAngle: Double, deltaAngle: Double, jitter: Double): FloatArray {
-        val angleIncrement = deltaAngle / 1023.0
-        return FloatArray(1024 * 256) { computeTalusAngle(it, minAngle, angleIncrement, jitter) }
+    private fun degreesToSlopes(): FloatArray {
+        return FloatArray(65536) { tan(toRadians(((it + 2.0) / 65540.0) * 90.0)).toFloat() }
     }
 
-    private fun computeTalusAngle(i: Int, minAngle: Double, angleIncrement: Double, jitter: Double): Float {
-        val height = i / 256
-        val variance = i % 256
-        val base = height * angleIncrement + minAngle
-        val baseVariance = base * jitter
-        return tan(toRadians(base + (variance / 255.0 * baseVariance * 2.0 - baseVariance))).toFloat()
+    private fun buildParabolicTalusAngles(minAngle: Float, deltaAngle: Float, jitter: Float): Pair<FloatArray, FloatArray> {
+        val angleIncrement = deltaAngle / 1023.0f
+        val baseAngles = FloatArray(1024) { ((minAngle + (it * angleIncrement)) / 90.0f).coerceIn(0.0f, 1.0f) }
+        val jitters = FloatArray(1024) {
+            val baseAngle = baseAngles[it]
+            val low = Math.abs(baseAngle - 0.0f)
+            val high = Math.abs(1.0f - baseAngle)
+            Math.min(jitter / 90.0f, Math.min(low, high)).coerceIn(0.0f, 1.0f)
+        }
+        return baseAngles to jitters
     }
 
-    private fun buildNormalTalusAngles(scale: Double, standardDeviation: Double, mean: Double, jitter: Double): FloatArray {
+    private fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Pair<FloatArray, FloatArray> {
         val term0 = -2.0 * standardDeviation * standardDeviation
         val term1 = scale * (1.0 / Math.sqrt(Math.PI * -term0))
-        return FloatArray(1024 * 256) { computeNormalTalusAngle(it, term0, term1, mean, jitter) }
+        val baseAngles = FloatArray(1024)
+        val jitters = FloatArray(1024)
+        (0..1023).forEach {
+            val (baseAngle, variance) = computeNormalTalusAngle(it, term0, term1, mean, jitter)
+            baseAngles[it] = baseAngle
+            jitters[it] = variance
+        }
+        return baseAngles to jitters
     }
 
-    private fun computeNormalTalusAngle(i: Int, term0: Double, term1: Double, mean: Double, jitter: Double): Float {
-        val height = i / 256
-        val variance = i % 256
-        val base = term1 * pow(E, (((height - mean) * (height - mean)) / term0))
-        val baseVariance = (base * jitter)
-        val varianceMod = ((variance / 255.0) * baseVariance * 2.0) - baseVariance
-        val angle = toRadians(base + varianceMod)
-        return tan(angle).toFloat()
+    private fun computeNormalTalusAngle(i: Int, term0: Double, term1: Double, mean: Float, jitter: Float): Pair<Float, Float> {
+        val baseAngle = ((term1 * pow(E, (((i - mean) * (i - mean)) / term0))) / 90.0).toFloat().coerceIn(0.0f, 1.0f)
+        val low = Math.abs(baseAngle - 0.0f)
+        val high = Math.abs(1.0f - baseAngle)
+        val variance = Math.min(baseAngle * jitter, Math.min(low, high)).coerceIn(0.0f, 1.0f)
+        return baseAngle to variance
     }
 
     private val noiseGraph128 = Graphs.generateGraph(128, 123, 0.98)
@@ -184,7 +191,7 @@ object Biomes {
     class ErosionSettings(
             val iterations: Int,
             val deltaTime: Float,
-            val talusAngles: FloatArray,
+            val talusAngles: Pair<FloatArray, FloatArray>,
             val heightMultiplier: Float,
             val erosionPower: Float)
 
