@@ -444,23 +444,7 @@ object WaterFlows {
     }
 
     private fun performErosion(executor: ExecutorService, graph: Graph, biomeMask: Matrix<Byte>?, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, erosionLevels: List<ErosionLevel>, heightMapWidth: Int, fallback: Matrix<Float>? = null, defaultValue: Float = 0.0f): FloatArrayMatrix {
-        val biomeSettings = erosionLevels.map { erosionLevel ->
-            val erosionSettingsRaw = erosionLevel.erosionSettings.flatMapTo(ArrayList()) {
-                val expanded = ArrayList<ErosionSettings>(it.iterations)
-                for (i in 1..it.iterations) {
-                    expanded.add(it)
-                }
-                expanded
-            }
-            if (erosionSettingsRaw.size > iterations) {
-                erosionSettingsRaw.subList(0, iterations)
-            } else if (erosionSettingsRaw.size < iterations) {
-                val last = erosionSettingsRaw.last()
-                erosionSettingsRaw + (1..iterations - erosionSettingsRaw.size).map { last }
-            } else {
-                erosionSettingsRaw
-            }
-        }
+        val biomeSettings = erosionLevels.map { it.erosionSettings }
         val lakes = ArrayList<WaterNode>()
         val passes = LinkedHashMap<PassKey, Pass>()
         for (i in 0..iterations - 1) {
@@ -469,7 +453,7 @@ object WaterFlows {
             prepareNodesAndLakes(executor, lakes, nodes, rivers)
             computeLakeConnections(graph.vertices, lakes, nodeIndex, passes, rivers)
             computeAreas(executor, rivers)
-            computeHeights(executor, rivers, biomeSettings.map { it[i] })
+            computeHeights(executor, rivers, biomeSettings)
         }
         val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
         renderHeightmap(executor, graph, nodeIndex, heightMap, fallback, threadCount)
@@ -915,8 +899,8 @@ object WaterFlows {
                 val parentHeight = parent.height
                 val flow = node.erosionPower * settings.erosionPower * Math.pow(node.drainageArea.toDouble(), 0.5)
                 val erosion = flow / node.distanceToParent
-                val denominator = 1.0 + (erosion * settings.deltaTime)
-                val numerator = node.height + (settings.deltaTime * (node.uplift + (erosion * parentHeight)))
+                val denominator = 1.0 + (erosion * 250000.0f)
+                val numerator = node.height + (250000.0f * (node.uplift + (erosion * parentHeight)))
                 node.height = (numerator / denominator).toFloat()
                 val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
                 val (talusSet, talusVarianceSet) = settings.talusAngles
