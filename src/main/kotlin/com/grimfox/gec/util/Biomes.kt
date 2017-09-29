@@ -39,27 +39,17 @@ object Biomes {
 
     val DEGREES_TO_SLOPES = degreesToSlopes()
 
-    private val TALUS_ANGLES_UNRESTRICTIVE = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)
+    private val TALUS_ANGLES_SHARP_PLATEAU = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)
 
-    private val TALUS_ANGLES_NO_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.0f)
+    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildParabolicTalusAngles(15.0f, 30.0f, 0.1f)
 
-    private val TALUS_ANGLES_LOW_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.1f)
+    private val TALUS_ANGLES_FOOTHILLS = buildParabolicTalusAngles(20.0f, 20.0f, 0.05f)
 
-    private val TALUS_ANGLES_MEDIUM_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.3f)
+    private val TALUS_ANGLES_MOUNTAINS = buildParabolicTalusAngles(30.0f, 15.0f, 0.1f)
 
-    private val TALUS_ANGLES_HIGH_VARIANCE = buildParabolicTalusAngles(15.0f, 30.0f, 0.5f)
+    private val TALUS_ANGLES_ROLLING_HILLS = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
 
-    private val TALUS_ANGLES_HIGH_NO_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.0f)
-
-    private val TALUS_ANGLES_HIGH_LOW_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.1f)
-
-    private val TALUS_ANGLES_HIGH_MEDIUM_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.2f)
-
-    private val TALUS_ANGLES_HIGH_HIGH_VARIANCE = buildParabolicTalusAngles(30.0f, 15.0f, 0.5f)
-
-    private val TALUS_ANGLES_NORMAL_DISTRIBUTION = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
-
-    private val TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT = buildNormalTalusAngles(20000.0f, 310.0f, 512.0f, 0.005f)
+    private val TALUS_ANGLES_PLAINS = buildNormalTalusAngles(20000.0f, 310.0f, 512.0f, 0.005f)
 
     private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
 
@@ -189,23 +179,18 @@ object Biomes {
             val beach: LinkedHashSet<Int>)
 
     class ErosionSettings(
-            val iterations: Int,
-            val talusAngles: Pair<FloatArray, FloatArray>,
-            val heightMultiplier: Float,
-            val erosionPower: Float)
-
-    class ErosionLevel(
-            val upliftMultiplier: Float,
             val previousTierBlendWeight: Float,
-            val erosionSettings: ErosionSettings,
+            val elevationPowerMultiplier: Float,
+            val soilMobilityMultiplier: Float,
             val terraceFunction: ((Float, Float) -> TerraceFunction)? = null)
 
     class Biome(
-            val bootstrapSettings: ErosionSettings,
-            val erosionLowSettings: ErosionLevel,
-            val erosionMidSettings: ErosionLevel,
-            val erosionHighSettings: ErosionLevel,
-            val upliftShader: Shader,
+            val talusAngles: Pair<FloatArray, FloatArray>,
+            val heightMultiplier: Float,
+            val lowPassSettings: ErosionSettings,
+            val midPassSettings: ErosionSettings,
+            val highPassSettings: ErosionSettings,
+            val elevationPowerShader: Shader,
             val startingHeightShader: Shader)
 
     private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): Future<TextureId> {
@@ -478,7 +463,7 @@ object Biomes {
 
     val basicNoiseTexture by lazy { basicNoiseTextureFuture.value }
 
-    private val coastalMountainsUpliftShader = object : Shader {
+    private val coastalMountainsElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -585,42 +570,26 @@ object Biomes {
     }
 
     val COASTAL_MOUNTAINS_BIOME = Biome(
-            upliftShader = coastalMountainsUpliftShader,
+            elevationPowerShader = coastalMountainsElevationShader,
             startingHeightShader = coastalMountainsStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_COASTAL_MOUNTAINS,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.8f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 3.0f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    elevationPowerMultiplier = 0.8f,
+                    soilMobilityMultiplier = 3.0f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.8f))
-    )
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 1.8f))
 
     val rollingHillsNoiseTexture by lazy { rollingHillsNoiseTextureFuture.value }
 
-    private val rollingHillsUpliftShader = object : Shader {
+    private val rollingHillsElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -719,42 +688,26 @@ object Biomes {
     }
 
     val ROLLING_HILLS_BIOME = Biome(
-            upliftShader = rollingHillsUpliftShader,
+            elevationPowerShader = rollingHillsElevationShader,
             startingHeightShader = rollingHillsStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_ROLLING_HILLS,
+            heightMultiplier = 30.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 30.0f,
-                                    erosionPower = 8.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 8.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 30.0f,
-                                    erosionPower = 4.0f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 4.0f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION,
-                                    heightMultiplier = 30.0f,
-                                    erosionPower = 2.5f))
-    )
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 2.5f))
 
     val foothillsNoiseTexture by lazy { foothillsNoiseTextureFuture.value }
 
-    private val foothillsUpliftShader = object : Shader {
+    private val foothillsElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -853,42 +806,26 @@ object Biomes {
     }
 
     val FOOTHILLS_BIOME = Biome(
-            upliftShader = foothillsUpliftShader,
+            elevationPowerShader = foothillsElevationShader,
             startingHeightShader = foothillsStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_FOOTHILLS,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.5f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 2.0f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.25f,
+                    elevationPowerMultiplier = 0.5f,
+                    soilMobilityMultiplier = 2.0f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 2.0f))
-    )
+                    elevationPowerMultiplier = 0.25f,
+                    soilMobilityMultiplier = 2.0f))
 
     val mountainsNoiseTexture by lazy { mountainsNoiseTextureFuture.value }
 
-    private val mountainsUpliftShader = object : Shader {
+    private val mountainsElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -987,42 +924,26 @@ object Biomes {
     }
 
     val MOUNTAINS_BIOME = Biome(
-            upliftShader = mountainsUpliftShader,
+            elevationPowerShader = mountainsElevationShader,
             startingHeightShader = mountainsStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_HIGH_LOW_VARIANCE,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_MOUNTAINS,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_HIGH_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.5f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_HIGH_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.0f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.2f,
+                    elevationPowerMultiplier = 0.5f,
+                    soilMobilityMultiplier = 1.0f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_HIGH_LOW_VARIANCE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 1.0f))
-    )
+                    elevationPowerMultiplier = 0.2f,
+                    soilMobilityMultiplier = 1.0f))
 
     val plainsNoiseTexture by lazy { plainsNoiseTextureFuture.value }
 
-    private val plainsUpliftShader = object : Shader {
+    private val plainsElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -1121,40 +1042,24 @@ object Biomes {
     }
 
     val PLAINS_BIOME = Biome(
-            upliftShader = plainsUpliftShader,
+            elevationPowerShader = plainsElevationShader,
             startingHeightShader = plainsStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_NO_VARIANCE,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_PLAINS,
+            heightMultiplier = 100.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT,
-                                    heightMultiplier = 100.0f,
-                                    erosionPower = 7.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 7.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT,
-                                    heightMultiplier = 100.0f,
-                                    erosionPower = 7.0f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 7.0f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_NORMAL_DISTRIBUTION_FLAT,
-                                    heightMultiplier = 100.0f,
-                                    erosionPower = 5.0f))
-    )
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 5.0f))
 
-    private val plateauBiomeUpliftShader = object : Shader {
+    private val plateauBiomeElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -1245,40 +1150,24 @@ object Biomes {
     }
 
     val PLATEAU_BIOME = Biome(
-            upliftShader = plateauBiomeUpliftShader,
+            elevationPowerShader = plateauBiomeElevationShader,
             startingHeightShader = plateauBiomeStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_PLATEAU,
-                    heightMultiplier = 8.5f,
-                    erosionPower = 1.0f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            talusAngles = TALUS_ANGLES_PLATEAU,
+            heightMultiplier = 8.5f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_PLATEAU,
-                                    heightMultiplier = 8.5f,
-                                    erosionPower = 1.0f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.9f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_PLATEAU,
-                                    heightMultiplier = 8.5f,
-                                    erosionPower = 0.2f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.1f,
+                    elevationPowerMultiplier = 0.9f,
+                    soilMobilityMultiplier = 0.2f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_PLATEAU,
-                                    heightMultiplier = 8.5f,
-                                    erosionPower = 0.1f))
-    )
+                    elevationPowerMultiplier = 0.1f,
+                    soilMobilityMultiplier = 0.1f))
 
-    private val sharpPlateauBiomeUpliftShader = object : Shader {
+    private val sharpPlateauBiomeElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -1363,37 +1252,22 @@ object Biomes {
     }
 
     val SHARP_PLATEAU_BIOME = Biome(
-            upliftShader = sharpPlateauBiomeUpliftShader,
+            elevationPowerShader = sharpPlateauBiomeElevationShader,
             startingHeightShader = sharpPlateauBiomeStartingHeightsShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 0.1f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 0.7f,
+            talusAngles = TALUS_ANGLES_SHARP_PLATEAU,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.1f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 0.5f,
+                    elevationPowerMultiplier = 0.7f,
+                    soilMobilityMultiplier = 0.1f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 0.4f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.01f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 0.4f,
+                    elevationPowerMultiplier = 0.5f,
+                    soilMobilityMultiplier = 0.01f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 0.15f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_UNRESTRICTIVE,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.15f),
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 0.15f,
                     terraceFunction = { min, max ->
                         val delta = max - min
                         val steps = listOf(
@@ -1404,8 +1278,7 @@ object Biomes {
                         terraceFunction { input ->
                             applyTerrace(input, steps)
                         }
-                    })
-    )
+                    }))
 
     private fun applyTerrace(input: Float, steps: List<(Float) -> Float?>): Float {
         steps.forEach {
@@ -1432,7 +1305,7 @@ object Biomes {
         }
     }
 
-    private val underWaterUpliftShader = object : Shader {
+    private val underWaterElevationShader = object : Shader {
 
         val floatBuffer = BufferUtils.createFloatBuffer(16)
 
@@ -1479,36 +1352,20 @@ object Biomes {
     }
 
     val UNDER_WATER_BIOME = Biome(
-            upliftShader = underWaterUpliftShader,
-            startingHeightShader = underWaterUpliftShader,
-            bootstrapSettings = ErosionSettings(
-                    iterations = 1,
-                    talusAngles = TALUS_ANGLES_UNDERWATER,
-                    heightMultiplier = 1.0f,
-                    erosionPower = 0.001f),
-            erosionLowSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+            elevationPowerShader = underWaterElevationShader,
+            startingHeightShader = underWaterElevationShader,
+            talusAngles = TALUS_ANGLES_UNDERWATER,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 50,
-                                    talusAngles = TALUS_ANGLES_UNDERWATER,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.2f)),
-            erosionMidSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 0.2f),
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_UNDERWATER,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.03f)),
-            erosionHighSettings = ErosionLevel(
-                    upliftMultiplier = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 0.03f),
+            highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    erosionSettings = ErosionSettings(
-                                    iterations = 25,
-                                    talusAngles = TALUS_ANGLES_UNDERWATER,
-                                    heightMultiplier = 1.0f,
-                                    erosionPower = 0.035f))
-    )
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 0.035f))
 }
