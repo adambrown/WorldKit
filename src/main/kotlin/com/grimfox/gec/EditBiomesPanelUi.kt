@@ -59,7 +59,7 @@ fun Block.editBiomesPanel(
                                 historyBiomesBackQueue.push(historyLast.copy())
                             }
                             syncBiomeParameterValues(historyItem.parameters)
-                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)
                             historyBiomesCurrent.value = historyItem.copy()
@@ -257,7 +257,7 @@ fun Block.editBiomesPanel(
                                 historyBiomesForwardQueue.push(historyLast.copy())
                             }
                             syncBiomeParameterValues(historyItem.parameters)
-                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)
                             historyBiomesCurrent.value = historyItem.copy()
@@ -276,7 +276,7 @@ fun Block.editBiomesPanel(
                                 historyBiomesBackQueue.push(historyLast.copy())
                             }
                             syncBiomeParameterValues(historyItem.parameters)
-                            currentState.biomeGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
                             biomesBuilder.build(historyItem.parameters, true)
                             historyBiomesCurrent.value = historyItem.copy()

@@ -107,7 +107,7 @@ fun Block.editRegionsPanel(
                                 historyRegionsBackQueue.push(historyLast.copy())
                             }
                             syncRegionParameterValues(historyItem.parameters)
-                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionGraph.value = Graphs.generateGraph(REGION_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
@@ -289,7 +289,7 @@ fun Block.editRegionsPanel(
                                 historyRegionsForwardQueue.push(historyLast.copy())
                             }
                             syncRegionParameterValues(historyItem.parameters)
-                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionGraph.value = Graphs.generateGraph(REGION_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()
@@ -312,7 +312,7 @@ fun Block.editRegionsPanel(
                                 historyRegionsBackQueue.push(historyLast.copy())
                             }
                             syncRegionParameterValues(historyItem.parameters)
-                            currentState.regionGraph.value = Graphs.generateGraph(128, historyItem.graphSeed, 0.8)
+                            currentState.regionGraph.value = Graphs.generateGraph(REGION_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.regionMask.value = historyItem.mask
                             regionsBuilder.build(historyItem.parameters, true, true)
                             historyRegionsCurrent.value = historyItem.copy()

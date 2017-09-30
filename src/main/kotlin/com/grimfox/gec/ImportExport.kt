@@ -26,7 +26,7 @@ fun importProjectFile(file: File): Project? {
         if (hasRegionState) {
             val currentRegionState = stream.readRegionsHistoryItem()
             currentState.regionParameters.value = currentRegionState.parameters
-            currentState.regionGraph.value = Graphs.generateGraph(128, currentRegionState.graphSeed, 0.8)
+            currentState.regionGraph.value = Graphs.generateGraph(REGION_GRAPH_WIDTH, currentRegionState.graphSeed, 0.8)
             currentState.regionMask.value = currentRegionState.mask
         }
         val hasSplineState = stream.readBoolean()
@@ -38,7 +38,7 @@ fun importProjectFile(file: File): Project? {
         if (hasBiomeState) {
             val currentBiomeState = stream.readBiomesHistoryItem()
             currentState.biomeParameters.value = currentBiomeState.parameters
-            currentState.biomeGraph.value = Graphs.generateGraph(128, currentBiomeState.graphSeed, 0.8)
+            currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, currentBiomeState.graphSeed, 0.8)
             currentState.biomeMask.value = currentBiomeState.mask
             currentState.biomes.value = currentBiomeState.parameters.biomes.map { ordinalToBiome(it) }
         }

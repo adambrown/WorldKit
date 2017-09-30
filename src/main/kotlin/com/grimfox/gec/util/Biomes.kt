@@ -1172,19 +1172,19 @@ object Biomes {
             elevationPowerShader = plainsElevationShader,
             startingHeightShader = plainsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_PLAINS,
-            heightMultiplier = 100.0f,
+            heightMultiplier = 20.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 7.0f),
+                    soilMobilityMultiplier = 5.0f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 7.0f),
+                    soilMobilityMultiplier = 5.0f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 5.0f))
+                    soilMobilityMultiplier = 3.0f))
 
     private val plateauBiomeElevationShader = object : Shader {
 

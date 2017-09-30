@@ -32,7 +32,7 @@ class RegionsBuilder(
                         land++
                     }
                 }
-                val graph = Graphs.generateGraph(128, parameters.regionsSeed, 0.8)
+                val graph = Graphs.generateGraph(REGION_GRAPH_WIDTH, parameters.regionsSeed, 0.8)
                 Pair(graph, mask)
             } else {
                 BuildContinent.generateRegions(parameters.copy(), executor)
@@ -139,10 +139,10 @@ class RegionsBuilder(
         val widthM1 = bufferedImage.width - 1
         val heightM1 = bufferedImage.height - 1
         var unknownColors = false
-        for (y in 0..127) {
-            for (x in 0..127) {
-                val actualX = Math.round(((x + 0.5f) / 128.0f) * widthM1)
-                val actualY = Math.round(((y + 0.5f) / 128.0f) * heightM1)
+        for (y in 0..REGION_GRAPH_WIDTH_M1) {
+            for (x in 0..REGION_GRAPH_WIDTH_M1) {
+                val actualX = Math.round(((x + 0.5f) / REGION_GRAPH_WIDTH_F) * widthM1)
+                val actualY = Math.round(((y + 0.5f) / REGION_GRAPH_WIDTH_F) * heightM1)
                 val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
                 val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
                 if (!unknownColors && curVal == null) {
@@ -161,8 +161,8 @@ class RegionsBuilder(
                 colorMap[value] = i
             }
         }
-        return ByteArrayMatrix(128) { i ->
-            (colorMap[bufferedImage.getRGB(Math.round((((i % 128) + 0.5f) / 128.0f) * widthM1), Math.round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
+        return ByteArrayMatrix(256) { i ->
+            (colorMap[bufferedImage.getRGB(Math.round((((i % REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * widthM1), Math.round((((i / REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
         }
     }
 }

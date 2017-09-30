@@ -52,7 +52,7 @@ object BuildContinent {
                     RegionIterationParameters(64, 0.40f, 0.1f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
                     RegionIterationParameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
-//                    Parameters(256, 0.39f, 0.01f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.015f)
+//                    RegionIterationParameters(256, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
             ),
             var currentIteration: Int = 0)
 

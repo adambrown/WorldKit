@@ -22,6 +22,14 @@ import java.util.concurrent.CountDownLatch
 
 val EXPERIMENTAL_BUILD = false
 
+val REGION_GRAPH_WIDTH = 128
+val REGION_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
+val REGION_GRAPH_WIDTH_F = REGION_GRAPH_WIDTH.toFloat()
+
+val BIOME_GRAPH_WIDTH = 128
+val BIOME_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
+val BIOME_GRAPH_WIDTH_F = REGION_GRAPH_WIDTH.toFloat()
+
 val REGION_COLORS = arrayListOf(
         color(0.0f, 0.0f, 0.0f),
         color(0.28627452f, 0.93333334f, 0.28627452f),

@@ -26,12 +26,12 @@ class BiomesBuilder(
                 for (i in 0..mask.size.toInt() - 1) {
                     mask[i] = ((mask[i].toInt() % parameters.biomes.size) + 1).toByte()
                 }
-                val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
+                val graph = Graphs.generateGraph(BIOME_GRAPH_WIDTH, parameters.biomesSeed, 0.8)
                 Pair(graph, mask)
             } else {
                 val scale = ((parameters.biomesMapScale * parameters.biomesMapScale) / 400.0f).coerceIn(0.0f, 1.0f)
                 val biomeScale = round(scale * 21) + 7
-                val graph = Graphs.generateGraph(128, parameters.biomesSeed, 0.8)
+                val graph = Graphs.generateGraph(BIOME_GRAPH_WIDTH, parameters.biomesSeed, 0.8)
                 BuildContinent.buildBiomeMaps(executor, parameters.biomesSeed, graph, parameters.biomes.size, biomeScale)
             }
         }
@@ -59,10 +59,10 @@ class BiomesBuilder(
         val widthM1 = bufferedImage.width - 1
         val heightM1 = bufferedImage.height - 1
         var unknownColors = false
-        for (y in 0..127) {
-            for (x in 0..127) {
-                val actualX = round(((x + 0.5f) / 128.0f) * widthM1)
-                val actualY = round(((y + 0.5f) / 128.0f) * heightM1)
+        for (y in 0..BIOME_GRAPH_WIDTH_M1) {
+            for (x in 0..BIOME_GRAPH_WIDTH_M1) {
+                val actualX = round(((x + 0.5f) / BIOME_GRAPH_WIDTH_F) * widthM1)
+                val actualY = round(((y + 0.5f) / BIOME_GRAPH_WIDTH_F) * heightM1)
                 val imageValue = bufferedImage.getRGB(actualX, actualY) and 0x00FFFFFF
                 val curVal = colorMap.putIfAbsent(imageValue, colorMap.size)
                 if (!unknownColors && curVal == null) {
@@ -80,8 +80,8 @@ class BiomesBuilder(
                 colorMap[value] = i - 1
             }
         }
-        return ByteArrayMatrix(128) { i ->
-            (colorMap[bufferedImage.getRGB(round((((i % 128) + 0.5f) / 128.0f) * widthM1), round((((i / 128) + 0.5f) / 128.0f) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
+        return ByteArrayMatrix(REGION_GRAPH_WIDTH) { i ->
+            (colorMap[bufferedImage.getRGB(round((((i % BIOME_GRAPH_WIDTH) + 0.5f) / BIOME_GRAPH_WIDTH_F) * widthM1), round((((i / BIOME_GRAPH_WIDTH) + 0.5f) / BIOME_GRAPH_WIDTH_F) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
         }
     }
 }
