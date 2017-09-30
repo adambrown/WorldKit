@@ -77,6 +77,42 @@ fun Block.editBiomesPanel(
             }
         }
         vSpacer(HALF_ROW_HEIGHT)
+        vButtonRow(LARGE_ROW_HEIGHT) {
+            generationLock.disableOnLockButton(this, "Import custom starting height map...") {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val newTexture = importTexture(dialogLayer, preferences, ui)
+                        if (newTexture != null) {
+                            currentState.customStartingHeightsMap.value = newTexture
+                        }
+                    }
+                }
+            }
+        }
+        vButtonRow(LARGE_ROW_HEIGHT) {
+            generationLock.disableOnLockButton(this, "Import custom elevation power map...") {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val newTexture = importTexture(dialogLayer, preferences, ui)
+                        if (newTexture != null) {
+                            currentState.customElevationPowerMap.value = newTexture
+                        }
+                    }
+                }
+            }
+        }
+        vButtonRow(LARGE_ROW_HEIGHT) {
+            generationLock.disableOnLockButton(this, "Import custom soil mobility map...") {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val newTexture = importTexture(dialogLayer, preferences, ui)
+                        if (newTexture != null) {
+                            currentState.customSoilMobilityMap.value = newTexture
+                        }
+                    }
+                }
+            }
+        }
         vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
             hSpacer(SMALL_SPACER_SIZE)
             button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
@@ -128,7 +164,7 @@ fun Block.editBiomesPanel(
                 biomes.value = newBiomes
             }
         }
-        biomeCount.value = 7
+        biomeCount.value = 8
         vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(editBiomesMode,
                 {

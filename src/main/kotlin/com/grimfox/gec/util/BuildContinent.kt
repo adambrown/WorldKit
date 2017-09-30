@@ -748,9 +748,36 @@ object BuildContinent {
         return output.map { Point2F(it.a, 1.0f - it.b) }
     }
 
-    fun generateWaterFlows(parameterSet: RegionParameters, regionSplines: RegionSplines, biomeGraph: Graph, biomeMask: Matrix<Byte>, biomes: List<Biome>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, mapScale: Int): Pair<TextureId, TextureId> {
+    fun generateWaterFlows(
+            parameterSet: RegionParameters,
+            regionSplines: RegionSplines,
+            biomeGraph: Graph,
+            biomeMask: Matrix<Byte>,
+            biomes: List<Biome>,
+            flowGraphSmall: Graph,
+            flowGraphMedium: Graph,
+            flowGraphLarge: Graph,
+            executor: ExecutorService,
+            mapScale: Int,
+            customElevationPowerMap: TextureId,
+            customStartingHeightsMap: TextureId,
+            customSoilMobilityMap: TextureId): Pair<TextureId, TextureId> {
         return timeIt("generated water flow in") {
-            generateWaterFlows(Random(parameterSet.regionsSeed), regionSplines, biomeGraph, biomeMask, flowGraphSmall, flowGraphMedium, flowGraphLarge, executor, 4096, mapScale, biomes)
+            generateWaterFlows(
+                    random = Random(parameterSet.regionsSeed),
+                    regionSplines = regionSplines,
+                    biomeGraph = biomeGraph,
+                    biomeMask = biomeMask,
+                    flowGraphSmall = flowGraphSmall,
+                    flowGraphMedium = flowGraphMedium,
+                    flowGraphLarge = flowGraphLarge,
+                    executor = executor,
+                    outputWidth = 4096,
+                    mapScale = mapScale,
+                    biomes = biomes,
+                    customElevationPowerMap = customElevationPowerMap,
+                    customStartingHeightsMap = customStartingHeightsMap,
+                    customSoilMobilityMap = customSoilMobilityMap)
         }
     }
 }

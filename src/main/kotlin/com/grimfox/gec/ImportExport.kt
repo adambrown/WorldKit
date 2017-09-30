@@ -7,14 +7,17 @@ import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.RegionSplines
+import org.lwjgl.opengl.GL11.GL_LINEAR
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.util.*
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import javax.imageio.ImageIO
 
 fun importProjectFile(file: File): Project? {
     return DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
@@ -237,6 +240,18 @@ fun importBiomesFile(dialogLayer: Block, preferences: Preferences, ui: UserInter
                 stream.readBiomesHistoryItem()
             }
             historyItem
+        }
+    }
+}
+
+fun importTexture(dialogLayer: Block, preferences: Preferences, ui: UserInterface): TextureId? {
+    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "png") { file ->
+        if (file == null) {
+            null
+        } else {
+            doOnMainThreadAndWait {
+                TextureId(loadTexture2D(GL_LINEAR, GL_LINEAR, ImageIO.read(file), false, true).first)
+            }
         }
     }
 }

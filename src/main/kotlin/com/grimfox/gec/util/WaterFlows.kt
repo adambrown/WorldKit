@@ -59,9 +59,23 @@ object WaterFlows {
 
     class Pass(val passKey: PassKey, val id1: Int, val id2: Int, val height: Float)
 
-    class Masks(val biomeMask: Matrix<Byte>, val elevationMask: Matrix<Short>, val landMask: Matrix<Byte>, val underWaterMask: Matrix<Float>, val startingHeightsMask: Matrix<Short>, val soilMobilityMask: Matrix<Short>)
+    class Masks(val biomeMask: Matrix<Byte>, val landMask: Matrix<Byte>, val underWaterMask: Matrix<Float>, val elevationPowerMask: Matrix<Short>, val startingHeightsMask: Matrix<Short>, val soilMobilityMask: Matrix<Short>)
 
-    fun generateWaterFlows(random: Random, regionSplines: RegionSplines, biomeGraph: Graph, biomeMask: Matrix<Byte>, flowGraphSmall: Graph, flowGraphMedium: Graph, flowGraphLarge: Graph, executor: ExecutorService, outputWidth: Int, mapScale: Int, biomes: List<Biome>): Pair<TextureId, TextureId> {
+    fun generateWaterFlows(
+            random: Random,
+            regionSplines: RegionSplines,
+            biomeGraph: Graph,
+            biomeMask: Matrix<Byte>,
+            flowGraphSmall: Graph,
+            flowGraphMedium: Graph,
+            flowGraphLarge: Graph,
+            executor: ExecutorService,
+            outputWidth: Int,
+            mapScale: Int,
+            biomes: List<Biome>,
+            customElevationPowerMap: TextureId,
+            customStartingHeightsMap: TextureId,
+            customSoilMobilityMap: TextureId): Pair<TextureId, TextureId> {
         val scale = ((mapScale * mapScale) / 400.0f).coerceIn(0.0f, 1.0f)
         val distanceScale = scale * 990000 + 10000
         val shaderTextureScale = ((mapScale / 20.0f).coerceIn(0.0f, 1.0f) * 0.75f) + 0.25f
@@ -79,7 +93,8 @@ object WaterFlows {
             val riverBorderTextureId = renderEdges(executor, regionSplines.riverEdges.flatMap { it } + regionSplines.customRiverEdges.flatMap { it }, threadCount)
             val mountainBorderTextureId = renderEdges(executor, regionSplines.mountainEdges.flatMap { it } + regionSplines.customMountainEdges.flatMap { it }, threadCount)
             val coastalBorderTextureId = renderEdges(executor, regionSplines.coastEdges.flatMap { it.first + it.second.flatMap { it } }, threadCount)
-            val elevationTextureId = render { _, dynamicGeometry2D, textureRenderer ->
+            val biomeRegions = buildTriangles(biomeGraph, biomeMask)
+            val elevationPowerTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
                 glDisable(GL11.GL_CULL_FACE)
                 glDisable(GL13.GL_MULTISAMPLE)
@@ -89,10 +104,21 @@ object WaterFlows {
                 textureRenderer.bind()
                 glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-                val biomeRegions = buildTriangles(biomeGraph, biomeMask)
                 biomeRegions.forEachIndexed { i, (vertexData, indexData) ->
                     val biome = biomes[i]
-                    biome.elevationPowerShader.bind(shaderTextureScale, shaderBorderDistanceScale, heightScale, landMapTextureId, coastalBorderTextureId, biomeTextureId, biomeBorderTextureId, riverBorderTextureId, mountainBorderTextureId)
+                    biome.elevationPowerShader.bind(
+                            textureScale = shaderTextureScale,
+                            borderDistanceScale = shaderBorderDistanceScale,
+                            heightScale = heightScale,
+                            landMask = landMapTextureId,
+                            coastBorderMask = coastalBorderTextureId,
+                            biomeMask = biomeTextureId,
+                            biomeBorderMask = biomeBorderTextureId,
+                            riverBorderMask = riverBorderTextureId,
+                            mountainBorderMask = mountainBorderTextureId,
+                            customElevationPowerMap = customElevationPowerMap,
+                            customStartingHeightsMap = customStartingHeightsMap,
+                            customSoilMobilityMap = customSoilMobilityMap)
                     dynamicGeometry2D.render(vertexData, indexData, biome.elevationPowerShader.positionAttribute)
                 }
                 val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
@@ -109,17 +135,28 @@ object WaterFlows {
                 textureRenderer.bind()
                 glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-                val biomeRegions = buildTriangles(biomeGraph, biomeMask)
                 biomeRegions.forEachIndexed { i, (vertexData, indexData) ->
                     val biome = biomes[i]
-                    biome.startingHeightShader.bind(shaderTextureScale, shaderBorderDistanceScale, heightScale, landMapTextureId, coastalBorderTextureId, biomeTextureId, biomeBorderTextureId, riverBorderTextureId, mountainBorderTextureId)
+                    biome.startingHeightShader.bind(
+                            textureScale = shaderTextureScale,
+                            borderDistanceScale = shaderBorderDistanceScale,
+                            heightScale = heightScale,
+                            landMask = landMapTextureId,
+                            coastBorderMask = coastalBorderTextureId,
+                            biomeMask = biomeTextureId,
+                            biomeBorderMask = biomeBorderTextureId,
+                            riverBorderMask = riverBorderTextureId,
+                            mountainBorderMask = mountainBorderTextureId,
+                            customElevationPowerMap = customElevationPowerMap,
+                            customStartingHeightsMap = customStartingHeightsMap,
+                            customSoilMobilityMap = customSoilMobilityMap)
                     dynamicGeometry2D.render(vertexData, indexData, biome.startingHeightShader.positionAttribute)
                 }
                 val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
                 retVal
             }
-            val soilMobilityTextureId = render { _, _, textureRenderer ->
+            val soilMobilityTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
                 glDisable(GL11.GL_CULL_FACE)
                 glDisable(GL13.GL_MULTISAMPLE)
@@ -129,6 +166,26 @@ object WaterFlows {
                 textureRenderer.bind()
                 glClearColor(0.5f, 0.5f, 0.5f, 1.0f)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+                biomeRegions.forEachIndexed { i, (vertexData, indexData) ->
+                    val biome = biomes[i]
+                    val shader = biome.soilMobilityShader
+                    if (shader != null) {
+                        shader.bind(
+                                textureScale = shaderTextureScale,
+                                borderDistanceScale = shaderBorderDistanceScale,
+                                heightScale = heightScale,
+                                landMask = landMapTextureId,
+                                coastBorderMask = coastalBorderTextureId,
+                                biomeMask = biomeTextureId,
+                                biomeBorderMask = biomeBorderTextureId,
+                                riverBorderMask = riverBorderTextureId,
+                                mountainBorderMask = mountainBorderTextureId,
+                                customElevationPowerMap = customStartingHeightsMap,
+                                customStartingHeightsMap = customElevationPowerMap,
+                                customSoilMobilityMap = customSoilMobilityMap)
+                        dynamicGeometry2D.render(vertexData, indexData, shader.positionAttribute)
+                    }
+                }
                 val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
                 retVal
@@ -149,13 +206,25 @@ object WaterFlows {
                         1.0f, 1.0f,
                         0.0f, 1.0f)
                 val indexData = intArrayOf(0, 1, 2, 2, 3, 0)
-                UNDER_WATER_BIOME.elevationPowerShader.bind(shaderTextureScale, shaderBorderDistanceScale, heightScale, landMapTextureId, coastalBorderTextureId, biomeTextureId, biomeBorderTextureId, riverBorderTextureId, mountainBorderTextureId)
+                UNDER_WATER_BIOME.elevationPowerShader.bind(
+                        textureScale = shaderTextureScale,
+                        borderDistanceScale = shaderBorderDistanceScale,
+                        heightScale = heightScale,
+                        landMask = landMapTextureId,
+                        coastBorderMask = coastalBorderTextureId,
+                        biomeMask = biomeTextureId,
+                        biomeBorderMask = biomeBorderTextureId,
+                        riverBorderMask = riverBorderTextureId,
+                        mountainBorderMask = mountainBorderTextureId,
+                        customElevationPowerMap = customElevationPowerMap,
+                        customStartingHeightsMap = customStartingHeightsMap,
+                        customSoilMobilityMap = customSoilMobilityMap)
                 dynamicGeometry2D.render(vertexData, indexData, UNDER_WATER_BIOME.elevationPowerShader.positionAttribute)
                 val retVal = textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
                 retVal
             }
-            val elevationMask = ShortArrayMatrix(4096, extractTextureRedShort(elevationTextureId, 4096))
+            val elevationMask = ShortArrayMatrix(4096, extractTextureRedShort(elevationPowerTextureId, 4096))
             val startingHeights = ShortArrayMatrix(4096, extractTextureRedShort(startingHeightsTextureId, 4096))
             val underWaterMask = FloatArrayMatrix(4096, extractTextureRedFloat(underWaterTextureId, 4096))
             val landMask = ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096))
@@ -166,15 +235,15 @@ object WaterFlows {
             coastalBorderTextureId.free()
             biomeTextureId.free()
             biomeBorderTextureId.free()
-            elevationTextureId.free()
+            elevationPowerTextureId.free()
             startingHeightsTextureId.free()
-            Masks(biomeMap, elevationMask, landMask, underWaterMask, startingHeights, soilMobilityMask)
+            Masks(biomeMap, landMask, underWaterMask, elevationMask, startingHeights, soilMobilityMask)
         }
         val regionDataFuture = executor.call {
             buildRegionData(flowGraphSmall, biomeMasksFuture.value.landMask)
         }
         val smallMapsFuture = executor.call {
-            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.biomeMask, biomeMasksFuture.value.elevationMask, biomeMasksFuture.value.startingHeightsMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]))
+            val (nodeIndex, nodes, rivers) = bootstrapErosion(executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.biomeMask, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]))
             performErosion(executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, null,-1.0f)
         }
         val smallWaterMapsFuture = executor.call {
@@ -197,7 +266,7 @@ object WaterFlows {
             val heightMap = smallMapsFuture.value
             val (nodeIndex, nodes, rivers) = midNodesFuture.value
             val erosionSettings = biomes.map { it.midPassSettings }
-            applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.elevationMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes)
+            applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes)
             performErosion(executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 2048, null, -1.0f)
         }
         val midWaterMapsFuture = executor.call {
@@ -273,7 +342,7 @@ object WaterFlows {
             val heightMap = midMapsFuture.value
             val (nodeIndex, nodes, rivers) = highNodesFuture.value
             val erosionSettings = biomes.map { it.highPassSettings }
-            applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes)
+            applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes)
             val underWaterMask = highWaterMapsFuture.value
             val retVal = performErosion(executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, outputWidth, underWaterMask, -600.0f)
             val riverEdges = ArrayList<LineSegment2F>()

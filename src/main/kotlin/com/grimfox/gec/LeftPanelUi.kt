@@ -190,7 +190,20 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                     val currentBiomes = currentState.biomes.value
                                     val currentMapScale = mapDetailScale.value
                                     if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
-                                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(currentParameters, currentRegionSplines, currentBiomeGraph, currentBiomeMask, currentBiomes, cachedGraph256.value, cachedGraph512.value, cachedGraph1024.value, executor, currentMapScale)
+                                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(
+                                                parameterSet = currentParameters,
+                                                regionSplines = currentRegionSplines,
+                                                biomeGraph = currentBiomeGraph,
+                                                biomeMask = currentBiomeMask,
+                                                biomes = currentBiomes,
+                                                flowGraphSmall = cachedGraph256.value,
+                                                flowGraphMedium = cachedGraph512.value,
+                                                flowGraphLarge = cachedGraph1024.value,
+                                                executor = executor,
+                                                mapScale = currentMapScale,
+                                                customElevationPowerMap = currentState.customElevationPowerMap.value,
+                                                customStartingHeightsMap = currentState.customStartingHeightsMap.value,
+                                                customSoilMobilityMap = currentState.customSoilMobilityMap.value)
                                         meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
                                         currentState.heightMapTexture.value = heightMapTexId
                                         currentState.riverMapTexture.value = riverMapTexId

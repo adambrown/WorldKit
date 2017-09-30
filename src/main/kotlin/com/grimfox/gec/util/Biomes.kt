@@ -34,24 +34,38 @@ object Biomes {
 
         val positionAttribute: ShaderAttribute
 
-        fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId)
+        fun bind(
+                textureScale: Float,
+                borderDistanceScale: Float,
+                heightScale: Float,
+                landMask: TextureId,
+                coastBorderMask: TextureId,
+                biomeMask: TextureId,
+                biomeBorderMask: TextureId,
+                riverBorderMask: TextureId,
+                mountainBorderMask: TextureId,
+                customElevationPowerMap: TextureId,
+                customStartingHeightsMap: TextureId,
+                customSoilMobilityMap: TextureId)
     }
 
     val DEGREES_TO_SLOPES = degreesToSlopes()
 
     private val TALUS_ANGLES_SHARP_PLATEAU = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)
 
-    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildParabolicTalusAngles(15.0f, 30.0f, 0.1f)
+    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildParabolicTalusAngles(15.0f, 30.0f, 2.0f)
 
-    private val TALUS_ANGLES_FOOTHILLS = buildParabolicTalusAngles(20.0f, 20.0f, 0.05f)
+    private val TALUS_ANGLES_FOOTHILLS = buildParabolicTalusAngles(20.0f, 20.0f, 2.0f)
 
-    private val TALUS_ANGLES_MOUNTAINS = buildParabolicTalusAngles(30.0f, 15.0f, 0.1f)
+    private val TALUS_ANGLES_MOUNTAINS = buildParabolicTalusAngles(30.0f, 15.0f, 5.0f)
 
     private val TALUS_ANGLES_ROLLING_HILLS = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
 
     private val TALUS_ANGLES_PLAINS = buildNormalTalusAngles(20000.0f, 310.0f, 512.0f, 0.005f)
 
     private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
+
+    private val TALUS_ANGLES_BASIC = buildParabolicTalusAngles(25.0f, 25.0f, 5.0f)
 
     private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0f, 15.0f, 0.0f)
 
@@ -191,7 +205,8 @@ object Biomes {
             val midPassSettings: ErosionSettings,
             val highPassSettings: ErosionSettings,
             val elevationPowerShader: Shader,
-            val startingHeightShader: Shader)
+            val startingHeightShader: Shader,
+            val soilMobilityShader: Shader? = null)
 
     private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): Future<TextureId> {
         return executor.call {
@@ -498,7 +513,19 @@ object Biomes {
             }
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(
+                textureScale: Float,
+                borderDistanceScale: Float,
+                heightScale: Float,
+                landMask: TextureId,
+                coastBorderMask: TextureId,
+                biomeMask: TextureId,
+                biomeBorderMask: TextureId,
+                riverBorderMask: TextureId,
+                mountainBorderMask: TextureId,
+                customElevationPowerMap: TextureId,
+                customStartingHeightsMap: TextureId,
+                customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -550,7 +577,19 @@ object Biomes {
             }
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(
+                textureScale: Float,
+                borderDistanceScale: Float,
+                heightScale: Float,
+                landMask: TextureId,
+                coastBorderMask: TextureId,
+                biomeMask: TextureId,
+                biomeBorderMask: TextureId,
+                riverBorderMask: TextureId,
+                mountainBorderMask: TextureId,
+                customElevationPowerMap: TextureId,
+                customStartingHeightsMap: TextureId,
+                customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -618,7 +657,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -667,7 +717,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -736,7 +797,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -785,7 +857,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -854,7 +937,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -903,7 +997,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -972,7 +1077,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -1021,7 +1137,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)
@@ -1086,7 +1213,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -1130,7 +1268,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, mountainBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -1193,7 +1342,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, borderDistanceScaleUniform, riverBorderDistanceTextureUniform, coastDistanceTextureUniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -1234,7 +1394,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, borderDistanceScaleUniform, heightScaleUniform, riverBorderDistanceTextureUniform, coastDistanceTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(borderDistanceScaleUniform.location, borderDistanceScale)
@@ -1279,6 +1450,157 @@ object Biomes {
                             applyTerrace(input, steps)
                         }
                     }))
+
+    private val customElevationPowerShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val mapTextureUniform = ShaderUniform("map")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/custom-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/custom-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, mapTextureUniform))
+        }
+
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(mapTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, customElevationPowerMap.id)
+        }
+    }
+
+    private val customStartingHeightsShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val mapTextureUniform = ShaderUniform("map")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/custom-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/custom-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, mapTextureUniform))
+        }
+
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(mapTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, customStartingHeightsMap.id)
+        }
+    }
+
+    private val customSoilMobilityShader = object : Shader {
+
+        val floatBuffer = BufferUtils.createFloatBuffer(16)
+
+        init {
+            val mvpMatrix = Matrix4f()
+            mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f)
+            mvpMatrix.get(0, floatBuffer)
+        }
+
+        override val positionAttribute = ShaderAttribute("position")
+
+        val mvpMatrixUniform = ShaderUniform("modelViewProjectionMatrix")
+        val mapTextureUniform = ShaderUniform("map")
+
+        val shaderProgram = TextureBuilder.buildShaderProgram {
+            val vertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/custom-biome.vert"))
+            val fragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/custom-biome.frag"))
+            createAndLinkProgram(
+                    listOf(vertexShader, fragmentShader),
+                    listOf(positionAttribute),
+                    listOf(mvpMatrixUniform, mapTextureUniform))
+        }
+
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
+            glUseProgram(shaderProgram.id)
+            glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
+            glUniform1i(mapTextureUniform.location, 0)
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, customSoilMobilityMap.id)
+        }
+    }
+
+    val CUSTOM_BIOME = Biome(
+            elevationPowerShader = customElevationPowerShader,
+            startingHeightShader = customStartingHeightsShader,
+            soilMobilityShader = customSoilMobilityShader,
+            talusAngles = TALUS_ANGLES_BASIC,
+            heightMultiplier = 1.0f,
+            lowPassSettings = ErosionSettings(
+                    previousTierBlendWeight = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            midPassSettings = ErosionSettings(
+                    previousTierBlendWeight = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f),
+            highPassSettings = ErosionSettings(
+                    previousTierBlendWeight = 1.0f,
+                    elevationPowerMultiplier = 1.0f,
+                    soilMobilityMultiplier = 1.0f))
 
     private fun applyTerrace(input: Float, steps: List<(Float) -> Float?>): Float {
         steps.forEach {
@@ -1333,7 +1655,18 @@ object Biomes {
                     listOf(mvpMatrixUniform, textureScaleUniform, borderDistanceScaleUniform, coastDistanceTextureUniform, landMaskTextureUniform, noiseTexture1Uniform))
         }
 
-        override fun bind(textureScale: Float, borderDistanceScale: Float, heightScale: Float, landMask: TextureId, coastBorderMask: TextureId, biomeMask: TextureId, biomeBorderMask: TextureId, riverBorderMask: TextureId, mountainBorderMask: TextureId) {
+        override fun bind(textureScale: Float,
+                          borderDistanceScale: Float,
+                          heightScale: Float,
+                          landMask: TextureId,
+                          coastBorderMask: TextureId,
+                          biomeMask: TextureId,
+                          biomeBorderMask: TextureId,
+                          riverBorderMask: TextureId,
+                          mountainBorderMask: TextureId,
+                          customElevationPowerMap: TextureId,
+                          customStartingHeightsMap: TextureId,
+                          customSoilMobilityMap: TextureId) {
             glUseProgram(shaderProgram.id)
             glUniformMatrix4fv(mvpMatrixUniform.location, false, floatBuffer)
             glUniform1f(textureScaleUniform.location, textureScale)

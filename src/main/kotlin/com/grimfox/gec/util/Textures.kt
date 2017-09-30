@@ -2,6 +2,8 @@ package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.ui.widgets.TextureBuilder
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
@@ -12,6 +14,8 @@ import java.awt.image.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
+
+val BLANK_TEXTURE = TextureId(loadTexture2D(GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR, "/textures/blank.png", true, true).first)
 
 fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
     val bufferedImage = getResourceStream(resource).use { ImageIO.read(it) }

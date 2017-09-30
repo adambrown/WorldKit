@@ -12,6 +12,7 @@ import com.grimfox.gec.ui.widgets.DropdownList
 import com.grimfox.gec.ui.widgets.DynamicTextReference
 import com.grimfox.gec.ui.widgets.ErrorDialog
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import com.grimfox.gec.util.BLANK_TEXTURE
 import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
@@ -32,16 +33,19 @@ import java.util.concurrent.locks.ReentrantLock
 private val LOG: Logger = LoggerFactory.getLogger(Project::class.java)
 
 class CurrentState(
-        var regionParameters: MonitoredReference<RegionParameters?> = ref(null),
-        var regionGraph: MonitoredReference<Graph?> = ref(null),
-        var regionMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
-        var regionSplines: MonitoredReference<RegionSplines?> = ref(null),
-        var biomeParameters: MonitoredReference<BiomeParameters?> = ref(null),
-        var biomeGraph: MonitoredReference<Graph?> = ref(null),
-        var biomeMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
-        var biomes: MonitoredReference<List<Biome>?> = ref(null),
-        var heightMapTexture: MonitoredReference<TextureId?> = ref(null),
-        var riverMapTexture: MonitoredReference<TextureId?> = ref(null)) {
+        val regionParameters: MonitoredReference<RegionParameters?> = ref(null),
+        val regionGraph: MonitoredReference<Graph?> = ref(null),
+        val regionMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
+        val regionSplines: MonitoredReference<RegionSplines?> = ref(null),
+        val biomeParameters: MonitoredReference<BiomeParameters?> = ref(null),
+        val biomeGraph: MonitoredReference<Graph?> = ref(null),
+        val biomeMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
+        val biomes: MonitoredReference<List<Biome>?> = ref(null),
+        val customElevationPowerMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
+        val customStartingHeightsMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
+        val customSoilMobilityMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
+        val heightMapTexture: MonitoredReference<TextureId?> = ref(null),
+        val riverMapTexture: MonitoredReference<TextureId?> = ref(null)) {
 
     fun copy(): CurrentState {
         return CurrentState(
