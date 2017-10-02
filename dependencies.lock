@@ -40,8 +40,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -142,28 +142,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -245,7 +246,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -292,8 +293,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -394,28 +395,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -497,7 +499,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -544,8 +546,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -646,28 +648,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -749,7 +752,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -806,8 +809,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -908,28 +911,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1011,7 +1015,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "ch.qos.logback:logback-classic",
                 "com.grimfox:triangle-kotlin"
@@ -1020,11 +1024,11 @@
     },
     "kapt": {
         "org.jetbrains.kotlin:kotlin-annotation-processing": {
-            "locked": "1.1.2",
-            "requested": "1.1.2"
+            "locked": "1.1.51",
+            "requested": "1.1.51"
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-annotation-processing"
             ]
@@ -1038,11 +1042,11 @@
     },
     "kaptTest": {
         "org.jetbrains.kotlin:kotlin-annotation-processing": {
-            "locked": "1.1.2",
-            "requested": "1.1.2"
+            "locked": "1.1.51",
+            "requested": "1.1.51"
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-annotation-processing"
             ]
@@ -1056,7 +1060,7 @@
     },
     "resolutionRules": {
         "com.netflix.nebula:gradle-resolution-rules": {
-            "locked": "0.41.0"
+            "locked": "0.51.0"
         }
     },
     "runtime": {
@@ -1110,8 +1114,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -1212,28 +1216,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1315,7 +1320,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "ch.qos.logback:logback-classic",
                 "com.grimfox:triangle-kotlin"
@@ -1363,8 +1368,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -1465,28 +1470,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1568,7 +1574,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1615,8 +1621,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -1717,28 +1723,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1820,7 +1827,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1867,8 +1874,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -1969,28 +1976,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -2072,7 +2080,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -2129,8 +2137,8 @@
             ]
         },
         "com.grimfox:triangle-kotlin": {
-            "locked": "1.6.0",
-            "requested": "1.6.0"
+            "locked": "1.7.1",
+            "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
             "locked": "3.3.1",
@@ -2231,28 +2239,29 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7"
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.2-2",
+            "locked": "1.1.51",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.2-2",
-            "requested": "1.1.2",
+            "locked": "1.1.51",
+            "requested": "1.1.51",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -2334,7 +2343,7 @@
         },
         "org.slf4j:slf4j-api": {
             "locked": "1.7.22",
-            "requested": "1.7.21",
+            "requested": "1.7.22",
             "transitive": [
                 "ch.qos.logback:logback-classic",
                 "com.grimfox:triangle-kotlin"

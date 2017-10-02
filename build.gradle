@@ -1,14 +1,14 @@
 
 buildscript {
 
-    ext.triangle_version = '1.6.0'
+    ext.triangle_version = '1.7.1'
     ext.airline_version = '0.7'
     ext.reflections_version = '0.9.10'
     ext.jackson_version = '2.7.5'
     ext.joml_version = '1.9.0'
     ext.imageio_version = '3.3.1'
     ext.lwjgl_version = '3.1.0'
-    ext.slf4j_version = '1.7.21'
+    ext.slf4j_version = '1.7.22'
     ext.logback_version = '1.1.7'
     ext.kovenant_version = '3.3.0'
 
@@ -28,7 +28,7 @@ plugins {
     id 'nebula.dependency-lock' version '4.3.2'
     id 'nebula.maven-publish' version '4.9.1'
     id 'nebula.nebula-release' version '4.0.1'
-    id 'nebula.kotlin' version '1.1.2'
+    id 'nebula.kotlin' version '1.1.51'
 }
 
 group = 'com.grimfox'
