@@ -262,7 +262,7 @@ object BuildContinent {
         return buildEdges(getCurvePoints(polygon.points, false, 0.00035f, smoothing), false, true)
     }
 
-    fun buildOpenEdges(polygon: Polygon2F, smoothing: Int): List<Point2F> {
+    fun buildOpenEdges(polygon: Polygon2F, smoothing: Int): MutableList<Point2F> {
         return buildEdges(getCurvePoints(polygon.points, false, 0.00035f, smoothing), false, true)
     }
 
@@ -278,7 +278,7 @@ object BuildContinent {
         return points
     }
 
-    fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Int): List<Point2F> {
+    fun buildClosedEdges(polygons: List<Polygon2F>, smoothing: Int): MutableList<Point2F> {
         val points = ArrayList<Point2F>()
         if (polygons.size == 1) {
             points.addAll(buildEdges(getCurvePoints(polygons.first().points, true, 0.00035f, smoothing), true, true))
@@ -652,7 +652,7 @@ object BuildContinent {
         }
     }
 
-    private fun buildEdges(inPoints: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean): List<Point2F> {
+    private fun buildEdges(inPoints: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean): MutableList<Point2F> {
         val outPoints = ArrayList<Point2F>()
         val start = inPoints.first()
         if (moveToFirst) {

@@ -164,7 +164,7 @@ fun Block.editBiomesPanel(
                 biomes.value = newBiomes
             }
         }
-        biomeCount.value = 8
+        biomeCount.value = 6
         vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(editBiomesMode,
                 {

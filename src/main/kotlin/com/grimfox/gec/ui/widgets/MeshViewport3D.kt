@@ -307,6 +307,12 @@ class MeshViewport3D(
         }
     }
 
+    fun setSplines(splineTextureId: TextureId) {
+        synchronized(textureLock) {
+            this.splineTextureId = splineTextureId
+        }
+    }
+
     fun setImage(textureId: TextureId) {
         synchronized(textureLock) {
             hasImage = true

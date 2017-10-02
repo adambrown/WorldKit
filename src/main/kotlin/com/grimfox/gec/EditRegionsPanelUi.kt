@@ -4,6 +4,8 @@ import com.grimfox.gec.brushes.PickAndGoDrawBrushListener
 import com.grimfox.gec.brushes.SplineDeletePicker
 import com.grimfox.gec.brushes.SplineDrawBrushListener
 import com.grimfox.gec.brushes.SplinePointPicker
+import com.grimfox.gec.model.ByteArrayMatrix
+import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.ShortArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
@@ -369,28 +371,19 @@ fun Block.editMapPanel(
         }
         vSpacer(HALF_ROW_HEIGHT)
         val drawSplinesMode = ref(false)
+        val closeSplineMode = ref(false)
         vToggleRow(drawSplinesMode, LARGE_ROW_HEIGHT, text("Draw splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+        var preferBiomesView = false
         editToggleSet.add(drawSplinesMode,
                 {
                     val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
-                        if (displayMode.value != DisplayMode.MAP) {
-                            val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                            meshViewport.setImage(mapTextureId)
-                            imageMode.value = 1
-                            displayMode.value = DisplayMode.MAP
-                            defaultToMap.value = true
-                        }
-                        val textureReference = ref(TextureBuilder.TextureId(-1))
-                        textureReference.listener { oldTexture, newTexture ->
-                            if (oldTexture != newTexture) {
-                                meshViewport.setImage(newTexture)
-                            }
-                        }
+                        val (textureReference, renderAsSplines) = prepareViewportForSplineEditing(currentSplines)
+                        preferBiomesView = renderAsSplines
                         currentEditBrushSize.value = drawSplineBrushSize
-                        brushListener.value = SplineDrawBrushListener(splineSmoothing, currentState, currentSplines, splineMap, textureReference)
+                        brushListener.value = SplineDrawBrushListener(splineSmoothing, closeSplineMode, currentState, currentSplines, splineMap, textureReference, renderAsSplines)
                         brushOn.value = true
                         true
                     } else {
@@ -401,13 +394,15 @@ fun Block.editMapPanel(
                     brushListener.value = null
                     brushOn.value = false
                     val parameters = extractCurrentParameters()
-                    regionsBuilder.build(parameters, true, false)
+                    regionsBuilder.build(parameters, true, false, false)
                     val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
+                        resetViewportAfterSplineEditing(currentSplines, preferBiomesView)
                         updateSplinesHistory(currentSplines)
                     }
                     generationLock.unlock()
                 },
+                vToggleRow(closeSplineMode, LARGE_ROW_HEIGHT, text("Close splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE),
                 vSliderRow(splineSmoothing, LARGE_ROW_HEIGHT, text("Smoothing:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20)))
         val editSplinesMode = ref(false)
         vToggleRow(editSplinesMode, LARGE_ROW_HEIGHT, text("Toggle splines:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
@@ -444,19 +439,8 @@ fun Block.editMapPanel(
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
                         splineEditSelectorMap = splineMap
-                        if (displayMode.value != DisplayMode.MAP) {
-                            val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                            meshViewport.setImage(mapTextureId)
-                            imageMode.value = 1
-                            displayMode.value = DisplayMode.MAP
-                            defaultToMap.value = true
-                        }
-                        val textureReference = ref(TextureBuilder.TextureId(-1))
-                        textureReference.listener { oldTexture, newTexture ->
-                            if (oldTexture != newTexture) {
-                                meshViewport.setImage(newTexture)
-                            }
-                        }
+                        val (textureReference, renderAsSplines) = prepareViewportForSplineEditing(currentSplines)
+                        preferBiomesView = renderAsSplines
                         val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
                         val selectorMatrix = ShortArrayMatrix(4096) { i ->
                             var offset = i * 4
@@ -465,7 +449,7 @@ fun Block.editMapPanel(
                             (r or g).toShort()
                         }
                         splineEditSelectorMatrix = selectorMatrix
-                        pointPicker.value = SplinePointPicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
+                        pointPicker.value = SplinePointPicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference, renderAsSplines)
                         pickerOn.value = true
                         true
                     } else {
@@ -477,9 +461,10 @@ fun Block.editMapPanel(
                     pointPicker.value = null
                     pickerOn.value = false
                     val parameters = extractCurrentParameters()
-                    regionsBuilder.build(parameters, true, false)
+                    regionsBuilder.build(parameters, true, false, false)
                     val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
+                        resetViewportAfterSplineEditing(currentSplines, preferBiomesView)
                         updateSplinesHistory(currentSplines)
                     }
                     generationLock.unlock()
@@ -520,21 +505,10 @@ fun Block.editMapPanel(
                         generationLock.lock()
                         val splineMap = buildSplineMap(currentSplines)
                         splineDeleteSelectorMap = splineMap
-                        if (displayMode.value != DisplayMode.MAP) {
-                            val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
-                            meshViewport.setImage(mapTextureId)
-                            imageMode.value = 1
-                            displayMode.value = DisplayMode.MAP
-                            defaultToMap.value = true
-                        }
-                        val textureReference = ref(TextureBuilder.TextureId(-1))
-                        textureReference.listener { oldTexture, newTexture ->
-                            if (oldTexture != newTexture) {
-                                meshViewport.setImage(newTexture)
-                            }
-                        }
+                        val (textureReference, renderAsSplines) = prepareViewportForSplineEditing(currentSplines)
+                        preferBiomesView = renderAsSplines
                         executor.call {
-                            textureReference.value = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+                            drawViewportDuringSplineEditing(currentSplines, preferBiomesView)
                         }
                         val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, 80.0f), 4096)
                         val selectorMatrix = ShortArrayMatrix(4096) { i ->
@@ -544,7 +518,7 @@ fun Block.editMapPanel(
                             (r or g).toShort()
                         }
                         splineDeleteSelectorMatrix = selectorMatrix
-                        pointPicker.value = SplineDeletePicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference)
+                        pointPicker.value = SplineDeletePicker(currentState, currentSplines, splineMap, selectorMatrix, textureReference, renderAsSplines)
                         pickerOn.value = true
                         true
                     } else {
@@ -559,6 +533,7 @@ fun Block.editMapPanel(
                     regionsBuilder.build(parameters, true, false)
                     val currentSplines = currentState.regionSplines.value
                     if (currentSplines != null) {
+                        resetViewportAfterSplineEditing(currentSplines, preferBiomesView)
                         updateSplinesHistory(currentSplines)
                     }
                     generationLock.unlock()
@@ -636,6 +611,78 @@ fun Block.editMapPanel(
         vSpacer(HALF_ROW_HEIGHT)
     }
     return splinePanel
+}
+
+private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair<MonitoredReference<TextureBuilder.TextureId>, Boolean> {
+    val biomeGraph = currentState.biomeGraph.value
+    val biomeMask = currentState.biomeMask.value
+    val renderAsSplines: Boolean
+    val textureReference = if (biomeGraph != null && biomeMask != null && displayMode.value != DisplayMode.MAP) {
+        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+        imageMode.value = 2
+        displayMode.value = DisplayMode.BIOMES
+        val textureReference = ref(TextureBuilder.TextureId(-1))
+        textureReference.listener { oldTexture, newTexture ->
+            if (oldTexture != newTexture) {
+                meshViewport.setSplines(newTexture)
+            }
+        }
+        renderAsSplines = true
+        textureReference
+    } else {
+        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        meshViewport.setImage(mapTextureId)
+        imageMode.value = 1
+        displayMode.value = DisplayMode.MAP
+        defaultToMap.value = true
+        val textureReference = ref(TextureBuilder.TextureId(-1))
+        textureReference.listener { oldTexture, newTexture ->
+            if (oldTexture != newTexture) {
+                meshViewport.setImage(newTexture)
+            }
+        }
+        renderAsSplines = false
+        textureReference
+    }
+    return Pair(textureReference, renderAsSplines)
+}
+
+private fun resetViewportAfterSplineEditing(currentSplines: RegionSplines, preferBiomesView: Boolean) {
+    val biomeGraph = currentState.biomeGraph.value
+    val biomeMask = currentState.biomeMask.value
+    if (biomeGraph != null && biomeMask != null && preferBiomesView) {
+        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+        imageMode.value = 2
+        displayMode.value = DisplayMode.BIOMES
+    } else {
+        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        meshViewport.setImage(mapTextureId)
+        imageMode.value = 1
+        displayMode.value = DisplayMode.MAP
+        defaultToMap.value = true
+    }
+}
+
+private fun drawViewportDuringSplineEditing(currentSplines: RegionSplines, preferBiomesView: Boolean) {
+    val biomeGraph = currentState.biomeGraph.value
+    val biomeMask = currentState.biomeMask.value
+    if (biomeGraph != null && biomeMask != null && preferBiomesView) {
+        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+        meshViewport.setBiomes(biomeTextureId, splineTextureId)
+        imageMode.value = 2
+        displayMode.value = DisplayMode.BIOMES
+    } else {
+        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+        meshViewport.setImage(mapTextureId)
+        imageMode.value = 1
+        displayMode.value = DisplayMode.MAP
+        defaultToMap.value = true
+    }
 }
 
 private fun buildSplineMap(currentSplines: RegionSplines): LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>> {

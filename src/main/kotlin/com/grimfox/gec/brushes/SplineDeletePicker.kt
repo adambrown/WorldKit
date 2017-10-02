@@ -6,6 +6,7 @@ import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.widgets.MeshViewport3D
+import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
 import com.grimfox.gec.util.BuildContinent
@@ -20,7 +21,8 @@ class SplineDeletePicker(
         val currentSplines: BuildContinent.RegionSplines,
         val splineMap: LinkedHashMap<Int, Quintuple<Int, Int, Pair<List<Point2F>, List<Point2F>>, List<LineSegment2F>, Boolean>>,
         val mask: Matrix<Short>,
-        val texture: MutableReference<TextureId>) : MeshViewport3D.PointPicker {
+        val texture: MutableReference<TextureId>,
+        val renderAsSplines: Boolean) : MeshViewport3D.PointPicker {
 
     private val maskWidth = mask.width
     private val maskWidthM1 = maskWidth - 1
@@ -122,20 +124,40 @@ class SplineDeletePicker(
                         customIgnoredEdges,
                         customIgnoredPoints)
                 executor.call {
-                    if (texture.value.id < 0) {
-                        texture.value = renderMapImage(
-                                currentSplines.coastPoints,
-                                riverPoints + customRiverPoints,
-                                mountainPoints + customMountainPoints,
-                                ignoredPoints + customIgnoredPoints,
-                                pendingPoints)
+                    if (renderAsSplines) {
+                        if (texture.value.id < 0) {
+                            texture.value = TextureBuilder.renderSplines(
+                                    currentSplines.coastPoints,
+                                    riverPoints + customRiverPoints,
+                                    mountainPoints + customMountainPoints,
+                                    ignoredPoints + customIgnoredPoints,
+                                    pendingPoints)
+                        } else {
+                            TextureBuilder.renderSplines(
+                                    currentSplines.coastPoints,
+                                    riverPoints + customRiverPoints,
+                                    mountainPoints + customMountainPoints,
+                                    ignoredPoints + customIgnoredPoints,
+                                    pendingPoints,
+                                    texture.value)
+                        }
                     } else {
-                        renderMapImage(
-                                currentSplines.coastPoints,
-                                riverPoints + customRiverPoints,
-                                mountainPoints + customMountainPoints,
-                                ignoredPoints + customIgnoredPoints,
-                                pendingPoints, texture.value)
+                        if (texture.value.id < 0) {
+                            texture.value = renderMapImage(
+                                    currentSplines.coastPoints,
+                                    riverPoints + customRiverPoints,
+                                    mountainPoints + customMountainPoints,
+                                    ignoredPoints + customIgnoredPoints,
+                                    pendingPoints)
+                        } else {
+                            renderMapImage(
+                                    currentSplines.coastPoints,
+                                    riverPoints + customRiverPoints,
+                                    mountainPoints + customMountainPoints,
+                                    ignoredPoints + customIgnoredPoints,
+                                    pendingPoints,
+                                    texture.value)
+                        }
                     }
                 }
             }

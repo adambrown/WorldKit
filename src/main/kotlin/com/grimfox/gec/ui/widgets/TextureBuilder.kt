@@ -233,13 +233,13 @@ object TextureBuilder {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
-            rgba(220, 220, 220, 255, color)
+            rgba(190, 220, 190, 255, color)
             nvgStrokeColor(nvg, color)
             ignoredPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
-            rgba(220, 100, 210, 255, color)
+            rgba(0, 0, 0, 255, color)
             nvgStrokeColor(nvg, color)
             pendingPolygons.forEach {
                 drawShape(nvg, it, false)
@@ -304,7 +304,7 @@ object TextureBuilder {
         }
     }
 
-    fun renderSplines(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>): TextureId {
+    fun renderSplines(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>> = listOf(), pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -344,6 +344,14 @@ object TextureBuilder {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
+            ignoredPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            pendingPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
             nvgStrokeWidth(nvg, 7.0f)
             rgba(0, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
@@ -354,6 +362,18 @@ object TextureBuilder {
             rgba(255, 255, 0, 255, color)
             nvgStrokeColor(nvg, color)
             mountainPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            rgba(190, 255, 190, 255, color)
+            nvgStrokeColor(nvg, color)
+            ignoredPolygons.forEach {
+                drawShape(nvg, it, false)
+                nvgStroke(nvg)
+            }
+            rgba(0, 255, 0, 255, color)
+            nvgStrokeColor(nvg, color)
+            pendingPolygons.forEach {
                 drawShape(nvg, it, false)
                 nvgStroke(nvg)
             }
@@ -371,9 +391,16 @@ object TextureBuilder {
 
             nvgEndFrame(nvg)
             nvgRestore(nvg)
-            val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
-            textureRenderer.unbind()
-            retVal
+
+            if (target == null) {
+                val retVal = textureRenderer.newRgbaTextureByte(GL_LINEAR, GL_LINEAR)
+                textureRenderer.unbind()
+                retVal
+            } else {
+                textureRenderer.copyTexture(target)
+                textureRenderer.unbind()
+                target
+            }
         }
     }
 

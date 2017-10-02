@@ -14,7 +14,7 @@ class RegionsBuilder(
         val displayMode: MonitoredReference<DisplayMode>,
         val defaultToMap: MonitoredReference<Boolean>) {
 
-    fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true) {
+    fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true, updateView: Boolean = true) {
         val currentRegionGraph = currentState.regionGraph.value
         val currentRegionMask = currentState.regionMask.value
         val (regionGraph, regionMask) = if (refreshOnly && currentRegionGraph != null && currentRegionMask != null) {
@@ -119,16 +119,18 @@ class RegionsBuilder(
         currentState.regionSplines.value = regionSplines
         currentState.heightMapTexture.value = null
         currentState.riverMapTexture.value = null
-        if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {
-            val mapTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
-            meshViewport.setImage(mapTextureId)
-            imageMode.value = 1
-            displayMode.value = DisplayMode.MAP
-        } else {
-            val regionTextureId = Rendering.renderRegions(regionGraph, regionMask)
-            meshViewport.setRegions(regionTextureId)
-            imageMode.value = 0
-            displayMode.value = DisplayMode.REGIONS
+        if (updateView) {
+            if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {
+                val mapTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
+                meshViewport.setImage(mapTextureId)
+                imageMode.value = 1
+                displayMode.value = DisplayMode.MAP
+            } else {
+                val regionTextureId = Rendering.renderRegions(regionGraph, regionMask)
+                meshViewport.setRegions(regionTextureId)
+                imageMode.value = 0
+                displayMode.value = DisplayMode.REGIONS
+            }
         }
     }
 
