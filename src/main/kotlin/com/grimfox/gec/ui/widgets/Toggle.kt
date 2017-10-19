@@ -5,7 +5,7 @@ import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.ObservableMutableReference
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
 class ToggleStyle(
@@ -67,7 +67,7 @@ class ToggleStyle(
                 hSizing = SHRINK,
                 vSizing = SHRINK))
 
-fun Block.toggle(toggleValue: MonitoredReference<Boolean>, textOn: Text, textOff: Text, style: ToggleStyle): Block {
+fun Block.toggle(toggleValue: ObservableMutableReference<Boolean>, textOn: Text, textOff: Text, style: ToggleStyle): Block {
     textOn.style = style.textNormalOn
     textOff.style = style.textNormalOff
     return block {
@@ -278,7 +278,7 @@ fun Block.toggle(toggleValue: MonitoredReference<Boolean>, textOn: Text, textOff
                 offBlock.isVisible = !toggleValue.value
             }
         }
-        toggleValue.listener { _, new ->
+        toggleValue.addListener { _, new ->
             onBlock.isVisible = new
             offBlock.isVisible = !new
         }

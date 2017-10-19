@@ -4,8 +4,6 @@ import com.grimfox.gec.brushes.PickAndGoDrawBrushListener
 import com.grimfox.gec.brushes.SplineDeletePicker
 import com.grimfox.gec.brushes.SplineDrawBrushListener
 import com.grimfox.gec.brushes.SplinePointPicker
-import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.ShortArrayMatrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
@@ -86,7 +84,7 @@ private fun extractCurrentParameters(): RegionParameters {
 }
 
 fun Block.editRegionsPanel(
-        regionPanelExpanded: MonitoredReference<Boolean>,
+        regionPanelExpanded: ObservableMutableReference<Boolean>,
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
@@ -94,8 +92,8 @@ fun Block.editRegionsPanel(
         uiLayout: UiLayout,
         dialogLayer: Block): Block {
     onUpdateParamsFun()
-    regions.listener { _, _ -> onUpdateParamsFun() }
-    islands.listener { _, _ -> onUpdateParamsFun() }
+    regions.addListener { _, _ -> onUpdateParamsFun() }
+    islands.addListener { _, _ -> onUpdateParamsFun() }
     return vExpandPanel("Edit regions", expanded = regionPanelExpanded) {
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
@@ -180,7 +178,7 @@ fun Block.editRegionsPanel(
         experimentalBlocks.add(vSliderWithValueRow(reduction, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Reduction:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..40), linearClampedScaleFunctionInverse(0..40)).with { isMouseAware = allowExperimental.value })
         experimentalBlocks.add(vSliderWithValueRow(connectedness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Connection:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.004f, 0.2f), linearClampedScaleFunctionInverse(0.004f, 0.2f)).with { isMouseAware = allowExperimental.value })
         experimentalBlocks.add(vSliderWithValueRow(regionSize, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Region size:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.005f, 0.05f), linearClampedScaleFunctionInverse(0.005f, 0.05f)).with { isMouseAware = allowExperimental.value })
-        allowExperimental.listener { _, new ->
+        allowExperimental.addListener { _, new ->
             if (!new) {
                 onUpdateParamsFun()
             }
@@ -204,7 +202,7 @@ fun Block.editRegionsPanel(
                         displayMode.value = DisplayMode.REGIONS
                         defaultToMap.value = false
                         val textureReference = ref(TextureBuilder.TextureId(-1))
-                        textureReference.listener { oldTexture, newTexture ->
+                        textureReference.addListener { oldTexture, newTexture ->
                             if (oldTexture != newTexture) {
                                 meshViewport.setRegions(newTexture)
                             }
@@ -332,7 +330,7 @@ fun Block.editRegionsPanel(
 }
 
 fun Block.editMapPanel(
-        splinePanelExpanded: MonitoredReference<Boolean>,
+        splinePanelExpanded: ObservableMutableReference<Boolean>,
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
@@ -613,7 +611,7 @@ fun Block.editMapPanel(
     return splinePanel
 }
 
-private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair<MonitoredReference<TextureBuilder.TextureId>, Boolean> {
+private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair<ObservableMutableReference<TextureBuilder.TextureId>, Boolean> {
     val biomeGraph = currentState.biomeGraph.value
     val biomeMask = currentState.biomeMask.value
     val renderAsSplines: Boolean
@@ -624,7 +622,7 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
         imageMode.value = 2
         displayMode.value = DisplayMode.BIOMES
         val textureReference = ref(TextureBuilder.TextureId(-1))
-        textureReference.listener { oldTexture, newTexture ->
+        textureReference.addListener { oldTexture, newTexture ->
             if (oldTexture != newTexture) {
                 meshViewport.setSplines(newTexture)
             }
@@ -638,7 +636,7 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
         displayMode.value = DisplayMode.MAP
         defaultToMap.value = true
         val textureReference = ref(TextureBuilder.TextureId(-1))
-        textureReference.listener { oldTexture, newTexture ->
+        textureReference.addListener { oldTexture, newTexture ->
             if (oldTexture != newTexture) {
                 meshViewport.setImage(newTexture)
             }

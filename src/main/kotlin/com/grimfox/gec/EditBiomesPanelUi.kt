@@ -41,7 +41,7 @@ private fun extractCurrentParameters(): BuildContinent.BiomeParameters {
 }
 
 fun Block.editBiomesPanel(
-        biomePanelExpanded: MonitoredReference<Boolean>,
+        biomePanelExpanded: ObservableMutableReference<Boolean>,
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
@@ -136,7 +136,7 @@ fun Block.editBiomesPanel(
             vSizing = Sizing.SHRINK
         }
         val editBiomesMode = ref(false)
-        biomeCount.listener { oldBiomeCount, newBiomeCount ->
+        biomeCount.addListener { oldBiomeCount, newBiomeCount ->
             if (oldBiomeCount != newBiomeCount) {
                 val newBiomes = ArrayList(biomes.value)
                 if (biomeRows.layoutChildren.size > newBiomeCount) {
@@ -152,7 +152,7 @@ fun Block.editBiomesPanel(
                         val selectedValue = selectedBiomes[index]
                         biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                         newBiomes.add(selectedValue.value)
-                        selectedValue.listener { oldBiomeId, newBiomeId ->
+                        selectedValue.addListener { oldBiomeId, newBiomeId ->
                             if (oldBiomeId != newBiomeId) {
                                 val changedBiomes = ArrayList(biomes.value)
                                 changedBiomes[index] = newBiomeId
@@ -185,7 +185,7 @@ fun Block.editBiomesPanel(
                             displayMode.value = DisplayMode.BIOMES
                         }
                         val textureReference = ref(TextureBuilder.TextureId(-1))
-                        textureReference.listener { oldTexture, newTexture ->
+                        textureReference.addListener { oldTexture, newTexture ->
                             if (oldTexture != newTexture) {
                                 meshViewport.setBiomes(newTexture)
                             }

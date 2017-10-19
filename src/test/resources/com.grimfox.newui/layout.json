@@ -1,0 +1,68 @@
+{
+  "references": {
+    "rowHeight": 26
+  },
+  "style": "style.json",
+  "root": {
+    "id": "root",
+    "type": "AnchorPane",
+    "children": [
+      {
+        "id": "windowTitleBar",
+        "type": "HBox",
+        "hAlignment": "LEFT",
+        "vAlignment": "MIDDLE",
+        "orientation": "LEFT_TO_RIGHT",
+        "height": "${rowHeight}",
+        "offsetTop": 0,
+        "offsetLeft": 0,
+        "offsetRight": 0,
+        "children": [
+          {
+            "id": "windowTitleBarLeft",
+            "type": "HBox",
+            "hAlignment": "LEFT",
+            "vAlignment": "MIDDLE",
+            "orientation": "LEFT_TO_RIGHT",
+            "grow": true,
+            "children": [
+              {
+                "id": "windowIcon",
+                "type": "Graphic",
+                "width": "${rowHeight}"
+              },
+              {
+                "id": "windowMenuBar",
+                "type": "MenuBar"
+              },
+              {
+                "id": "windowTitleBox",
+                "type": "HBox",
+                "hAlignment": "CENTER",
+                "vAlignment": "MIDDLE",
+                "orientation": "LEFT_TO_RIGHT",
+                "grow": true,
+                "children": [
+                  {
+                    "id": "windowTitle",
+                    "type": "Label"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "titleBarRight",
+            "type": "HBox",
+            "hAlignment": "RIGHT",
+            "vAlignment": "MIDDLE",
+            "orientation": "LEFT_TO_RIGHT",
+            "children": [
+
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

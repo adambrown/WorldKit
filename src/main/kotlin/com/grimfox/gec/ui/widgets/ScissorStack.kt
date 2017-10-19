@@ -1,8 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.ui.nvgproxy.*
 import org.joml.Vector4f
-import org.lwjgl.nanovg.NanoVG.nvgResetScissor
-import org.lwjgl.nanovg.NanoVG.nvgScissor
 import java.util.*
 
 class ScissorStack(val nvg: Long) {

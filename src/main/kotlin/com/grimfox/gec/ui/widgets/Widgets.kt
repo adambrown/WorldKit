@@ -1,7 +1,9 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.util.twr
-import com.grimfox.gec.ui.NO_COLOR
+import com.grimfox.gec.ui.nvgproxy.NO_COLOR
+import com.grimfox.gec.ui.nvgproxy.NPColor
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.*
 import com.grimfox.gec.ui.widgets.Layout.*
@@ -13,10 +15,6 @@ import com.grimfox.gec.util.Utils.LOG
 import com.grimfox.gec.util.cRef
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
-import org.lwjgl.nanovg.NVGColor
-import org.lwjgl.nanovg.NVGPaint
-import org.lwjgl.nanovg.NVGTextRow
-import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
@@ -75,7 +73,7 @@ private class FillNone : Fill {
     }
 }
 
-class FillColor(val color: NVGColor) : Fill {
+class FillColor(val color: NPColor) : Fill {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgFillColor(nvg, color)
@@ -85,7 +83,7 @@ class FillColor(val color: NVGColor) : Fill {
 
 class FillImageDynamic(val image: Int) : Fill {
 
-    private val paint = NVGPaint.create()
+    private val paint = NPPaint.create()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgImagePattern(nvg, Math.round(block.x * scale).toFloat(), Math.round(block.y * scale).toFloat(), Math.round(block.width * scale).toFloat(), Math.round(block.height * scale).toFloat(), 0.0f, image, 1.0f, paint)
@@ -96,7 +94,7 @@ class FillImageDynamic(val image: Int) : Fill {
 
 class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
 
-    private val paint = NVGPaint.create()
+    private val paint = NPPaint.create()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgImagePattern(nvg, Math.round(block.x * scale).toFloat(), Math.round(block.y * scale).toFloat(), Math.round(block.width * scale).toFloat(), Math.round(block.height * scale).toFloat(), 0.0f, image, 1.0f, paint)
@@ -105,9 +103,9 @@ class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
     }
 }
 
-class FillBoxGradient(val innerColor: NVGColor, val outerColor: NVGColor, val cornerRadius: Float, val feather: Float) : Fill {
+class FillBoxGradient(val innerColor: NPColor, val outerColor: NPColor, val cornerRadius: Float, val feather: Float) : Fill {
 
-    private val paint = NVGPaint.create()
+    private val paint = NPPaint.create()
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgBoxGradient(nvg, block.x * scale, block.y * scale, block.width * scale, block.height * scale, cornerRadius, feather, innerColor, outerColor, paint)
@@ -137,7 +135,7 @@ class StrokeInvisible(override val size: Float) : Stroke {
     }
 }
 
-class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
+class StrokeColor(val color: NPColor, override val size: Float) : Stroke {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         nvgStrokeColor(nvg, color)
@@ -146,7 +144,7 @@ class StrokeColor(val color: NVGColor, override val size: Float) : Stroke {
     }
 }
 
-open class TextStyle(open val size: Reference<Float>, open val font: Reference<Int>, open val color: Reference<NVGColor>)
+open class TextStyle(open val size: Reference<Float>, open val font: Reference<Int>, open val color: Reference<NPColor>)
 
 interface Text {
 
@@ -177,7 +175,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
 
     override val length: Int get() = data.limit()
     private val lineHeight = BufferUtils.createFloatBuffer(1)
-    private val rows = NVGTextRow.create(3)
+    private val rows = NPTextRow.create(3)
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         var (x , y, alignMask) = calculatePositionAndAlignmentForText(block)
@@ -192,7 +190,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
         val width = block.width * scale
         var start = memAddress(data)
         val end = start + data.remaining()
-        var rowCount: Int = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+        var rowCount: Int = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
         if (block.vAlign == TOP) {
             while (rowCount != 0) {
                 for (i in 0..rowCount - 1) {
@@ -201,7 +199,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
                     y += scaledHeight
                 }
                 start = rows.get(rowCount - 1).next()
-                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
             }
         } else {
             var yDelta = 0.0f
@@ -210,7 +208,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
                     yDelta += scaledHeight
                 }
                 start = rows.get(rowCount - 1).next()
-                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
             }
             yDelta -= verticalSpace * scale
             if (block.vAlign == MIDDLE) {
@@ -220,7 +218,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
                 y -= yDelta - lineHeight.get(0)
             }
             start = memAddress(data)
-            rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+            rowCount = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
             while (rowCount != 0) {
                 for (i in 0..rowCount - 1) {
                     val row = rows.get(i)
@@ -228,7 +226,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
                     y += scaledHeight
                 }
                 start = rows.get(rowCount - 1).next()
-                rowCount = nnvgTextBreakLines(nvg, start, end, width, memAddress(rows), 3)
+                rowCount = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
             }
         }
     }

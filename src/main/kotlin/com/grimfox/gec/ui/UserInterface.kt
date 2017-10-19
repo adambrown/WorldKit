@@ -8,6 +8,7 @@ import com.grimfox.gec.WindowState
 import com.grimfox.gec.executor
 import com.grimfox.gec.saveRecentProjects
 import com.grimfox.gec.saveWindowState
+import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import org.lwjgl.BufferUtils
@@ -16,9 +17,6 @@ import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWDropCallback
 import org.lwjgl.glfw.GLFWErrorCallback
 import org.lwjgl.glfw.GLFWImage
-import org.lwjgl.nanovg.NVGColor
-import org.lwjgl.nanovg.NanoVG.*
-import org.lwjgl.nanovg.NanoVGGL3.*
 import org.lwjgl.opengl.ARBDebugOutput
 import org.lwjgl.opengl.GL.createCapabilities
 import org.lwjgl.opengl.GL11.*
@@ -41,6 +39,8 @@ import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import java.util.*
 
+import com.grimfox.gec.ui.nvgproxy.*
+
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(ALWAYS).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
@@ -49,7 +49,7 @@ private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsSc
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?, tick: UserInterface.() -> Unit) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, beforeDraw: UserInterface.() -> Unit = {}, afterDraw: UserInterface.() -> Unit = {}) {
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
@@ -75,8 +75,9 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
             val frameWidth = ui.width
             val frameHeight = ui.height
             ui.clearViewport(frameWidth, frameHeight)
-            ui.tick()
+            ui.beforeDraw()
             ui.drawFrame(frameWidth, frameHeight)
+            ui.afterDraw()
             ui.swapBuffers()
         }
     } catch (e: Throwable) {
@@ -89,7 +90,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState?,
 
 interface UiLayout {
 
-    val background: NVGColor
+    val background: NPColor
 
     var root: Block
 
@@ -424,13 +425,13 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
     }
 }
 
-data class GlyphLayer(val text: String, val font: Reference<Int>, val size: Float, val color: NVGColor, val xOffset: Float, val yOffset: Float)
+data class GlyphLayer(val text: String, val font: Reference<Int>, val size: Float, val color: NPColor, val xOffset: Float, val yOffset: Float)
 
 private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
     internal val fonts: ArrayList<ByteBuffer> = ArrayList()
 
-    override val background: NVGColor = NO_COLOR
+    override val background: NPColor = NO_COLOR
 
     override lateinit var root: Block
     override lateinit var dragArea: Block
@@ -465,11 +466,11 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
 
     private data class ResolvedGlyphLayer(val text: Text, var xOffset: Float, var yOffset: Float, var width: Float, var height: Float)
 
-    private fun glyphStyle(font: Int, size: Float, color: NVGColor): TextStyle {
+    private fun glyphStyle(font: Int, size: Float, color: NPColor): TextStyle {
         return TextStyle(cRef(size), cRef(font), cRef(color))
     }
 
-    private fun glyph(value: String, font: Int, size: Float, color: NVGColor): Text {
+    private fun glyph(value: String, font: Int, size: Float, color: NPColor): Text {
         return StaticTextUtf8(value, glyphStyle(font, size, color))
     }
 

@@ -2,11 +2,10 @@ package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.LOG
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.util.*
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
-import org.lwjgl.nanovg.NVGColor
-import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
@@ -167,7 +166,7 @@ object TextureBuilder {
             glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
             nvgBeginFrame(nvg, width, height, 1.0f)
 
-            val color = NVGColor.create()
+            val color = NPColor.create()
             rgba(255, 255, 255, 255, color)
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
@@ -187,11 +186,11 @@ object TextureBuilder {
         }
     }
 
-    fun rgba(r: Int, g: Int, b: Int, a: Int, color: NVGColor): NVGColor {
+    fun rgba(r: Int, g: Int, b: Int, a: Int, color: NPColor): NPColor {
         return nvgRGBA(r.toByte(), g.toByte(), b.toByte(), a.toByte(), color)
     }
 
-    fun rgba(r: Float, g: Float, b: Float, a: Float, color: NVGColor): NVGColor {
+    fun rgba(r: Float, g: Float, b: Float, a: Float, color: NPColor): NPColor {
         return nvgRGBAf(r, g, b, a, color)
     }
 
@@ -209,7 +208,7 @@ object TextureBuilder {
             glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
             nvgBeginFrame(nvg, width, height, 1.0f)
 
-            val color = NVGColor.create()
+            val color = NPColor.create()
             rgba(110, 210, 115, 255, color)
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
@@ -285,7 +284,7 @@ object TextureBuilder {
             glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
             nvgBeginFrame(nvg, width, height, 1.0f)
 
-            val color = NVGColor.create()
+            val color = NPColor.create()
             nvgStrokeWidth(nvg, strokeWidth)
             splines.forEach { (index, spline) ->
                 val r = index and 0x000000FF
@@ -322,7 +321,7 @@ object TextureBuilder {
             glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
             nvgBeginFrame(nvg, width, height, 1.0f)
 
-            val color = NVGColor.create()
+            val color = NPColor.create()
             rgba(255, 0, 255, 255, color)
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {

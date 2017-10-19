@@ -5,13 +5,13 @@ import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import org.lwjgl.nanovg.NVGColor
 import java.awt.Desktop
 import java.io.IOException
 import java.net.URI
@@ -48,7 +48,7 @@ val REGION_COLORS = arrayListOf(
         color(0.16470589f, 0.16470589f, 0.6627451f),
         color(0.61960787f, 0.16078432f, 0.16078432f),
         color(0.20392157f, 0.45490196f, 0.45490196f)
-) as List<NVGColor>
+) as List<NPColor>
 
 private fun colorToInt(id: Int): Int {
     val color = REGION_COLORS[id]
@@ -148,13 +148,13 @@ val rememberWindowState = ref(preferences.rememberWindowState)
 val projectDir = DynamicTextReference(preferences.projectDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val tempDir = DynamicTextReference(preferences.tempDir.canonicalPath, 1024, TEXT_STYLE_NORMAL)
 val historyRegionsBackQueue get() = currentProject.value?.historyRegionsBackQueue ?: HistoryQueue(0)
-val historyRegionsCurrent: MonitoredReference<RegionsHistoryItem?> get() = currentProject.value?.historyRegionsCurrent ?: ref<RegionsHistoryItem?>(null)
+val historyRegionsCurrent: ObservableMutableReference<RegionsHistoryItem?> get() = currentProject.value?.historyRegionsCurrent ?: ref<RegionsHistoryItem?>(null)
 val historyRegionsForwardQueue get() = currentProject.value?.historyRegionsForwardQueue ?: HistoryQueue(0)
 val historySplinesBackQueue get() = currentProject.value?.historySplinesBackQueue ?: HistoryQueue(0)
-val historySplinesCurrent: MonitoredReference<RegionSplines?> get() = currentProject.value?.historySplinesCurrent ?: ref<RegionSplines?>(null)
+val historySplinesCurrent: ObservableMutableReference<RegionSplines?> get() = currentProject.value?.historySplinesCurrent ?: ref<RegionSplines?>(null)
 val historySplinesForwardQueue get() = currentProject.value?.historySplinesForwardQueue ?: HistoryQueue(0)
 val historyBiomesBackQueue get() = currentProject.value?.historyBiomesBackQueue ?: HistoryQueue(0)
-val historyBiomesCurrent: MonitoredReference<BiomesHistoryItem?> get() = currentProject.value?.historyBiomesCurrent ?: ref<BiomesHistoryItem?>(null)
+val historyBiomesCurrent: ObservableMutableReference<BiomesHistoryItem?> get() = currentProject.value?.historyBiomesCurrent ?: ref<BiomesHistoryItem?>(null)
 val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForwardQueue ?: HistoryQueue(0)
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
@@ -263,7 +263,7 @@ fun doOnMainThread(callable: () -> Unit) {
     }
 }
 
-fun newProject(overwriteWarningReference: MonitoredReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, noop: () -> Unit) {
+fun newProject(overwriteWarningReference: ObservableMutableReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, noop: () -> Unit) {
     if (currentProject.value != null && currentProjectHasModifications.value) {
         dialogLayer.isVisible = true
         overwriteWarningReference.value = "Do you want to save the current project before creating a new one?"

@@ -1,7 +1,7 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.ObservableMutableReference
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.call
 import com.grimfox.gec.util.ref
@@ -46,9 +46,9 @@ class ToggleSet(val executor: ExecutorService) {
         enable()
     }
 
-    fun add(reference: MonitoredReference<Boolean>, onToggleOn: () -> Boolean, onToggleOff: () -> Unit, vararg dependents: Block) {
+    fun add(reference: ObservableMutableReference<Boolean>, onToggleOn: () -> Boolean, onToggleOff: () -> Unit, vararg dependents: Block) {
         var toggleActivated = false
-        reference.listener { old, new ->
+        reference.addListener { old, new ->
             dependents.forEach {
                 it.isMouseAware = new
                 it.isVisible = new

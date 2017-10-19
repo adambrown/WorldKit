@@ -5,7 +5,7 @@ import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.RELATIVE
 import com.grimfox.gec.ui.widgets.Sizing.STATIC
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.ObservableMutableReference
 import com.grimfox.gec.util.clamp
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 import java.lang.Math.round
@@ -42,21 +42,21 @@ class SliderStyle(
     }
 }
 
-fun Block.slider(valueReference: MonitoredReference<Int>, valueMin: Int, valueMax: Int, style: SliderStyle): Block {
+fun Block.slider(valueReference: ObservableMutableReference<Int>, valueMin: Int, valueMax: Int, style: SliderStyle): Block {
     val valueRange = valueMax - valueMin
     return slider(valueReference, style,
             { clamp(round((it * valueRange) + valueMin), valueMin, valueMax) },
             { clamp((it - valueMin) / valueRange.toFloat(), 0.0f, 1.0f) })
 }
 
-fun Block.slider(valueReference: MonitoredReference<Float>, valueMin: Float, valueMax: Float, style: SliderStyle): Block {
+fun Block.slider(valueReference: ObservableMutableReference<Float>, valueMin: Float, valueMax: Float, style: SliderStyle): Block {
     val valueRange = valueMax - valueMin
     return slider(valueReference, style,
             { clamp((it * valueRange) + valueMin, valueMin, valueMax) },
             { clamp((it - valueMin) / valueRange, 0.0f, 1.0f) })
 }
 
-fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, valueFunction: (Float) -> T, valueFunctionInverse: (T) -> Float): Block {
+fun <T> Block.slider(valueReference: ObservableMutableReference<T>, style: SliderStyle, valueFunction: (Float) -> T, valueFunctionInverse: (T) -> Float): Block {
     return block {
         var barUnfilled = NO_BLOCK
         var barFilled = NO_BLOCK
@@ -203,7 +203,7 @@ fun <T> Block.slider(valueReference: MonitoredReference<T>, style: SliderStyle, 
             }
         }
         onMouseDrag = updateSlider
-        valueReference.listener { _, new ->
+        valueReference.addListener { _, new ->
             barFilled.width = 10000.0f * valueFunctionInverse(new)
         }
     }

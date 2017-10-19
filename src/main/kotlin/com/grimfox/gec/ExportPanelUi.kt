@@ -1,6 +1,9 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.nvgproxy.bInt
+import com.grimfox.gec.ui.nvgproxy.gInt
+import com.grimfox.gec.ui.nvgproxy.rInt
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.ref
 import java.awt.image.BufferedImage
@@ -24,10 +27,10 @@ fun exportPanel(ui: UserInterface) {
             }
         }
     }
-    regionFile.reference.listener(pngExtensionFilter(regionFile))
-    biomeFile.reference.listener(pngExtensionFilter(biomeFile))
-    mapFile.reference.listener(pngExtensionFilter(mapFile))
-    heightFile.reference.listener(pngExtensionFilter(heightFile))
+    regionFile.reference.addListener(pngExtensionFilter(regionFile))
+    biomeFile.reference.addListener(pngExtensionFilter(biomeFile))
+    mapFile.reference.addListener(pngExtensionFilter(mapFile))
+    heightFile.reference.addListener(pngExtensionFilter(heightFile))
     panelLayer {
         exportPanel = panel(650.0f) {
             vSizing = Sizing.SHRINK

@@ -1,6 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import org.joml.*
@@ -8,7 +9,6 @@ import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT
-import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
@@ -138,7 +138,7 @@ class MeshViewport3D(
     private var hasImage = false
     private var imageTextureId: TextureId? = null
 
-    private val background = NVGColor.create().set(30, 30, 30)
+    private val background = NPColor.create().set(30, 30, 30)
 
     private val lightDirection = Vector3f(1.0f, 1.0f, 2.0f)
 

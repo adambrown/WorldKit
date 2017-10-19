@@ -2,7 +2,7 @@ package com.grimfox.gec
 
 import com.grimfox.gec.ui.HotkeyHandler
 import com.grimfox.gec.ui.layout
-import com.grimfox.gec.ui.set
+import com.grimfox.gec.ui.nvgproxy.set
 import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
@@ -33,7 +33,7 @@ object Main {
         val uiLayout = layout { ui ->
             val uiLayout = this
             ui {
-                disableCursor.listener { old, new ->
+                disableCursor.addListener { old, new ->
                     if (old != new) {
                         if (new) {
                             disableCursor()
@@ -42,7 +42,7 @@ object Main {
                         }
                     }
                 }
-                hideCursor.listener { old, new ->
+                hideCursor.addListener { old, new ->
                     if (old != new) {
                         if (new) {
                             hideCursor()
@@ -156,7 +156,7 @@ object Main {
                     }
 
                 }
-                currentProject.listener { _, new ->
+                currentProject.addListener { _, new ->
                     doOnMainThread {
                         updateTitle(titleText, new)
                         doesActiveProjectExist.value = new != null
@@ -165,7 +165,7 @@ object Main {
                         }
                     }
                 }
-                currentProjectHasModifications.listener { _, new ->
+                currentProjectHasModifications.addListener { _, new ->
                     doOnMainThread {
                         updateTitle(titleText, currentProject.value, new)
                     }
@@ -397,7 +397,7 @@ object Main {
                         isMouseAware = false
                     }
                 }
-                brushActive.listener { _, new ->
+                brushActive.addListener { _, new ->
                     mouseOverlayLayer.isVisible = new
                     mouseOverlayLayer.isMouseAware = new
                     brushShapeOuter.isVisible = new
@@ -493,14 +493,14 @@ object Main {
         var wasResizing = false
         var wasMinimized = true
         var wasJustMaximized = false
-        ui(uiLayout, preferences.windowState) {
-            if (isResizing) {
-                wasResizing = true
+        ui(uiLayout, preferences.windowState, beforeDraw = {
+            wasResizing = if (isResizing) {
+                true
             } else {
                 if (wasResizing) {
                     onWindowResize()
                 }
-                wasResizing = false
+                false
             }
             if (wasJustMaximized) {
                 onWindowResize()
@@ -515,6 +515,6 @@ object Main {
                 wasMinimized = true
             }
             performMainThreadTasks()
-        }
+        })
     }
 }

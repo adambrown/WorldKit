@@ -11,8 +11,8 @@ import javax.imageio.ImageIO
 class RegionsBuilder(
         val regionFile: DynamicTextReference,
         val useRegionFile: Reference<Boolean>,
-        val displayMode: MonitoredReference<DisplayMode>,
-        val defaultToMap: MonitoredReference<Boolean>) {
+        val displayMode: ObservableMutableReference<DisplayMode>,
+        val defaultToMap: ObservableMutableReference<Boolean>) {
 
     fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true, updateView: Boolean = true) {
         val currentRegionGraph = currentState.regionGraph.value

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.model.HistoryQueue.ModificationEvent
+import com.grimfox.gec.model.ObservableCollection.ModificationEvent
 import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
@@ -19,7 +19,7 @@ import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.util.FileDialogs.saveFileDialog
 import com.grimfox.gec.util.FileDialogs.selectFile
-import com.grimfox.gec.util.MonitoredReference
+import com.grimfox.gec.util.ObservableMutableReference
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.ref
 import org.slf4j.Logger
@@ -30,22 +30,22 @@ import java.util.*
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
-private val LOG: Logger = LoggerFactory.getLogger(Project::class.java)
+private val log: Logger = LoggerFactory.getLogger(Project::class.java)
 
 class CurrentState(
-        val regionParameters: MonitoredReference<RegionParameters?> = ref(null),
-        val regionGraph: MonitoredReference<Graph?> = ref(null),
-        val regionMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
-        val regionSplines: MonitoredReference<RegionSplines?> = ref(null),
-        val biomeParameters: MonitoredReference<BiomeParameters?> = ref(null),
-        val biomeGraph: MonitoredReference<Graph?> = ref(null),
-        val biomeMask: MonitoredReference<ByteArrayMatrix?> = ref(null),
-        val biomes: MonitoredReference<List<Biome>?> = ref(null),
-        val customElevationPowerMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
-        val customStartingHeightsMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
-        val customSoilMobilityMap: MonitoredReference<TextureId> = ref(BLANK_TEXTURE),
-        val heightMapTexture: MonitoredReference<TextureId?> = ref(null),
-        val riverMapTexture: MonitoredReference<TextureId?> = ref(null)) {
+        val regionParameters: ObservableMutableReference<RegionParameters?> = ref(null),
+        val regionGraph: ObservableMutableReference<Graph?> = ref(null),
+        val regionMask: ObservableMutableReference<ByteArrayMatrix?> = ref(null),
+        val regionSplines: ObservableMutableReference<RegionSplines?> = ref(null),
+        val biomeParameters: ObservableMutableReference<BiomeParameters?> = ref(null),
+        val biomeGraph: ObservableMutableReference<Graph?> = ref(null),
+        val biomeMask: ObservableMutableReference<ByteArrayMatrix?> = ref(null),
+        val biomes: ObservableMutableReference<List<Biome>?> = ref(null),
+        val customElevationPowerMap: ObservableMutableReference<TextureId> = ref(BLANK_TEXTURE),
+        val customStartingHeightsMap: ObservableMutableReference<TextureId> = ref(BLANK_TEXTURE),
+        val customSoilMobilityMap: ObservableMutableReference<TextureId> = ref(BLANK_TEXTURE),
+        val heightMapTexture: ObservableMutableReference<TextureId?> = ref(null),
+        val riverMapTexture: ObservableMutableReference<TextureId?> = ref(null)) {
 
     fun copy(): CurrentState {
         return CurrentState(
@@ -59,28 +59,28 @@ class CurrentState(
         )
     }
 
-    private fun copyMatrixRef(inputMatrixRef: MonitoredReference<ByteArrayMatrix?>): MonitoredReference<ByteArrayMatrix?> {
+    private fun copyMatrixRef(inputMatrixRef: ObservableMutableReference<ByteArrayMatrix?>): ObservableMutableReference<ByteArrayMatrix?> {
         val inputMatrixVal = inputMatrixRef.value
         return if (inputMatrixVal != null) {
-            ref<ByteArrayMatrix?>(ByteArrayMatrix(inputMatrixVal.width, Arrays.copyOf(inputMatrixVal.array, inputMatrixVal.array.size)))
+            ref(ByteArrayMatrix(inputMatrixVal.width, Arrays.copyOf(inputMatrixVal.array, inputMatrixVal.array.size)))
         } else {
-            ref<ByteArrayMatrix?>(null)
+            ref(null)
         }
     }
 }
 
 data class Project(
         var file: File? = null,
-        var isModifiedSinceSave: MonitoredReference<Boolean> = ref(false),
-        var currentState: MonitoredReference<CurrentState> = ref(CurrentState()),
+        var isModifiedSinceSave: ObservableMutableReference<Boolean> = ref(false),
+        var currentState: ObservableMutableReference<CurrentState> = ref(CurrentState()),
         val historyRegionsBackQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
-        val historyRegionsCurrent: MonitoredReference<RegionsHistoryItem?> = ref(null),
+        val historyRegionsCurrent: ObservableMutableReference<RegionsHistoryItem?> = ref(null),
         val historyRegionsForwardQueue: HistoryQueue<RegionsHistoryItem> = HistoryQueue(1000),
         val historySplinesBackQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
-        val historySplinesCurrent: MonitoredReference<RegionSplines?> = ref(null),
+        val historySplinesCurrent: ObservableMutableReference<RegionSplines?> = ref(null),
         val historySplinesForwardQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
         val historyBiomesBackQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000),
-        val historyBiomesCurrent: MonitoredReference<BiomesHistoryItem?> = ref(null),
+        val historyBiomesCurrent: ObservableMutableReference<BiomesHistoryItem?> = ref(null),
         val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000)) {
 
     private val valueModifiedListener: (Any?, Any?) -> Unit = { old, new ->
@@ -89,27 +89,27 @@ data class Project(
         }
     }
 
-    private val queueModifiedListener: (ModificationEvent) -> Unit = {
+    private val queueModifiedListener: (ModificationEvent<Any?>) -> Unit = {
         isModifiedSinceSave.value = true
     }
 
     init {
-        historyRegionsBackQueue.listener(queueModifiedListener)
-        historyRegionsCurrent.listener(valueModifiedListener)
-        historyRegionsForwardQueue.listener(queueModifiedListener)
-        historySplinesBackQueue.listener(queueModifiedListener)
-        historySplinesCurrent.listener(valueModifiedListener)
-        historySplinesForwardQueue.listener(queueModifiedListener)
-        historyBiomesBackQueue.listener(queueModifiedListener)
-        historyBiomesCurrent.listener(valueModifiedListener)
-        historyBiomesForwardQueue.listener(queueModifiedListener)
-        currentState.value.regionParameters.listener(valueModifiedListener)
-        currentState.value.regionGraph.listener(valueModifiedListener)
-        currentState.value.regionMask.listener(valueModifiedListener)
-        currentState.value.regionSplines.listener(valueModifiedListener)
-        currentState.value.biomeParameters.listener(valueModifiedListener)
-        currentState.value.biomeGraph.listener(valueModifiedListener)
-        currentState.value.biomeMask.listener(valueModifiedListener)
+        historyRegionsBackQueue.addListener(queueModifiedListener)
+        historyRegionsCurrent.addListener(valueModifiedListener)
+        historyRegionsForwardQueue.addListener(queueModifiedListener)
+        historySplinesBackQueue.addListener(queueModifiedListener)
+        historySplinesCurrent.addListener(valueModifiedListener)
+        historySplinesForwardQueue.addListener(queueModifiedListener)
+        historyBiomesBackQueue.addListener(queueModifiedListener)
+        historyBiomesCurrent.addListener(valueModifiedListener)
+        historyBiomesForwardQueue.addListener(queueModifiedListener)
+        currentState.value.regionParameters.addListener(valueModifiedListener)
+        currentState.value.regionGraph.addListener(valueModifiedListener)
+        currentState.value.regionMask.addListener(valueModifiedListener)
+        currentState.value.regionSplines.addListener(valueModifiedListener)
+        currentState.value.biomeParameters.addListener(valueModifiedListener)
+        currentState.value.biomeGraph.addListener(valueModifiedListener)
+        currentState.value.biomeMask.addListener(valueModifiedListener)
     }
 
     fun copy(): Project {
@@ -138,13 +138,13 @@ val recentAutosaves = ArrayList<Pair<File, Block>>()
 val recentProjectsDropdown = ref<DropdownList?>(null)
 val recentProjectsAvailable = ref(false)
 val currentProjectHasModifications = ref(false)
-val currentProject = ref<Project?>(null).listener { old, new ->
+val currentProject = ref<Project?>(null).addListener { old, new ->
     if (old != new) {
         if (new == null) {
             currentProjectHasModifications.value = false
         } else {
             currentProjectHasModifications.value = new.isModifiedSinceSave.value
-            new.isModifiedSinceSave.listener { lastModified, nowModified ->
+            new.isModifiedSinceSave.addListener { lastModified, nowModified ->
                 if (lastModified != nowModified) {
                     currentProjectHasModifications.value = nowModified
                 }
@@ -183,7 +183,7 @@ fun saveRecentProjects() {
             JSON.writeValue(it, RecentProjects(recentProjects.map { it.first.canonicalPath }))
         }
     } catch (e: Exception) {
-        LOG.error("Error writing recent projects file.")
+        log.error("Error writing recent projects file.")
     }
 }
 
@@ -409,7 +409,7 @@ fun openProject(file: File,
         }
         return project
     } catch (e: Exception) {
-        LOG.error("Unexpected error opening project.", e)
+        log.error("Unexpected error opening project.", e)
         throw e
     } finally {
         dialogLayer.isVisible = false

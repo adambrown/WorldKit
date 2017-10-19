@@ -23,20 +23,33 @@ interface MutableReference<T> : Reference<T> {
     override var value: T
 }
 
-interface MonitoredReference<T> : MutableReference<T> {
+interface ObservableReference<T> : Reference<T> {
 
     val listeners: MutableList<(oldValue: T, newValue: T) -> Unit>
 
+    override val value: T
+
+    fun addListener(listener: (oldValue: T, newValue: T) -> Unit): ObservableReference<T>
+
+    fun removeListener(listener: (T, T) -> Unit): Boolean
+}
+
+interface ObservableMutableReference<T> : ObservableReference<T>, MutableReference<T> {
+
+    override val listeners: MutableList<(oldValue: T, newValue: T) -> Unit>
+
     override var value: T
 
-    fun listener(listener: (oldValue: T, newValue: T) -> Unit): MonitoredReference<T>
+    override fun addListener(listener: (oldValue: T, newValue: T) -> Unit): ObservableMutableReference<T>
+
+    override fun removeListener(listener: (T, T) -> Unit): Boolean
 }
 
 private class CRef<out T>(override val value: T) : Reference<T>
 
 private class MRef<T>(override var value: T) : MutableReference<T>
 
-private class Ref<T>(value: T) : MonitoredReference<T> {
+private class Ref<T>(value: T) : ObservableMutableReference<T> {
 
     override val listeners: MutableList<(oldValue: T, newValue: T) -> Unit> = ArrayList()
 
@@ -49,9 +62,13 @@ private class Ref<T>(value: T) : MonitoredReference<T> {
             listeners.forEach { it(old, value) }
         }
 
-    override fun listener(listener: (oldValue: T, newValue: T) -> Unit): MonitoredReference<T> {
+    override fun addListener(listener: (oldValue: T, newValue: T) -> Unit): ObservableMutableReference<T> {
         listeners.add(listener)
         return this
+    }
+
+    override fun removeListener(listener: (T, T) -> Unit): Boolean {
+        return listeners.remove(listener)
     }
 }
 
@@ -63,7 +80,7 @@ fun <T> mRef(value: T): MutableReference<T> {
     return MRef(value)
 }
 
-fun <T> ref(value: T): MonitoredReference<T> {
+fun <T> ref(value: T): ObservableMutableReference<T> {
     return Ref(value)
 }
 

@@ -3,7 +3,8 @@ package com.grimfox.gec
 import com.grimfox.gec.ui.KeyboardHandler
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.color
+import com.grimfox.gec.ui.nvgproxy.color
+import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_LEFT
@@ -16,11 +17,9 @@ import com.grimfox.gec.util.FileDialogs.saveFile
 import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.FileDialogs.selectFolder
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.nanovg.NVGColor
 import java.io.File
 import java.math.BigDecimal
 import java.nio.ByteBuffer
-import javax.management.monitor.Monitor
 
 val textFont = ref(-1)
 val glyphFont = ref(-1)
@@ -405,7 +404,7 @@ fun dynamicParagraph(value: String, limit: Int, style: TextStyle = TEXT_STYLE_NO
     return DynamicTextParagraphReference(value, limit, SMALL_SPACER_SIZE, style)
 }
 
-fun glyphStyle(size: Float, color: NVGColor): TextStyle {
+fun glyphStyle(size: Float, color: NPColor): TextStyle {
     return TextStyle(cRef(size), glyphFont, cRef(color))
 }
 
@@ -413,7 +412,7 @@ fun glyph(value: String, style: TextStyle = TEXT_STYLE_GLYPH): Text {
     return StaticTextUtf8(value, style)
 }
 
-fun glyph(value: String, size: Float, color: NVGColor): Text {
+fun glyph(value: String, size: Float, color: NPColor): Text {
     return StaticTextUtf8(value, glyphStyle(size, color))
 }
 
@@ -478,11 +477,11 @@ fun Block.dragArea(title: Text): Block {
     }
 }
 
-fun Block.toggle(value: MonitoredReference<Boolean>): Block {
+fun Block.toggle(value: ObservableMutableReference<Boolean>): Block {
     return toggle(value, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
 }
 
-fun <T> Block.slider(value: MonitoredReference<T>, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.slider(value: ObservableMutableReference<T>, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return slider(value, SLIDER_STYLE, function, inverseFunction)
 }
 
@@ -607,7 +606,7 @@ fun Block.hDivider() {
     }
 }
 
-fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float): Block {
+fun Block.vToggleRow(value: ObservableMutableReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -625,7 +624,7 @@ fun Block.vToggleRow(value: MonitoredReference<Boolean>, height: Float, label: T
     }
 }
 
-fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrushValue: MonitoredReference<Byte>, menuLayer: Block, color: NVGColor, values: List<String>, selected: MonitoredReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
+fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, currentBrushValue: ObservableMutableReference<Byte>, menuLayer: Block, color: NPColor, values: List<String>, selected: ObservableMutableReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -648,7 +647,7 @@ fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrus
                     vSizing = SHRINK
                     text = glyph(GLYPH_BRUSH, 18.0f, COLOR_ACTIVE_HIGHLIGHT)
                     isVisible = false
-                    editModeOn.listener { old, new ->
+                    editModeOn.addListener { old, new ->
                         if (old != new) {
                             isVisible = currentBrushValue.value.toInt() == index + 1 && new
                         }
@@ -668,7 +667,7 @@ fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrus
                 currentBrushValue.value = (index + 1).toByte()
             }
         }
-        currentBrushValue.listener { old, new ->
+        currentBrushValue.addListener { old, new ->
             if (old != new) {
                 editIconBlock.isVisible = new.toInt() == index + 1 && editModeOn.value
             }
@@ -688,7 +687,7 @@ fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrus
                 vAlign = VerticalAlignment.MIDDLE
             }
         }
-        selected.listener { old, new ->
+        selected.addListener { old, new ->
             if (old != new) {
                 textRef.reference.value = values[new]
             }
@@ -697,7 +696,7 @@ fun Block.vBiomeDropdownRow(editModeOn: MonitoredReference<Boolean>, currentBrus
 }
 
 
-fun Block.vLongInputRow(reference: MonitoredReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NVGColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
+fun Block.vLongInputRow(reference: ObservableMutableReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NPColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -717,11 +716,11 @@ fun Block.vLongInputRow(reference: MonitoredReference<Long>, height: Float, labe
     }
 }
 
-private fun Block.longInputBox(reference: MonitoredReference<Long>, textStyle: TextStyle, textColorActive: NVGColor, ui: UserInterface, uiLayout: UiLayout): Block {
+private fun Block.longInputBox(reference: ObservableMutableReference<Long>, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
     val textValue = DynamicTextReference(reference.value.toString(), 18, textStyle)
     val textStyleActive = TextStyle(textStyle.size, textStyle.font, cRef(textColorActive))
     val caret = uiLayout.createCaret(textValue)
-    reference.listener { old, new ->
+    reference.addListener { old, new ->
         if (new != old) {
             textValue.reference.value = new.toString()
             caret.position = textValue.reference.value.length
@@ -928,7 +927,7 @@ fun Block.vFileRow(file: DynamicTextReference, height: Float, label: Text, shrin
     }
 }
 
-fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
+fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: ObservableMutableReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -973,7 +972,7 @@ fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: Monito
     }
 }
 
-fun Block.vFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
+fun Block.vFileRowWithToggle(file: DynamicTextReference, toggleValue: ObservableMutableReference<Boolean>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -1018,7 +1017,7 @@ fun Block.vFileRowWithToggle(file: DynamicTextReference, toggleValue: MonitoredR
     }
 }
 
-fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float): Block {
+fun Block.hToggleRow(value: ObservableMutableReference<Boolean>, label: Text, gap: Float): Block {
     return block {
         val row = this
         hSizing = SHRINK
@@ -1035,7 +1034,7 @@ fun Block.hToggleRow(value: MonitoredReference<Boolean>, label: Text, gap: Float
     }
 }
 
-fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.vSliderRow(value: ObservableMutableReference<T>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return block {
         val row = this
         vSizing = STATIC
@@ -1053,9 +1052,9 @@ fun <T> Block.vSliderRow(value: MonitoredReference<T>, height: Float, label: Tex
     }
 }
 
-fun <T> Block.vSliderWithValueRow(value: MonitoredReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.vSliderWithValueRow(value: ObservableMutableReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     val dynamicText = DynamicTextReference(value.value.toString(), valueSize, textStyle)
-    value.listener { _, new ->
+    value.addListener { _, new ->
         dynamicText.reference.value = new.toString()
     }
     return block {
@@ -1087,7 +1086,7 @@ fun <T> Block.vSliderWithValueRow(value: MonitoredReference<T>, valueSize: Int, 
     }
 }
 
-fun <T> Block.hSliderRow(value: MonitoredReference<T>, width: Float, label: Text, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.hSliderRow(value: ObservableMutableReference<T>, width: Float, label: Text, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
     return block {
         val row = this
         hSizing = SHRINK
@@ -1132,7 +1131,7 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
     }
 }
 
-fun Block.vExpandPanel(panelName: String, expanded: MonitoredReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
+fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
     val panelNameOpen = "- $panelName"
     val panelNameClosed = "+ $panelName"
     val panelOpen = expanded
@@ -1151,7 +1150,7 @@ fun Block.vExpandPanel(panelName: String, expanded: MonitoredReference<Boolean> 
             layout = Layout.VERTICAL
             panelBuilder()
         }
-        panelOpen.listener { _, new ->
+        panelOpen.addListener { _, new ->
             if (new) {
                 panelTitle.reference.value = panelNameOpen
                 panelBlock.isVisible = true

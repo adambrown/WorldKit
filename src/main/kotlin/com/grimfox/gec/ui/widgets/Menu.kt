@@ -1,37 +1,37 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.*
+import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.util.*
 import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.nanovg.NVGColor
 import java.util.*
 
 class MenuBar(private val block: Block,
               private val menuLayer: Block,
               private val rowHeight: Float,
               private val textStyle: TextStyle,
-              private val textColorInactive: NVGColor,
+              private val textColorInactive: NPColor,
               private val activeMenu: MutableReference<Pair<Block, () -> Unit>?>,
-              private val mouseDownOnActivator: MonitoredReference<Boolean>,
-              private val mouseDownOnDeActivator: MonitoredReference<Boolean>,
-              private val mouseOverActivator: MonitoredReference<Boolean>,
-              private val mouseOverDeActivator: MonitoredReference<Boolean>) {
+              private val mouseDownOnActivator: ObservableMutableReference<Boolean>,
+              private val mouseDownOnDeActivator: ObservableMutableReference<Boolean>,
+              private val mouseOverActivator: ObservableMutableReference<Boolean>,
+              private val mouseOverDeActivator: ObservableMutableReference<Boolean>) {
 
     fun menu(title: String, builder: DropdownList.() -> Unit): Block {
         return block.menu(title, menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, rowHeight, textStyle, textColorInactive, builder)
     }
 }
 
-class DropdownList(private val block: Block, private val rowHeight: Float, private val textStyle: TextStyle, private val textColorInactive: NVGColor, private val mouseDownOnActivator: MonitoredReference<Boolean>, private val deactivate: () -> Unit, private val activeItem: MutableReference<Pair<Block, () -> Unit>?>, private val shrink: Boolean = true) {
+class DropdownList(private val block: Block, private val rowHeight: Float, private val textStyle: TextStyle, private val textColorInactive: NPColor, private val mouseDownOnActivator: ObservableMutableReference<Boolean>, private val deactivate: () -> Unit, private val activeItem: MutableReference<Pair<Block, () -> Unit>?>, private val shrink: Boolean = true) {
 
     private val shrinkGroup = hShrinkGroup()
 
-    fun menuItem(text: String, hotKey: String? = null, glyph: Block.() -> Block = {block{}}, isActive: MonitoredReference<Boolean> = ref(true), onClick: () -> Unit): Block {
+    fun menuItem(text: String, hotKey: String? = null, glyph: Block.() -> Block = {block{}}, isActive: ObservableMutableReference<Boolean> = ref(true), onClick: () -> Unit): Block {
         return block.menuItem(text(text, textStyle), if (hotKey != null) { text(hotKey, textStyle) } else { NO_TEXT }, glyph, rowHeight, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, shrink, onClick)
     }
 
-    fun subMenu(text: String, isActive: MonitoredReference<Boolean> = ref(true), builder: DropdownList.() -> Unit): Block {
+    fun subMenu(text: String, isActive: ObservableMutableReference<Boolean> = ref(true), builder: DropdownList.() -> Unit): Block {
         return block.subMenu(text(text, textStyle), rowHeight, textStyle, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, builder)
     }
 
@@ -63,7 +63,7 @@ class DropdownList(private val block: Block, private val rowHeight: Float, priva
     }
 }
 
-fun Block.menuBar(menuLayer: Block, rowHeight: Float, textStyle: TextStyle, textColorInactive: NVGColor, builder: MenuBar.() -> Unit): Block {
+fun Block.menuBar(menuLayer: Block, rowHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, builder: MenuBar.() -> Unit): Block {
     val parent = this
     return block {
         parent.renderChildren.remove(this)
@@ -82,7 +82,7 @@ fun Block.menuBar(menuLayer: Block, rowHeight: Float, textStyle: TextStyle, text
     }
 }
 
-fun Block.dropdown(title: Text, dropdownLayer: Block, buttonHeight: Float, itemHeight: Float, textStyle: TextStyle, textColorInactive: NVGColor, builder: DropdownList.() -> Unit): Block {
+fun Block.dropdown(title: Text, dropdownLayer: Block, buttonHeight: Float, itemHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, builder: DropdownList.() -> Unit): Block {
     return dropdownMenu(title, dropdownLayer, buttonHeight, itemHeight, textStyle, textColorInactive, builder)
 }
 
@@ -90,13 +90,13 @@ private fun Block.menu(
         title: String,
         menuLayer: Block,
         activeMenu: MutableReference<Pair<Block, () -> Unit>?>,
-        mouseDownOnActivator: MonitoredReference<Boolean>,
-        mouseDownOnDeActivator: MonitoredReference<Boolean>,
-        mouseOverActivator: MonitoredReference<Boolean>,
-        mouseOverDeActivator: MonitoredReference<Boolean>,
+        mouseDownOnActivator: ObservableMutableReference<Boolean>,
+        mouseDownOnDeActivator: ObservableMutableReference<Boolean>,
+        mouseOverActivator: ObservableMutableReference<Boolean>,
+        mouseOverDeActivator: ObservableMutableReference<Boolean>,
         rowHeight: Float,
         textStyle: TextStyle,
-        textColorInactive: NVGColor,
+        textColorInactive: NPColor,
         builder: DropdownList.() -> Unit): Block {
     val titleText = text(title, textStyle)
     return menu(titleText,
@@ -116,13 +116,13 @@ private fun Block.menu(
         titleText: Text,
         menuLayer: Block,
         activeMenu: MutableReference<Pair<Block, () -> Unit>?>,
-        mouseDownOnActivator: MonitoredReference<Boolean>,
-        mouseDownOnDeActivator: MonitoredReference<Boolean>,
-        mouseOverActivator: MonitoredReference<Boolean>,
-        mouseOverDeActivator: MonitoredReference<Boolean>,
+        mouseDownOnActivator: ObservableMutableReference<Boolean>,
+        mouseDownOnDeActivator: ObservableMutableReference<Boolean>,
+        mouseOverActivator: ObservableMutableReference<Boolean>,
+        mouseOverDeActivator: ObservableMutableReference<Boolean>,
         rowHeight: Float,
         textStyle: TextStyle,
-        textColorInactive: NVGColor,
+        textColorInactive: NPColor,
         builder: DropdownList.() -> Unit): Block {
     return block {
         val menu = this
@@ -269,7 +269,7 @@ private fun Block.dropdownMenu(
         buttonHeight: Float,
         itemHeight: Float,
         textStyle: TextStyle,
-        textColorInactive: NVGColor,
+        textColorInactive: NPColor,
         builder: DropdownList.() -> Unit): Block {
     return block {
         val menu = this
@@ -407,8 +407,8 @@ private fun Block.menuItem(text: Text,
                            glyph: Block.() -> Block,
                            height: Float,
                            shrinkGroup: ShrinkGroup,
-                           textColorInactive: NVGColor,
-                           isActive: MonitoredReference<Boolean>,
+                           textColorInactive: NPColor,
+                           isActive: ObservableMutableReference<Boolean>,
                            mouseDownOnActivator: Reference<Boolean>,
                            deactivate: () -> Unit,
                            activeItem: MutableReference<Pair<Block, () -> Unit>?>,
@@ -443,7 +443,7 @@ private fun Block.menuItem(text: Text,
                 val textStyles = allTexts.map {
                     Triple(it, it.style, TextStyle(it.style.size, it.style.font, inactiveColor))
                 }
-                isActive.listener { oldVal, newVal ->
+                isActive.addListener { oldVal, newVal ->
                     if (oldVal != newVal) {
                         if (newVal) {
                             textStyles.forEach {
@@ -551,9 +551,9 @@ private fun Block.subMenu(text: Text,
                           rowHeight: Float,
                           textStyle: TextStyle,
                           shrinkGroup: ShrinkGroup,
-                          textColorInactive: NVGColor,
-                          isActive: MonitoredReference<Boolean>,
-                          mouseDownOnActivator: MonitoredReference<Boolean>,
+                          textColorInactive: NPColor,
+                          isActive: ObservableMutableReference<Boolean>,
+                          mouseDownOnActivator: ObservableMutableReference<Boolean>,
                           deactivate: () -> Unit,
                           activeItem: MutableReference<Pair<Block, () -> Unit>?>,
                           builder: DropdownList.() -> Unit): Block {
@@ -585,7 +585,7 @@ private fun Block.subMenu(text: Text,
                     this.vAlign = VerticalAlignment.MIDDLE
                     val inactiveColor = cRef(textColorInactive)
                     val labelTextStyle = Triple(text, text.style, TextStyle(text.style.size, text.style.font, inactiveColor))
-                    isActive.listener { oldVal, newVal ->
+                    isActive.addListener { oldVal, newVal ->
                         if (oldVal != newVal) {
                             if (newVal) {
                                 labelTextStyle.first.style = labelTextStyle.second
@@ -839,7 +839,7 @@ private fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
     }
 }
 
-private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textColorInactive: NVGColor, mouseDownOnActivator: MonitoredReference<Boolean>, deactivate: () -> Unit, activeItem: MutableReference<Pair<Block, () -> Unit>?>, shrink: Boolean = true, builder: DropdownList.() -> Unit): Block {
+private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, mouseDownOnActivator: ObservableMutableReference<Boolean>, deactivate: () -> Unit, activeItem: MutableReference<Pair<Block, () -> Unit>?>, shrink: Boolean = true, builder: DropdownList.() -> Unit): Block {
     return block {
         layout = Layout.ABSOLUTE
         hSizing = if (shrink) Sizing.SHRINK else Sizing.STATIC

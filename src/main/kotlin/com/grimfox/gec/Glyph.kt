@@ -2,7 +2,7 @@ package com.grimfox.gec
 
 import com.grimfox.gec.ui.GlyphLayer
 import com.grimfox.gec.ui.UiLayout
-import com.grimfox.gec.ui.color
+import com.grimfox.gec.ui.nvgproxy.color
 import com.grimfox.gec.ui.widgets.Block
 
 private val glyphIndex = Array(95) { i -> (i + 32).toChar().toString() }

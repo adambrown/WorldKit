@@ -7,7 +7,7 @@ import java.nio.ByteBuffer
 class DynamicTextParagraphReference(initialString: String, private val sizeLimit: Int, verticalSpace: Float, textStyle: TextStyle) {
 
     private val buffer = ByteBuffer.allocateDirect(sizeLimit + 1)
-    val reference = ref("").listener { _, new ->
+    val reference = ref("").addListener { _, new ->
         val newValue = if (new.length <= sizeLimit) {
             new
         } else {

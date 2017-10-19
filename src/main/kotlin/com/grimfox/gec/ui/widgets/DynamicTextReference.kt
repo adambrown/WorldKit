@@ -2,19 +2,20 @@ package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.KeyboardHandler
 import com.grimfox.gec.ui.UserInterface
+import com.grimfox.gec.ui.nvgproxy.NPGlyphPosition
 import com.grimfox.gec.util.ref
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.nanovg.NVGGlyphPosition
-import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
 import java.nio.ByteBuffer
 import java.util.*
 
+import com.grimfox.gec.ui.nvgproxy.*
+
 class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle: TextStyle) {
 
     private val buffer = ByteBuffer.allocateDirect(sizeLimit + 1)
-    val reference = ref("").listener { _, new ->
+    val reference = ref("").addListener { _, new ->
         val newValue = if (new.length <= sizeLimit) {
             new
         } else {
@@ -39,11 +40,11 @@ class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle:
 
 class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: Int = dynamicText.reference.value.length, var selection: Int = 0) {
 
-    private val glyphPositions = NVGGlyphPosition.create(dynamicText.sizeLimit)
+    private val glyphPositions = NPGlyphPosition.create(dynamicText.sizeLimit)
     private var lastScale = 1.0f
 
     init {
-        dynamicText.reference.listener { _, new ->
+        dynamicText.reference.addListener { _, new ->
             if (position > new.length) {
                 position = new.length
             }

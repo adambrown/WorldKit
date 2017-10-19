@@ -117,7 +117,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             biomePanelExpanded.listeners.add(resetScrollerListener)
             val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
             mapDetailScaleSlider.isVisible = false
-            mapDetailScale.listener { old, new ->
+            mapDetailScale.addListener { old, new ->
                 if (old != new) {
                     editToggleSet.suspend {
                         generationLock.doWithLock {
@@ -241,7 +241,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     }
                 }
             }
-            currentProject.listener { _, new ->
+            currentProject.addListener { _, new ->
                 if (new != null) {
                     newProjectPanel.isVisible = false
                     regionPanel.isVisible = true

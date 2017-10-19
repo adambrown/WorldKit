@@ -1,13 +1,13 @@
 package com.grimfox.gec.model
 
+import com.grimfox.gec.model.ObservableCollection.ModificationEvent
+import com.grimfox.gec.model.ObservableCollection.ModificationEvent.Type.*
 import com.grimfox.gec.util.Quintuple
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.locks.ReentrantLock
-import com.grimfox.gec.model.HistoryQueue.ModificationEvent.*
 
-class HistoryQueue<T>(val limit: Int) {
-
-    enum class ModificationEvent { PUSH, POP, CLEAR }
+class HistoryQueue<T>(private val limit: Int) : ObservableCollection<T> {
 
     companion object {
 
@@ -41,7 +41,7 @@ class HistoryQueue<T>(val limit: Int) {
     private var _size = 0
     private val lock = ReentrantLock()
 
-    val listeners: MutableList<(ModificationEvent) -> Unit> = ArrayList()
+    private val listeners: MutableList<(ModificationEvent<T?>) -> Unit> = CopyOnWriteArrayList()
 
     val size: Int get() {
         lock.lock()
@@ -52,8 +52,13 @@ class HistoryQueue<T>(val limit: Int) {
         }
     }
 
-    fun listener(listener: (ModificationEvent) -> Unit) {
+    override fun addListener(listener: (ModificationEvent<T?>) -> Unit): HistoryQueue<T> {
         listeners.add(listener)
+        return this
+    }
+
+    override fun removeListener(listener: (ModificationEvent<T?>) -> Unit): Boolean {
+        return listeners.remove(listener)
     }
 
     fun push(value: T) {
@@ -73,7 +78,8 @@ class HistoryQueue<T>(val limit: Int) {
                 head = (head + 1) % limit
                 tail = (tail + 1) % limit
             }
-            listeners.forEach { it(PUSH) }
+            val event = ModificationEvent(ADD, newElement = value, changed = true)
+            listeners.forEach { it(event) }
         } finally {
             lock.unlock()
         }
@@ -89,7 +95,8 @@ class HistoryQueue<T>(val limit: Int) {
             _size--
             val temp = buffer[tail]
             buffer[tail] = null
-            listeners.forEach { it(POP) }
+            val event = ModificationEvent(REMOVE, newElement = temp, changed = true)
+            listeners.forEach { it(event) }
             return temp
         } finally {
             lock.unlock()
@@ -115,7 +122,8 @@ class HistoryQueue<T>(val limit: Int) {
             tail = 0
             _size = 0
             buffer.clear()
-            listeners.forEach { it(CLEAR) }
+            val event = ModificationEvent<T>(CLEAR)
+            listeners.forEach { it(event) }
         } finally {
             lock.unlock()
         }

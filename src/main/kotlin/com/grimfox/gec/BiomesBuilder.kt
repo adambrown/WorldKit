@@ -11,8 +11,8 @@ import javax.imageio.ImageIO
 
 class BiomesBuilder(
         val biomeFile: DynamicTextReference,
-        val useBiomeFile: MonitoredReference<Boolean>,
-        val displayMode: MonitoredReference<DisplayMode>) {
+        val useBiomeFile: ObservableMutableReference<Boolean>,
+        val displayMode: ObservableMutableReference<DisplayMode>) {
 
     fun build(parameters: BiomeParameters, refreshOnly: Boolean = false) {
         val currentBiomeGraph = currentState.biomeGraph.value
