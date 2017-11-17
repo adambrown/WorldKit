@@ -106,8 +106,6 @@ interface UiLayout {
 
     fun createGlfwImages(vararg resources: String): GLFWImage.Buffer
 
-//    fun createImage(resource: String, options: Int): Int
-//
     fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int
 
     fun createMultiGlyph(vararg glyphs: GlyphLayer): Block.() -> Block
@@ -121,7 +119,7 @@ interface UiLayout {
 
 class KeyboardHandler(var onChar: ((codePoint: Int) -> Unit)?, var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Unit)?)
 
-class HotkeyHandler(var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Boolean)?)
+class HotKeyHandler(var onKey: ((key: Int, scanCode: Int, action: Int, mods: Int) -> Boolean)?)
 
 interface UserInterface {
 
@@ -148,7 +146,7 @@ interface UserInterface {
     var maximizeHandler: () -> Unit
     var minimizeHandler: () -> Unit
     var restoreHandler: () -> Unit
-    var hotkeyHandler: HotkeyHandler?
+    var hotKeyHandler: HotKeyHandler?
     var keyboardHandler: KeyboardHandler?
     var dropHandler: (List<String>) -> Unit
 
@@ -189,9 +187,7 @@ interface UserInterface {
     }
 }
 
-private fun getMousePosition(window: WindowContext): Pair<Int, Int> {
-    return getMousePosition(window.id, window.x, window.y)
-}
+private fun getMousePosition(window: WindowContext): Pair<Int, Int> = getMousePosition(window.id, window.x, window.y)
 
 private fun getMousePosition(windowId: Long, windowX: Int, windowY: Int): Pair<Int, Int> {
     twr(stackPush()) { stack ->
@@ -204,9 +200,7 @@ private fun getMousePosition(windowId: Long, windowX: Int, windowY: Int): Pair<I
     }
 }
 
-private fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> {
-    return screenInfoFetcher.getScreens()
-}
+private fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> = screenInfoFetcher.getScreens()
 
 private class UserInterfaceInternal internal constructor(internal val window: WindowContext) : UserInterface {
 
@@ -260,10 +254,10 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             window.restoreHandler = value
         }
 
-    override var hotkeyHandler: HotkeyHandler?
-        get() = window.hotkeyHandler
+    override var hotKeyHandler: HotKeyHandler?
+        get() = window.hotKeyHandler
         set(value) {
-            window.hotkeyHandler = value
+            window.hotKeyHandler = value
         }
 
     override var keyboardHandler: KeyboardHandler?
@@ -338,9 +332,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         window.enableCursor()
     }
 
-    override fun getClipboardString(): String {
-        return window.getClipboardString()
-    }
+    override fun getClipboardString(): String = window.getClipboardString()
 
     override fun hideCursor() {
         window.hideCursor()
@@ -362,17 +354,13 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         window.handleFrameInput()
     }
 
-    internal fun handleDragAndResize(): Boolean {
-        return window.handleDragAndResize()
-    }
+    internal fun handleDragAndResize(): Boolean = window.handleDragAndResize()
 
     internal fun updatePositionAndSize() {
         window.updatePositionAndSize()
     }
 
-    internal fun shouldClose(): Boolean {
-        return glfwWindowShouldClose(window.id)
-    }
+    internal fun shouldClose(): Boolean = glfwWindowShouldClose(window.id)
 
     internal fun clearViewport(width: Int, height: Int) {
         glViewport(0, 0, width, height)
@@ -397,23 +385,27 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             } else {
                 clamp(Math.round((Math.round((window.currentPixelWidth / window.currentWidth) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
             }
+            val scaleChanged = window.lastMonitor.scaleFactor != window.currentMonitor.scaleFactor
+            val windowChanged = window.lastPixelWidth != window.currentPixelWidth && window.lastPixelHeight != window.currentPixelHeight && !isResizing
             root.width = width.toFloat()
             root.height = height.toFloat()
             root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
             nvgBeginFrame(nvg, window.currentPixelWidth, window.currentPixelHeight, 1.0f)
-            root.draw(nvg, scale)
+            root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
             glViewport(0, 0, width, height)
             glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
         } else {
             glViewport(0, 0, width, height)
             glEnable(GL_MULTISAMPLE)
             nvgSave(nvg)
-            val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            val scaleChanged = window.lastMonitor.scaleFactor != window.currentMonitor.scaleFactor
+            val windowChanged = window.lastPixelWidth != window.currentPixelWidth && window.lastPixelHeight != window.currentPixelHeight && !isResizing
             root.width = width / scale
             root.height = height / scale
             root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
-            nvgBeginFrame(nvg, width, height, pixelWidth / width.toFloat())
-            root.draw(nvg, scale)
+            nvgBeginFrame(nvg, width, height, 1.0f)
+            root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
             glViewport(0, 0, width, height)
         }
         nvgEndFrame(nvg)
@@ -460,19 +452,13 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         return buffer
     }
 
-    override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int {
-        return nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
-    }
+    override fun createImage(textureHandle: Int, width: Int, height: Int, options: Int): Int = nvglCreateImageFromHandle(nvg, textureHandle, width, height, options)
 
     private data class ResolvedGlyphLayer(val text: Text, var xOffset: Float, var yOffset: Float, var width: Float, var height: Float)
 
-    private fun glyphStyle(font: Int, size: Float, color: NPColor): TextStyle {
-        return TextStyle(cRef(size), cRef(font), cRef(color))
-    }
+    private fun glyphStyle(font: Int, size: Float, color: NPColor): TextStyle = TextStyle(cRef(size), cRef(font), cRef(color))
 
-    private fun glyph(value: String, font: Int, size: Float, color: NPColor): Text {
-        return StaticTextUtf8(value, glyphStyle(font, size, color))
-    }
+    private fun glyph(value: String, font: Int, size: Float, color: NPColor): Text = StaticTextUtf8(value, glyphStyle(font, size, color))
 
     override fun createMultiGlyph(vararg glyphs: GlyphLayer): Block.() -> Block {
         val resolvedGlyphs = ArrayList<ResolvedGlyphLayer>()
@@ -480,7 +466,7 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         var minYOffset = 0.0f
         glyphs.forEach {
             val text = glyph(it.text, it.font.value, it.size, it.color)
-            val (width, height) = text.dimensions(nvg)
+            val (width, height) = text.dimensions(nvg, 1.0f, false, 0)
             resolvedGlyphs.add(ResolvedGlyphLayer(text, it.xOffset, it.yOffset, width, height))
             if (it.xOffset < minXOffset) {
                 minXOffset = it.xOffset
@@ -526,9 +512,7 @@ private class UiLayoutInternal internal constructor(val nvg: Long) : UiLayout {
         }
     }
 
-    override fun createCaret(text: DynamicTextReference): Caret {
-        return Caret(nvg, text)
-    }
+    override fun createCaret(text: DynamicTextReference): Caret = Caret(nvg, text)
 
     internal fun close() {
         fonts.clear()
@@ -562,27 +546,18 @@ private data class MonitorSpec(
         val maximizedX2: Int,
         val maximizedY2: Int,
         val scaleFactor: Double,
-        val overRender: Double,
         val redBits: Int,
         val greenBits: Int,
         val blueBits: Int,
         val refreshRate: Int)
 
-private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 1.0, 0, 0, 0, 0)
+private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0)
 
 internal data class ScreenIdentity(
         val x: Int,
         val y: Int,
         val width: Int,
         val height: Int)
-
-internal data class WarpLine(
-        val x1: Int,
-        val y1: Int,
-        val x2: Int,
-        val y2: Int,
-        val warpX: Int,
-        val warpY: Int)
 
 internal data class ScreenSpec(
         val x1: Int,
@@ -599,8 +574,7 @@ internal data class ScreenSpec(
         val maximizedY2: Int,
         val maximizedWidth: Int,
         val maximizedHeight: Int,
-        var scaleFactor: Double,
-        var overRender: Double)
+        var scaleFactor: Double)
 
 private class WindowContext(
         var id: Long = 0,
@@ -658,6 +632,9 @@ private class WindowContext(
         var currentPixelWidth: Int = width,
         var currentPixelHeight: Int = height,
 
+        var lastPixelWidth: Int = width,
+        var lastPixelHeight: Int = height,
+
         var restoreX: Int = 0,
         var restoreY: Int = 0,
 
@@ -666,13 +643,16 @@ private class WindowContext(
         var ignoreInput: Boolean = false,
 
         var currentMonitor: MonitorSpec = NO_MONITOR,
+        var lastMonitor: MonitorSpec = NO_MONITOR,
+        var monitorScaleChanged: Boolean = false,
+
         var mouseClickHandler: (Int, Int, Int, Boolean, Int) -> Unit = { _, _, _, _, _ -> },
         var scrollHandler: (Double, Double) -> Unit = { _, _ -> },
         var maximizeHandler: () -> Unit = {},
         var minimizeHandler: () -> Unit = {},
         var restoreHandler: () -> Unit = {},
 
-        var hotkeyHandler: HotkeyHandler? = null,
+        var hotKeyHandler: HotKeyHandler? = null,
         var keyboardHandler: KeyboardHandler? = null,
 
         var dropHandler: (List<String>) -> Unit = {}
@@ -682,11 +662,7 @@ private class WindowContext(
     val currentMonitorIndex: Int
         get() {
             val index = monitors.indexOf(currentMonitor)
-            if (index > 0) {
-                return index
-            } else {
-                return 0
-            }
+            return if (index > 0) index else 0
         }
 
     internal fun handleFrameInput() {
@@ -699,6 +675,8 @@ private class WindowContext(
                 currentWidth = w.get(0)
                 currentHeight = h.get(0)
 
+                lastPixelWidth = currentPixelWidth
+                lastPixelHeight = currentPixelHeight
                 glfwGetFramebufferSize(id, w, h)
                 currentPixelWidth = w.get(0)
                 currentPixelHeight = h.get(0)
@@ -709,6 +687,17 @@ private class WindowContext(
                 } else if (currentPixelWidth > 0 && currentPixelHeight > 0 && isMinimized) {
                     isMinimized = false
                 }
+
+                if (monitorScaleChanged) {
+                    monitorScaleChanged = false
+                    lastMonitor = currentMonitor
+                } else {
+                    val windowScaleChanged = lastPixelWidth != currentPixelWidth && lastPixelHeight != currentPixelHeight && !isResizing
+                    if (lastMonitor != currentMonitor && windowScaleChanged) {
+                        monitorScaleChanged = true
+                    }
+                }
+
 
                 glfwGetWindowPos(id, w, h)
                 x = w[0]
@@ -941,9 +930,7 @@ private class WindowContext(
         glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
     }
 
-    fun getClipboardString(): String {
-        return glfwGetClipboardString(id)
-    }
+    fun getClipboardString(): String = glfwGetClipboardString(id)
 
     fun setClipboardString(string: String) {
         glfwSetClipboardString(id, string)
@@ -1018,24 +1005,22 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     Configuration.DEBUG_STREAM.set(errorStream)
     val caps = createCapabilities()
     val debugProc = setupDebugMessageCallback(errorStream)
-    if (caps.OpenGL43) {
-        GL43.glDebugMessageControl(GL43.GL_DEBUG_SOURCE_API, GL43.GL_DEBUG_TYPE_OTHER, GL43.GL_DEBUG_SEVERITY_NOTIFICATION, null as IntBuffer?, false)
-    } else if (caps.GL_KHR_debug) {
-        KHRDebug.glDebugMessageControl(
+    when {
+        caps.OpenGL43 -> GL43.glDebugMessageControl(GL43.GL_DEBUG_SOURCE_API, GL43.GL_DEBUG_TYPE_OTHER, GL43.GL_DEBUG_SEVERITY_NOTIFICATION, null as IntBuffer?, false)
+        caps.GL_KHR_debug -> KHRDebug.glDebugMessageControl(
                 KHRDebug.GL_DEBUG_SOURCE_API,
                 KHRDebug.GL_DEBUG_TYPE_OTHER,
                 KHRDebug.GL_DEBUG_SEVERITY_NOTIFICATION,
                 null as IntBuffer?,
                 false
         )
-    } else if (caps.GL_ARB_debug_output) {
-        ARBDebugOutput.glDebugMessageControlARB(ARBDebugOutput.GL_DEBUG_SOURCE_API_ARB, ARBDebugOutput.GL_DEBUG_TYPE_OTHER_ARB, ARBDebugOutput.GL_DEBUG_SEVERITY_LOW_ARB, null as IntBuffer?, false)
+        caps.GL_ARB_debug_output -> ARBDebugOutput.glDebugMessageControlARB(ARBDebugOutput.GL_DEBUG_SOURCE_API_ARB, ARBDebugOutput.GL_DEBUG_TYPE_OTHER_ARB, ARBDebugOutput.GL_DEBUG_SEVERITY_LOW_ARB, null as IntBuffer?, false)
     }
     val nvg = nvgCreate(NVG_STENCIL_STROKES)
     if (nvg == NULL) {
         throw RuntimeException("Could not init nanovg.")
     }
-    glfwSwapInterval(1)
+    glfwSwapInterval(0)
     val window = WindowContext(id = windowId, debugProc = debugProc, nvg = nvg, monitors = monitors, width = width, height = height)
     glfwSetScrollCallback(window.id) { _, xOffset, yOffset ->
         if (!window.ignoreInput) {
@@ -1059,7 +1044,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
     glfwSetKeyCallback(window.id) { _, key, scanCode, action, mods ->
         if (!window.ignoreInput) {
             try {
-                if (!(window.hotkeyHandler?.onKey?.invoke(key, scanCode, action, mods) ?: false)) {
+                if (window.hotKeyHandler?.onKey?.invoke(key, scanCode, action, mods) != true) {
                     window.keyboardHandler?.onKey?.invoke(key, scanCode, action, mods)
                 }
             } catch (t: Throwable) {
@@ -1082,7 +1067,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
                     val scale = if (isMac) {
                         1.0
                     } else {
-                        clamp(Math.round((Math.round((window.currentMonitor.scaleFactor * window.currentMonitor.overRender) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
+                        clamp(Math.round((Math.round((window.currentMonitor.scaleFactor) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5)
                     }
                     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && mouseIsWithin(window.layout.dragArea, scale, x, y)) {
                         startDrag(stack, window)
@@ -1102,7 +1087,7 @@ private fun createWindow(windowState: WindowState?): WindowContext {
         }
     }
     glfwSetDropCallback(window.id) { _, count, address ->
-        val strings = (0..count - 1).mapTo(ArrayList<String>(count)) { GLFWDropCallback.getName(address, it) }
+        val strings = (0 until count).mapTo(ArrayList<String>(count)) { GLFWDropCallback.getName(address, it) }
         window.dropHandler.invoke(strings)
     }
     var windowSize = getWindowSize(windowId)
@@ -1214,7 +1199,7 @@ private fun initializeWindowState(window: WindowContext, windowState: WindowStat
             }
         }
         glfwSetWindowSize(window.id, window.currentWidth, window.currentHeight)
-        if (windowState?.isMaximized ?: false) {
+        if (windowState?.isMaximized == true) {
             window.maximize()
         }
     }
@@ -1231,9 +1216,10 @@ private fun getWindowSize(windowId: Long): Pair<Int, Int> {
 
 private fun adjustForCurrentMonitor(monitorSpec: MonitorSpec, window: WindowContext) {
     val lastMonitor = window.currentMonitor
+    window.lastMonitor = lastMonitor
     window.currentMonitor = monitorSpec
     if (lastMonitor != window.currentMonitor && lastMonitor.scaleFactor != window.currentMonitor.scaleFactor) {
-        val sizeAdjustment = ((window.currentMonitor.scaleFactor / lastMonitor.scaleFactor) / lastMonitor.overRender) * window.currentMonitor.overRender
+        val sizeAdjustment = window.currentMonitor.scaleFactor / lastMonitor.scaleFactor
         LOG.info("sizeAdjustment: $sizeAdjustment, width: ${window.width}, height: ${window.height}, currentWidth: ${window.currentWidth}, currentHeight: ${window.currentHeight}")
         window.width = round(window.width * sizeAdjustment).toInt()
         window.height = round(window.height * sizeAdjustment).toInt()
@@ -1249,9 +1235,7 @@ internal interface ScreenInfoFetcher {
 
 internal class MacScreenInfoFetcher: ScreenInfoFetcher {
 
-    override fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> {
-        return LinkedHashMap()
-    }
+    override fun getScreens(): LinkedHashMap<ScreenIdentity, ScreenSpec> = LinkedHashMap()
 }
 
 private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<MonitorSpec>, MonitorSpec> {
@@ -1285,8 +1269,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                 screen = screens.entries.first().value
             }
             if (screen != null) {
-//                val avgDpi = (dpiX + dpiY) / 2.0
-//                screen.scaleFactor = (Math.round((Math.round((avgDpi / 100.0) * 4.0) / 4.0) * 100.0) / 100.0) / screen.scaleFactor
                 monitors.add(MonitorSpec(
                         id = monitorId,
                         dpiX = dpiX,
@@ -1314,7 +1296,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                         maximizedX2 = screen.maximizedX2,
                         maximizedY2 = screen.maximizedY2,
                         scaleFactor = screen.scaleFactor,
-                        overRender = screen.overRender,
                         redBits = redBits,
                         greenBits = greenBits,
                         blueBits = blueBits,
@@ -1347,7 +1328,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                         maximizedX2 = virtualX + virtualWidth,
                         maximizedY2 = virtualY + virtualHeight,
                         scaleFactor = 1.0,
-                        overRender = 1.0,
                         redBits = redBits,
                         greenBits = greenBits,
                         blueBits = blueBits,

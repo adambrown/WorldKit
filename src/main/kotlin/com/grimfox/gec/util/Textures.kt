@@ -26,8 +26,8 @@ fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
     val imageBuffer = ByteBuffer.allocateDirect(width * height * 4)
     val bands = intArrayOf(0, 1, 2, 3)
     var offset = 0
-    for (y in 0..height - 1) {
-        for (x in 0..width - 1) {
+    for (y in 0 until height) {
+        for (x in 0 until width) {
             for (band in 0..3) {
                 imageBuffer.put(offset++, sampleModel.getSample(x, y, bands[band], dataBuffer).toByte())
             }
@@ -57,7 +57,7 @@ fun loadGraphPointsAsTexture(graph: Graph): Triple<Int, Int, Int> {
 fun loadRegionMaskAsTexture(regionMask: Matrix<Byte>): Triple<Int, Int, Int> {
     val width = regionMask.width
     val data = ByteBuffer.allocateDirect(width * width)
-    for (i in 0..regionMask.size.toInt() - 1) {
+    for (i in 0 until regionMask.size.toInt()) {
         data.put(Math.round((com.grimfox.gec.util.geometry.clamp(regionMask[i].toFloat(), 0.0f, 16.0f) / 16.0f) * 255).toByte())
     }
     data.flip()

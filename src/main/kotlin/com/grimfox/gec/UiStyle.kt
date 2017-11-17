@@ -392,33 +392,19 @@ val LARGE_TEXT_BUTTON_STYLE = ButtonStyle(
 
 val MENU_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE { copy(template = template.copy(vAlign = BOTTOM)) }
 
-fun text(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
-    return StaticTextUtf8(value, style)
-}
+fun text(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text = StaticTextUtf8(value, style)
 
-fun paragraph(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text {
-    return StaticTextParagraphUtf8(value, SMALL_SPACER_SIZE, style)
-}
+fun paragraph(value: String, style: TextStyle = TEXT_STYLE_NORMAL): Text = StaticTextParagraphUtf8(value, SMALL_SPACER_SIZE, style)
 
-fun dynamicParagraph(value: String, limit: Int, style: TextStyle = TEXT_STYLE_NORMAL): DynamicTextParagraphReference {
-    return DynamicTextParagraphReference(value, limit, SMALL_SPACER_SIZE, style)
-}
+fun dynamicParagraph(value: String, limit: Int, style: TextStyle = TEXT_STYLE_NORMAL): DynamicTextParagraphReference = DynamicTextParagraphReference(value, limit, SMALL_SPACER_SIZE, style)
 
-fun glyphStyle(size: Float, color: NPColor): TextStyle {
-    return TextStyle(cRef(size), glyphFont, cRef(color))
-}
+fun glyphStyle(size: Float, color: NPColor): TextStyle = TextStyle(cRef(size), glyphFont, cRef(color))
 
-fun glyph(value: String, style: TextStyle = TEXT_STYLE_GLYPH): Text {
-    return StaticTextUtf8(value, style)
-}
+fun glyph(value: String, style: TextStyle = TEXT_STYLE_GLYPH): Text = StaticTextUtf8(value, style)
 
-fun glyph(value: String, size: Float, color: NPColor): Text {
-    return StaticTextUtf8(value, glyphStyle(size, color))
-}
+fun glyph(value: String, size: Float, color: NPColor): Text = StaticTextUtf8(value, glyphStyle(size, color))
 
-fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text {
-    return DynamicTextUtf8(value, style)
-}
+fun glyph(value: ByteBuffer, style: TextStyle = TEXT_STYLE_GLYPH): Text = DynamicTextUtf8(value, style)
 
 val TEXT_ON = text("On")
 val TEXT_OFF = text("Off")
@@ -477,13 +463,9 @@ fun Block.dragArea(title: Text): Block {
     }
 }
 
-fun Block.toggle(value: ObservableMutableReference<Boolean>): Block {
-    return toggle(value, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
-}
+fun Block.toggle(value: ObservableMutableReference<Boolean>): Block = toggle(value, TEXT_ON, TEXT_OFF, TOGGLE_STYLE)
 
-fun <T> Block.slider(value: ObservableMutableReference<T>, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
-    return slider(value, SLIDER_STYLE, function, inverseFunction)
-}
+fun <T> Block.slider(value: ObservableMutableReference<T>, function: (Float) -> T, inverseFunction: (T) -> Float): Block = slider(value, SLIDER_STYLE, function, inverseFunction)
 
 fun combineFunctions(f1: (Block.() -> Unit)?, f2: (Block.() -> Unit)?): (Block.() -> Unit)? {
     if (f1 == null && f2 == null) {
@@ -1134,15 +1116,14 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
 fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
     val panelNameOpen = "- $panelName"
     val panelNameClosed = "+ $panelName"
-    val panelOpen = expanded
-    val isExpanded = panelOpen.value
+    val isExpanded = expanded.value
     val panelTitle = DynamicTextReference(if (isExpanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
     return block {
         vSizing = SHRINK
         layout = VERTICAL
         shape = NO_SHAPE
         vExpandableButton(LARGE_ROW_HEIGHT, panelTitle.text, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
-            panelOpen.value = !panelOpen.value
+            expanded.value = !expanded.value
         }
         val panelBlock = block {
             hSizing = RELATIVE
@@ -1150,7 +1131,7 @@ fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<B
             layout = Layout.VERTICAL
             panelBuilder()
         }
-        panelOpen.addListener { _, new ->
+        expanded.addListener { _, new ->
             if (new) {
                 panelTitle.reference.value = panelNameOpen
                 panelBlock.isVisible = true
@@ -1159,7 +1140,7 @@ fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<B
                 panelBlock.isVisible = false
             }
         }
-        panelOpen.value = isExpanded
+        expanded.value = isExpanded
     }
 }
 
@@ -1206,15 +1187,13 @@ fun Block.icon(imageRef: Int, imageWidth: Float, imageHeight: Float, layoutWidth
             vSizing = STATIC
             width = imageWidth
             height = imageHeight
-            shape = ShapeRectangle(FillImageDynamic(imageRef), NO_STROKE)
+            shape = ShapeRectangle(FillImage(imageRef), NO_STROKE)
             isMouseAware = false
         }
     }
 }
 
-fun Block.icon(imageRef: Int, imageSize: Float, layoutSize: Float): Block {
-    return icon(imageRef, imageSize, imageSize, layoutSize, layoutSize)
-}
+fun Block.icon(imageRef: Int, imageSize: Float, layoutSize: Float): Block = icon(imageRef, imageSize, imageSize, layoutSize, layoutSize)
 
 fun Block.meshViewport3D(meshViewport: MeshViewport3D, ui: UserInterface): Block {
     return block {

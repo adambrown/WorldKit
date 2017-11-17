@@ -4,7 +4,8 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.LOG
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
@@ -49,6 +50,28 @@ val REGION_COLORS = arrayListOf(
         color(0.61960787f, 0.16078432f, 0.16078432f),
         color(0.20392157f, 0.45490196f, 0.45490196f)
 ) as List<NPColor>
+
+val BIOME_COLORS = arrayListOf(
+        color(0, 0, 0),
+
+        color(183, 57, 97), color(103, 184, 140), color(150, 107, 234), color(223, 173, 121),
+        color(152, 75, 88), color(57, 198, 133), color(134, 60, 185), color(171, 136, 78),
+        color(225, 56, 95), color(50, 126, 88), color(126, 87, 147), color(159, 117, 25),
+        color(219, 130, 130), color(65, 191, 181), color(126, 73, 156), color(228, 174, 57),
+        color(225, 90, 90), color(59, 196, 224), color(198, 121, 230), color(116, 101, 41),
+        color(176, 62, 63), color(91, 171, 223), color(194, 137, 212), color(183, 164, 62),
+        color(234, 76, 57), color(66, 129, 183), color(174, 76, 193), color(182, 182, 45),
+        color(187, 49, 29), color(69, 142, 232), color(165, 76, 151), color(120, 136, 41),
+        color(148, 78, 56), color(65, 92, 158), color(200, 132, 185), color(165, 176, 105),
+        color(233, 112, 73), color(94, 123, 241), color(232, 118, 207), color(170, 196, 65),
+        color(234, 138, 104), color(121, 125, 190), color(203, 60, 165), color(118, 169, 48),
+        color(218, 93, 34), color(56, 91, 207), color(182, 42, 124), color(82, 115, 46),
+        color(165, 73, 26), color(168, 166, 232), color(160, 75, 117), color(110, 193, 66),
+        color(172, 104, 62), color(104, 98, 190), color(231, 146, 181), color(127, 186, 105),
+        color(221, 132, 42), color(154, 139, 229), color(228, 65, 139), color(54, 141, 54),
+        color(213, 148, 75), color(114, 79, 190), color(234, 111, 158), color(69, 197, 88)
+)
+
 
 private fun colorToInt(id: Int): Int {
     val color = REGION_COLORS[id]

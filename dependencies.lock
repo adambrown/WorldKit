@@ -1,29 +1,29 @@
 {
     "compile": {
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -44,7 +44,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -53,7 +53,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -63,7 +63,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -74,22 +74,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -142,13 +142,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -157,14 +157,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -176,69 +175,34 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -254,29 +218,29 @@
     },
     "compileClasspath": {
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -297,7 +261,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -306,7 +270,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -316,7 +280,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -327,22 +291,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -395,13 +359,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -410,14 +374,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -429,322 +392,34 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.reflections:reflections": {
-            "locked": "0.9.10",
-            "requested": "0.9.10"
-        },
-        "org.slf4j:slf4j-api": {
-            "locked": "1.7.22",
-            "requested": "1.7.22",
-            "transitive": [
-                "com.grimfox:triangle-kotlin"
-            ]
-        }
-    },
-    "compileOnly": {
-        "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.core:jackson-databind",
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.core:jackson-databind"
-            ]
-        },
-        "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
-        },
-        "com.google.code.findbugs:annotations": {
-            "locked": "2.0.3",
-            "transitive": [
-                "io.airlift:airline",
-                "org.reflections:reflections"
-            ]
-        },
-        "com.google.guava:guava": {
-            "locked": "18.0",
-            "transitive": [
-                "io.airlift:airline",
-                "org.reflections:reflections"
-            ]
-        },
-        "com.grimfox:triangle-kotlin": {
-            "locked": "1.7.1",
-            "requested": "1.7.1"
-        },
-        "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.common:common-image",
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.common:common-image",
-                "com.twelvemonkeys.common:common-io",
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
-        },
-        "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
-        },
-        "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio-hdr"
-            ]
-        },
-        "io.airlift:airline": {
-            "locked": "0.7",
-            "requested": "0.7"
-        },
-        "javax.inject:javax.inject": {
-            "locked": "1",
-            "transitive": [
-                "io.airlift:airline"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant": {
-            "locked": "3.3.0",
-            "requested": "3.3.0"
-        },
-        "nl.komponents.kovenant:kovenant-combine": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-core": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant",
-                "nl.komponents.kovenant:kovenant-combine",
-                "nl.komponents.kovenant:kovenant-functional",
-                "nl.komponents.kovenant:kovenant-jvm"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-functional": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-jvm": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "org.javassist:javassist": {
-            "locked": "3.18.2-GA",
-            "transitive": [
-                "org.reflections:reflections"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
-            "transitive": [
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
-            "transitive": [
-                "com.grimfox:triangle-kotlin",
-                "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
-            "transitive": [
-                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
-            "transitive": [
-                "com.grimfox:triangle-kotlin"
-            ]
-        },
-        "org.jetbrains:annotations": {
-            "locked": "13.0",
-            "transitive": [
-                "org.jetbrains.kotlin:kotlin-stdlib"
-            ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
-        },
-        "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
-            "transitive": [
-                "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
-                "org.lwjgl:lwjgl-nanovg",
-                "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
-            ]
-        },
-        "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -770,29 +445,29 @@
             ]
         },
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -813,7 +488,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -822,7 +497,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -832,7 +507,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -843,22 +518,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -911,13 +586,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -926,14 +601,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -945,69 +619,34 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1023,14 +662,34 @@
         }
     },
     "kapt": {
-        "org.jetbrains.kotlin:kotlin-annotation-processing": {
-            "locked": "1.1.51",
-            "requested": "1.1.51"
+        "org.jetbrains.kotlin:kotlin-annotation-processing-gradle": {
+            "locked": "1.1.60",
+            "requested": "1.1.60"
+        },
+        "org.jetbrains.kotlin:kotlin-compiler-embeddable": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-annotation-processing-gradle"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-reflect": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-script-runtime": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable"
+            ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
-                "org.jetbrains.kotlin:kotlin-annotation-processing"
+                "org.jetbrains.kotlin:kotlin-annotation-processing-gradle",
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+                "org.jetbrains.kotlin:kotlin-reflect"
             ]
         },
         "org.jetbrains:annotations": {
@@ -1041,14 +700,34 @@
         }
     },
     "kaptTest": {
-        "org.jetbrains.kotlin:kotlin-annotation-processing": {
-            "locked": "1.1.51",
-            "requested": "1.1.51"
+        "org.jetbrains.kotlin:kotlin-annotation-processing-gradle": {
+            "locked": "1.1.60",
+            "requested": "1.1.60"
+        },
+        "org.jetbrains.kotlin:kotlin-compiler-embeddable": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-annotation-processing-gradle"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-reflect": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-script-runtime": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable"
+            ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
-                "org.jetbrains.kotlin:kotlin-annotation-processing"
+                "org.jetbrains.kotlin:kotlin-annotation-processing-gradle",
+                "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+                "org.jetbrains.kotlin:kotlin-reflect"
             ]
         },
         "org.jetbrains:annotations": {
@@ -1060,7 +739,8 @@
     },
     "resolutionRules": {
         "com.netflix.nebula:gradle-resolution-rules": {
-            "locked": "0.51.0"
+            "locked": "0.52.0",
+            "requested": "latest.release"
         }
     },
     "runtime": {
@@ -1075,29 +755,29 @@
             ]
         },
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -1118,7 +798,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -1127,7 +807,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -1137,7 +817,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -1148,22 +828,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -1216,13 +896,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -1231,14 +911,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1250,69 +929,262 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "org.reflections:reflections": {
+            "locked": "0.9.10",
+            "requested": "0.9.10"
         },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "org.slf4j:slf4j-api": {
+            "locked": "1.7.22",
+            "requested": "1.7.22",
+            "transitive": [
+                "ch.qos.logback:logback-classic",
+                "com.grimfox:triangle-kotlin"
+            ]
+        }
+    },
+    "runtimeClasspath": {
+        "ch.qos.logback:logback-classic": {
+            "locked": "1.1.7",
+            "requested": "1.1.7"
         },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "ch.qos.logback:logback-core": {
+            "locked": "1.1.7",
+            "transitive": [
+                "ch.qos.logback:logback-classic"
+            ]
         },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "com.fasterxml.jackson.core:jackson-annotations": {
+            "locked": "2.9.2",
+            "transitive": [
+                "com.fasterxml.jackson.core:jackson-databind",
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "com.fasterxml.jackson.core:jackson-core": {
+            "locked": "2.9.2",
+            "requested": "latest.release",
+            "transitive": [
+                "com.fasterxml.jackson.core:jackson-databind"
+            ]
+        },
+        "com.fasterxml.jackson.core:jackson-databind": {
+            "locked": "2.9.2",
+            "requested": "latest.release",
+            "transitive": [
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "com.fasterxml.jackson.module:jackson-module-kotlin": {
+            "locked": "2.9.2",
+            "requested": "latest.release"
+        },
+        "com.google.code.findbugs:annotations": {
+            "locked": "2.0.3",
+            "transitive": [
+                "io.airlift:airline",
+                "org.reflections:reflections"
+            ]
+        },
+        "com.google.guava:guava": {
+            "locked": "18.0",
+            "transitive": [
+                "io.airlift:airline",
+                "org.reflections:reflections"
+            ]
+        },
+        "com.grimfox:triangle-kotlin": {
+            "locked": "1.7.1",
+            "requested": "1.7.1"
+        },
+        "com.twelvemonkeys.common:common-image": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.common:common-io": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.common:common-image",
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.common:common-lang": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.common:common-image",
+                "com.twelvemonkeys.common:common-io",
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.imageio:imageio": {
+            "locked": "3.3.2",
+            "requested": "latest.release"
+        },
+        "com.twelvemonkeys.imageio:imageio-core": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.imageio:imageio-hdr": {
+            "locked": "3.3.2",
+            "requested": "latest.release"
+        },
+        "com.twelvemonkeys.imageio:imageio-metadata": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio-hdr"
+            ]
+        },
+        "io.airlift:airline": {
+            "locked": "0.7",
+            "requested": "0.7"
+        },
+        "javax.inject:javax.inject": {
+            "locked": "1",
+            "transitive": [
+                "io.airlift:airline"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant": {
+            "locked": "3.3.0",
+            "requested": "3.3.0"
+        },
+        "nl.komponents.kovenant:kovenant-combine": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-core": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant",
+                "nl.komponents.kovenant:kovenant-combine",
+                "nl.komponents.kovenant:kovenant-functional",
+                "nl.komponents.kovenant:kovenant-jvm"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-functional": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-jvm": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "org.javassist:javassist": {
+            "locked": "3.18.2-GA",
+            "transitive": [
+                "org.reflections:reflections"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-reflect": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.grimfox:triangle-kotlin",
+                "org.jetbrains.kotlin:kotlin-reflect",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.grimfox:triangle-kotlin"
+            ]
+        },
+        "org.jetbrains:annotations": {
+            "locked": "13.0",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-stdlib"
+            ]
+        },
+        "org.joml:joml": {
+            "locked": "1.9.6",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl": {
+            "locked": "3.1.3",
+            "requested": "latest.release",
+            "transitive": [
+                "org.lwjgl:lwjgl-glfw",
+                "org.lwjgl:lwjgl-nanovg",
+                "org.lwjgl:lwjgl-nfd",
+                "org.lwjgl:lwjgl-opengl"
+            ]
+        },
+        "org.lwjgl:lwjgl-glfw": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-nanovg": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-nfd": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-opengl": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1329,29 +1201,29 @@
     },
     "testCompile": {
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -1372,7 +1244,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -1381,7 +1253,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -1391,7 +1263,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -1402,22 +1274,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -1470,13 +1342,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -1485,14 +1357,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1504,69 +1375,34 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1582,29 +1418,29 @@
     },
     "testCompileClasspath": {
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -1625,7 +1461,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -1634,7 +1470,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -1644,7 +1480,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -1655,22 +1491,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -1723,13 +1559,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -1738,14 +1574,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -1757,322 +1592,34 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.reflections:reflections": {
-            "locked": "0.9.10",
-            "requested": "0.9.10"
-        },
-        "org.slf4j:slf4j-api": {
-            "locked": "1.7.22",
-            "requested": "1.7.22",
-            "transitive": [
-                "com.grimfox:triangle-kotlin"
-            ]
-        }
-    },
-    "testCompileOnly": {
-        "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.core:jackson-databind",
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.core:jackson-databind"
-            ]
-        },
-        "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
-            "transitive": [
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
-        },
-        "com.google.code.findbugs:annotations": {
-            "locked": "2.0.3",
-            "transitive": [
-                "io.airlift:airline",
-                "org.reflections:reflections"
-            ]
-        },
-        "com.google.guava:guava": {
-            "locked": "18.0",
-            "transitive": [
-                "io.airlift:airline",
-                "org.reflections:reflections"
-            ]
-        },
-        "com.grimfox:triangle-kotlin": {
-            "locked": "1.7.1",
-            "requested": "1.7.1"
-        },
-        "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.common:common-image",
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.common:common-image",
-                "com.twelvemonkeys.common:common-io",
-                "com.twelvemonkeys.imageio:imageio",
-                "com.twelvemonkeys.imageio:imageio-core",
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
-        },
-        "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio-hdr",
-                "com.twelvemonkeys.imageio:imageio-metadata"
-            ]
-        },
-        "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
-        },
-        "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
-            "transitive": [
-                "com.twelvemonkeys.imageio:imageio-hdr"
-            ]
-        },
-        "io.airlift:airline": {
-            "locked": "0.7",
-            "requested": "0.7"
-        },
-        "javax.inject:javax.inject": {
-            "locked": "1",
-            "transitive": [
-                "io.airlift:airline"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant": {
-            "locked": "3.3.0",
-            "requested": "3.3.0"
-        },
-        "nl.komponents.kovenant:kovenant-combine": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-core": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant",
-                "nl.komponents.kovenant:kovenant-combine",
-                "nl.komponents.kovenant:kovenant-functional",
-                "nl.komponents.kovenant:kovenant-jvm"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-functional": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "nl.komponents.kovenant:kovenant-jvm": {
-            "locked": "3.3.0",
-            "transitive": [
-                "nl.komponents.kovenant:kovenant"
-            ]
-        },
-        "org.javassist:javassist": {
-            "locked": "3.18.2-GA",
-            "transitive": [
-                "org.reflections:reflections"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
-            "transitive": [
-                "com.fasterxml.jackson.module:jackson-module-kotlin"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
-            "transitive": [
-                "com.grimfox:triangle-kotlin",
-                "org.jetbrains.kotlin:kotlin-reflect",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
-                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
-            "transitive": [
-                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
-            ]
-        },
-        "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
-            "transitive": [
-                "com.grimfox:triangle-kotlin"
-            ]
-        },
-        "org.jetbrains:annotations": {
-            "locked": "13.0",
-            "transitive": [
-                "org.jetbrains.kotlin:kotlin-stdlib"
-            ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
-        },
-        "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
-            "transitive": [
-                "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
-                "org.lwjgl:lwjgl-nanovg",
-                "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
-            ]
-        },
-        "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -2098,29 +1645,29 @@
             ]
         },
         "com.fasterxml.jackson.core:jackson-annotations": {
-            "locked": "2.7.5",
+            "locked": "2.9.2",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind",
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.core:jackson-core": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.core:jackson-databind"
             ]
         },
         "com.fasterxml.jackson.core:jackson-databind": {
-            "locked": "2.7.5",
-            "requested": "2.7.5",
+            "locked": "2.9.2",
+            "requested": "latest.release",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "com.fasterxml.jackson.module:jackson-module-kotlin": {
-            "locked": "2.7.5",
-            "requested": "2.7.5"
+            "locked": "2.9.2",
+            "requested": "latest.release"
         },
         "com.google.code.findbugs:annotations": {
             "locked": "2.0.3",
@@ -2141,7 +1688,7 @@
             "requested": "1.7.1"
         },
         "com.twelvemonkeys.common:common-image": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio",
                 "com.twelvemonkeys.imageio:imageio-core",
@@ -2150,7 +1697,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-io": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.imageio:imageio",
@@ -2160,7 +1707,7 @@
             ]
         },
         "com.twelvemonkeys.common:common-lang": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.common:common-image",
                 "com.twelvemonkeys.common:common-io",
@@ -2171,22 +1718,22 @@
             ]
         },
         "com.twelvemonkeys.imageio:imageio": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-core": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr",
                 "com.twelvemonkeys.imageio:imageio-metadata"
             ]
         },
         "com.twelvemonkeys.imageio:imageio-hdr": {
-            "locked": "3.3.1",
-            "requested": "3.3.1"
+            "locked": "3.3.2",
+            "requested": "latest.release"
         },
         "com.twelvemonkeys.imageio:imageio-metadata": {
-            "locked": "3.3.1",
+            "locked": "3.3.2",
             "transitive": [
                 "com.twelvemonkeys.imageio:imageio-hdr"
             ]
@@ -2239,13 +1786,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-reflect": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.fasterxml.jackson.module:jackson-module-kotlin"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin",
                 "org.jetbrains.kotlin:kotlin-reflect",
@@ -2254,14 +1801,13 @@
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
-            "locked": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib-jre8"
             ]
         },
         "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
-            "locked": "1.1.51",
-            "requested": "1.1.51",
+            "locked": "1.1.60",
             "transitive": [
                 "com.grimfox:triangle-kotlin"
             ]
@@ -2273,69 +1819,262 @@
             ]
         },
         "org.joml:joml": {
-            "locked": "1.9.0",
-            "requested": "1.9.0"
+            "locked": "1.9.6",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0",
+            "locked": "3.1.3",
+            "requested": "latest.release",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
-                "org.lwjgl:lwjgl-jemalloc",
-                "org.lwjgl:lwjgl-lmdb",
                 "org.lwjgl:lwjgl-nanovg",
                 "org.lwjgl:lwjgl-nfd",
-                "org.lwjgl:lwjgl-opencl",
-                "org.lwjgl:lwjgl-opengl",
-                "org.lwjgl:lwjgl-par",
-                "org.lwjgl:lwjgl-sse",
-                "org.lwjgl:lwjgl-stb",
-                "org.lwjgl:lwjgl-tinyfd"
+                "org.lwjgl:lwjgl-opengl"
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-jemalloc": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-lmdb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
-        },
-        "org.lwjgl:lwjgl-opencl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
-        "org.lwjgl:lwjgl-par": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "org.reflections:reflections": {
+            "locked": "0.9.10",
+            "requested": "0.9.10"
         },
-        "org.lwjgl:lwjgl-sse": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "org.slf4j:slf4j-api": {
+            "locked": "1.7.22",
+            "requested": "1.7.22",
+            "transitive": [
+                "ch.qos.logback:logback-classic",
+                "com.grimfox:triangle-kotlin"
+            ]
+        }
+    },
+    "testRuntimeClasspath": {
+        "ch.qos.logback:logback-classic": {
+            "locked": "1.1.7",
+            "requested": "1.1.7"
         },
-        "org.lwjgl:lwjgl-stb": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "ch.qos.logback:logback-core": {
+            "locked": "1.1.7",
+            "transitive": [
+                "ch.qos.logback:logback-classic"
+            ]
         },
-        "org.lwjgl:lwjgl-tinyfd": {
-            "locked": "3.1.0",
-            "requested": "3.1.0"
+        "com.fasterxml.jackson.core:jackson-annotations": {
+            "locked": "2.9.2",
+            "transitive": [
+                "com.fasterxml.jackson.core:jackson-databind",
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "com.fasterxml.jackson.core:jackson-core": {
+            "locked": "2.9.2",
+            "requested": "latest.release",
+            "transitive": [
+                "com.fasterxml.jackson.core:jackson-databind"
+            ]
+        },
+        "com.fasterxml.jackson.core:jackson-databind": {
+            "locked": "2.9.2",
+            "requested": "latest.release",
+            "transitive": [
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "com.fasterxml.jackson.module:jackson-module-kotlin": {
+            "locked": "2.9.2",
+            "requested": "latest.release"
+        },
+        "com.google.code.findbugs:annotations": {
+            "locked": "2.0.3",
+            "transitive": [
+                "io.airlift:airline",
+                "org.reflections:reflections"
+            ]
+        },
+        "com.google.guava:guava": {
+            "locked": "18.0",
+            "transitive": [
+                "io.airlift:airline",
+                "org.reflections:reflections"
+            ]
+        },
+        "com.grimfox:triangle-kotlin": {
+            "locked": "1.7.1",
+            "requested": "1.7.1"
+        },
+        "com.twelvemonkeys.common:common-image": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.common:common-io": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.common:common-image",
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.common:common-lang": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.common:common-image",
+                "com.twelvemonkeys.common:common-io",
+                "com.twelvemonkeys.imageio:imageio",
+                "com.twelvemonkeys.imageio:imageio-core",
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.imageio:imageio": {
+            "locked": "3.3.2",
+            "requested": "latest.release"
+        },
+        "com.twelvemonkeys.imageio:imageio-core": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio-hdr",
+                "com.twelvemonkeys.imageio:imageio-metadata"
+            ]
+        },
+        "com.twelvemonkeys.imageio:imageio-hdr": {
+            "locked": "3.3.2",
+            "requested": "latest.release"
+        },
+        "com.twelvemonkeys.imageio:imageio-metadata": {
+            "locked": "3.3.2",
+            "transitive": [
+                "com.twelvemonkeys.imageio:imageio-hdr"
+            ]
+        },
+        "io.airlift:airline": {
+            "locked": "0.7",
+            "requested": "0.7"
+        },
+        "javax.inject:javax.inject": {
+            "locked": "1",
+            "transitive": [
+                "io.airlift:airline"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant": {
+            "locked": "3.3.0",
+            "requested": "3.3.0"
+        },
+        "nl.komponents.kovenant:kovenant-combine": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-core": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant",
+                "nl.komponents.kovenant:kovenant-combine",
+                "nl.komponents.kovenant:kovenant-functional",
+                "nl.komponents.kovenant:kovenant-jvm"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-functional": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "nl.komponents.kovenant:kovenant-jvm": {
+            "locked": "3.3.0",
+            "transitive": [
+                "nl.komponents.kovenant:kovenant"
+            ]
+        },
+        "org.javassist:javassist": {
+            "locked": "3.18.2-GA",
+            "transitive": [
+                "org.reflections:reflections"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-reflect": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.fasterxml.jackson.module:jackson-module-kotlin"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.grimfox:triangle-kotlin",
+                "org.jetbrains.kotlin:kotlin-reflect",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre7",
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib-jre7": {
+            "locked": "1.1.60",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-stdlib-jre8"
+            ]
+        },
+        "org.jetbrains.kotlin:kotlin-stdlib-jre8": {
+            "locked": "1.1.60",
+            "transitive": [
+                "com.grimfox:triangle-kotlin"
+            ]
+        },
+        "org.jetbrains:annotations": {
+            "locked": "13.0",
+            "transitive": [
+                "org.jetbrains.kotlin:kotlin-stdlib"
+            ]
+        },
+        "org.joml:joml": {
+            "locked": "1.9.6",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl": {
+            "locked": "3.1.3",
+            "requested": "latest.release",
+            "transitive": [
+                "org.lwjgl:lwjgl-glfw",
+                "org.lwjgl:lwjgl-nanovg",
+                "org.lwjgl:lwjgl-nfd",
+                "org.lwjgl:lwjgl-opengl"
+            ]
+        },
+        "org.lwjgl:lwjgl-glfw": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-nanovg": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-nfd": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
+        },
+        "org.lwjgl:lwjgl-opengl": {
+            "locked": "3.1.3",
+            "requested": "latest.release"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",

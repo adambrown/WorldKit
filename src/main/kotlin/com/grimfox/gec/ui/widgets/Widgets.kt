@@ -1,8 +1,5 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.util.twr
-import com.grimfox.gec.ui.nvgproxy.NO_COLOR
-import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.*
@@ -13,11 +10,11 @@ import com.grimfox.gec.ui.widgets.VerticalTruncation.*
 import com.grimfox.gec.util.Reference
 import com.grimfox.gec.util.Utils.LOG
 import com.grimfox.gec.util.cRef
+import com.grimfox.gec.util.twr
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
-import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.MemoryUtil.memAddress
 import java.lang.Math.max
 import java.lang.Math.min
@@ -81,7 +78,7 @@ class FillColor(val color: NPColor) : Fill {
     }
 }
 
-class FillImageDynamic(val image: Int) : Fill {
+class FillImage(private val image: Int) : Fill {
 
     private val paint = NPPaint.create()
 
@@ -92,18 +89,7 @@ class FillImageDynamic(val image: Int) : Fill {
     }
 }
 
-class FillImageStatic(val image: Int, val width: Int, val height: Int) : Fill {
-
-    private val paint = NPPaint.create()
-
-    override fun draw(nvg: Long, block: Block, scale: Float) {
-        nvgImagePattern(nvg, Math.round(block.x * scale).toFloat(), Math.round(block.y * scale).toFloat(), Math.round(block.width * scale).toFloat(), Math.round(block.height * scale).toFloat(), 0.0f, image, 1.0f, paint)
-        nvgFillPaint(nvg, paint)
-        nvgFill(nvg)
-    }
-}
-
-class FillBoxGradient(val innerColor: NPColor, val outerColor: NPColor, val cornerRadius: Float, val feather: Float) : Fill {
+class FillBoxGradient(private val innerColor: NPColor, private val outerColor: NPColor, private val cornerRadius: Float, private val feather: Float) : Fill {
 
     private val paint = NPPaint.create()
 
@@ -129,12 +115,6 @@ private class StrokeNone : Stroke {
     }
 }
 
-class StrokeInvisible(override val size: Float) : Stroke {
-
-    override fun draw(nvg: Long, block: Block, scale: Float) {
-    }
-}
-
 class StrokeColor(val color: NPColor, override val size: Float) : Stroke {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
@@ -154,7 +134,11 @@ interface Text {
 
     fun draw(nvg: Long, block: Block, scale: Float)
 
-    fun dimensions(nvg: Long): Pair<Float, Float>
+    fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float
+
+    fun height(scale: Float): Float
+
+    fun dimensions(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Pair<Float, Float>
 }
 
 private class TextNone : Text {
@@ -166,12 +150,14 @@ private class TextNone : Text {
     override fun draw(nvg: Long, block: Block, scale: Float) {
     }
 
-    override fun dimensions(nvg: Long): Pair<Float, Float> {
-        return Pair(0.0f, 0.0f)
-    }
+    override fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float = 0.0f
+
+    override fun height(scale: Float): Float = 0.0f
+
+    override fun dimensions(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Pair<Float, Float> = 0.0f to 0.0f
 }
 
-open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalSpace: Float, override var style: TextStyle) : Text {
+open class DynamicTextParagraphUtf8(override val data: ByteBuffer, private val verticalSpace: Float, override var style: TextStyle) : Text {
 
     override val length: Int get() = data.limit()
     private val lineHeight = BufferUtils.createFloatBuffer(1)
@@ -193,7 +179,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
         var rowCount: Int = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
         if (block.vAlign == TOP) {
             while (rowCount != 0) {
-                for (i in 0..rowCount - 1) {
+                for (i in 0 until rowCount) {
                     val row = rows.get(i)
                     nnvgText(nvg, x, y, row.start(), row.end())
                     y += scaledHeight
@@ -204,7 +190,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
         } else {
             var yDelta = 0.0f
             while (rowCount != 0) {
-                for (i in 0..rowCount - 1) {
+                for (i in 0 until rowCount) {
                     yDelta += scaledHeight
                 }
                 start = rows.get(rowCount - 1).next()
@@ -220,7 +206,7 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
             start = memAddress(data)
             rowCount = nnvgTextBreakLines(nvg, start, end, width, rows.memAddress(), 3)
             while (rowCount != 0) {
-                for (i in 0..rowCount - 1) {
+                for (i in 0 until rowCount) {
                     val row = rows.get(i)
                     nnvgText(nvg, x, y, row.start(), row.end())
                     y += scaledHeight
@@ -231,9 +217,11 @@ open class DynamicTextParagraphUtf8(override val data: ByteBuffer, val verticalS
         }
     }
 
-    override fun dimensions(nvg: Long): Pair<Float, Float> {
-        return Pair(0.0f, 0.0f)
-    }
+    override fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float = 0.0f
+
+    override fun height(scale: Float): Float = 0.0f
+
+    override fun dimensions(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Pair<Float, Float> = 0.0f to 0.0f
 }
 
 class StaticTextParagraphUtf8(string: String, verticalSpace: Float, style: TextStyle) : DynamicTextParagraphUtf8(MemoryUtil.memUTF8(string, false), verticalSpace, style) {
@@ -251,23 +239,42 @@ open class DynamicTextUtf8(override val data: ByteBuffer, override var style: Te
         nvgFontSize(nvg, style.size.value * scale)
         nvgTextAlign(nvg, alignMask)
         nvgFillColor(nvg, style.color.value)
-        nvgText(nvg, x * scale, y * scale, data, NULL)
+        nvgText(nvg, x * scale, y * scale, data)
     }
 
-    override fun dimensions(nvg: Long): Pair<Float, Float> {
+    protected fun widthInternal(nvg: Long, scale: Float, font: Int, size: Float): Float {
         twr(stackPush()) { stack ->
             val bounds = stack.mallocFloat(4)
-            nvgFontFaceId(nvg, style.font.value)
-            nvgFontSize(nvg, style.size.value)
-            nvgTextBounds(nvg, 0f, 0f, data, NULL, bounds)
-            return Pair(bounds[2] - bounds[0], bounds[3] - bounds[1])
+            nvgFontFaceId(nvg, font)
+            nvgFontSize(nvg, size * scale)
+            nvgTextBounds(nvg, 0f, 0f, data, bounds)
+            return Math.ceil(Math.ceil(bounds[2] - bounds[0].toDouble()) / scale).toFloat()
         }
     }
+
+    override fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float = widthInternal(nvg, scale, style.font.value, style.size.value)
+
+    override fun height(scale: Float) = Math.ceil(Math.ceil(style.size.value * scale.toDouble()) / scale).toFloat()
+
+    override fun dimensions(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long) = width(nvg, scale, scaleChanged, runId) to height(scale)
 }
 
-class StaticTextUtf8(string: String, style: TextStyle) : DynamicTextUtf8(MemoryUtil.memUTF8(string, true), style) {
+class StaticTextUtf8(string: String, style: TextStyle) : DynamicTextUtf8(MemoryUtil.memUTF8(string, false), style) {
+
+    private var cachedRunId = -1L
+    private var cachedWidth = -1.0f
 
     override val length: Int = data.limit()
+
+    override fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float {
+        if ((scaleChanged && cachedRunId != runId) || cachedWidth < 0.0f) {
+            cachedRunId = runId
+            cachedWidth = widthInternal(nvg, scale, style.font.value, style.size.value)
+        }
+        return cachedWidth
+    }
+
+    override fun dimensions(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long) = width(nvg, scale, scaleChanged, runId) to height(scale)
 }
 
 private fun calculatePositionAndAlignmentForText(block: Block): Triple<Float, Float, Int> {
@@ -342,7 +349,7 @@ class ShapeRectangle(override val fill: Fill, override val stroke: Stroke) : Sha
     }
 }
 
-class ShapeCursor(override val fill: Fill, override val stroke: Stroke, val selectFill: Fill, val caret: Caret, var timeOffset: Long = 0) : Shape {
+class ShapeCursor(override val fill: Fill, override val stroke: Stroke, private val selectFill: Fill, private val caret: Caret, var timeOffset: Long = 0) : Shape {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         if (caret.selection == 0) {
@@ -386,7 +393,7 @@ class ShapeEllipse(override val fill: Fill, override val stroke: Stroke) : Shape
     }
 }
 
-class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke, val cornerRadius: Float) : Shape {
+class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke, private val cornerRadius: Float) : Shape {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val halfStroke = stroke.size / 2.0f
@@ -397,7 +404,7 @@ class ShapeRoundedRectangle(override val fill: Fill, override val stroke: Stroke
     }
 }
 
-class ShapeDropShadow(override val fill: Fill, override val stroke: Stroke, val inset: Float, val cornerRadius: Float) : Shape {
+class ShapeDropShadow(override val fill: Fill, override val stroke: Stroke, private val inset: Float, private val cornerRadius: Float) : Shape {
 
     private val insetX2 = inset * 2
 
@@ -421,7 +428,7 @@ class ShapeDropShadow(override val fill: Fill, override val stroke: Stroke, val 
 
 private const val TRIANGLE_SIDE = 0.70710678118
 
-class ShapeTriangle(override val fill: Fill, override val stroke: Stroke, val direction: Direction) : Shape {
+class ShapeTriangle(override val fill: Fill, override val stroke: Stroke, private val direction: Direction) : Shape {
 
     enum class Direction {
         NORTH,
@@ -505,7 +512,7 @@ class ShapeTriangle(override val fill: Fill, override val stroke: Stroke, val di
     }
 }
 
-class ShapeMeshViewport3D(val viewport: MeshViewport3D) : Shape {
+class ShapeMeshViewport3D(private val viewport: MeshViewport3D) : Shape {
 
     override val fill = NO_FILL
     override val stroke = NO_STROKE
@@ -553,36 +560,35 @@ private class ShrinkGroupInternal(internal val blocks: MutableList<Block>, inter
 
     internal val size: Float
     get() {
-        if (isCalculated) {
-            return _size
+        return if (isCalculated) {
+            _size
         } else {
             var max = 0.0f
             blocks.forEach {
-                if (horizontal) {
-                    max = max(it.width, max)
+                max = if (horizontal) {
+                    max(it.width, max)
                 } else {
-                    max = max(it.height, max)
+                    max(it.height, max)
                 }
             }
             _size = max
             isCalculated = true
-            return _size
+            _size
         }
     }
 }
 
-fun hShrinkGroup(): ShrinkGroup {
-    return ShrinkGroupInternal(ArrayList(), true)
-}
+fun hShrinkGroup(): ShrinkGroup = ShrinkGroupInternal(ArrayList(), true)
 
-fun vShrinkGroup(): ShrinkGroup {
-    return ShrinkGroupInternal(ArrayList(), false)
-}
+fun vShrinkGroup(): ShrinkGroup = ShrinkGroupInternal(ArrayList(), false)
 
 abstract class Block {
     abstract val root: Block
+    abstract val scale: Float
+    abstract val scaleChanged: Boolean
     abstract val parent: Block
-    abstract var nvg: Long
+    abstract val nvg: Long
+    abstract val runId: Long
     abstract val layoutChildren: MutableList<Block>
     abstract val renderChildren: MutableList<Block>
     abstract var isVisible: Boolean
@@ -644,19 +650,18 @@ abstract class Block {
             itemsToProcess.forEach { itemToProcess ->
                 do {
                     reprocess = false
-                    val mouseOver = itemToProcess
-                    if (mouseOver != null) {
+                    if (itemToProcess != null) {
                         if (isDown) {
-                            val mouseDownFun = mouseOver.onMouseDown
+                            val mouseDownFun = itemToProcess.onMouseDown
                             if (mouseDownFun != null) {
-                                mouseOver.mouseDownFun(button, x, y, mods)
+                                itemToProcess.mouseDownFun(button, x, y, mods)
                             }
                             var needToAdd = true
                             if (onlyOnFirst) {
                                 val toRemove = ArrayList<Triple<Int, Block, Int>>(awaitingMouseDownOverOther.size)
                                 awaitingMouseDownOverOther.forEach {
                                     if (it.first == button) {
-                                        if (it.second == mouseOver) {
+                                        if (it.second == itemToProcess) {
                                             needToAdd = false
                                         } else {
                                             val mouseDownOverOtherFun = it.second.onMouseDownOverOther
@@ -669,22 +674,22 @@ abstract class Block {
                                 awaitingMouseDownOverOther.removeAll(toRemove)
                                 onlyOnFirst = false
                             }
-                            val pair = Triple(button, mouseOver, mods)
+                            val pair = Triple(button, itemToProcess, mods)
                             awaitingRelease.add(pair)
                             if (needToAdd) {
                                 awaitingMouseDownOverOther.add(pair)
                             }
                         } else {
-                            val mouseUpFun = mouseOver.onMouseUp
+                            val mouseUpFun = itemToProcess.onMouseUp
                             if (mouseUpFun != null) {
-                                mouseOver.mouseUpFun(button, x, y, mods)
+                                itemToProcess.mouseUpFun(button, x, y, mods)
                             }
                             if (onlyOnFirst) {
                                 awaitingRelease.forEach {
-                                    if (it.first == button && it.second == mouseOver) {
-                                        val mouseClickFun = mouseOver.onMouseClick
+                                    if (it.first == button && it.second == itemToProcess) {
+                                        val mouseClickFun = itemToProcess.onMouseClick
                                         if (mouseClickFun != null) {
-                                            mouseOver.mouseClickFun(button, x, y, mods)
+                                            itemToProcess.mouseClickFun(button, x, y, mods)
                                         }
                                     }
                                 }
@@ -719,10 +724,9 @@ abstract class Block {
             reprocess = false
             val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
             itemsToProcess.forEach { itemToProcess ->
-                val mouseOver = itemToProcess
-                val scrollFun = mouseOver?.onScroll
-                if (mouseOver != null && scrollFun != null) {
-                    mouseOver.scrollFun(scrollX, scrollY)
+                val scrollFun = itemToProcess?.onScroll
+                if (itemToProcess != null && scrollFun != null) {
+                    itemToProcess.scrollFun(scrollX, scrollY)
                 }
             }
         } else {
@@ -735,10 +739,9 @@ abstract class Block {
             reprocess = false
             val itemsToProcess = listOf(mouseOver) + (mouseOverParents ?: emptyList())
             itemsToProcess.forEach { itemToProcess ->
-                val mouseOver = itemToProcess
-                val dropFun = mouseOver?.onDrop
-                if (mouseOver != null && dropFun != null) {
-                    mouseOver.dropFun(strings)
+                val dropFun = itemToProcess?.onDrop
+                if (itemToProcess != null && dropFun != null) {
+                    itemToProcess.dropFun(strings)
                 }
             }
         } else {
@@ -748,15 +751,16 @@ abstract class Block {
 
     fun handleNewMousePosition(nvg: Long, mouseX: Int, mouseY: Int) {
         if (this === root) {
+            (this as RootBlock).nvg = nvg
             val reprocessAfter = reprocess
             do {
                 reprocess = false
                 lastMouseOver = mouseOver
                 val mouseOverPair = if (inputOverride != null) {
-                    getMouseOverBlock(nvg, mouseX, mouseY)
+                    prepareAndGetMouseOverBlock(mouseX, mouseY)
                     inputOverride to emptyList<Block>()
                 } else {
-                    getMouseOverBlock(nvg, mouseX, mouseY)
+                    prepareAndGetMouseOverBlock(mouseX, mouseY)
                 }
                 mouseOver = mouseOverPair?.first
                 if (mouseOver != lastMouseOver) {
@@ -783,9 +787,8 @@ abstract class Block {
         }
     }
 
-    private fun getMouseOverBlock(nvg: Long, mouseX: Int, mouseY: Int): Pair<Block, List<Block>>? {
+    private fun prepareAndGetMouseOverBlock(mouseX: Int, mouseY: Int): Pair<Block, List<Block>>? {
         if (isVisible) {
-            this.nvg = nvg
             val onTicks: MutableList<Block.(Int, Int) -> Unit> = ArrayList()
             try {
                 prepareForIteration(onTicks)
@@ -818,9 +821,13 @@ abstract class Block {
         return null
     }
 
-    fun draw(nvg: Long, scale: Float) {
+    fun draw(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long) {
+        val root = (root as RootBlock)
+        root.nvg = nvg
+        root.runId = runId
+        root.scale = scale
+        root.scaleChanged = scaleChanged
         if (isVisible) {
-            this.nvg = nvg
             prepareForIteration()
             draw(ScissorStack(nvg), scale)
         }
@@ -840,8 +847,7 @@ abstract class Block {
         var lastChild: Block? = null
         layoutChildren.forEach {
             it.lastBlock = lastChild
-            it.nvg = nvg
-            if (onTicks!= null) {
+            if (onTicks != null) {
                 val onTick = it.onTick
                 if (onTick != null) {
                     onTicks.add(onTick)
@@ -926,20 +932,20 @@ abstract class Block {
         return this
     }
 
-    fun with(builder: Block.() -> Unit): Block {
-        return invoke(builder)
-    }
+    fun with(builder: Block.() -> Unit): Block = invoke(builder)
 }
 
+private val ignore = Unit
+
 private open class RootBlock(override var x: Float, override var y: Float, override var width: Float, override var height: Float) : Block() {
+    override var scale: Float = 1.0f
+    override var scaleChanged: Boolean = false
     override var hShrinkGroup: ShrinkGroup?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var vShrinkGroup: ShrinkGroup?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override val root: RootBlock
         get() = this
     override val parent: RootBlock
@@ -947,138 +953,106 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
     override val layoutChildren = ArrayList<Block>()
     override val renderChildren = ArrayList<Block>()
     override var nvg: Long = -1
+    override var runId: Long = -1
     override var isVisible: Boolean
         get() = true
-        set(value) {
-        }
+        set(value) = ignore
     override var hAlign: HorizontalAlignment
         get() = LEFT
-        set(value) {
-        }
+        set(value) = ignore
     override var vAlign: VerticalAlignment
         get() = TOP
-        set(value) {
-        }
+        set(value) = ignore
     override var hTruncate: HorizontalTruncation
         get() = TRUNCATE_RIGHT
-        set(value) {
-        }
+        set(value) = ignore
     override var vTruncate: VerticalTruncation
         get() = TRUNCATE_BOTTOM
-        set(value) {
-        }
+        set(value) = ignore
     override var layout: Layout
         get() = ABSOLUTE
-        set(value) {
-        }
+        set(value) = ignore
     override var xOffset: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var yOffset: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var hSizing: Sizing
         get() = STATIC
-        set(value) {
-        }
+        set(value) = ignore
     override var vSizing: Sizing
         get() = STATIC
-        set(value) {
-        }
+        set(value) = ignore
     override var padLeft: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var padRight: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var padTop: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var padBottom: Float
         get() = 0.0f
-        set(value) {
-        }
+        set(value) = ignore
     override var shape: Shape
         get() = NO_SHAPE
-        set(value) {
-        }
+        set(value) = ignore
     override var text: Text
         get() = NO_TEXT
-        set(value) {
-        }
+        set(value) = ignore
     override var lastBlock: Block?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var isMouseAware: Boolean
         get() = true
-        set(value) {
-        }
+        set(value) = ignore
     override var receiveChildEvents: Boolean
         get() = false
-        set(value) {
-        }
+        set(value) = ignore
     override var isFallThrough: Boolean
         get() = false
-        set(value) {
-        }
+        set(value) = ignore
     override var canOverflow: Boolean
         get() = false
-        set(value) {
-        }
+        set(value) = ignore
     override var overflowCount: Int
         get() = -1
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseOver: (Block.() -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseOut: (Block.() -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseDown: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseUp: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseRelease: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseDownOverOther: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onScroll: (Block.(Double, Double) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onDrop: (Block.(List<String>) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var onTick: (Block.(Int, Int) -> Unit)?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var inputOverride: Block? = null
     override var awaitingRelease: MutableList<Triple<Int, Block, Int>> = ArrayList()
     override var mouseOver: Block? = null
@@ -1090,18 +1064,15 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
 val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
     override var isVisible: Boolean
         get() = false
-        set(value) {
-        }
+        set(value) = ignore
     override var inputOverride: Block?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
 }
 
 private class DefaultBlock(
         override val root: Block,
         override val parent: Block,
-        override var nvg: Long = -1,
         override val layoutChildren: MutableList<Block> = ArrayList(),
         override val renderChildren: MutableList<Block> = ArrayList(),
         override var isVisible: Boolean = true,
@@ -1140,6 +1111,18 @@ private class DefaultBlock(
         override var onDrop: (Block.(List<String>) -> Unit)? = null,
         override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
 
+    override val nvg: Long
+        get() = root.nvg
+
+    override val runId: Long
+        get() = root.runId
+
+    override val scale: Float
+        get() = root.scale
+
+    override val scaleChanged: Boolean
+        get() = root.scaleChanged
+
     override var inputOverride: Block?
         get() = root.inputOverride
         set(value) {
@@ -1148,25 +1131,19 @@ private class DefaultBlock(
 
     override var awaitingRelease: MutableList<Triple<Int, Block, Int>>
         get() = ArrayList()
-        set(value) {
-        }
-
+        set(value) = ignore
     override var mouseOver: Block?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var mouseOverParents: List<Block>?
         get() = null
-        set(value) {
-        }
+        set(value) = ignore
     override var lastMouseOver: Block?
         get() = null
-        set(value) {
-        }
-
+        set(value) = ignore
     override var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>>
         get() = ArrayList()
-        set(value) {}
+        set(value) = ignore
 
     private var _hShrinkGroup: ShrinkGroupInternal? = null
     private var _vShrinkGroup: ShrinkGroupInternal? = null
@@ -1176,11 +1153,10 @@ private class DefaultBlock(
         set(value) {
             if (value is ShrinkGroupInternal) {
                 _hShrinkGroup?.blocks?.remove(this)
-                val shrinkGroup = value
-                if (!shrinkGroup.blocks.contains(this)) {
-                    shrinkGroup.blocks.add(this)
+                if (!value.blocks.contains(this)) {
+                    value.blocks.add(this)
                 }
-                _hShrinkGroup = shrinkGroup
+                _hShrinkGroup = value
             } else if (value == null) {
                 _hShrinkGroup?.blocks?.remove(this)
                 _hShrinkGroup = null
@@ -1191,11 +1167,10 @@ private class DefaultBlock(
         set(value) {
             if (value is ShrinkGroupInternal) {
                 _vShrinkGroup?.blocks?.remove(this)
-                val shrinkGroup = value
-                if (!shrinkGroup.blocks.contains(this)) {
-                    shrinkGroup.blocks.add(this)
+                if (!value.blocks.contains(this)) {
+                    value.blocks.add(this)
                 }
-                _vShrinkGroup = shrinkGroup
+                _vShrinkGroup = value
             } else if (value == null) {
                 _vShrinkGroup?.blocks?.remove(this)
                 _vShrinkGroup = null
@@ -1229,10 +1204,10 @@ private class DefaultBlock(
                     return max(0.0f, _width)
                 }
                 RELATIVE -> {
-                    if (_width < 0.0f) {
-                        return parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight + _width
+                    return if (_width < 0.0f) {
+                        parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight + _width
                     } else {
-                        return (min(10000.0f, _width) / 10000.0f) * (parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight)
+                        (min(10000.0f, _width) / 10000.0f) * (parent.width - (parent.shape.stroke.size * 2.0f) - padLeft - padRight)
                     }
                 }
                 SHRINK, SHRINK_GROUP -> {
@@ -1267,13 +1242,13 @@ private class DefaultBlock(
                                 }
                             }
                         }
-                        val textDimensions = text.dimensions(nvg)
+                        val textWidth = text.width(nvg, scale, scaleChanged, runId)
                         leftWidth = max(leftWidth, horizontalWidth)
-                        return max(max(max(textDimensions.first, leftWidth), centerWidth), rightWidth) + (2 * shape.stroke.size)
+                        return max(max(max(textWidth, leftWidth), centerWidth), rightWidth) + (2 * shape.stroke.size)
                     }
                 }
                 GROW -> {
-                    val parentWidth = if (parent.hSizing == SHRINK && (parent.hShrinkGroup == null || !(parent.hShrinkGroup?.isCalculated ?: false))) {
+                    val parentWidth = if (parent.hSizing == SHRINK && (parent.hShrinkGroup == null || parent.hShrinkGroup?.isCalculated != true)) {
                         0.0f
                     } else {
                         parent.width
@@ -1355,10 +1330,10 @@ private class DefaultBlock(
                     return max(0.0f, _height)
                 }
                 RELATIVE -> {
-                    if (_height < 0) {
-                        return parent.height - (parent.shape.stroke.size * 2) + _height
+                    return if (_height < 0) {
+                        parent.height - (parent.shape.stroke.size * 2) + _height
                     } else {
-                        return (min(10000.0f, _height) / 10000.0f) * (parent.height - (parent.shape.stroke.size * 2.0f))
+                        (min(10000.0f, _height) / 10000.0f) * (parent.height - (parent.shape.stroke.size * 2.0f))
                     }
                 }
                 SHRINK, SHRINK_GROUP -> {
@@ -1393,13 +1368,13 @@ private class DefaultBlock(
                                 }
                             }
                         }
-                        val textDimensions = text.dimensions(nvg)
+                        val textHeight = text.height(scale)
                         topHeight = max(topHeight, verticalHeight)
-                        return max(max(max(textDimensions.second, topHeight), middleHeight), bottomHeight) + (2 * shape.stroke.size)
+                        return max(max(max(textHeight, topHeight), middleHeight), bottomHeight) + (2 * shape.stroke.size)
                     }
                 }
                 GROW -> {
-                    val parentHeight = if (parent.vSizing == SHRINK && (parent.vShrinkGroup == null || !(parent.vShrinkGroup?.isCalculated ?: false))) {
+                    val parentHeight = if (parent.vSizing == SHRINK && (parent.vShrinkGroup == null || parent.vShrinkGroup?.isCalculated != true)) {
                         0.0f
                     } else {
                         parent.height
@@ -1481,8 +1456,7 @@ private class DefaultBlock(
             }
             return getXRelativeTo(parent.x, parent.width)
         }
-        set(value) {
-        }
+        set(value) = ignore
 
     override var y: Float
         get() {
@@ -1495,8 +1469,7 @@ private class DefaultBlock(
             return getYRelativeTo(lastBlock!!.y + lastBlock!!.height + lastBlock!!.padBottom + padTop, parent.height)
 
         }
-        set(value) {
-        }
+        set(value) = ignore
 
     private fun getXRelativeTo(relativeX: Float, relativeWidth: Float): Float {
         if (width > relativeWidth) {

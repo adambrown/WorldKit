@@ -3,8 +3,6 @@ package com.grimfox.gec.util
 import org.lwjgl.opengl.GL11.GL_FALSE
 import org.lwjgl.opengl.GL20.*
 
-object Shaders
-
 data class ShaderAttribute(val name: String) {
     internal var _location: Int = -1
     val location: Int

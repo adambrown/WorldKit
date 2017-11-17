@@ -14,7 +14,7 @@ import com.grimfox.gec.ui.nvgproxy.*
 
 class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle: TextStyle) {
 
-    private val buffer = ByteBuffer.allocateDirect(sizeLimit + 1)
+    private val buffer = ByteBuffer.allocateDirect(sizeLimit)
     val reference = ref("").addListener { _, new ->
         val newValue = if (new.length <= sizeLimit) {
             new
@@ -22,8 +22,8 @@ class DynamicTextReference(initialString: String, val sizeLimit: Int, textStyle:
             new.substring(0, sizeLimit)
         }
         buffer.clear()
-        val byteCount = MemoryUtil.memUTF8(newValue, true, buffer, 0)
-        buffer.limit(byteCount + 1)
+        val byteCount = MemoryUtil.memUTF8(newValue, false, buffer, 0)
+        buffer.limit(byteCount)
     }
     val text = DynamicTextUtf8(buffer, textStyle)
     var style: TextStyle
@@ -66,9 +66,9 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
         nvgFontSize(nvg, dynamicText.style.size.value * scale)
         nvgTextAlign(nvg, NVG_ALIGN_LEFT or NVG_ALIGN_MIDDLE)
         glyphPositions.clear()
-        val count = nvgTextGlyphPositions(nvg, 0.0f, 0.0f, dynamicText.text.data, NULL, glyphPositions)
+        val count = nvgTextGlyphPositions(nvg, 0.0f, 0.0f, dynamicText.text.data, glyphPositions)
         val positions = ArrayList<Float>(count + 1)
-        (0..count - 1).forEach {
+        (0 until count).forEach {
             positions.add(glyphPositions.get(it).minx() / scale)
         }
         positions.add(glyphPositions.get(count - 1).maxx() / scale)

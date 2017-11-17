@@ -18,22 +18,68 @@ class MenuBar(private val block: Block,
               private val mouseOverActivator: ObservableMutableReference<Boolean>,
               private val mouseOverDeActivator: ObservableMutableReference<Boolean>) {
 
-    fun menu(title: String, builder: DropdownList.() -> Unit): Block {
-        return block.menu(title, menuLayer, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator, rowHeight, textStyle, textColorInactive, builder)
-    }
+    fun menu(title: String, builder: DropdownList.() -> Unit): Block =
+            block.menu(
+                    title = title,
+                    menuLayer = menuLayer,
+                    activeMenu = activeMenu,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    mouseDownOnDeActivator = mouseDownOnDeActivator,
+                    mouseOverActivator = mouseOverActivator,
+                    mouseOverDeActivator = mouseOverDeActivator,
+                    rowHeight = rowHeight,
+                    textStyle = textStyle,
+                    textColorInactive = textColorInactive,
+                    builder = builder)
 }
 
-class DropdownList(private val block: Block, private val rowHeight: Float, private val textStyle: TextStyle, private val textColorInactive: NPColor, private val mouseDownOnActivator: ObservableMutableReference<Boolean>, private val deactivate: () -> Unit, private val activeItem: MutableReference<Pair<Block, () -> Unit>?>, private val shrink: Boolean = true) {
+class DropdownList(
+        private val block: Block,
+        private val rowHeight: Float,
+        private val textStyle: TextStyle,
+        private val textColorInactive: NPColor,
+        private val mouseDownOnActivator: ObservableMutableReference<Boolean>,
+        private val deactivate: () -> Unit,
+        private val activeItem: MutableReference<Pair<Block, () -> Unit>?>,
+        private val shrink: Boolean = true) {
 
     private val shrinkGroup = hShrinkGroup()
 
-    fun menuItem(text: String, hotKey: String? = null, glyph: Block.() -> Block = {block{}}, isActive: ObservableMutableReference<Boolean> = ref(true), onClick: () -> Unit): Block {
-        return block.menuItem(text(text, textStyle), if (hotKey != null) { text(hotKey, textStyle) } else { NO_TEXT }, glyph, rowHeight, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, shrink, onClick)
-    }
+    fun menuItem(
+            text: String,
+            hotKey: String? = null,
+            glyph: Block.() -> Block = { block { } },
+            isActive: ObservableMutableReference<Boolean> = ref(true),
+            onClick: () -> Unit): Block =
+            block.menuItem(
+                    text = text(text, textStyle),
+                    hotKey = if (hotKey != null) text(hotKey, textStyle) else NO_TEXT,
+                    glyph = glyph,
+                    height = rowHeight,
+                    shrinkGroup = shrinkGroup,
+                    textColorInactive = textColorInactive,
+                    isActive = isActive,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    deactivate = deactivate,
+                    activeItem = activeItem,
+                    shrink = shrink,
+                    onClick = onClick)
 
-    fun subMenu(text: String, isActive: ObservableMutableReference<Boolean> = ref(true), builder: DropdownList.() -> Unit): Block {
-        return block.subMenu(text(text, textStyle), rowHeight, textStyle, shrinkGroup, textColorInactive, isActive, mouseDownOnActivator, deactivate, activeItem, builder)
-    }
+    fun subMenu(
+            text: String,
+            isActive: ObservableMutableReference<Boolean> = ref(true),
+            builder: DropdownList.() -> Unit): Block =
+            block.subMenu(
+                    text = text(text, textStyle),
+                    rowHeight = rowHeight,
+                    textStyle = textStyle,
+                    shrinkGroup = shrinkGroup,
+                    textColorInactive = textColorInactive,
+                    isActive = isActive,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    deactivate = deactivate,
+                    activeItem = activeItem,
+                    builder = builder)
 
     fun removeItem(block: Block) {
         this.block.layoutChildren.remove(block)
@@ -58,12 +104,15 @@ class DropdownList(private val block: Block, private val rowHeight: Float, priva
         this.block.renderChildren.add(index, block)
     }
 
-    fun menuDivider(): Block {
-        return block.menuDivider(3.0f, shrinkGroup)
-    }
+    fun menuDivider(): Block = block.menuDivider(3.0f, shrinkGroup)
 }
 
-fun Block.menuBar(menuLayer: Block, rowHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, builder: MenuBar.() -> Unit): Block {
+fun Block.menuBar(
+        menuLayer: Block,
+        rowHeight: Float,
+        textStyle: TextStyle,
+        textColorInactive: NPColor,
+        builder: MenuBar.() -> Unit): Block {
     val parent = this
     return block {
         parent.renderChildren.remove(this)
@@ -78,13 +127,28 @@ fun Block.menuBar(menuLayer: Block, rowHeight: Float, textStyle: TextStyle, text
         height = rowHeight
         layout = Layout.HORIZONTAL
         isFallThrough = true
-        MenuBar(this, menuLayer, rowHeight, textStyle, textColorInactive, activeMenu, mouseDownOnActivator, mouseDownOnDeActivator, mouseOverActivator, mouseOverDeActivator).builder()
+        MenuBar(block = this,
+                menuLayer = menuLayer,
+                rowHeight = rowHeight,
+                textStyle = textStyle,
+                textColorInactive = textColorInactive,
+                activeMenu = activeMenu,
+                mouseDownOnActivator = mouseDownOnActivator,
+                mouseDownOnDeActivator = mouseDownOnDeActivator,
+                mouseOverActivator = mouseOverActivator,
+                mouseOverDeActivator = mouseOverDeActivator).builder()
     }
 }
 
-fun Block.dropdown(title: Text, dropdownLayer: Block, buttonHeight: Float, itemHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, builder: DropdownList.() -> Unit): Block {
-    return dropdownMenu(title, dropdownLayer, buttonHeight, itemHeight, textStyle, textColorInactive, builder)
-}
+fun Block.dropdown(
+        title: Text,
+        dropdownLayer: Block,
+        buttonHeight: Float,
+        itemHeight: Float,
+        textStyle: TextStyle,
+        textColorInactive: NPColor,
+        builder: DropdownList.() -> Unit): Block =
+        dropdownMenu(title, dropdownLayer, buttonHeight, itemHeight, textStyle, textColorInactive, builder)
 
 private fun Block.menu(
         title: String,
@@ -165,7 +229,8 @@ private fun Block.menu(
             height = SMALL_ROW_HEIGHT
             block {
                 hSizing = Sizing.SHRINK
-                vSizing = Sizing.SHRINK
+                vSizing = Sizing.STATIC
+                height = SMALL_ROW_HEIGHT
                 hAlign = HorizontalAlignment.CENTER
                 vAlign = VerticalAlignment.MIDDLE
                 padLeft = SMALL_SPACER_SIZE
@@ -187,7 +252,15 @@ private fun Block.menu(
             height = 0.0f
             canOverflow = true
             isFallThrough = true
-            menuDropDownList(rowHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivateMenuBar, activeItem, true, builder)
+            menuDropDownList(
+                    rowHeight = rowHeight,
+                    textStyle = textStyle,
+                    textColorInactive = textColorInactive,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    deactivate = deactivateMenuBar,
+                    activeItem = activeItem,
+                    shrink = true,
+                    builder = builder)
             block {
                 layout = Layout.ABSOLUTE
                 hSizing = Sizing.SHRINK
@@ -199,7 +272,7 @@ private fun Block.menu(
                 block {
                     hSizing = Sizing.SHRINK
                     vSizing = Sizing.STATIC
-                    height = SMALL_ROW_HEIGHT + 2
+                    height = SMALL_ROW_HEIGHT + 1
                     padLeft = 1.0f
                     padRight = 1.0f
                     padTop = 1.0f
@@ -208,10 +281,11 @@ private fun Block.menu(
                     isMouseAware = false
                     block {
                         hSizing = Sizing.SHRINK
-                        vSizing = Sizing.SHRINK
+                        vSizing = Sizing.STATIC
+                        height = SMALL_ROW_HEIGHT
                         hAlign = HorizontalAlignment.CENTER
                         vAlign = VerticalAlignment.MIDDLE
-                        yOffset = -1.0f
+                        yOffset = -0.5f
                         padLeft = SMALL_SPACER_SIZE
                         padRight = SMALL_SPACER_SIZE
                         text = titleText
@@ -345,7 +419,15 @@ private fun Block.dropdownMenu(
             height = 0.0f
             canOverflow = true
             isFallThrough = true
-            dropdownList = menuDropDownList(itemHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivateMenuBar, activeItem, false, builder)
+            dropdownList = menuDropDownList(
+                    rowHeight = itemHeight,
+                    textStyle = textStyle,
+                    textColorInactive = textColorInactive,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    deactivate = deactivateMenuBar,
+                    activeItem = activeItem,
+                    shrink = false,
+                    builder = builder)
             deactivator = block {
                 layout = Layout.ABSOLUTE
                 hSizing = Sizing.STATIC
@@ -402,18 +484,19 @@ private fun Block.dropdownMenu(
     }
 }
 
-private fun Block.menuItem(text: Text,
-                           hotKey: Text,
-                           glyph: Block.() -> Block,
-                           height: Float,
-                           shrinkGroup: ShrinkGroup,
-                           textColorInactive: NPColor,
-                           isActive: ObservableMutableReference<Boolean>,
-                           mouseDownOnActivator: Reference<Boolean>,
-                           deactivate: () -> Unit,
-                           activeItem: MutableReference<Pair<Block, () -> Unit>?>,
-                           shrink: Boolean = true,
-                           onClick: () -> Unit = {}): Block {
+private fun Block.menuItem(
+        text: Text,
+        hotKey: Text,
+        glyph: Block.() -> Block,
+        height: Float,
+        shrinkGroup: ShrinkGroup,
+        textColorInactive: NPColor,
+        isActive: ObservableMutableReference<Boolean>,
+        mouseDownOnActivator: Reference<Boolean>,
+        deactivate: () -> Unit,
+        activeItem: MutableReference<Pair<Block, () -> Unit>?>,
+        shrink: Boolean = true,
+        onClick: () -> Unit = {}): Block {
     return block {
         val thisItem = this
         var mouseDownOver = false
@@ -498,11 +581,7 @@ private fun Block.menuItem(text: Text,
         onMouseOver {
             mouseOver = true
             if (!mouseDownOver && isActive.value) {
-                if (mouseDownOnActivator.value) {
-                    shape = SHAPE_BUTTON_MOUSE_DOWN
-                } else {
-                    shape = SHAPE_MENU_BORDER
-                }
+                shape = if (mouseDownOnActivator.value) SHAPE_BUTTON_MOUSE_DOWN else SHAPE_MENU_BORDER
             }
             val activeItemValue = activeItem.value
             if (activeItemValue != null && activeItemValue.first != thisItem) {
@@ -547,16 +626,17 @@ private fun Block.menuItem(text: Text,
     }
 }
 
-private fun Block.subMenu(text: Text,
-                          rowHeight: Float,
-                          textStyle: TextStyle,
-                          shrinkGroup: ShrinkGroup,
-                          textColorInactive: NPColor,
-                          isActive: ObservableMutableReference<Boolean>,
-                          mouseDownOnActivator: ObservableMutableReference<Boolean>,
-                          deactivate: () -> Unit,
-                          activeItem: MutableReference<Pair<Block, () -> Unit>?>,
-                          builder: DropdownList.() -> Unit): Block {
+private fun Block.subMenu(
+        text: Text,
+        rowHeight: Float,
+        textStyle: TextStyle,
+        shrinkGroup: ShrinkGroup,
+        textColorInactive: NPColor,
+        isActive: ObservableMutableReference<Boolean>,
+        mouseDownOnActivator: ObservableMutableReference<Boolean>,
+        deactivate: () -> Unit,
+        activeItem: MutableReference<Pair<Block, () -> Unit>?>,
+        builder: DropdownList.() -> Unit): Block {
     return block {
         val inactiveShape = ShapeTriangle(FillColor(textColorInactive), NO_STROKE, ShapeTriangle.Direction.EAST)
         val activeShape = ShapeTriangle(FillColor(textStyle.color.value), NO_STROKE, ShapeTriangle.Direction.EAST)
@@ -724,18 +804,22 @@ private fun Block.subMenu(text: Text,
             this.height = 0.0f
             canOverflow = true
             isFallThrough = true
-            menuDropDownList(rowHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivate, subActiveItem, true, builder)
+            menuDropDownList(
+                    rowHeight = rowHeight,
+                    textStyle = textStyle,
+                    textColorInactive = textColorInactive,
+                    mouseDownOnActivator = mouseDownOnActivator,
+                    deactivate = deactivate,
+                    activeItem = subActiveItem,
+                    shrink = true,
+                    builder = builder)
         }
         dropDown.isVisible = false
         dropDown.isMouseAware = false
         clickCatcher.onMouseOver {
             mouseOver = true
             if (!mouseDownOver && isActive.value) {
-                if (mouseDownOnActivator.value) {
-                    shape = SHAPE_BUTTON_MOUSE_DOWN
-                } else {
-                    shape = SHAPE_MENU_BORDER
-                }
+                shape = if (mouseDownOnActivator.value) SHAPE_BUTTON_MOUSE_DOWN else SHAPE_MENU_BORDER
                 var startX: Int? = null
                 var startY: Int? = null
                 val startTime: Long = System.nanoTime()
@@ -839,7 +923,15 @@ private fun Block.menuDivider(height: Float, shrinkGroup: ShrinkGroup): Block {
     }
 }
 
-private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textColorInactive: NPColor, mouseDownOnActivator: ObservableMutableReference<Boolean>, deactivate: () -> Unit, activeItem: MutableReference<Pair<Block, () -> Unit>?>, shrink: Boolean = true, builder: DropdownList.() -> Unit): Block {
+private fun Block.menuDropDownList(
+        rowHeight: Float,
+        textStyle: TextStyle,
+        textColorInactive: NPColor,
+        mouseDownOnActivator: ObservableMutableReference<Boolean>,
+        deactivate: () -> Unit,
+        activeItem: MutableReference<Pair<Block, () -> Unit>?>,
+        shrink: Boolean = true,
+        builder: DropdownList.() -> Unit): Block {
     return block {
         layout = Layout.ABSOLUTE
         hSizing = if (shrink) Sizing.SHRINK else Sizing.STATIC
@@ -877,7 +969,15 @@ private fun Block.menuDropDownList(rowHeight: Float, textStyle: TextStyle, textC
                     padTop = 2.0f
                     padBottom = 2.0f
                     isFallThrough = true
-                    DropdownList(this, rowHeight, textStyle, textColorInactive, mouseDownOnActivator, deactivate, activeItem, shrink).builder()
+                    DropdownList(
+                            block = this,
+                            rowHeight = rowHeight,
+                            textStyle = textStyle,
+                            textColorInactive = textColorInactive,
+                            mouseDownOnActivator = mouseDownOnActivator,
+                            deactivate = deactivate,
+                            activeItem = activeItem,
+                            shrink = shrink).builder()
                 }
             }
         }

@@ -20,12 +20,12 @@ object Main {
                 textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
                 glyphFont.value = createFont("/fonts/WorldKitUi.ttf", "Glyphs")
 
-                val maxRestoreGlyph = MemoryUtil.memUTF8(if (isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, true)
+                val maxRestoreGlyph = MemoryUtil.memUTF8(if (isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, false)
                 maximizeHandler = {
-                    MemoryUtil.memUTF8(GLYPH_RESTORE, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_RESTORE, false, maxRestoreGlyph, 0)
                 }
                 restoreHandler = {
-                    MemoryUtil.memUTF8(GLYPH_MAXIMIZE, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_MAXIMIZE, false, maxRestoreGlyph, 0)
                 }
 
                 val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,

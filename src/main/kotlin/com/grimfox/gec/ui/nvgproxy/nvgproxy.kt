@@ -142,8 +142,8 @@ fun nvgTextAlign(ctx: Long, align: Int) {
     NanoVG.nvgTextAlign(ctx, align)
 }
 
-fun nvgTextGlyphPositions(ctx: Long, x: Float, y: Float, string: ByteBuffer, end: Long, positions: NPGlyphPosition): Int {
-    return NanoVG.nvgTextGlyphPositions(ctx, x, y, string, end, positions.delegate)
+fun nvgTextGlyphPositions(ctx: Long, x: Float, y: Float, string: ByteBuffer, positions: NPGlyphPosition): Int {
+    return NanoVG.nvgTextGlyphPositions(ctx, x, y, string, positions.delegate)
 }
 
 fun nvgScissor(ctx: Long, x: Float, y: Float, w: Float, h: Float) {
@@ -228,12 +228,12 @@ fun nnvgText(ctx: Long, x: Float, y: Float, string: Long, end: Long) {
     NanoVG.nnvgText(ctx, x, y, string, end)
 }
 
-fun nvgText(ctx: Long, x: Float, y: Float, string: ByteBuffer, end: Long) {
-    NanoVG.nvgText(ctx, x, y, string, end)
+fun nvgText(ctx: Long, x: Float, y: Float, string: ByteBuffer) {
+    NanoVG.nvgText(ctx, x, y, string)
 }
 
-fun nvgTextBounds(ctx: Long, x: Float, y: Float, string: ByteBuffer, end: Long, bounds: FloatBuffer?) {
-    NanoVG.nvgTextBounds(ctx, x, y, string, end, bounds)
+fun nvgTextBounds(ctx: Long, x: Float, y: Float, string: ByteBuffer, bounds: FloatBuffer?): Float {
+    return NanoVG.nvgTextBounds(ctx, x, y, string, bounds)
 }
 
 fun nvgRect(ctx: Long, x: Float, y: Float, w: Float, h: Float) {

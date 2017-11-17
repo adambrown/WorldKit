@@ -4,10 +4,10 @@ buildscript {
     ext.triangle_version = '1.7.1'
     ext.airline_version = '0.7'
     ext.reflections_version = '0.9.10'
-    ext.jackson_version = '2.7.5'
-    ext.joml_version = '1.9.0'
-    ext.imageio_version = '3.3.1'
-    ext.lwjgl_version = '3.1.0'
+    ext.jackson_version = 'latest.release'
+    ext.joml_version = 'latest.release'
+    ext.imageio_version = 'latest.release'
+    ext.lwjgl_version = 'latest.release'
     ext.slf4j_version = '1.7.22'
     ext.logback_version = '1.1.7'
     ext.kovenant_version = '3.3.0'
@@ -23,12 +23,12 @@ buildscript {
 }
 
 plugins {
-    id 'nebula.dependency-recommender' version '3.7.0'
-    id 'nebula.resolution-rules' version '2.0.0'
-    id 'nebula.dependency-lock' version '4.3.2'
-    id 'nebula.maven-publish' version '4.9.1'
+    id 'nebula.dependency-recommender' version '5.0.0'
+    id 'nebula.resolution-rules' version '5.0.2'
+    id 'nebula.dependency-lock' version '4.9.5'
+    id 'nebula.maven-publish' version '5.1.5'
     id 'nebula.nebula-release' version '4.0.1'
-    id 'nebula.kotlin' version '1.1.51'
+    id 'org.jetbrains.kotlin.jvm' version '1.1.60'
 }
 
 group = 'com.grimfox'
@@ -51,15 +51,11 @@ switch (OperatingSystem.current()) {
 
 //apply plugin: 'com.grimfox.packr-gradle-plugin'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_9
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '3.3'
-}
-
-dependencyRecommendations {
-    add { org, name -> 'latest.release' }
+    gradleVersion = '4.3.1'
 }
 
 dependencyLock {
@@ -72,7 +68,7 @@ repositories {
 }
 
 dependencies {
-    resolutionRules group: 'com.netflix.nebula', name: 'gradle-resolution-rules'
+    resolutionRules group: 'com.netflix.nebula', name: 'gradle-resolution-rules', version: 'latest.release'
 
     compile group: 'com.grimfox', name: 'triangle-kotlin', version: triangle_version
 
@@ -96,28 +92,16 @@ dependencies {
     // LWJGL dependencies START
     compile group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-opencl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-opengl', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version
-    compile group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version
 
     // LWJGL natives
     runtime group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-jemalloc', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-lmdb', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-nanovg', version: lwjgl_version, classifier: lwjgl_natives
     runtime group: 'org.lwjgl', name: 'lwjgl-nfd', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-par', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-sse', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-stb', version: lwjgl_version, classifier: lwjgl_natives
-    runtime group: 'org.lwjgl', name: 'lwjgl-tinyfd', version: lwjgl_version, classifier: lwjgl_natives
+    runtime group: 'org.lwjgl', name: 'lwjgl-opengl', version: lwjgl_version, classifier: lwjgl_natives
     // LWJGL dependencies END
 
     runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version

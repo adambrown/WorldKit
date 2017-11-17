@@ -1,6 +1,6 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.HotkeyHandler
+import com.grimfox.gec.ui.HotKeyHandler
 import com.grimfox.gec.ui.layout
 import com.grimfox.gec.ui.nvgproxy.set
 import com.grimfox.gec.ui.ui
@@ -53,15 +53,15 @@ object Main {
                 }
                 background.set(45, 45, 48)
 
-                textFont.value = createFont("/fonts/FiraSans.ttf", "FiraSans")
+                textFont.value = createFont("/fonts/Roboto.ttf", "Roboto")
                 glyphFont.value = createFont("/fonts/WorldKitUi.ttf", "Glyphs")
 
-                val maxRestoreGlyph = MemoryUtil.memUTF8(if (isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, true)
+                val maxRestoreGlyph = MemoryUtil.memUTF8(if (isMaximized) GLYPH_RESTORE else GLYPH_MAXIMIZE, false)
                 maximizeHandler = {
-                    MemoryUtil.memUTF8(GLYPH_RESTORE, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_RESTORE, false, maxRestoreGlyph, 0)
                 }
                 restoreHandler = {
-                    MemoryUtil.memUTF8(GLYPH_MAXIMIZE, true, maxRestoreGlyph, 0)
+                    MemoryUtil.memUTF8(GLYPH_MAXIMIZE, false, maxRestoreGlyph, 0)
                 }
 
                 val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,
@@ -428,7 +428,7 @@ object Main {
                         it.isVisible = false
                     }
                 }
-                hotkeyHandler = HotkeyHandler { key, _, action, mods ->
+                hotKeyHandler = HotKeyHandler { key, _, action, mods ->
                     if (action == GLFW.GLFW_PRESS) {
                         val ctrl = GLFW.GLFW_MOD_CONTROL and mods != 0
                         val shift = GLFW.GLFW_MOD_SHIFT and mods != 0

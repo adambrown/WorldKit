@@ -1,9 +1,10 @@
 package com.grimfox.gec.ui
 
 import com.grimfox.gec.util.clamp
-import java.awt.*
-import java.util.ArrayList
-import java.util.LinkedHashMap
+import java.awt.GraphicsEnvironment
+import java.awt.Rectangle
+import java.awt.Toolkit
+import java.util.*
 
 internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
 
@@ -30,22 +31,45 @@ internal class WindowsScreenInfoFetcher : ScreenInfoFetcher {
             val height = bounds.height
             val x2 = x1 + width
             val y2 = y1 + height
-            val maximizedX1 = x1 + insets.left
-            val maximizedY1 = y1 + insets.top
-            val maximizedWidth = width - insets.left - insets.right
-            val maximizedHeight = height - insets.top - insets.bottom
-            val maximizedX2 = maximizedX1 + maximizedWidth
-            val maximizedY2 = maximizedY1 + maximizedHeight
             if (x1 > lastX || currentMode.width != width) {
+                val pixelWidth = currentMode.width
+                val pixelHeight = currentMode.height
+                val maximizedX1 = x1 + insets.left
+                val maximizedY1 = y1 + insets.top
+                val maximizedWidth = pixelWidth - insets.left - insets.right
+                val maximizedHeight = pixelHeight - insets.top - insets.bottom
+                val maximizedX2 = maximizedX1 + maximizedWidth
+                val maximizedY2 = maximizedY1 + maximizedHeight
                 val scaleFactor = currentMode.width / width.toDouble()
                 lastIdentity = ScreenIdentity(lastX, Math.round(y1 * scaleFactor).toInt(), currentMode.width, currentMode.height)
-                screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, width, height, currentMode.width, currentMode.height,
-                        maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, scaleFactor, width.toDouble() / currentMode.width))
+                screens.put(lastIdentity,
+                        ScreenSpec(
+                                x1 = x1,
+                                y1 = y1,
+                                x2 = x2,
+                                y2 = y2,
+                                width = width,
+                                height = height,
+                                pixelWidth = pixelWidth,
+                                pixelHeight = pixelHeight,
+                                maximizedX1 = maximizedX1,
+                                maximizedY1 = maximizedY1,
+                                maximizedX2 = maximizedX2,
+                                maximizedY2 = maximizedY2,
+                                maximizedWidth = maximizedWidth,
+                                maximizedHeight = maximizedHeight,
+                                scaleFactor = scaleFactor))
                 lastX += currentMode.width
             } else {
+                val maximizedX1 = x1 + insets.left
+                val maximizedY1 = y1 + insets.top
+                val maximizedWidth = width - insets.left - insets.right
+                val maximizedHeight = height - insets.top - insets.bottom
+                val maximizedX2 = maximizedX1 + maximizedWidth
+                val maximizedY2 = maximizedY1 + maximizedHeight
                 lastIdentity = ScreenIdentity(x1, y1, currentMode.width, currentMode.height)
                 screens.put(lastIdentity, ScreenSpec(x1, y1, x2, y2, currentMode.width, currentMode.height, currentMode.width, currentMode.height,
-                        maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, 1.0, 1.0))
+                        maximizedX1, maximizedY1, maximizedX2, maximizedY2, maximizedWidth, maximizedHeight, 1.0))
                 lastX = x2
             }
         }
