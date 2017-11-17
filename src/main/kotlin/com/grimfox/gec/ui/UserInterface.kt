@@ -398,9 +398,13 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             glViewport(0, 0, width, height)
             glEnable(GL_MULTISAMPLE)
             nvgSave(nvg)
-            val scale = clamp(Math.round((Math.round((window.currentMonitor.scaleFactor) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
             val scaleChanged = window.lastMonitor.scaleFactor != window.currentMonitor.scaleFactor
             val windowChanged = window.lastPixelWidth != window.currentPixelWidth && window.lastPixelHeight != window.currentPixelHeight && !isResizing
+            val scale = if (scaleChanged != windowChanged) {
+                clamp(Math.round((Math.round((window.lastMonitor.scaleFactor) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            } else {
+                clamp(Math.round((Math.round((window.currentMonitor.scaleFactor) * 4.0) / 4.0) * 100.0) / 100.0, 1.0, 2.5).toFloat()
+            }
             root.width = width / scale
             root.height = height / scale
             root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))

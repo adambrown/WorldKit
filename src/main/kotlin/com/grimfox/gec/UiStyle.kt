@@ -606,7 +606,7 @@ fun Block.vToggleRow(value: ObservableMutableReference<Boolean>, height: Float, 
     }
 }
 
-fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, currentBrushValue: ObservableMutableReference<Byte>, menuLayer: Block, color: NPColor, values: List<String>, selected: ObservableMutableReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
+fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, currentBrushValue: ObservableMutableReference<Byte>, menuLayer: Block, color: NPColor, values: List<Text>, selected: ObservableMutableReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -655,11 +655,11 @@ fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, cur
             }
         }
         hSpacer(gap)
-        val textRef = DynamicTextReference(values[selected.value], values.map { it.length }.max()!!, TEXT_STYLE_BUTTON)
+        val textRef = StaticTextReference(values[selected.value])
         block {
             layout = HORIZONTAL
             hSizing = GROW
-            dropdown(textRef.text, menuLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+            dropdown(textRef, menuLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                 values.forEachIndexed { i, value ->
                     menuItem(value) {
                         selected.value = i

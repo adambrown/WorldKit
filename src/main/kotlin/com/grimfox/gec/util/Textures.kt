@@ -2,6 +2,7 @@ package com.grimfox.gec.util
 
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import org.lwjgl.opengl.GL11
@@ -35,6 +36,27 @@ fun loadImagePixels(resource: String): Triple<Int, Int, ByteBuffer> {
     }
     return Triple(width, height, imageBuffer)
 }
+
+fun loadColorsAsTexture(colors: Iterable<NPColor>, width: Int, skip: Int): Int {
+    val data = ByteBuffer.allocateDirect(width * width * 3).order(ByteOrder.nativeOrder())
+    colors.drop(skip).take(width * width).forEach {
+        data.put(it.rByte)
+        data.put(it.gByte)
+        data.put(it.bByte)
+    }
+    data.flip()
+    val textureId = GL11.glGenTextures()
+    glBindTexture(GL_TEXTURE_2D, textureId)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, width, 0, GL_RGB, GL_UNSIGNED_BYTE, data)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    glBindTexture(GL_TEXTURE_2D, 0)
+    return textureId
+}
+
 
 fun loadGraphPointsAsTexture(graph: Graph): Triple<Int, Int, Int> {
     val width = graph.stride!!

@@ -15,7 +15,7 @@ private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useBiomeFile = ref(false)
 private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val biomes = ref(emptyList<Int>())
-private val selectedBiomes = Array(16) { ref(it % BIOME_NAMES.size) }.toList()
+private val selectedBiomes = Array(64) { ref(it % BIOME_NAMES.size) }.toList()
 
 fun syncBiomeParameterValues(parameters: BuildContinent.BiomeParameters) {
     val randomSeed = parameters.biomesSeed
@@ -127,7 +127,7 @@ fun Block.editBiomesPanel(
         }
         vFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Region file:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
         vSliderWithValueRow(biomesMapScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
-        vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..16), linearClampedScaleFunctionInverse(1..16))
+        vSliderWithValueRow(biomeCount, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Biome count:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..64), linearClampedScaleFunctionInverse(1..64))
         val biomeRows = block {
             vAlign = VerticalAlignment.TOP
             hAlign = HorizontalAlignment.LEFT
@@ -150,7 +150,7 @@ fun Block.editBiomesPanel(
                     for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
                         val index = newBiomes.size
                         val selectedValue = selectedBiomes[index]
-                        biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, REGION_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES.keys.toList(), selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+                        biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, BIOME_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES_AS_TEXT, selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
                         newBiomes.add(selectedValue.value)
                         selectedValue.addListener { oldBiomeId, newBiomeId ->
                             if (oldBiomeId != newBiomeId) {

@@ -261,13 +261,22 @@ open class DynamicTextUtf8(override val data: ByteBuffer, override var style: Te
 
 class StaticTextUtf8(string: String, style: TextStyle) : DynamicTextUtf8(MemoryUtil.memUTF8(string, false), style) {
 
+    private var cachedScale = -1.0f
+    private var cachedSize = -1.0f
+    private var cachedFont = -1
+
     private var cachedRunId = -1L
     private var cachedWidth = -1.0f
 
     override val length: Int = data.limit()
 
     override fun width(nvg: Long, scale: Float, scaleChanged: Boolean, runId: Long): Float {
-        if ((scaleChanged && cachedRunId != runId) || cachedWidth < 0.0f) {
+        val size = style.size.value
+        val font = style.font.value
+        if ((scaleChanged && cachedRunId != runId) || cachedScale != scale || cachedSize != size || cachedFont != font || cachedWidth < 0.0f) {
+            cachedScale = scale
+            cachedSize = size
+            cachedFont = font
             cachedRunId = runId
             cachedWidth = widthInternal(nvg, scale, style.font.value, style.size.value)
         }

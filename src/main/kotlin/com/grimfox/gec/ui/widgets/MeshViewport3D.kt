@@ -1,5 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.BIOME_COLORS
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
@@ -105,6 +106,7 @@ class MeshViewport3D(
     private val mvpMatrixUniformBiome = ShaderUniform("modelViewProjectionMatrix")
     private val biomeTextureUniform = ShaderUniform("biomeTexture")
     private val splineTextureUniform = ShaderUniform("splineTexture")
+    private val biomeColorsTextureUniform = ShaderUniform("biomeColorsTexture")
 
     private val positionAttribute = ShaderAttribute("position")
     private val uvAttribute = ShaderAttribute("uv")
@@ -134,6 +136,7 @@ class MeshViewport3D(
     private var hasBiomes = false
     private var biomeTextureId: TextureId? = null
     private var splineTextureId: TextureId? = null
+    private var biomeColorsTextureId: TextureId? = null
 
     private var hasImage = false
     private var imageTextureId: TextureId? = null
@@ -218,6 +221,8 @@ class MeshViewport3D(
         val biomeVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/biomes.vert"))
         val biomeFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/biomes.frag"))
 
+        biomeColorsTextureId = TextureId(loadColorsAsTexture(BIOME_COLORS, 8, 1))
+
         val imagePlaneVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/image-plane.vert"))
         val imagePlaneFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/image-plane.frag"))
 
@@ -239,7 +244,7 @@ class MeshViewport3D(
         biomePlaneProgram = createAndLinkProgram(
                 listOf(biomeVertexShader, biomeFragmentShader),
                 listOf(positionAttributeBiome, uvAttributeBiome),
-                listOf(mvpMatrixUniformBiome, biomeTextureUniform, splineTextureUniform))
+                listOf(mvpMatrixUniformBiome, biomeTextureUniform, splineTextureUniform, biomeColorsTextureUniform))
 
         imagePlaneProgram = createAndLinkProgram(
                 listOf(imagePlaneVertexShader, imagePlaneFragmentShader),
@@ -911,6 +916,9 @@ class MeshViewport3D(
         glUniform1i(splineTextureUniform.location, 1)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, splineTextureId?.id ?: -1)
+        glUniform1i(biomeColorsTextureUniform.location, 2)
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, biomeColorsTextureId?.id ?: -1)
         biomePlane.render()
     }
 

@@ -54,22 +54,22 @@ val REGION_COLORS = arrayListOf(
 val BIOME_COLORS = arrayListOf(
         color(0, 0, 0),
 
-        color(183, 57, 97), color(103, 184, 140), color(150, 107, 234), color(223, 173, 121),
-        color(152, 75, 88), color(57, 198, 133), color(134, 60, 185), color(171, 136, 78),
-        color(225, 56, 95), color(50, 126, 88), color(126, 87, 147), color(159, 117, 25),
-        color(219, 130, 130), color(65, 191, 181), color(126, 73, 156), color(228, 174, 57),
-        color(225, 90, 90), color(59, 196, 224), color(198, 121, 230), color(116, 101, 41),
-        color(176, 62, 63), color(91, 171, 223), color(194, 137, 212), color(183, 164, 62),
-        color(234, 76, 57), color(66, 129, 183), color(174, 76, 193), color(182, 182, 45),
-        color(187, 49, 29), color(69, 142, 232), color(165, 76, 151), color(120, 136, 41),
-        color(148, 78, 56), color(65, 92, 158), color(200, 132, 185), color(165, 176, 105),
-        color(233, 112, 73), color(94, 123, 241), color(232, 118, 207), color(170, 196, 65),
-        color(234, 138, 104), color(121, 125, 190), color(203, 60, 165), color(118, 169, 48),
-        color(218, 93, 34), color(56, 91, 207), color(182, 42, 124), color(82, 115, 46),
-        color(165, 73, 26), color(168, 166, 232), color(160, 75, 117), color(110, 193, 66),
-        color(172, 104, 62), color(104, 98, 190), color(231, 146, 181), color(127, 186, 105),
-        color(221, 132, 42), color(154, 139, 229), color(228, 65, 139), color(54, 141, 54),
-        color(213, 148, 75), color(114, 79, 190), color(234, 111, 158), color(69, 197, 88)
+        color(0, 137, 65), color(0, 111, 166), color(163, 0, 89), color(122, 73, 0),
+        color(0, 0, 166), color(183, 151, 98), color(0, 77, 67), color(90, 0, 7),
+        color(79, 198, 1), color(186, 9, 0), color(107, 121, 0), color(0, 194, 160),
+        color(185, 3, 170), color(123, 79, 75), color(0, 132, 111), color(160, 121, 191),
+        color(204, 7, 68), color(0, 72, 156), color(111, 0, 98), color(12, 189, 102),
+        color(69, 109, 117), color(183, 123, 104), color(136, 85, 120), color(190, 196, 89),
+        color(136, 111, 76), color(0, 166, 170), color(87, 83, 41), color(176, 91, 111),
+        color(59, 151, 0), color(30, 110, 0), color(167, 117, 0), color(99, 103, 169),
+        color(160, 88, 55), color(107, 0, 44), color(119, 38, 0), color(155, 151, 0),
+        color(84, 158, 121), color(114, 65, 143), color(58, 36, 101), color(146, 35, 41),
+        color(91, 69, 52), color(0, 137, 163), color(203, 126, 152), color(50, 78, 114),
+        color(106, 58, 76), color(131, 171, 88), color(191, 86, 80), color(1, 44, 88),
+        color(148, 58, 77), color(149, 86, 189), color(2, 82, 95), color(126, 100, 5),
+        color(2, 104, 78), color(150, 43, 117), color(141, 133, 70), color(62, 137, 190),
+        color(202, 131, 78), color(81, 138, 135), color(91, 17, 60), color(85, 129, 59),
+        color(0, 0, 95), color(75, 129, 96), color(89, 115, 138), color(100, 49, 39)
 )
 
 
@@ -92,6 +92,8 @@ val BIOME_NAMES = linkedMapOf(
         "Sharp plateaus" to 6,
         "Custom" to 7
 )
+
+val BIOME_NAMES_AS_TEXT = BIOME_NAMES.keys.map { text(it, TEXT_STYLE_BUTTON) }
 
 val BIOME_ORDINALS = linkedMapOf(*BIOME_NAMES.map { it.value  to it.key }.toTypedArray())
 
