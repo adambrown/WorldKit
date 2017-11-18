@@ -1,5 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
+import com.grimfox.gec.model.ObservableMutableList
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.HorizontalTruncation.*
@@ -7,19 +8,17 @@ import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.ui.widgets.VerticalTruncation.*
-import com.grimfox.gec.util.Reference
+import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Utils.LOG
-import com.grimfox.gec.util.cRef
-import com.grimfox.gec.util.twr
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.memAddress
-import java.lang.Math.max
-import java.lang.Math.min
+import java.lang.Math.*
 import java.nio.ByteBuffer
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class HorizontalAlignment {
     LEFT,
@@ -598,6 +597,7 @@ abstract class Block {
     abstract val parent: Block
     abstract val nvg: Long
     abstract val runId: Long
+    abstract var movedOrResized: Boolean
     abstract val layoutChildren: MutableList<Block>
     abstract val renderChildren: MutableList<Block>
     abstract var isVisible: Boolean
@@ -836,11 +836,34 @@ abstract class Block {
         root.runId = runId
         root.scale = scale
         root.scaleChanged = scaleChanged
+        val movedOrResized = root.getAndSetMovedOrResized(false)
+        if (movedOrResized) {
+            clearPositionAndSize(root)
+            recalculatePositionAndSize(root)
+        }
         if (isVisible) {
             prepareForIteration()
             draw(ScissorStack(nvg), scale)
         }
     }
+
+    private fun clearPositionAndSize(block: Block) {
+        block.clearPositionAndSize()
+        block.layoutChildren.forEach {
+            clearPositionAndSize(it)
+        }
+    }
+
+    private fun recalculatePositionAndSize(block: Block) {
+        block.recalculatePositionAndSize()
+        block.layoutChildren.forEach {
+            recalculatePositionAndSize(it)
+        }
+    }
+
+    abstract protected fun clearPositionAndSize()
+
+    abstract protected fun recalculatePositionAndSize()
 
     private fun prepareForIteration(onTicks: MutableList<Block.(Int, Int) -> Unit>? = null) {
         val shrinkGroups = HashSet<ShrinkGroup>()
@@ -946,9 +969,64 @@ abstract class Block {
 
 private val ignore = Unit
 
-private open class RootBlock(override var x: Float, override var y: Float, override var width: Float, override var height: Float) : Block() {
+private open class RootBlock(x: Float, y: Float, width: Float, height: Float) : Block() {
+    private var _movedOrResized: AtomicBoolean = AtomicBoolean(true)
+    override var movedOrResized: Boolean
+        get() = _movedOrResized.get()
+        set(value) {
+            _movedOrResized.set(value)
+        }
+
+    fun getAndSetMovedOrResized(value: Boolean): Boolean = _movedOrResized.getAndSet(value)
+
+    private var _x = x
+    override var x: Float
+        get() = _x
+        set(value) {
+            if (value != _x) {
+                _x = value
+                movedOrResized = true
+            }
+        }
+
+    private var _y = y
+    override var y: Float
+        get() = _y
+        set(value) {
+            if (value != _y) {
+                _y = value
+                movedOrResized = true
+            }
+        }
+
+    private var _width = width
+    override var width: Float
+        get() = _width
+        set(value) {
+            if (value != _width) {
+                _width = value
+                movedOrResized = true
+            }
+        }
+
+    private var _height = height
+    override var height: Float
+        get() = _height
+        set(value) {
+            if (value != _height) {
+                _height = value
+                movedOrResized = true
+            }
+        }
+
     override var scale: Float = 1.0f
-    override var scaleChanged: Boolean = false
+    private var _scaleChanged = false
+    override var scaleChanged: Boolean
+        get() = _scaleChanged
+        set(value) {
+            _scaleChanged = value
+            movedOrResized = value || movedOrResized
+        }
     override var hShrinkGroup: ShrinkGroup?
         get() = null
         set(value) = ignore
@@ -959,8 +1037,8 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
         get() = this
     override val parent: RootBlock
         get() = this
-    override val layoutChildren = ArrayList<Block>()
-    override val renderChildren = ArrayList<Block>()
+    override val layoutChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
+    override val renderChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
     override var nvg: Long = -1
     override var runId: Long = -1
     override var isVisible: Boolean
@@ -1068,6 +1146,8 @@ private open class RootBlock(override var x: Float, override var y: Float, overr
     override var mouseOverParents: List<Block>? = null
     override var lastMouseOver: Block? = null
     override var awaitingMouseDownOverOther: MutableList<Triple<Int, Block, Int>> = ArrayList()
+    override fun clearPositionAndSize() {}
+    override fun recalculatePositionAndSize() {}
 }
 
 val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
@@ -1081,44 +1161,184 @@ val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
 
 private class DefaultBlock(
         override val root: Block,
-        override val parent: Block,
-        override val layoutChildren: MutableList<Block> = ArrayList(),
-        override val renderChildren: MutableList<Block> = ArrayList(),
-        override var isVisible: Boolean = true,
-        override var hAlign: HorizontalAlignment = LEFT,
-        override var vAlign: VerticalAlignment = TOP,
-        override var hTruncate: HorizontalTruncation = if (hAlign == RIGHT) TRUNCATE_LEFT else if (hAlign == LEFT) TRUNCATE_RIGHT else TRUNCATE_CENTER,
-        override var vTruncate: VerticalTruncation = if (vAlign == BOTTOM) TRUNCATE_TOP else if (vAlign == TOP) TRUNCATE_BOTTOM else TRUNCATE_MIDDLE,
-        override var layout: Layout = ABSOLUTE,
-        override var xOffset: Float = 0.0f,
-        override var yOffset: Float = 0.0f,
-        override var hSizing: Sizing = RELATIVE,
-        override var vSizing: Sizing = RELATIVE,
-        width: Float = 10000.0f,
-        height: Float = 10000.0f,
-        override var padLeft: Float = 0.0f,
-        override var padRight: Float = 0.0f,
-        override var padTop: Float = 0.0f,
-        override var padBottom: Float = 0.0f,
-        override var shape: Shape = NO_SHAPE,
-        override var text: Text = NO_TEXT,
-        override var canOverflow: Boolean = false,
-        override var overflowCount: Int = -1,
-        override var lastBlock: Block? = null,
-        override var isMouseAware: Boolean = parent.isMouseAware,
-        override var receiveChildEvents: Boolean = false,
-        override var isFallThrough: Boolean = false,
-        override var onMouseOver: (Block.() -> Unit)? = null,
-        override var onMouseOut: (Block.() -> Unit)? = null,
-        override var onMouseDown: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onMouseUp: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onMouseRelease: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onMouseDownOverOther: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)? = null,
-        override var onScroll: (Block.(Double, Double) -> Unit)? = null,
-        override var onDrop: (Block.(List<String>) -> Unit)? = null,
-        override var onTick: (Block.(Int, Int) -> Unit)? = null) : Block() {
+        override val parent: Block) : Block() {
+
+    override var movedOrResized: Boolean
+        get() = root.movedOrResized
+        set(value) {
+            root.movedOrResized = value
+        }
+    override val layoutChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
+    override val renderChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
+    private var _isVisible: Boolean = true
+    override var isVisible: Boolean
+        get() = _isVisible
+        set(value) {
+            if (_isVisible != value) {
+                _isVisible = value
+                movedOrResized = true
+            }
+        }
+    private var _hAlign: HorizontalAlignment = LEFT
+    override var hAlign: HorizontalAlignment
+        get() = _hAlign
+        set(value) {
+            if (_hAlign != value) {
+                _hAlign = value
+                movedOrResized = true
+            }
+        }
+    private var _vAlign: VerticalAlignment = TOP
+    override var vAlign: VerticalAlignment
+        get() = _vAlign
+        set(value) {
+            if (_vAlign != value) {
+                _vAlign = value
+                movedOrResized = true
+            }
+        }
+    private var _hTruncate: HorizontalTruncation = if (hAlign == RIGHT) TRUNCATE_LEFT else if (hAlign == LEFT) TRUNCATE_RIGHT else TRUNCATE_CENTER
+    override var hTruncate: HorizontalTruncation
+        get() = _hTruncate
+        set(value) {
+            if (_hTruncate != value) {
+                _hTruncate = value
+                movedOrResized = true
+            }
+        }
+    private var _vTruncate: VerticalTruncation = if (vAlign == BOTTOM) TRUNCATE_TOP else if (vAlign == TOP) TRUNCATE_BOTTOM else TRUNCATE_MIDDLE
+    override var vTruncate: VerticalTruncation
+        get() = _vTruncate
+        set(value) {
+            if (_vTruncate != value) {
+                _vTruncate = value
+                movedOrResized = true
+            }
+        }
+    private var _layout: Layout = ABSOLUTE
+    override var layout: Layout
+        get() = _layout
+        set(value) {
+            if (_layout != value) {
+                _layout = value
+                movedOrResized = true
+            }
+        }
+    private var _xOffset: Float = 0.0f
+    override var xOffset: Float
+        get() = _xOffset
+        set(value) {
+            if (_xOffset != value) {
+                _xOffset = value
+                movedOrResized = true
+            }
+        }
+    private var _yOffset: Float = 0.0f
+    override var yOffset: Float
+        get() = _yOffset
+        set(value) {
+            if (_yOffset != value) {
+                _yOffset = value
+                movedOrResized = true
+            }
+        }
+    private var _hSizing: Sizing = RELATIVE
+    override var hSizing: Sizing
+        get() = _hSizing
+        set(value) {
+            if (_hSizing != value) {
+                _hSizing = value
+                movedOrResized = true
+            }
+        }
+    private var _vSizing: Sizing = RELATIVE
+    override var vSizing: Sizing
+        get() = _vSizing
+        set(value) {
+            if (_vSizing != value) {
+                _vSizing = value
+                movedOrResized = true
+            }
+        }
+    private var _padLeft: Float = 0.0f
+    override var padLeft: Float
+        get() = _padLeft
+        set(value) {
+            if (_padLeft != value) {
+                _padLeft = value
+                movedOrResized = true
+            }
+        }
+    private var _padRight: Float = 0.0f
+    override var padRight: Float
+        get() = _padRight
+        set(value) {
+            if (_padRight != value) {
+                _padRight = value
+                movedOrResized = true
+            }
+        }
+    private var _padTop: Float = 0.0f
+    override var padTop: Float
+        get() = _padTop
+        set(value) {
+            if (_padTop != value) {
+                _padTop = value
+                movedOrResized = true
+            }
+        }
+    private var _padBottom: Float = 0.0f
+    override var padBottom: Float
+        get() = _padBottom
+        set(value) {
+            if (_padBottom != value) {
+                _padBottom = value
+                movedOrResized = true
+            }
+        }
+    private var _shape: Shape = NO_SHAPE
+    override var shape: Shape
+        get() = _shape
+        set(value) {
+            if (_shape != value) {
+                _shape = value
+                movedOrResized = true
+            }
+        }
+    private var _text: Text = NO_TEXT
+    override var text: Text
+        get() = _text
+        set(value) {
+            if (_text != value) {
+                _text = value
+                movedOrResized = true
+            }
+        }
+    private var _canOverflow: Boolean = false
+    override var canOverflow: Boolean
+        get() = _canOverflow
+        set(value) {
+            if (_canOverflow != value) {
+                _canOverflow = value
+                movedOrResized = true
+            }
+        }
+    override var overflowCount: Int = -1
+    override var lastBlock: Block? = null
+    override var isMouseAware: Boolean = parent.isMouseAware
+    override var receiveChildEvents: Boolean = false
+    override var isFallThrough: Boolean = false
+    override var onMouseOver: (Block.() -> Unit)? = null
+    override var onMouseOut: (Block.() -> Unit)? = null
+    override var onMouseDown: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onMouseUp: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onMouseRelease: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onMouseDownOverOther: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onMouseClick: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onMouseDrag: (Block.(Int, Int, Int, Int) -> Unit)? = null
+    override var onScroll: (Block.(Double, Double) -> Unit)? = null
+    override var onDrop: (Block.(List<String>) -> Unit)? = null
+    override var onTick: (Block.(Int, Int) -> Unit)? = null
 
     override val nvg: Long
         get() = root.nvg
@@ -1200,11 +1420,21 @@ private class DefaultBlock(
         super.prepareForIteration(shrinkGroups, onTicks)
     }
 
-    private var _width = width
-    private var _height = height
+    private var _width = 10000.0f
+    private var _height = 10000.0f
 
     override var width: Float
         get() {
+            val finalCachedWidth = cachedWidth
+            if (finalCachedWidth != null) {
+                return finalCachedWidth
+            } else if (cachedRunId != runId) {
+                recalculatePositionAndSize()
+                val recalculatedWidth = cachedWidth
+                if (recalculatedWidth != null) {
+                    return recalculatedWidth
+                }
+            }
             if (!isVisible) {
                 return 0.0f
             }
@@ -1326,11 +1556,24 @@ private class DefaultBlock(
             }
         }
         set(value) {
-            _width = value
+            if (_width != value) {
+                _width = value
+                movedOrResized = true
+            }
         }
 
     override var height: Float
         get() {
+            val finalCachedHeight = cachedHeight
+            if (finalCachedHeight != null) {
+                return finalCachedHeight
+            } else if (cachedRunId != runId) {
+                recalculatePositionAndSize()
+                val recalculatedHeight = cachedHeight
+                if (recalculatedHeight != null) {
+                    return recalculatedHeight
+                }
+            }
             if (!isVisible) {
                 return 0.0f
             }
@@ -1452,11 +1695,24 @@ private class DefaultBlock(
             }
         }
         set(value) {
-            _height = value
+            if (_height != value) {
+                _height = value
+                movedOrResized = true
+            }
         }
 
     override var x: Float
         get() {
+            val finalCachedX = cachedX
+            if (finalCachedX != null) {
+                return finalCachedX
+            } else if (cachedRunId != runId) {
+                recalculatePositionAndSize()
+                val recalculatedX = cachedX
+                if (recalculatedX != null) {
+                    return recalculatedX
+                }
+            }
             if (layout == ABSOLUTE || lastBlock == null) {
                 return getXRelativeTo(parent.x, parent.width)
             }
@@ -1469,6 +1725,16 @@ private class DefaultBlock(
 
     override var y: Float
         get() {
+            val finalCachedY = cachedY
+            if (finalCachedY != null) {
+                return finalCachedY
+            } else if (cachedRunId != runId) {
+                recalculatePositionAndSize()
+                val recalculatedY = cachedY
+                if (recalculatedY != null) {
+                    return recalculatedY
+                }
+            }
             if (layout == ABSOLUTE || lastBlock == null) {
                 return getYRelativeTo(parent.y, parent.height)
             }
@@ -1479,6 +1745,30 @@ private class DefaultBlock(
 
         }
         set(value) = ignore
+
+    private var cachedRunId: Long = -1
+    private var cachedX: Float? = null
+    private var cachedY: Float? = null
+    private var cachedWidth: Float? = null
+    private var cachedHeight: Float? = null
+
+    override fun clearPositionAndSize() {
+        cachedRunId = -1
+        cachedX = null
+        cachedY = null
+        cachedWidth = null
+        cachedHeight = null
+    }
+
+    override fun recalculatePositionAndSize() {
+        if (cachedRunId != runId) {
+            cachedRunId = runId
+            cachedX = x
+            cachedY = y
+            cachedWidth = width
+            cachedHeight = height
+        }
+    }
 
     private fun getXRelativeTo(relativeX: Float, relativeWidth: Float): Float {
         if (width > relativeWidth) {

@@ -1,11 +1,10 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.brushes.PreSelectDrawBrushListener
-import com.grimfox.gec.ui.UiLayout
-import com.grimfox.gec.ui.UserInterface
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
-import java.util.ArrayList
+import java.util.*
 
 private val biomesSeed = ref(1L)
 private val biomesMapScale = ref(4)
@@ -137,31 +136,33 @@ fun Block.editBiomesPanel(
         }
         val editBiomesMode = ref(false)
         biomeCount.addListener { oldBiomeCount, newBiomeCount ->
-            if (oldBiomeCount != newBiomeCount) {
-                val newBiomes = ArrayList(biomes.value)
-                if (biomeRows.layoutChildren.size > newBiomeCount) {
-                    for (i in 1..biomeRows.layoutChildren.size - newBiomeCount) {
-                        val removeAt = biomeRows.layoutChildren.size - 1
-                        biomeRows.layoutChildren.removeAt(removeAt)
-                        biomeRows.renderChildren.removeAt(removeAt)
-                        newBiomes.removeAt(removeAt)
-                    }
-                } else if (biomeRows.layoutChildren.size < newBiomeCount) {
-                    for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
-                        val index = newBiomes.size
-                        val selectedValue = selectedBiomes[index]
-                        biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, BIOME_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES_AS_TEXT, selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
-                        newBiomes.add(selectedValue.value)
-                        selectedValue.addListener { oldBiomeId, newBiomeId ->
-                            if (oldBiomeId != newBiomeId) {
-                                val changedBiomes = ArrayList(biomes.value)
-                                changedBiomes[index] = newBiomeId
-                                biomes.value = changedBiomes
+            doOnMainThread {
+                if (oldBiomeCount != newBiomeCount) {
+                    val newBiomes = ArrayList(biomes.value)
+                    if (biomeRows.layoutChildren.size > newBiomeCount) {
+                        for (i in 1..biomeRows.layoutChildren.size - newBiomeCount) {
+                            val removeAt = biomeRows.layoutChildren.size - 1
+                            biomeRows.layoutChildren.removeAt(removeAt)
+                            biomeRows.renderChildren.removeAt(removeAt)
+                            newBiomes.removeAt(removeAt)
+                        }
+                    } else if (biomeRows.layoutChildren.size < newBiomeCount) {
+                        for (i in 1..newBiomeCount - biomeRows.layoutChildren.size) {
+                            val index = newBiomes.size
+                            val selectedValue = selectedBiomes[index]
+                            biomeRows.vBiomeDropdownRow(editBiomesMode, currentBiomeBrushValue, dropdownLayer, BIOME_COLORS[biomeRows.layoutChildren.size + 1], BIOME_NAMES_AS_TEXT, selectedValue, index, LARGE_ROW_HEIGHT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
+                            newBiomes.add(selectedValue.value)
+                            selectedValue.addListener { oldBiomeId, newBiomeId ->
+                                if (oldBiomeId != newBiomeId) {
+                                    val changedBiomes = ArrayList(biomes.value)
+                                    changedBiomes[index] = newBiomeId
+                                    biomes.value = changedBiomes
+                                }
                             }
                         }
                     }
+                    biomes.value = newBiomes
                 }
-                biomes.value = newBiomes
             }
         }
         biomeCount.value = 6

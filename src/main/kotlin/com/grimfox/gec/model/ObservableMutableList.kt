@@ -65,7 +65,8 @@ class ObservableMutableList<T>(private val delegate: MutableList<T>, private val
     }
 
     override fun add(index: Int, element: T) {
-        sendAddEvent(element, delegate.add(element), index)
+        delegate.add(index, element)
+        sendAddEvent(element, true, index)
     }
 
     override fun addAll(index: Int, elements: Collection<T>): Boolean {

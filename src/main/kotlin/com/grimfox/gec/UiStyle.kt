@@ -3,12 +3,10 @@ package com.grimfox.gec
 import com.grimfox.gec.ui.KeyboardHandler
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
-import com.grimfox.gec.ui.nvgproxy.color
-import com.grimfox.gec.ui.nvgproxy.NPColor
+import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
-import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_LEFT
-import com.grimfox.gec.ui.widgets.HorizontalTruncation.TRUNCATE_RIGHT
+import com.grimfox.gec.ui.widgets.HorizontalTruncation.*
 import com.grimfox.gec.ui.widgets.Layout.*
 import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
@@ -285,7 +283,10 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 padLeft = SMALL_SPACER_SIZE,
                 padRight = SMALL_SPACER_SIZE))
 
-val LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE.copy(textShapeTemplate = NORMAL_TEXT_BUTTON_STYLE.textShapeTemplate.copy(hAlign = HorizontalAlignment.LEFT))
+val LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE.copy(
+        textShapeTemplate = BlockTemplate(
+                hAlign = LEFT,
+                vAlign = MIDDLE))
 
 val DISABLED_TEXT_BUTTON_STYLE = ButtonStyle(
         normal = SHAPE_BUTTON_NORMAL,
@@ -1097,7 +1098,7 @@ fun Block.vLabelRow(height: Float, label: Text): Block {
     }
 }
 
-fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onClick: () -> Unit = {}): Block {
+fun Block.vExpandableButton(height: Float, openOrClosed: Text, openOrClosedWidth: Float, label: Text, style: ButtonStyle, onClick: () -> Unit = {}): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -1106,7 +1107,31 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
             hSizing = Sizing.RELATIVE
             width = 10000.0f
             hAlign = LEFT
-            val button = button(label, style, onClick)
+            val button = button({
+                block {
+                    layout = HORIZONTAL
+                    vSizing = SHRINK
+                    hSizing = STATIC
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    width = openOrClosedWidth
+                    block {
+                        vSizing = SHRINK
+                        hSizing = SHRINK
+                        hAlign = CENTER
+                        vAlign = MIDDLE
+                        text = openOrClosed
+                    }
+                }
+                block {
+                    layout = HORIZONTAL
+                    vSizing = SHRINK
+                    hSizing = SHRINK
+                    hAlign = LEFT
+                    vAlign = MIDDLE
+                    text = label
+                }
+            }, style, onClick)
             button.hSizing = Sizing.RELATIVE
             button.width = 10000.0f
         }
@@ -1114,15 +1139,16 @@ fun Block.vExpandableButton(height: Float, label: Text, style: ButtonStyle, onCl
 }
 
 fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
-    val panelNameOpen = "- $panelName"
-    val panelNameClosed = "+ $panelName"
+    val panelNameText = text(panelName, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    val openText = text("-", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    val closedText = text("+", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    val isOpenText = StaticTextReference(if (expanded.value) openText else closedText)
     val isExpanded = expanded.value
-    val panelTitle = DynamicTextReference(if (isExpanded) panelNameOpen else panelNameClosed, 20, TEXT_STYLE_NORMAL)
     return block {
         vSizing = SHRINK
         layout = VERTICAL
         shape = NO_SHAPE
-        vExpandableButton(LARGE_ROW_HEIGHT, panelTitle.text, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
+        vExpandableButton(LARGE_ROW_HEIGHT, isOpenText, 12.0f, panelNameText, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
             expanded.value = !expanded.value
         }
         val panelBlock = block {
@@ -1133,10 +1159,10 @@ fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<B
         }
         expanded.addListener { _, new ->
             if (new) {
-                panelTitle.reference.value = panelNameOpen
+                isOpenText.reference.value = openText
                 panelBlock.isVisible = true
             } else {
-                panelTitle.reference.value = panelNameClosed
+                isOpenText.reference.value = closedText
                 panelBlock.isVisible = false
             }
         }
