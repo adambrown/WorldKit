@@ -18,6 +18,7 @@ import org.lwjgl.opengl.GL30.*
 import java.lang.Math.round
 import java.lang.Math.sqrt
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MeshViewport3D(
         val resetView: MutableReference<Boolean>,
@@ -464,49 +465,58 @@ class MeshViewport3D(
         }
     }
 
-    fun checkKeysPressed() {
+    private var lastKeyCheck = -1L
+
+    private fun checkKeysPressed() {
+        val currentTime = System.nanoTime()
+        if (lastKeyCheck == -1L) {
+            lastKeyCheck = currentTime
+            return
+        }
+        val deltaTime = (currentTime - lastKeyCheck) / 1000000000.0f
+        lastKeyCheck = currentTime
         if (isFlyModeOn) {
             if (!disableCursor.value) {
                 disableCursor.value = true
             }
             val lazyCamera = LazyCameraPosition()
             if (pressedKeys.contains(GLFW.GLFW_KEY_W)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.04f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(0.0f, 0.0f, increment)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_S)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.04f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(0.0f, 0.0f, increment)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_A)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.03f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(increment, 0.0f, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_D)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.03f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(increment, 0.0f, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_Q)) {
                 deltaRotation.identity()
-                deltaRotation.rotate(0.0f, 0.0f, -0.02f)
+                deltaRotation.rotate(0.0f, 0.0f, -2f * deltaTime)
                 modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_E)) {
                 deltaRotation.identity()
-                deltaRotation.rotate(0.0f, 0.0f, 0.02f)
+                deltaRotation.rotate(0.0f, 0.0f, 2f * deltaTime)
                 modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_SPACE)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * -0.02f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_CONTROL)) {
-                val increment = Math.max(lazyCamera.value.z, 50.0f) * 0.02f
+                val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
@@ -527,7 +537,7 @@ class MeshViewport3D(
         } else if (imageMode.value == 2) {
             onDrawFrameInternalBiome(xPosition, yPosition, width, height, rootHeight, scale)
         } else {
-            onDrawFrameInternalHeightmap(xPosition, yPosition, width, height, rootHeight, scale)
+            onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, rootHeight, scale)
         }
     }
 
@@ -723,7 +733,7 @@ class MeshViewport3D(
         }
     }
 
-    private fun onDrawFrameInternalHeightmap(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+    private fun onDrawFrameInternalHeightMap(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
 
         if (width < 1 || height < 1) {
             return
