@@ -7,6 +7,8 @@ import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.geometry.*
+import com.grimfox.gec.ui.nvgproxy.color
+import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedByte
@@ -14,6 +16,7 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedFloat
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesRedFloat
 import com.grimfox.gec.util.Biomes.DEGREES_TO_SLOPES
 import com.grimfox.gec.util.Biomes.UNDER_WATER_BIOME
 import com.grimfox.gec.util.Rendering.renderEdges
@@ -121,9 +124,8 @@ object WaterFlows {
                             customSoilMobilityMap = customSoilMobilityMap)
                     dynamicGeometry2D.render(vertexData, indexData, biome.elevationPowerShader.positionAttribute)
                 }
-                val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
-                retVal
+                textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
             }
             val startingHeightsTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
@@ -152,9 +154,8 @@ object WaterFlows {
                             customSoilMobilityMap = customSoilMobilityMap)
                     dynamicGeometry2D.render(vertexData, indexData, biome.startingHeightShader.positionAttribute)
                 }
-                val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
-                retVal
+                textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
             }
             val soilMobilityTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
@@ -186,9 +187,8 @@ object WaterFlows {
                         dynamicGeometry2D.render(vertexData, indexData, shader.positionAttribute)
                     }
                 }
-                val retVal = textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
-                retVal
+                textureRenderer.newRedTextureShort(GL_LINEAR, GL_LINEAR)
             }
             val underWaterTextureId = render { _, dynamicGeometry2D, textureRenderer ->
                 glDisable(GL11.GL_BLEND)
@@ -220,9 +220,8 @@ object WaterFlows {
                         customStartingHeightsMap = customStartingHeightsMap,
                         customSoilMobilityMap = customSoilMobilityMap)
                 dynamicGeometry2D.render(vertexData, indexData, UNDER_WATER_BIOME.elevationPowerShader.positionAttribute)
-                val retVal = textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
                 textureRenderer.unbind()
-                retVal
+                textureRenderer.newRedTextureByte(GL_LINEAR, GL_LINEAR)
             }
             val elevationMask = ShortArrayMatrix(4096, extractTextureRedShort(elevationPowerTextureId, 4096))
             val startingHeights = ShortArrayMatrix(4096, extractTextureRedShort(startingHeightsTextureId, 4096))
@@ -517,8 +516,9 @@ object WaterFlows {
             computeAreas(executor, rivers)
             computeHeights(executor, rivers, biomes, erosionSettings)
         }
-        val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
-        renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount)
+        val startTime = System.nanoTime()
+        val heightMap = renderHeightMap(executor, graph, nodeIndex, fallback, defaultValue, heightMapWidth, threadCount)
+        println("triangle time = ${(System.nanoTime() - startTime) / 1000000.0}")
         val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE))}
         nodes.forEach {
             val (min, max) = biomeExtremes[it.biome]
@@ -1092,15 +1092,88 @@ object WaterFlows {
         futures.forEach(Future<*>::join)
     }
 
+    private fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, defaultValue: Float, heightMapWidth: Int, threadCount: Int): FloatArrayMatrix {
+        val fWidth = fallback?.width ?: 0
+        val fWidthM1 = fWidth - 1
+        val triangles = graph.triangles
+        val graphVertices = graph.vertices
+        var vertexIndex = 0
+        var minHeight = defaultValue
+        var maxHeight = defaultValue
+        val meshVertices = Array(graphVertices.size) { i ->
+            val point = graphVertices.getPoint(i)
+            val node = nodeIndex[i]
+            if (node == null) {
+                if (fallback != null) {
+                    val z = fallback[(Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)] - 600
+                    if (z < minHeight) {
+                        minHeight = z
+                    }
+                    if (z > maxHeight) {
+                        maxHeight = z
+                    }
+                    vertexIndex++ to Point3F(point.x, point.y, z)
+                } else {
+                    null
+                }
+            } else {
+                val z = node.height
+                if (z < minHeight) {
+                    minHeight = z
+                }
+                if (z > maxHeight) {
+                    maxHeight = z
+                }
+                vertexIndex++ to Point3F(point.x, point.y, z)
+            }
+        }
+        val deltaHeight = maxHeight - minHeight
+        val vertexData = FloatArray(vertexIndex * 3)
+        meshVertices.forEach {
+            if (it != null) {
+                val (i, point) = it
+                var index = i * 3
+                vertexData[index++] = point.x
+                vertexData[index++] = point.y
+                vertexData[index] = (point.z - minHeight) / deltaHeight
+            }
+        }
+        val futures = ArrayList<Future<*>>(threadCount)
+        val indexData = IntArray(triangles.size * 3)
+        (0 until threadCount).mapTo(futures) {
+            executor.submit {
+                for (t in it until triangles.size step threadCount) {
+                    val triangleVertices = triangles.getVertices(t)
+                    val a = meshVertices[triangleVertices.first]
+                    val b = meshVertices[triangleVertices.second]
+                    val c = meshVertices[triangleVertices.third]
+                    if (a != null && b != null && c != null) {
+                        var offset = t * 3
+                        indexData[offset++] = a.first
+                        indexData[offset++] = b.first
+                        indexData[offset] = c.first
+                    }
+                }
+            }
+        }
+        futures.forEach(Future<*>::join)
+        val adjustedDefault = (defaultValue - minHeight) / deltaHeight
+        val array = renderTrianglesRedFloat(vertexData, indexData, heightMapWidth, Quadruple(adjustedDefault, adjustedDefault, adjustedDefault, 1.0f))
+        for (i in 0 until array.size) {
+            array[i] = (array[i] * deltaHeight) + minHeight
+        }
+        return FloatArrayMatrix(heightMapWidth, array)
+    }
+
     private fun writeHeightMapBytes(heightMap: Matrix<Byte>): TextureId {
         val width = heightMap.width
         val output = ShortArray(width * width)
-        val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.max()?.toFloat() ?: 0.0f
+        val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max()?.toFloat() ?: 0.0f
         println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        for (y in (0..width - 1)) {
-            for (x in (0..width - 1)) {
+        for (y in (0 until width)) {
+            for (x in (0 until width)) {
                 val heightValue = heightMap[x, y].toFloat()
                 if (heightValue < 0.0f) {
                     output[y * width + x] = 0
@@ -1115,12 +1188,12 @@ object WaterFlows {
     private fun writeHeightMapUBytes(heightMap: Matrix<Byte>): TextureId {
         val width = heightMap.width
         val output = ShortArray(width * width)
-        val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it].toInt() and 0xFF }.max()?.toFloat() ?: 0.0f
+        val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it].toInt() and 0xFF }.max()?.toFloat() ?: 0.0f
         println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        for (y in (0..width - 1)) {
-            for (x in (0..width - 1)) {
+        for (y in (0 until width)) {
+            for (x in (0 until width)) {
                 val heightValue = (heightMap[x, y].toInt() and 0xFF).toFloat()
                 if (heightValue < 0.0f) {
                     output[y * width + x] = 0
@@ -1135,12 +1208,12 @@ object WaterFlows {
     private fun writeHeightMapUShorts(heightMap: Matrix<Short>): TextureId {
         val width = heightMap.width
         val output = ShortArray(width * width)
-        val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it].toInt() and 0xFFFF }.max()?.toFloat() ?: 0.0f
+        val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it].toInt() and 0xFFFF }.max()?.toFloat() ?: 0.0f
         println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        for (y in (0..width - 1)) {
-            for (x in (0..width - 1)) {
+        for (y in (0 until width)) {
+            for (x in (0 until width)) {
                 val heightValue = (heightMap[x, y].toInt() and 0xFFFF).toFloat()
                 if (heightValue < 0.0f) {
                     output[y * width + x] = 0
@@ -1155,15 +1228,15 @@ object WaterFlows {
     private fun writeHeightMap(heightMap: Matrix<Float>): TextureId {
         val width = heightMap.width
         val output = ShortArray(width * width)
-        val maxLandValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.max() ?: 0.0f
+        val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
         println("maxLandValue = $maxLandValue")
-        val minWaterValue = (0..heightMap.size.toInt() - 1).asSequence().map { heightMap[it] }.min() ?: 0.0f
+        val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
         println("minWaterValue = $minWaterValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         val waterFactor = (1.0f / minWaterValue) * waterLine
-        for (y in (0..width - 1)) {
-            for (x in (0..width - 1)) {
+        for (y in (0 until width)) {
+            for (x in (0 until width)) {
                 val heightValue = heightMap[x, y]
                 if (heightValue < 0.0f) {
                     output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
@@ -1178,14 +1251,14 @@ object WaterFlows {
     private fun buildTriangles(graph: Graph, regionMask: Matrix<Byte>): List<Pair<FloatArray, IntArray>> {
         val regions = ArrayList<Triple<ArrayList<Float>, ArrayList<Int>, AtomicInteger>>(16)
         val vertices = graph.vertices
-        for (id in 0..vertices.size - 1) {
+        for (id in 0 until vertices.size) {
             val regionId = regionMask[id]
             if (regionId < 1) {
                 continue
             }
             if (regions.size < regionId) {
-                for (i in regions.size..regionId - 1) {
-                    regions.add(Triple(ArrayList<Float>(), ArrayList<Int>(), AtomicInteger(0)))
+                for (i in regions.size until regionId) {
+                    regions.add(Triple(ArrayList(), ArrayList(), AtomicInteger(0)))
                 }
             }
             val region = regions[regionId - 1]

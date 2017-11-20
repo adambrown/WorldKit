@@ -25,7 +25,7 @@ object Rendering {
 
     fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
         val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
-        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
+        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId = textureId)
         return textureId
     }
 
