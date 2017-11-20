@@ -12,6 +12,7 @@ import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Utils.LOG
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
+import org.lwjgl.opengl.GL11.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.memAddress
@@ -527,9 +528,20 @@ class ShapeMeshViewport3D(private val viewport: MeshViewport3D) : Shape {
 
     override fun draw(nvg: Long, block: Block, scale: Float) {
         val doubleScale = scale.toDouble()
+        val xPosition = Math.ceil(block.x * doubleScale).toInt()
+        val yPosition = Math.ceil(block.y * doubleScale).toInt()
+        val width = Math.ceil(block.width * doubleScale).toInt()
+        val height = Math.ceil(block.height * doubleScale).toInt()
+        val rootHeight = Math.ceil(block.root.height * doubleScale).toInt()
+        val flippedY = rootHeight - (yPosition + height)
         nvgSave(nvg)
         nvgReset(nvg)
-        viewport.onDrawFrame(Math.ceil(block.x * doubleScale).toInt(), Math.ceil(block.y * doubleScale).toInt(), Math.ceil(block.width * doubleScale).toInt(), Math.ceil(block.height * doubleScale).toInt(), Math.ceil(block.root.height * doubleScale).toInt(), scale)
+        glEnable(GL_SCISSOR_TEST)
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+        glScissor(xPosition, flippedY, width, height)
+        glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+        glDisable(GL_SCISSOR_TEST)
+        viewport.prepareDrawFrame(xPosition, yPosition, width, height, scale)
         nvgRestore(nvg)
     }
 }

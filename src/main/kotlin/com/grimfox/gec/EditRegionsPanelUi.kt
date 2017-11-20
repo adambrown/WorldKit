@@ -206,6 +206,7 @@ fun Block.editRegionsPanel(
                             if (oldTexture != newTexture) {
                                 meshViewport.setRegions(newTexture)
                             }
+                            meshViewport.forceDrawUpdate()
                         }
                         currentEditBrushSize.value = regionEditBrushSize
                         brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
@@ -626,6 +627,7 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
             if (oldTexture != newTexture) {
                 meshViewport.setSplines(newTexture)
             }
+            meshViewport.forceDrawUpdate()
         }
         renderAsSplines = true
         textureReference
@@ -640,6 +642,7 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
             if (oldTexture != newTexture) {
                 meshViewport.setImage(newTexture)
             }
+            meshViewport.forceDrawUpdate()
         }
         renderAsSplines = false
         textureReference

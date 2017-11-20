@@ -124,7 +124,7 @@ class SplineDrawBrushListener(
                                 ignoredPoints + customIgnoredPoints,
                                 pendingPoints)
                     } else {
-                        renderSplines(
+                        texture.value = renderSplines(
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -141,7 +141,7 @@ class SplineDrawBrushListener(
                                 ignoredPoints + customIgnoredPoints,
                                 pendingPoints)
                     } else {
-                        renderMapImage(
+                        texture.value = renderMapImage(
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -261,7 +261,7 @@ class SplineDrawBrushListener(
                                 mountainPoints + customMountainPoints,
                                 ignoredPoints + customIgnoredPoints)
                     } else {
-                        renderSplines(
+                        texture.value = renderSplines(
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -277,7 +277,7 @@ class SplineDrawBrushListener(
                                 mountainPoints + customMountainPoints,
                                 ignoredPoints + customIgnoredPoints)
                     } else {
-                        renderMapImage(
+                        texture.value = renderMapImage(
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,

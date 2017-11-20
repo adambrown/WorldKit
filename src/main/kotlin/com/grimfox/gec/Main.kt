@@ -1,9 +1,7 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.HotKeyHandler
-import com.grimfox.gec.ui.layout
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
-import com.grimfox.gec.ui.ui
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
 import com.grimfox.gec.ui.widgets.Layout.*
@@ -522,6 +520,8 @@ object Main {
                 wasMinimized = true
             }
             performMainThreadTasks()
+        }, afterDraw = {
+            listOf(meshViewport.onDrawFrame())
         })
     }
 }

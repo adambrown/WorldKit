@@ -190,6 +190,7 @@ fun Block.editBiomesPanel(
                             if (oldTexture != newTexture) {
                                 meshViewport.setBiomes(newTexture)
                             }
+                            meshViewport.forceDrawUpdate()
                         }
                         currentEditBrushSize.value = biomeEditBrushSize
                         brushListener.value = PreSelectDrawBrushListener(currentBiomeGraph, currentBiomeMask, biomeEditBrushSize, textureReference, currentBiomeBrushValue)
