@@ -237,6 +237,9 @@ val errorMessageReference = errorMessageDynamic.reference
 
 var overwriteWarningDialog = NO_BLOCK
 var errorMessageDialog = NO_BLOCK
+var generatingMessageBlock = NO_BLOCK
+var generatingPrimaryMessage = StaticTextReference()
+var generatingSecondaryMessage = StaticTextReference()
 val noop = {}
 val dialogCallback = mRef(noop)
 

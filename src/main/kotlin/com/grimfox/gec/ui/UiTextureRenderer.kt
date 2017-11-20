@@ -9,6 +9,7 @@ import org.lwjgl.system.MemoryUtil
 
 class UiTextureRenderer(val width: Int, val height: Int) {
 
+    @Volatile var isFinalized = false
     val msFboId = glGenFramebuffers()
     val fboId = glGenFramebuffers()
     val renderTextureId: Int
@@ -70,11 +71,18 @@ class UiTextureRenderer(val width: Int, val height: Int) {
     @Suppress("unused")
     fun finalize() {
         doOnMainThread {
-            glDeleteFramebuffers(fboId)
-            glDeleteFramebuffers(msFboId)
-            glDeleteRenderbuffers(depthBufferId)
-            glDeleteRenderbuffers(colorBufferId)
-            glDeleteTextures(renderTextureId)
+            if (!isFinalized) {
+                synchronized(this) {
+                    if (!isFinalized) {
+                        isFinalized = true
+                        glDeleteFramebuffers(fboId)
+                        glDeleteFramebuffers(msFboId)
+                        glDeleteRenderbuffers(depthBufferId)
+                        glDeleteRenderbuffers(colorBufferId)
+                        glDeleteTextures(renderTextureId)
+                    }
+                }
+            }
         }
     }
 }

@@ -377,6 +377,7 @@ class ShapeCursor(override val fill: Fill, override val stroke: Stroke, private 
             nvgRect(nvg, (block.x + halfStroke + start) * scale, (block.y + halfStroke) * scale, (end - start) * scale, (block.height - stroke.size) * scale)
             selectFill.draw(nvg, block, scale)
         }
+        block.root.movedOrResized = true
     }
 }
 

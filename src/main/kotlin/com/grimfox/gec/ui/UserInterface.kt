@@ -91,6 +91,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
             val currentWidth = ui.pixelWidth
             val currentHeight = ui.pixelHeight
             if (lastWidth != currentWidth || lastHeight != currentHeight) {
+                uiRenderer.finalize()
                 uiRenderer = UiTextureRenderer(currentWidth, currentHeight)
                 lastWidth = currentWidth
                 lastHeight = currentHeight

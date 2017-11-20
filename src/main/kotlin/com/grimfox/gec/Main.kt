@@ -3,13 +3,12 @@ package com.grimfox.gec
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
-import com.grimfox.gec.ui.widgets.HorizontalAlignment.LEFT
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
-import com.grimfox.gec.ui.widgets.Sizing.GROW
-import com.grimfox.gec.ui.widgets.Sizing.STATIC
+import com.grimfox.gec.ui.widgets.Sizing.*
+import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.generateRegions
-import com.grimfox.gec.util.geometry.*
 import com.grimfox.gec.util.loadTexture2D
 import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
@@ -153,7 +152,32 @@ object Main {
                             dialogCallback.value()
                         }.with { width = 60.0f }
                     }
-
+                    generatingMessageBlock = block {
+                        hAlign = CENTER
+                        vAlign = MIDDLE
+                        hSizing = SHRINK
+                        vSizing = SHRINK
+                        block {
+                            layout = VERTICAL
+                            hAlign = CENTER
+                            vAlign = TOP
+                            hSizing = SHRINK
+                            vSizing = SHRINK
+                            text = generatingPrimaryMessage
+                            isVisible = true
+                        }
+                        vSpacer(SMALL_SPACER_SIZE)
+                        block {
+                            layout = VERTICAL
+                            hAlign = CENTER
+                            vAlign = TOP
+                            hSizing = SHRINK
+                            vSizing = SHRINK
+                            text = generatingSecondaryMessage
+                            isVisible = true
+                        }
+                        isVisible = false
+                    }
                 }
                 currentProject.addListener { _, new ->
                     doOnMainThread {

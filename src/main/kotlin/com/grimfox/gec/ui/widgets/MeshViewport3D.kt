@@ -575,6 +575,7 @@ class MeshViewport3D(
         lastImageMode = currentImageMode
         if (lastWidth != width || lastHeight != height || textureRenderer == null) {
             val newTextureRenderer = UiTextureRenderer(width, height)
+            textureRenderer?.finalize()
             textureRenderer = newTextureRenderer
             viewportTextureId = newTextureRenderer.renderTextureId
         }
