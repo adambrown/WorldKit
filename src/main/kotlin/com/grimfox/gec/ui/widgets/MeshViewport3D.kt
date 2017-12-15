@@ -1,6 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.*
+import com.grimfox.gec.BIOME_COLORS
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
@@ -15,8 +15,7 @@ import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
-import java.lang.Math.round
-import java.lang.Math.sqrt
+import java.lang.Math.*
 import java.util.*
 
 class MeshViewport3D(
@@ -528,8 +527,7 @@ class MeshViewport3D(
         pressedKeys.clear()
     }
 
-    private var viewportTextureId: Int? = null
-    private var textureRenderer: UiTextureRenderer? = null
+    private var viewportTextureId: TextureId? = null
     private var lastWidth = -1
     private var lastHeight = -1
     private var lastImageMode = -1
@@ -561,7 +559,7 @@ class MeshViewport3D(
         this.scale = scale
     }
 
-    fun onDrawFrame(): Triple<Boolean, Int, QuadInstance> {
+    fun onDrawFrame(uiTextureRenderer: UiTextureRenderer): Triple<Boolean, TextureId?, QuadInstance> {
         val currentImageMode = imageMode.value
         if (forceDrawUpdate || lastImageMode != currentImageMode || lastWidth != width || lastHeight != height) {
             lastMvpMatrix = null
@@ -573,23 +571,20 @@ class MeshViewport3D(
             forceDrawUpdate = false
         }
         lastImageMode = currentImageMode
-        if (lastWidth != width || lastHeight != height || textureRenderer == null) {
-            val newTextureRenderer = UiTextureRenderer(width, height)
-            textureRenderer?.finalize()
-            textureRenderer = newTextureRenderer
-            viewportTextureId = newTextureRenderer.renderTextureId
+        if (lastWidth != width || lastHeight != height) {
+            viewportTextureId = null
         }
         lastWidth = width
         lastHeight = height
         return Triple(when (currentImageMode) {
-            0 -> onDrawFrameInternalRegion(xPosition, yPosition, width, height, scale)
-            1 -> onDrawFrameInternalImage(xPosition, yPosition, width, height, scale)
-            2 -> onDrawFrameInternalBiome(xPosition, yPosition, width, height, scale)
-            else -> onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, scale)
-        }, viewportTextureId!!, QuadInstance(xPosition.toFloat(), yPosition.toFloat(), width.toFloat(), height.toFloat()))
+            0 -> onDrawFrameInternalRegion(uiTextureRenderer, xPosition, yPosition, width, height, scale)
+            1 -> onDrawFrameInternalImage(uiTextureRenderer, xPosition, yPosition, width, height, scale)
+            2 -> onDrawFrameInternalBiome(uiTextureRenderer, xPosition, yPosition, width, height, scale)
+            else -> onDrawFrameInternalHeightMap(uiTextureRenderer, xPosition, yPosition, width, height, scale)
+        }, viewportTextureId, QuadInstance(xPosition.toFloat(), yPosition.toFloat(), width.toFloat(), height.toFloat()))
     }
 
-    private fun onDrawFrameInternalRegion(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalRegion(uiTextureRenderer: UiTextureRenderer, xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
         if (width < 1 || height < 1) {
             return false
         }
@@ -644,28 +639,26 @@ class MeshViewport3D(
                     }
                 }
 
-                textureRenderer?.bind()
+                val (_, resultTextureId) = uiTextureRenderer.use {
+                    glDisable(GL_BLEND)
+                    glDisable(GL_CULL_FACE)
+                    glEnable(GL_DEPTH_TEST)
+                    glEnable(GL_MULTISAMPLE)
 
-                glDisable(GL_BLEND)
-                glDisable(GL_CULL_FACE)
-                glEnable(GL_DEPTH_TEST)
-                glEnable(GL_MULTISAMPLE)
+                    glClearColor(background.r, background.g, background.b, background.a)
+                    glViewport(0, 0, width, height)
+                    glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-                glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
-                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-                drawRegionPlane()
-
-                textureRenderer?.unbind()
-
+                    drawRegionPlane()
+                }
+                viewportTextureId = resultTextureId
                 return true
             }
         }
         return false
     }
 
-    private fun onDrawFrameInternalBiome(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalBiome(uiTextureRenderer: UiTextureRenderer, xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
         if (width < 1 || height < 1) {
             return false
         }
@@ -721,28 +714,26 @@ class MeshViewport3D(
                     }
                 }
 
-                textureRenderer?.bind()
+                val (_, resultTextureId) = uiTextureRenderer.use {
+                    glDisable(GL_BLEND)
+                    glDisable(GL_CULL_FACE)
+                    glEnable(GL_DEPTH_TEST)
+                    glEnable(GL_MULTISAMPLE)
 
-                glDisable(GL_BLEND)
-                glDisable(GL_CULL_FACE)
-                glEnable(GL_DEPTH_TEST)
-                glEnable(GL_MULTISAMPLE)
+                    glClearColor(background.r, background.g, background.b, background.a)
+                    glViewport(0, 0, width, height)
+                    glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-                glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
-                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-                drawBiomePlane()
-
-                textureRenderer?.unbind()
-
+                    drawBiomePlane()
+                }
+                viewportTextureId = resultTextureId
                 return true
             }
         }
         return false
     }
 
-    private fun onDrawFrameInternalImage(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalImage(uiTextureRenderer: UiTextureRenderer, xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
         if (width < 1 || height < 1) {
             return false
         }
@@ -797,28 +788,26 @@ class MeshViewport3D(
                     }
                 }
 
-                textureRenderer?.bind()
+                val (_, resultTextureId) = uiTextureRenderer.use {
+                    glDisable(GL_BLEND)
+                    glDisable(GL_CULL_FACE)
+                    glEnable(GL_DEPTH_TEST)
+                    glEnable(GL_MULTISAMPLE)
 
-                glDisable(GL_BLEND)
-                glDisable(GL_CULL_FACE)
-                glEnable(GL_DEPTH_TEST)
-                glEnable(GL_MULTISAMPLE)
+                    glClearColor(background.r, background.g, background.b, background.a)
+                    glViewport(0, 0, width, height)
+                    glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-                glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
-                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-                drawImagePlane()
-
-                textureRenderer?.unbind()
-
+                    drawImagePlane()
+                }
+                viewportTextureId = resultTextureId
                 return true
             }
         }
         return false
     }
 
-    private fun onDrawFrameInternalHeightMap(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalHeightMap(uiTextureRenderer: UiTextureRenderer, xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
 
         if (width < 1 || height < 1) {
             return false
@@ -941,24 +930,22 @@ class MeshViewport3D(
                     }
                 }
 
-                textureRenderer?.bind()
+                val (_, resultTextureId) = uiTextureRenderer.use {
+                    glDisable(GL_BLEND)
+                    glDisable(GL_CULL_FACE)
+                    glEnable(GL_DEPTH_TEST)
+                    glEnable(GL_MULTISAMPLE)
 
-                glDisable(GL_BLEND)
-                glDisable(GL_CULL_FACE)
-                glEnable(GL_DEPTH_TEST)
-                glEnable(GL_MULTISAMPLE)
+                    glClearColor(background.r, background.g, background.b, background.a)
+                    glViewport(0, 0, width, height)
+                    glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
 
-                glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
-                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-                if (waterOn) {
-                    drawWaterPlane()
+                    if (waterOn) {
+                        drawWaterPlane()
+                    }
+                    drawHeightMap()
                 }
-                drawHeightMap()
-
-                textureRenderer?.unbind()
-
+                viewportTextureId = resultTextureId
                 return true
             }
         }

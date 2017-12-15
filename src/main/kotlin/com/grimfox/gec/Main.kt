@@ -1,7 +1,7 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.ui.nvgproxy.*
+import com.grimfox.gec.ui.nvgproxy.set
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
@@ -166,7 +166,7 @@ object Main {
                             text = generatingPrimaryMessage
                             isVisible = true
                         }
-                        vSpacer(SMALL_SPACER_SIZE)
+                        vSpacer(MEDIUM_SPACER_SIZE)
                         block {
                             layout = VERTICAL
                             hAlign = CENTER
@@ -494,7 +494,16 @@ object Main {
                                 }
                             }
                         } else {
-                            false
+                            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                                if (cancelCurrentRunningTask.value?.value == false) {
+                                    cancelCurrentRunningTask.value?.value = true
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
                         }
                     } else {
                         false
@@ -522,31 +531,37 @@ object Main {
 //            println()
 //        }
 
-        ui(uiLayout, preferences.windowState, beforeDraw = {
-            wasResizing = if (isResizing) {
-                true
-            } else {
-                if (wasResizing) {
-                    onWindowResize()
-                }
-                false
-            }
-            if (wasJustMaximized) {
-                onWindowResize()
-                wasJustMaximized = false
-            }
-            if (isMaximized) {
-                if (wasMinimized) {
-                    wasJustMaximized = true
-                }
-                wasMinimized = false
-            } else {
-                wasMinimized = true
-            }
-            performMainThreadTasks()
-        }, afterDraw = {
-            listOf(meshViewport.onDrawFrame())
-        })
+        var meshViewportRenderer: UiTextureRenderer? = null
+        ui(uiLayout, preferences.windowState,
+                afterInit = {
+                    meshViewportRenderer = UiTextureRenderer(maxMonitorWidth, maxMonitorHeight)
+                },
+                beforeDraw = {
+                    wasResizing = if (isResizing) {
+                        true
+                    } else {
+                        if (wasResizing) {
+                            onWindowResize()
+                        }
+                        false
+                    }
+                    if (wasJustMaximized) {
+                        onWindowResize()
+                        wasJustMaximized = false
+                    }
+                    if (isMaximized) {
+                        if (wasMinimized) {
+                            wasJustMaximized = true
+                        }
+                        wasMinimized = false
+                    } else {
+                        wasMinimized = true
+                    }
+                    performMainThreadTasks()
+                },
+                afterDraw = {
+                    listOf(meshViewport.onDrawFrame(meshViewportRenderer!!))
+                })
     }
 }
 

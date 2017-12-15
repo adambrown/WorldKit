@@ -17,13 +17,10 @@ import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWDropCallback
 import org.lwjgl.glfw.GLFWErrorCallback
 import org.lwjgl.glfw.GLFWImage
-import org.lwjgl.opengl.ARBDebugOutput
 import org.lwjgl.opengl.GL.createCapabilities
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
-import org.lwjgl.opengl.GL43
 import org.lwjgl.opengl.GLUtil.setupDebugMessageCallback
-import org.lwjgl.opengl.KHRDebug
 import org.lwjgl.system.Callback
 import org.lwjgl.system.Configuration
 import org.lwjgl.system.MemoryStack
@@ -40,6 +37,8 @@ import java.nio.IntBuffer
 import java.util.*
 
 import com.grimfox.gec.ui.nvgproxy.*
+import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
+import org.lwjgl.opengl.*
 
 val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
 val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(ALWAYS).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -49,7 +48,7 @@ private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsSc
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, beforeDraw: UserInterface.() -> Unit = {}, afterDraw: UserInterface.() -> List<Triple<Boolean, Int, QuadInstance>> = { listOf() }) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, afterInit: UserInterface.() -> Unit = {}, beforeDraw: UserInterface.() -> Unit = {}, afterDraw: UserInterface.() -> List<Triple<Boolean, TextureId?, QuadInstance>> = { listOf() }) {
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
@@ -64,18 +63,19 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
         }
         ui.show()
         TextureBuilder.init(ui.nvg)
-        var lastWidth = ui.pixelWidth
-        var lastHeight = ui.pixelHeight
-        var uiRenderer = UiTextureRenderer(ui.pixelWidth, ui.pixelHeight)
+        val uiRenderer = UiTextureRenderer(ui.maxMonitorWidth, ui.maxMonitorHeight)
         val composer = ComposeUiShader("/shaders/ui-composer.vert", "/shaders/ui-composer.frag")
         executor.call { Biomes.init() }
-        var lastDraw = System.nanoTime()
-        val renderBlock = { internalWork: () -> Unit ->
-            uiRenderer.bind()
-            glClearColor(ui.layout.background.r, ui.layout.background.g, ui.layout.background.b, 1.0f)
-            glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-            internalWork()
-            uiRenderer.unbind()
+        ui.afterInit()
+        var lastTick = System.nanoTime()
+        var lastDraw = 0L
+        var uiTextureId: TextureId? = null
+        val renderBlock: (() -> Unit) -> TextureId = { internalWork: () -> Unit ->
+            uiRenderer.use {
+                glClearColor(ui.layout.background.r, ui.layout.background.g, ui.layout.background.b, 1.0f)
+                glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+                internalWork()
+            }.second
         }
         while (!ui.shouldClose()) {
             TextureBuilder.onDrawFrame()
@@ -90,25 +90,25 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
             ui.beforeDraw()
             val currentWidth = ui.pixelWidth
             val currentHeight = ui.pixelHeight
-            if (lastWidth != currentWidth || lastHeight != currentHeight) {
-                uiRenderer.finalize()
-                uiRenderer = UiTextureRenderer(currentWidth, currentHeight)
-                lastWidth = currentWidth
-                lastHeight = currentHeight
+            val (needToDrawUi, textureId) = ui.drawFrame(frameWidth, frameHeight, renderBlock)
+            if (needToDrawUi) {
+                uiTextureId = textureId
             }
-            val needToDrawUi = ui.drawFrame(frameWidth, frameHeight, renderBlock)
             val realTimeItems = ui.afterDraw()
             val needToDrawRealTimeItems = realTimeItems.any { it.first }
-            if (needToDrawUi || needToDrawRealTimeItems) {
+            var curTime = System.nanoTime()
+            if ((needToDrawUi || needToDrawRealTimeItems || lastDraw - curTime >=  500000000) && uiTextureId != null) {
                 composer.use {
                     realTimeItems.forEach {
-                        render(currentWidth, currentHeight, listOf(it.third to it.second))
+                        if (it.second != null) {
+                            render(currentWidth, currentHeight, listOf(it.third to it.second!!))
+                        }
                     }
-                    render(currentWidth, currentHeight, listOf(QuadInstance(0.0f, 0.0f, currentWidth.toFloat(), currentHeight.toFloat()) to uiRenderer.renderTextureId))
+                    render(currentWidth, currentHeight, listOf(QuadInstance(0.0f, 0.0f, currentWidth.toFloat(), currentHeight.toFloat()) to uiTextureId!!))
                 }
             }
-            val curTime = System.nanoTime()
-            val timeDif = curTime - lastDraw
+            curTime = System.nanoTime()
+            val timeDif = curTime - lastTick
             if (timeDif < 16000000) {
                 val waitFor = 16000000 - timeDif
                 val millis = waitFor / 1000000
@@ -117,9 +117,11 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
                     Thread.sleep(millis, nanos)
                 } catch (ignore: InterruptedException) { }
             }
-            lastDraw = System.nanoTime()
-            if (needToDrawUi || needToDrawRealTimeItems) {
+            curTime = System.nanoTime()
+            lastTick = curTime
+            if ((needToDrawUi || needToDrawRealTimeItems || lastDraw - curTime >=  250000000) && uiTextureId != null) {
                 ui.swapBuffers()
+                lastDraw = System.nanoTime()
             }
         }
     } catch (e: Throwable) {
@@ -191,6 +193,8 @@ interface UserInterface {
     var hotKeyHandler: HotKeyHandler?
     var keyboardHandler: KeyboardHandler?
     var dropHandler: (List<String>) -> Unit
+    val maxMonitorWidth: Int
+    val maxMonitorHeight: Int
 
     fun setWindowIcon(images: GLFWImage.Buffer)
 
@@ -314,6 +318,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             window.dropHandler = value
         }
 
+    override val maxMonitorWidth: Int
+        get() = window.monitors.map { it.pixelWidth }.max() ?: 8192
+
+    override val maxMonitorHeight: Int
+        get() = window.monitors.map { it.pixelWidth }.max() ?: 8192
+
     override fun setWindowIcon(images: GLFWImage.Buffer) {
         glfwSetWindowIcon(window.id, images)
     }
@@ -410,13 +420,13 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
-    internal fun drawFrame(width: Int, height: Int, renderBlock: (()->Unit) -> Unit): Boolean {
+    internal fun drawFrame(width: Int, height: Int, renderBlock: (()->Unit) -> TextureId): Pair<Boolean, TextureId?> {
         if (window.currentPixelWidth < 0 || window.currentPixelHeight < 0 && !isMinimized) {
             window.isMinimized = true
             minimizeHandler()
         }
         if (isMinimized) {
-            return false
+            return false to null
         }
         if (isMac) {
             val scale = if (window.isResizing) {
@@ -430,7 +440,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             root.height = height.toFloat()
             root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
             return if (root.movedOrResized) {
-                renderBlock {
+                true to renderBlock {
                     glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
                     glEnable(GL_MULTISAMPLE)
                     nvgSave(nvg)
@@ -440,9 +450,8 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
                     nvgEndFrame(nvg)
                     nvgRestore(nvg)
                 }
-                true
             } else {
-                false
+                false to null
             }
         } else {
             val scaleChanged = window.lastMonitor.scaleFactor != window.currentMonitor.scaleFactor
@@ -456,7 +465,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             root.height = height / scale
             root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
             return if (root.movedOrResized) {
-                renderBlock {
+                true to renderBlock {
                     glViewport(0, 0, width, height)
                     glEnable(GL_MULTISAMPLE)
                     nvgSave(nvg)
@@ -466,9 +475,8 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
                     nvgEndFrame(nvg)
                     nvgRestore(nvg)
                 }
-                true
             } else {
-                false
+                false to null
             }
         }
     }
@@ -588,6 +596,8 @@ private data class MonitorSpec(
         val physicalHeight: Int,
         val virtualWidth: Int,
         val virtualHeight: Int,
+        val pixelWidth: Int,
+        val pixelHeight: Int,
         val x1: Int,
         val y1: Int,
         val x2: Int,
@@ -612,7 +622,7 @@ private data class MonitorSpec(
         val blueBits: Int,
         val refreshRate: Int)
 
-private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0)
+private val NO_MONITOR = MonitorSpec(-1, 0.0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0)
 
 internal data class ScreenIdentity(
         val x: Int,
@@ -1338,6 +1348,8 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                         physicalHeight = physicalHeight,
                         virtualWidth = virtualWidth,
                         virtualHeight = virtualHeight,
+                        pixelWidth = screen.pixelWidth,
+                        pixelHeight = screen.pixelHeight,
                         x1 = virtualX,
                         y1 = virtualY,
                         x2 = virtualX + virtualWidth,
@@ -1370,6 +1382,8 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
                         physicalHeight = physicalHeight,
                         virtualWidth = virtualWidth,
                         virtualHeight = virtualHeight,
+                        pixelWidth = virtualWidth,
+                        pixelHeight = virtualHeight,
                         x1 = virtualX,
                         y1 = virtualY,
                         x2 = virtualX + virtualWidth,

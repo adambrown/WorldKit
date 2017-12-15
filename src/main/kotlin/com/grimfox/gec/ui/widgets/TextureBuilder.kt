@@ -747,29 +747,6 @@ object TextureBuilder {
                 throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
             }
             glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-//            glBindFramebuffer(GL_FRAMEBUFFER, fboId)
-//
-//            depthBufferId = glGenRenderbuffers()
-//            glBindRenderbuffer(GL_RENDERBUFFER, depthBufferId)
-//            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height)
-//            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthBufferId)
-//
-//            renderTextureId = glGenTextures()
-//            glBindTexture(GL_TEXTURE_2D, renderTextureId)
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-//            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, MemoryUtil.NULL)
-//            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId, 0)
-//
-//            glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
-//            val frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-//            if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-//                throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
-//            }
-//            glBindFramebuffer(GL_FRAMEBUFFER, 0)
         }
 
         fun bind() {
