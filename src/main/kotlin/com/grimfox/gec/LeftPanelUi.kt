@@ -1,13 +1,14 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.UiLayout
-import com.grimfox.gec.ui.UserInterface
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.generateWaterFlows
 import com.grimfox.gec.util.Rendering.renderRegions
 import org.lwjgl.glfw.GLFW
 import java.util.*
+import java.util.concurrent.CancellationException
+
 
 private val cachedGraph256 = preferences.cachedGraph256!!
 private val cachedGraph512 = preferences.cachedGraph512!!
@@ -208,27 +209,40 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                             }
                                         }, 1000, 1000)
                                         try {
-                                            val (heightMapTexId, riverMapTexId) = generateWaterFlows(
-                                                    parameterSet = currentParameters,
-                                                    regionSplines = currentRegionSplines,
-                                                    biomeGraph = currentBiomeGraph,
-                                                    biomeMask = currentBiomeMask,
-                                                    biomes = currentBiomes,
-                                                    flowGraphSmall = cachedGraph256.value,
-                                                    flowGraphMedium = cachedGraph512.value,
-                                                    flowGraphLarge = cachedGraph1024.value,
-                                                    executor = executor,
-                                                    mapScale = currentMapScale,
-                                                    customElevationPowerMap = currentState.customElevationPowerMap.value,
-                                                    customStartingHeightsMap = currentState.customStartingHeightsMap.value,
-                                                    customSoilMobilityMap = currentState.customSoilMobilityMap.value)
-                                            meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
-                                            currentState.heightMapTexture.value = heightMapTexId
-                                            currentState.riverMapTexture.value = riverMapTexId
-                                            val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
-                                            heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
-                                            imageMode.value = 3
-                                            displayMode.value = DisplayMode.MESH
+                                            val canceled = ref(false)
+                                            cancelCurrentRunningTask.value = canceled
+                                            try {
+                                                val (heightMapTexId, riverMapTexId) = generateWaterFlows(
+                                                        parameterSet = currentParameters,
+                                                        regionSplines = currentRegionSplines,
+                                                        biomeGraph = currentBiomeGraph,
+                                                        biomeMask = currentBiomeMask,
+                                                        biomes = currentBiomes,
+                                                        flowGraphSmall = cachedGraph256.value,
+                                                        flowGraphMedium = cachedGraph512.value,
+                                                        flowGraphLarge = cachedGraph1024.value,
+                                                        executor = executor,
+                                                        mapScale = currentMapScale,
+                                                        customElevationPowerMap = currentState.customElevationPowerMap.value,
+                                                        customStartingHeightsMap = currentState.customStartingHeightsMap.value,
+                                                        customSoilMobilityMap = currentState.customSoilMobilityMap.value,
+                                                        canceled = canceled)
+                                                meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
+                                                currentState.heightMapTexture.value = heightMapTexId
+                                                currentState.riverMapTexture.value = riverMapTexId
+                                                val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
+                                                heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+                                                imageMode.value = 3
+                                                displayMode.value = DisplayMode.MESH
+                                            } catch (w: Exception) {
+                                                if (!causedByCancellation(w)) {
+                                                    throw w
+                                                }
+                                            } finally {
+                                                if (cancelCurrentRunningTask.value == canceled) {
+                                                    cancelCurrentRunningTask.value = null
+                                                }
+                                            }
                                         } finally {
                                             generationTimer.cancel()
                                             generatingMessageBlock.isVisible = false
@@ -308,3 +322,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
     }
 }
 
+fun causedByCancellation(w: Throwable?): Boolean {
+    if (w == null) return false
+    if (w is CancellationException) return true
+    return causedByCancellation(w.cause)
+}

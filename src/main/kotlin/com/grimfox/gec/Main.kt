@@ -1,7 +1,7 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.ui.*
-import com.grimfox.gec.ui.nvgproxy.*
+import com.grimfox.gec.ui.nvgproxy.set
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.*
 import com.grimfox.gec.ui.widgets.Layout.*
@@ -62,26 +62,36 @@ object Main {
                     MemoryUtil.memUTF8(GLYPH_MAXIMIZE, false, maxRestoreGlyph, 0)
                 }
 
-                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/wk-icon-1024.png", true, true,
-                        "/textures/wk-icon-512.png",
-                        "/textures/wk-icon-256.png",
-                        "/textures/wk-icon-128.png",
-                        "/textures/wk-icon-64.png",
-                        "/textures/wk-icon-32.png",
-                        "/textures/wk-icon-16.png")
+                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/icon/512.png", true, true,
+                        "/textures/icon/256.png",
+                        "/textures/icon/128.png",
+                        "/textures/icon/64.png",
+                        "/textures/icon/32.png",
+                        "/textures/icon/16.png")
                 val icon = createImage(texId, texWidth, texHeight, 0)
 
                 setWindowIcon(createGlfwImages(
-                        "/textures/wk-icon-16.png",
-                        "/textures/wk-icon-24.png",
-                        "/textures/wk-icon-32.png",
-                        "/textures/wk-icon-40.png",
-                        "/textures/wk-icon-48.png",
-                        "/textures/wk-icon-64.png",
-                        "/textures/wk-icon-96.png",
-                        "/textures/wk-icon-128.png",
-                        "/textures/wk-icon-192.png",
-                        "/textures/wk-icon-256.png"
+                        "/textures/icon/16.png",
+                        "/textures/icon/20.png",
+                        "/textures/icon/24.png",
+                        "/textures/icon/30.png",
+                        "/textures/icon/32.png",
+                        "/textures/icon/36.png",
+                        "/textures/icon/40.png",
+                        "/textures/icon/48.png",
+                        "/textures/icon/50.png",
+                        "/textures/icon/60.png",
+                        "/textures/icon/64.png",
+                        "/textures/icon/72.png",
+                        "/textures/icon/80.png",
+                        "/textures/icon/96.png",
+                        "/textures/icon/128.png",
+                        "/textures/icon/160.png",
+                        "/textures/icon/192.png",
+                        "/textures/icon/256.png",
+                        "/textures/icon/320.png",
+                        "/textures/icon/384.png",
+                        "/textures/icon/512.png"
                 ))
 
                 meshViewport.init()
@@ -166,7 +176,7 @@ object Main {
                             text = generatingPrimaryMessage
                             isVisible = true
                         }
-                        vSpacer(SMALL_SPACER_SIZE)
+                        vSpacer(MEDIUM_SPACER_SIZE)
                         block {
                             layout = VERTICAL
                             hAlign = CENTER
@@ -494,7 +504,16 @@ object Main {
                                 }
                             }
                         } else {
-                            false
+                            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                                if (cancelCurrentRunningTask.value?.value == false) {
+                                    cancelCurrentRunningTask.value?.value = true
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
                         }
                     } else {
                         false
