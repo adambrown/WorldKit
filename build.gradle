@@ -111,7 +111,7 @@ buildExecutables {
     executable {
         name = 'WorldKit'
         platform = 'windows64'
-        jdk = file('file://D:/sandbox/oracle-jdk-8-windows64.zip')
+        jdk = file('file://D:/sandbox/oracle-jdk-9-windows64.zip')
         mainClass = 'com.grimfox.gec.MainUi'
         minimizeJre = 'oraclejre8'
     }
