@@ -233,10 +233,7 @@ class Graph(val seed: Long,
 
         val center: Point2F by lazy { triangles.getCenter(id) }
 
-        val vertices: List<Vertex> by lazy {
-            val (v1, v2, v3) = triangles.getVertices(id)
-            listOf(newVertex(v1), newVertex(v2), newVertex(v3))
-        }
+        val vertices: List<Vertex> by lazy { triangles.getVertices(id).map { newVertex(it) } }
 
         val a: Vertex by lazy { vertices[0] }
 
@@ -492,10 +489,9 @@ class Graph(val seed: Long,
             return Point2F(triangleToCenters[o], triangleToCenters[o + 1])
         }
 
-        fun getVertices(id: Int): Triple<Int, Int, Int> {
-            var o = id * 3
-            return Triple(triangleToVertices[o++], triangleToVertices[o++], triangleToVertices[o])
-//            return triangleToVertices.slice(o..o + 2).toList()
+        fun getVertices(id: Int): List<Int> {
+            val o = id * 3
+            return triangleToVertices.slice(o..o + 2).toList()
         }
 
         fun getAdjacentTriangles(id: Int): List<Int> {

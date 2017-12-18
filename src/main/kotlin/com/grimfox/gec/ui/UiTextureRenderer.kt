@@ -1,29 +1,22 @@
 package com.grimfox.gec.ui
 
 import com.grimfox.gec.doOnMainThread
-import com.grimfox.gec.ui.widgets.TextureBuilder
-import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.*
 import org.lwjgl.opengl.GL20.glDrawBuffers
-import org.lwjgl.opengl.GL30
 import org.lwjgl.opengl.GL30.*
 import org.lwjgl.system.MemoryUtil
 
 class UiTextureRenderer(val width: Int, val height: Int) {
 
-    @Volatile private var isFinalized = false
-    private val msFboId = glGenFramebuffers()
-    private val fboId = glGenFramebuffers()
-    private val renderTextureId: TextureId
-    private val depthBufferId: Int
-    private val colorBufferId: Int
+    @Volatile var isFinalized = false
+    val msFboId = glGenFramebuffers()
+    val fboId = glGenFramebuffers()
+    val renderTextureId: Int
+    val depthBufferId: Int
+    val colorBufferId: Int
 
     init {
-        if (msFboId < 1 || fboId < 1) {
-            throw RuntimeException("Framebuffer not created successfully.")
-        }
-
         glBindFramebuffer(GL_FRAMEBUFFER, msFboId)
 
         depthBufferId = glGenRenderbuffers()
@@ -38,36 +31,27 @@ class UiTextureRenderer(val width: Int, val height: Int) {
 
         glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
         var frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-        if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE || depthBufferId < 1 || colorBufferId < 1) {
-            throw RuntimeException("Multisample framebuffer not created successfully. Code: $frameBufferStatus, fboId: $msFboId, depthBufferId: $depthBufferId, colorBufferId: $colorBufferId")
+        if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+            throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, fboId)
 
-        renderTextureId = TextureId(glGenTextures())
-        glBindTexture(GL_TEXTURE_2D, renderTextureId.id)
+        renderTextureId = glGenTextures()
+        glBindTexture(GL_TEXTURE_2D, renderTextureId)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, MemoryUtil.NULL)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId.id, 0)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId, 0)
 
         glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
         frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-        if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE || renderTextureId.id < 1) {
-            throw RuntimeException("Texture framebuffer not created successfully. Code: $frameBufferStatus")
+        if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+            throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-    }
-
-    fun <T> use(doWork: () -> T): Pair<T, TextureId> {
-        bind()
-        try {
-            return doWork() to renderTextureId
-        } finally {
-            unbind()
-        }
     }
 
     fun bind() {
@@ -84,25 +68,21 @@ class UiTextureRenderer(val width: Int, val height: Int) {
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
     }
 
-    fun cleanup() {
-        if (!isFinalized) {
-            synchronized(this) {
-                if (!isFinalized) {
-                    isFinalized = true
-                    glDeleteRenderbuffers(depthBufferId)
-                    glDeleteRenderbuffers(colorBufferId)
-                    glDeleteFramebuffers(fboId)
-                    glDeleteFramebuffers(msFboId)
-                    renderTextureId.free()
-                }
-            }
-        }
-    }
-
     @Suppress("unused")
     fun finalize() {
         doOnMainThread {
-            cleanup()
+            if (!isFinalized) {
+                synchronized(this) {
+                    if (!isFinalized) {
+                        isFinalized = true
+                        glDeleteFramebuffers(fboId)
+                        glDeleteFramebuffers(msFboId)
+                        glDeleteRenderbuffers(depthBufferId)
+                        glDeleteRenderbuffers(colorBufferId)
+                        glDeleteTextures(renderTextureId)
+                    }
+                }
+            }
         }
     }
 }

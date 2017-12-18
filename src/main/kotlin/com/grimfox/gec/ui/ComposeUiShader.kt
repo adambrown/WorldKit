@@ -1,6 +1,5 @@
 package com.grimfox.gec.ui
 
-import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
@@ -43,14 +42,14 @@ class ComposeUiShader(vertexShaderResource: String, fragmentShaderResource: Stri
         }
     }
 
-    fun render(width: Int, height: Int, instances: List<Pair<RenderableInstance, TextureId>>) {
+    fun render(width: Int, height: Int, instances: List<Pair<RenderableInstance, Int>>) {
         glViewport(0, 0, width, height)
         projectionMatrix.setOrtho(0.0f, width.toFloat(), height.toFloat(), 0.0f, 0.0f, 1000.0f)
         glUniformMatrix4fv(mvpMatrixUniform.location, false, projectionMatrix.get(0, floatBuffer))
         instances.forEach { (instance, textureId) ->
             glUniform1i(imageTextureUniform.location, 0)
             glActiveTexture(GL_TEXTURE0)
-            glBindTexture(GL_TEXTURE_2D, textureId.id)
+            glBindTexture(GL_TEXTURE_2D, textureId)
             instanceRenderer.render(listOf(instance))
         }
     }

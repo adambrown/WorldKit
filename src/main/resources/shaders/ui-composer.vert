@@ -1,7 +1,6 @@
 #version 330
 
 uniform mat4 modelViewProjectionMatrix;
-uniform sampler2D imageTexture;
 
 in vec2 position;
 in vec2 uv;
@@ -13,9 +12,6 @@ out VertexData {
 } VertexOut;
 
 void main () {
-    float width = instancePosition.z;
-    float height = instancePosition.w;
-    ivec2 imageTextureSize = textureSize(imageTexture, 0);
-    VertexOut.uv = vec2((uv.x * width) / imageTextureSize.x, (uv.y * height) / imageTextureSize.y);
+    VertexOut.uv = uv;
     gl_Position = modelViewProjectionMatrix * vec4(instancePosition.xy + (position * instancePosition.zw), 0.0f, 1.0f);
 }

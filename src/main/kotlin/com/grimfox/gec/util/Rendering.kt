@@ -25,7 +25,7 @@ object Rendering {
 
     fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
         val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
-        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId = textureId)
+        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
         return textureId
     }
 
@@ -70,7 +70,7 @@ object Rendering {
     fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
-        for (i in 0 until vertices.size) {
+        for (i in 0..vertices.size - 1) {
             val maskValue = regionMask[i]
             if (maskValue >= 1) {
                 val regionId = maskValue - 1
@@ -82,11 +82,11 @@ object Rendering {
                 regions[regionId].add(i)
             }
         }
-        val borderEdgeFutures = (0 until regions.size).map { i ->
+        val borderEdgeFutures = (0..regions.size - 1).map { i ->
             executor.call {
                 val region = regions[i]
                 val mask = LinkedHashSet<Int>()
-                for (j in (i + 1 until regions.size)) {
+                for (j in (i + 1..regions.size - 1)) {
                     mask.addAll(regions[j])
                 }
                 graph.findBorderEdges(region, mask, false, true)
@@ -100,7 +100,7 @@ object Rendering {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
         val land = LinkedHashSet<Int>(vertices.size)
-        for (i in 0 until vertices.size) {
+        for (i in 0..vertices.size - 1) {
             val maskValue = regionMask[i]
             if (maskValue >= 1) {
                 val regionId = maskValue - 1
@@ -117,7 +117,7 @@ object Rendering {
             executor.call {
                 val region = regions[i]
                 val mask = LinkedHashSet<Int>()
-                for (j in (i + 1 until regions.size)) {
+                for (j in (i + 1..regions.size - 1)) {
                     mask.addAll(regions[j])
                 }
                 graph.findBorderEdges(region, land, true, true)
@@ -131,9 +131,9 @@ object Rendering {
         val vertexData = FloatArray(edges.size * 60)
         val indexData = IntArray(edges.size * 60)
         val futures = ArrayList<Future<*>>(threadCount)
-        (0 until threadCount).mapTo(futures) {
+        (0..threadCount - 1).mapTo(futures) {
             executor.submit {
-                for (i in it until edges.size step threadCount) {
+                for (i in it..edges.size - 1 step threadCount) {
                     var vertexOffset = i * 60
                     var vertexIndex = i * 20
                     fun buildVertex(x: Float, y: Float, z: Float): Int {

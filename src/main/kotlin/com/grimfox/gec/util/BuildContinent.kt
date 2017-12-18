@@ -761,8 +761,7 @@ object BuildContinent {
             mapScale: Int,
             customElevationPowerMap: TextureId,
             customStartingHeightsMap: TextureId,
-            customSoilMobilityMap: TextureId,
-            canceled: Reference<Boolean>): Pair<TextureId, TextureId> {
+            customSoilMobilityMap: TextureId): Pair<TextureId, TextureId> {
         return timeIt("generated water flow in") {
             generateWaterFlows(
                     random = Random(parameterSet.regionsSeed),
@@ -778,8 +777,7 @@ object BuildContinent {
                     biomes = biomes,
                     customElevationPowerMap = customElevationPowerMap,
                     customStartingHeightsMap = customStartingHeightsMap,
-                    customSoilMobilityMap = customSoilMobilityMap,
-                    canceled = canceled)
+                    customSoilMobilityMap = customSoilMobilityMap)
         }
     }
 }
