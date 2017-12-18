@@ -255,11 +255,11 @@ object WaterFlows {
         }
         val smallMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapErosion(canceled, executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.biomeMask, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1])) }
-            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, null,-1.0f) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 4096, null,-1.0f) }
         }
         val smallWaterMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapUnderWaterErosion(executor, flowGraphSmall, regionDataFuture.value, biomeMasksFuture.value.underWaterMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1])) }
-            doOrCancel { performErosion(canceled, executor, flowGraphSmall, null, nodeIndex, nodes, rivers, 10, listOf(UNDER_WATER_BIOME), listOf(UNDER_WATER_BIOME.lowPassSettings), 1024, null, 0.0f) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSmall, null, nodeIndex, nodes, rivers, 10, listOf(UNDER_WATER_BIOME), listOf(UNDER_WATER_BIOME.lowPassSettings), 4096, null, 0.0f) }
         }
         val midNodesFuture = executor.call {
             doOrCancel { prepareGraphNodes(canceled, executor, flowGraphMedium, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
@@ -278,7 +278,7 @@ object WaterFlows {
             val (nodeIndex, nodes, rivers) = midNodesFuture.value
             val erosionSettings = doOrCancel { biomes.map { it.midPassSettings } }
             doOrCancel { applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
-            doOrCancel { performErosion(canceled, executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 2048, null, -1.0f) }
+            doOrCancel { performErosion(canceled, executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 4096, null, -1.0f) }
         }
         val midWaterMapsFuture = executor.call {
             val heightMap = smallWaterMapsFuture.value
@@ -314,7 +314,7 @@ object WaterFlows {
                     lastUnusedCount = unused.size
                 }
             }
-            doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(UNDER_WATER_BIOME), listOf(UNDER_WATER_BIOME.midPassSettings), 2048, null, 0.0f) }
+            doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(UNDER_WATER_BIOME), listOf(UNDER_WATER_BIOME.midPassSettings), 4096, null, 0.0f) }
         }
         val highWaterMapsFuture = executor.call {
             val heightMap = midWaterMapsFuture.value

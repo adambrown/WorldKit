@@ -130,7 +130,7 @@ object TextureBuilder {
         })
     }
 
-    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
             mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 2.0f)
             glDisable(GL_BLEND)
@@ -143,7 +143,7 @@ object TextureBuilder {
             glClearColor(clearColor.first, clearColor.second, clearColor.third, clearColor.fourth)
             glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
             drawTriangles(input)
-            textureRenderer.unbind(outputWidth, outputWidth)
+            textureRenderer.unbind()
             collector(textureRenderer)
         })
     }
@@ -427,7 +427,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
-        return renderTrianglesInternal(input, outputWidth, clearColor, {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureFloat(GL_NEAREST, GL_NEAREST, outputWidth, outputWidth)
             val retVal = extractTextureRedFloatInternal(id, outputWidth)
             id.free()
@@ -440,7 +440,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesRedShort(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
-        return renderTrianglesInternal(input, outputWidth, clearColor, {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureShort(GL_NEAREST, GL_NEAREST, outputWidth, outputWidth)
             val retVal = extractTextureRedShortInternal(id, outputWidth)
             id.free()
@@ -453,7 +453,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesRedByte(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesInternal(input, outputWidth, clearColor, {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureByte(GL_NEAREST, GL_NEAREST, outputWidth, outputWidth)
             val retVal = extractTextureRedByteInternal(id, outputWidth)
             id.free()
@@ -466,7 +466,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesRgbaByte(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesInternal(input, outputWidth, clearColor, {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST, outputWidth, outputWidth)
             val retVal = extractTextureRgbaByteInternal(id, outputWidth)
             id.free()
@@ -480,7 +480,7 @@ object TextureBuilder {
 
 
     fun renderTrianglesTexRedFloat(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, outputWidth, clearColor, { it.newRedTextureFloat(minFilter, magFilter, outputWidth, outputWidth) })
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureFloat(minFilter, magFilter, outputWidth, outputWidth) })
     }
 
     fun renderTrianglesTexRedFloat(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
@@ -488,7 +488,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesTexRedShort(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, outputWidth, clearColor, { it.newRedTextureShort(minFilter, magFilter, outputWidth, outputWidth) })
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureShort(minFilter, magFilter, outputWidth, outputWidth) })
     }
 
     fun renderTrianglesTexRedShort(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
@@ -496,7 +496,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesTexRedByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, outputWidth, clearColor, { it.newRedTextureByte(minFilter, magFilter, outputWidth, outputWidth) })
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureByte(minFilter, magFilter, outputWidth, outputWidth) })
     }
 
     fun renderTrianglesTexRedByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
@@ -504,7 +504,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesTexRgbaByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, outputWidth, clearColor, { it.newRgbaTextureByte(minFilter, magFilter, outputWidth, outputWidth) })
+        return renderTrianglesInternal(input, clearColor, { it.newRgbaTextureByte(minFilter, magFilter, outputWidth, outputWidth) })
     }
 
     fun renderTrianglesTexRgbaByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
@@ -516,7 +516,7 @@ object TextureBuilder {
     }
 
     fun renderTrianglesToTexture(input: Pair<FloatArray, IntArray>, outputWidth: Int = textureRenderer.width, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), textureId: TextureId): TextureId {
-        return renderTrianglesInternal(input, outputWidth, clearColor, {
+        return renderTrianglesInternal(input, clearColor, {
             it.copyTexture(textureId, outputWidth, outputWidth)
             textureId
         })
@@ -685,52 +685,17 @@ object TextureBuilder {
 
     class TextureRenderer(val width: Int, val height: Int) {
 
-        @Volatile private var isFinalized = false
-        private val msFboId = glGenFramebuffers()
         private val fboId = glGenFramebuffers()
-        private val resizeFboId = glGenFramebuffers()
         private val renderTextureId: Int
         private val depthBufferId: Int
-        private val colorBufferId: Int
-        private val resizeTextureId: Int
 
         init {
-            glBindFramebuffer(GL_FRAMEBUFFER, msFboId)
+            glBindFramebuffer(GL_FRAMEBUFFER, fboId)
 
             depthBufferId = glGenRenderbuffers()
             glBindRenderbuffer(GL_RENDERBUFFER, depthBufferId)
-            glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, width, height)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height)
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthBufferId)
-
-            colorBufferId = glGenRenderbuffers()
-            glBindRenderbuffer(GL_RENDERBUFFER, colorBufferId)
-            glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_RGBA32F, width, height)
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBufferId)
-
-            glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
-            var frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-            if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-                throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
-            }
-
-            glBindFramebuffer(GL_FRAMEBUFFER, resizeFboId)
-
-            resizeTextureId = glGenTextures()
-            glBindTexture(GL_TEXTURE_2D, resizeTextureId)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, MemoryUtil.NULL)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resizeTextureId, 0)
-
-            glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
-            frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-            if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-                throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
-            }
-
-            glBindFramebuffer(GL_FRAMEBUFFER, fboId)
 
             renderTextureId = glGenTextures()
             glBindTexture(GL_TEXTURE_2D, renderTextureId)
@@ -742,7 +707,7 @@ object TextureBuilder {
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderTextureId, 0)
 
             glDrawBuffers(intArrayOf(GL_COLOR_ATTACHMENT0))
-            frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+            val frameBufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
             if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
                 throw RuntimeException("Framebuffer not created successfully. Code: $frameBufferStatus")
             }
@@ -750,28 +715,12 @@ object TextureBuilder {
         }
 
         fun bind() {
-            glBindFramebuffer(GL_FRAMEBUFFER, msFboId)
+            glBindFramebuffer(GL_FRAMEBUFFER, fboId)
             glViewport(0, 0, width, height)
         }
 
-        fun unbind(outputWidth: Int = width, outputHeight: Int = height) {
+        fun unbind() {
             glBindFramebuffer(GL_FRAMEBUFFER, 0)
-            if (min(width, outputWidth) == width && min(width, outputWidth) == height) {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, msFboId)
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboId)
-                glBlitFramebuffer(0, 0, width, height, 0, 0, min(width, outputWidth), min(height, outputHeight), GL_COLOR_BUFFER_BIT, GL_LINEAR)
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, 0)
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
-            } else {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, msFboId)
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resizeFboId)
-                glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST)
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, resizeFboId)
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboId)
-                glBlitFramebuffer(0, 0, width, height, 0, 0, min(width, outputWidth), min(height, outputHeight), GL_COLOR_BUFFER_BIT, GL_LINEAR)
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, 0)
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
-            }
         }
 
         fun newRedTextureFloat(minFilter: Int, magFilter: Int, outputWidth: Int = width, outputHeight: Int = height): TextureId {
@@ -844,20 +793,9 @@ object TextureBuilder {
 
         @Suppress("unused")
         fun finalize() {
-            if (!isFinalized) {
-                synchronized(this) {
-                    if (!isFinalized) {
-                        isFinalized = true
-                        glDeleteFramebuffers(fboId)
-                        glDeleteFramebuffers(resizeFboId)
-                        glDeleteFramebuffers(msFboId)
-                        glDeleteRenderbuffers(depthBufferId)
-                        glDeleteRenderbuffers(colorBufferId)
-                        glDeleteTextures(renderTextureId)
-                        glDeleteTextures(resizeTextureId)
-                    }
-                }
-            }
+            glDeleteFramebuffers(fboId)
+            glDeleteRenderbuffers(depthBufferId)
+            glDeleteTextures(renderTextureId)
         }
     }
 
