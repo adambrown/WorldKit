@@ -632,7 +632,7 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (lastMvpMatrix == mvpMatrix && lastRegionId == regionTextureId) {
+                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastRegionId == regionTextureId) {
                     return false
                 } else {
                     lastRegionId = regionTextureId
@@ -708,7 +708,7 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (lastMvpMatrix == mvpMatrix && lastBiomeId == biomeTextureId && lastSplineId == splineTextureId) {
+                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastBiomeId == biomeTextureId && lastSplineId == splineTextureId) {
                     return false
                 } else {
                     lastBiomeId = biomeTextureId
@@ -785,7 +785,7 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (lastMvpMatrix == mvpMatrix && lastImageId == imageTextureId) {
+                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastImageId == imageTextureId) {
                     return false
                 } else {
                     lastImageId = imageTextureId
