@@ -1,6 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.*
+import com.grimfox.gec.BIOME_COLORS
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
@@ -18,6 +18,7 @@ import org.lwjgl.opengl.GL30.*
 import java.lang.Math.round
 import java.lang.Math.sqrt
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MeshViewport3D(
         val resetView: MutableReference<Boolean>,
@@ -126,7 +127,7 @@ class MeshViewport3D(
 
     private val textureLock = Object()
     private var hasHeightmap = false
-    private var heightMapId: TextureId? = null
+    private var heightmapId: TextureId? = null
     private var rivermapId: TextureId? = null
     private var heightMapResolution = 0
 
@@ -269,7 +270,7 @@ class MeshViewport3D(
     fun reset() {
         synchronized(textureLock) {
             hasHeightmap = false
-            heightMapId = null
+            heightmapId = null
             rivermapId = null
             heightMapResolution = 0
             hasRegions = false
@@ -285,7 +286,7 @@ class MeshViewport3D(
     fun setHeightmap(newTexture: Pair<TextureId, TextureId>, resolution: Int) {
         synchronized(textureLock) {
             hasHeightmap = true
-            heightMapId = newTexture.first
+            heightmapId = newTexture.first
             rivermapId = newTexture.second
             heightMapResolution = resolution
         }
@@ -514,7 +515,7 @@ class MeshViewport3D(
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
             }
-            if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_SHIFT)) {
+            if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_CONTROL)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
@@ -528,70 +529,21 @@ class MeshViewport3D(
         pressedKeys.clear()
     }
 
-    private var viewportTextureId: Int? = null
-    private var textureRenderer: UiTextureRenderer? = null
-    private var lastWidth = -1
-    private var lastHeight = -1
-    private var lastImageMode = -1
-    private var lastMvpMatrix: Matrix4f? = null
-    private var lastWaterOn: Boolean = false
-    private var lastHeightScale: Float = -1.0f
-    private var lastHeightMapId: TextureId? = null
-    private var lastImageId: TextureId? = null
-    private var lastBiomeId: TextureId? = null
-    private var lastSplineId: TextureId? = null
-    private var lastRegionId: TextureId? = null
-    private var forceDrawUpdate: Boolean = true
-
-    fun forceDrawUpdate() {
-        forceDrawUpdate = true
-    }
-
-    private var xPosition: Int = 0
-    private var yPosition: Int = 0
-    private var width: Int = 0
-    private var height: Int = 0
-    private var scale: Float = 1.0f
-
-    fun prepareDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float) {
-        this.xPosition = xPosition
-        this.yPosition = yPosition
-        this.width = width
-        this.height = height
-        this.scale = scale
-    }
-
-    fun onDrawFrame(): Triple<Boolean, Int, QuadInstance> {
-        val currentImageMode = imageMode.value
-        if (forceDrawUpdate || lastImageMode != currentImageMode || lastWidth != width || lastHeight != height) {
-            lastMvpMatrix = null
-            lastHeightMapId = null
-            lastImageId = null
-            lastBiomeId = null
-            lastSplineId = null
-            lastRegionId = null
-            forceDrawUpdate = false
+    fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
+        if (imageMode.value == 0) {
+            onDrawFrameInternalRegion(xPosition, yPosition, width, height, rootHeight, scale)
+        } else if (imageMode.value == 1) {
+            onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
+        } else if (imageMode.value == 2) {
+            onDrawFrameInternalBiome(xPosition, yPosition, width, height, rootHeight, scale)
+        } else {
+            onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, rootHeight, scale)
         }
-        lastImageMode = currentImageMode
-        if (lastWidth != width || lastHeight != height || textureRenderer == null) {
-            val newTextureRenderer = UiTextureRenderer(width, height)
-            textureRenderer?.finalize()
-            textureRenderer = newTextureRenderer
-            viewportTextureId = newTextureRenderer.renderTextureId
-        }
-        lastWidth = width
-        lastHeight = height
-        return Triple(when (currentImageMode) {
-            0 -> onDrawFrameInternalRegion(xPosition, yPosition, width, height, scale)
-            1 -> onDrawFrameInternalImage(xPosition, yPosition, width, height, scale)
-            2 -> onDrawFrameInternalBiome(xPosition, yPosition, width, height, scale)
-            else -> onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, scale)
-        }, viewportTextureId!!, QuadInstance(xPosition.toFloat(), yPosition.toFloat(), width.toFloat(), height.toFloat()))
     }
 
-    private fun onDrawFrameInternalRegion(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalRegion(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
         if (width < 1 || height < 1) {
-            return false
+            return
         }
         synchronized(textureLock) {
             if (hasRegions) {
@@ -614,6 +566,8 @@ class MeshViewport3D(
                 hotZoneY1 = adjustedY + marginHeight
                 hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
 
+                val flippedY = rootHeight - (yPosition + height)
+
                 val premulRatio = width / height.toFloat()
                 val orthoZoom = zoom * perspectiveToOrtho
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
@@ -632,42 +586,28 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastRegionId == regionTextureId) {
-                    return false
-                } else {
-                    lastRegionId = regionTextureId
-                    val finalLastMvpMatrix = lastMvpMatrix
-                    if (finalLastMvpMatrix == null) {
-                        lastMvpMatrix = Matrix4f(mvpMatrix)
-                    } else {
-                        finalLastMvpMatrix.set(mvpMatrix)
-                    }
-                }
-
-                textureRenderer?.bind()
-
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
                 glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
                 glEnable(GL_MULTISAMPLE)
 
                 glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
+                glScissor(xPosition, flippedY, width, height)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
 
                 drawRegionPlane()
 
-                textureRenderer?.unbind()
-
-                return true
+                glDisable(GL_SCISSOR_TEST)
             }
         }
-        return false
     }
 
-    private fun onDrawFrameInternalBiome(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalBiome(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
         if (width < 1 || height < 1) {
-            return false
+            return
         }
         synchronized(textureLock) {
             if (hasBiomes) {
@@ -690,6 +630,8 @@ class MeshViewport3D(
                 hotZoneY1 = adjustedY + marginHeight
                 hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
 
+                val flippedY = rootHeight - (yPosition + height)
+
                 val premulRatio = width / height.toFloat()
                 val orthoZoom = zoom * perspectiveToOrtho
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
@@ -708,43 +650,28 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastBiomeId == biomeTextureId && lastSplineId == splineTextureId) {
-                    return false
-                } else {
-                    lastBiomeId = biomeTextureId
-                    lastSplineId = splineTextureId
-                    val finalLastMvpMatrix = lastMvpMatrix
-                    if (finalLastMvpMatrix == null) {
-                        lastMvpMatrix = Matrix4f(mvpMatrix)
-                    } else {
-                        finalLastMvpMatrix.set(mvpMatrix)
-                    }
-                }
-
-                textureRenderer?.bind()
-
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
                 glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
                 glEnable(GL_MULTISAMPLE)
 
                 glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
+                glScissor(xPosition, flippedY, width, height)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
 
                 drawBiomePlane()
 
-                textureRenderer?.unbind()
-
-                return true
+                glDisable(GL_SCISSOR_TEST)
             }
         }
-        return false
     }
 
-    private fun onDrawFrameInternalImage(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalImage(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
         if (width < 1 || height < 1) {
-            return false
+            return
         }
         synchronized(textureLock) {
             if (hasImage) {
@@ -767,6 +694,8 @@ class MeshViewport3D(
                 hotZoneY1 = adjustedY + marginHeight
                 hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
 
+                val flippedY = rootHeight - (yPosition + height)
+
                 val premulRatio = width / height.toFloat()
                 val orthoZoom = zoom * perspectiveToOrtho
                 projectionMatrix.setOrtho(premulRatio * -orthoZoom, premulRatio * orthoZoom, -orthoZoom, orthoZoom, 6.0f, 6000.0f)
@@ -785,43 +714,29 @@ class MeshViewport3D(
                 viewMatrix.mul(modelMatrix, mvMatrix)
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (!brushActive.value && lastMvpMatrix == mvpMatrix && lastImageId == imageTextureId) {
-                    return false
-                } else {
-                    lastImageId = imageTextureId
-                    val finalLastMvpMatrix = lastMvpMatrix
-                    if (finalLastMvpMatrix == null) {
-                        lastMvpMatrix = Matrix4f(mvpMatrix)
-                    } else {
-                        finalLastMvpMatrix.set(mvpMatrix)
-                    }
-                }
-
-                textureRenderer?.bind()
-
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
                 glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
                 glEnable(GL_MULTISAMPLE)
 
                 glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
+                glScissor(xPosition, flippedY, width, height)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
 
                 drawImagePlane()
 
-                textureRenderer?.unbind()
-
-                return true
+                glDisable(GL_SCISSOR_TEST)
             }
         }
-        return false
     }
 
-    private fun onDrawFrameInternalHeightMap(xPosition: Int, yPosition: Int, width: Int, height: Int, scale: Float): Boolean {
+    private fun onDrawFrameInternalHeightMap(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
 
         if (width < 1 || height < 1) {
-            return false
+            return
         }
         synchronized(textureLock) {
             if (hasHeightmap) {
@@ -845,6 +760,8 @@ class MeshViewport3D(
                 val hotZoneHeight = adjustedHeight - (2 * marginHeight)
                 hotZoneY1 = adjustedY + marginHeight
                 hotZoneY2 = adjustedY + marginHeight + hotZoneHeight
+
+                val flippedY = rootHeight - (yPosition + height)
 
                 val waterOn = waterPlaneOn.value
                 val doReset = resetView.value
@@ -927,42 +844,26 @@ class MeshViewport3D(
                 normalMatrix.set(mvMatrix).invert().transpose()
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
-                if (lastMvpMatrix == mvpMatrix && lastHeightMapId == heightMapId && lastWaterOn == waterOn && lastHeightScale == heightMapScaleFactor.value) {
-                    return false
-                } else {
-                    lastHeightScale = heightMapScaleFactor.value
-                    lastWaterOn = waterOn
-                    lastHeightMapId = heightMapId
-                    val finalLastMvpMatrix = lastMvpMatrix
-                    if (finalLastMvpMatrix == null) {
-                        lastMvpMatrix = Matrix4f(mvpMatrix)
-                    } else {
-                        finalLastMvpMatrix.set(mvpMatrix)
-                    }
-                }
-
-                textureRenderer?.bind()
-
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
                 glEnable(GL_DEPTH_TEST)
+                glEnable(GL_SCISSOR_TEST)
                 glEnable(GL_MULTISAMPLE)
 
                 glClearColor(background.r, background.g, background.b, background.a)
-                glViewport(0, 0, width, height)
+                glScissor(xPosition, flippedY, width, height)
                 glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+
+                glViewport(xPosition, flippedY, width, height)
 
                 if (waterOn) {
                     drawWaterPlane()
                 }
                 drawHeightMap()
 
-                textureRenderer?.unbind()
-
-                return true
+                glDisable(GL_SCISSOR_TEST)
             }
         }
-        return false
     }
 
     private fun drawHeightMap() {
@@ -985,7 +886,7 @@ class MeshViewport3D(
         glUniform1f(uvScaleUniform.location, heightMap.width / heightMapResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, heightMapId?.id ?: -1)
+        glBindTexture(GL_TEXTURE_2D, heightmapId?.id ?: -1)
         glUniform1i(riverMapTextureUniform.location, 1)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, rivermapId?.id ?: -1)
@@ -1128,7 +1029,7 @@ class MeshViewport3D(
                 val floatsPerVertex = 4
                 val vertexCount = xResolution * yResolution + 2
                 val heightMapVertexData = BufferUtils.createFloatBuffer(vertexCount * floatsPerVertex)
-                for (y in 0 until yResolution) {
+                for (y in 0..yResolution - 1) {
                     if (y == 0) {
                         heightMapVertexData.put(minXY).put(maxXY).put(0.0f).put(0.0f)
                     }
@@ -1137,7 +1038,7 @@ class MeshViewport3D(
                     val isEven = y % 2 == 0
                     val xOffset = minXY + if (isEven) halfXIncrement else 0.0f
                     val uOffset = if (isEven) halfUIncrement else 0.0f
-                    for (x in 0 until xResolution) {
+                    for (x in 0..xResolution - 1) {
                         heightMapVertexData.put(xOffset + x * xIncrement)
                         heightMapVertexData.put(yOffset)
                         heightMapVertexData.put(uOffset + x * uIncrement)
@@ -1351,8 +1252,8 @@ class MeshViewport3D(
                             GLFW.GLFW_KEY_SPACE -> {
                                 pressedKeys.add(GLFW.GLFW_KEY_SPACE)
                             }
-                            GLFW.GLFW_KEY_LEFT_SHIFT -> {
-                                pressedKeys.add(GLFW.GLFW_KEY_LEFT_SHIFT)
+                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_LEFT_CONTROL)
                             }
                         }
                     }
@@ -1379,8 +1280,8 @@ class MeshViewport3D(
                             GLFW.GLFW_KEY_SPACE -> {
                                 pressedKeys.remove(GLFW.GLFW_KEY_SPACE)
                             }
-                            GLFW.GLFW_KEY_LEFT_SHIFT -> {
-                                pressedKeys.remove(GLFW.GLFW_KEY_LEFT_SHIFT)
+                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_LEFT_CONTROL)
                             }
                         }
                     }

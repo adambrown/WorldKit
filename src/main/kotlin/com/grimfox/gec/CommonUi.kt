@@ -4,7 +4,8 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.LOG
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
@@ -236,13 +237,8 @@ val errorMessageReference = errorMessageDynamic.reference
 
 var overwriteWarningDialog = NO_BLOCK
 var errorMessageDialog = NO_BLOCK
-var generatingMessageBlock = NO_BLOCK
-var generatingPrimaryMessage = StaticTextReference()
-var generatingSecondaryMessage = StaticTextReference()
 val noop = {}
 val dialogCallback = mRef(noop)
-
-val cancelCurrentRunningTask: ObservableMutableReference<MutableReference<Boolean>?> = ref(null)
 
 class MainThreadTask<T>(val latch: CountDownLatch? = null, val work: () -> T) {
 

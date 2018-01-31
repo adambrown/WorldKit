@@ -16,7 +16,7 @@ import com.grimfox.gec.util.Graphs.generateGraph
 import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.WaterFlows.generateWaterFlows
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.ExecutorService
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -761,8 +761,7 @@ object BuildContinent {
             mapScale: Int,
             customElevationPowerMap: TextureId,
             customStartingHeightsMap: TextureId,
-            customSoilMobilityMap: TextureId,
-            canceled: Reference<Boolean>): Pair<TextureId, TextureId> {
+            customSoilMobilityMap: TextureId): Pair<TextureId, TextureId> {
         return timeIt("generated water flow in") {
             generateWaterFlows(
                     random = Random(parameterSet.regionsSeed),
@@ -778,8 +777,7 @@ object BuildContinent {
                     biomes = biomes,
                     customElevationPowerMap = customElevationPowerMap,
                     customStartingHeightsMap = customStartingHeightsMap,
-                    customSoilMobilityMap = customSoilMobilityMap,
-                    canceled = canceled)
+                    customSoilMobilityMap = customSoilMobilityMap)
         }
     }
 }

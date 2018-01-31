@@ -9,7 +9,6 @@ import com.grimfox.gec.ui.widgets.MeshViewport3D
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
-import com.grimfox.gec.ui.widgets.TextureBuilder.renderSplines
 import com.grimfox.gec.util.*
 import java.lang.Math.round
 import java.util.*
@@ -115,7 +114,7 @@ class SplinePointPicker(
                                     mountainPoints + customMountainPoints,
                                     ignoredPoints + customIgnoredPoints)
                         } else {
-                            texture.value = renderSplines(
+                            TextureBuilder.renderSplines(
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,
@@ -131,7 +130,7 @@ class SplinePointPicker(
                                     mountainPoints + customMountainPoints,
                                     ignoredPoints + customIgnoredPoints)
                         } else {
-                            texture.value = renderMapImage(
+                            renderMapImage(
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,

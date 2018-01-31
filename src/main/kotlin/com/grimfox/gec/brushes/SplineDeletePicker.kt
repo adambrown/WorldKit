@@ -9,7 +9,6 @@ import com.grimfox.gec.ui.widgets.MeshViewport3D
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderMapImage
-import com.grimfox.gec.ui.widgets.TextureBuilder.renderSplines
 import com.grimfox.gec.util.BuildContinent
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.Quintuple
@@ -134,7 +133,7 @@ class SplineDeletePicker(
                                     ignoredPoints + customIgnoredPoints,
                                     pendingPoints)
                         } else {
-                            texture.value = renderSplines(
+                            TextureBuilder.renderSplines(
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,
@@ -151,7 +150,7 @@ class SplineDeletePicker(
                                     ignoredPoints + customIgnoredPoints,
                                     pendingPoints)
                         } else {
-                            texture.value = renderMapImage(
+                            renderMapImage(
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,

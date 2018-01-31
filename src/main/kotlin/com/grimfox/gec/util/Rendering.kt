@@ -23,10 +23,9 @@ object Rendering {
         return renderTrianglesTexRedByte(vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
     }
 
-    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
+    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0) {
         val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
         renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
-        return textureId
     }
 
     private fun renderInternal(offset: Float, graph: Graph, regionMask: Matrix<Byte>, skips: Int, divisor: Float): Pair<ArrayList<Float>, ArrayList<Int>> {

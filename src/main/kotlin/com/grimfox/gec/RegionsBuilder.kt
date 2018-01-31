@@ -163,7 +163,7 @@ class RegionsBuilder(
                 colorMap[value] = i
             }
         }
-        return ByteArrayMatrix(REGION_GRAPH_WIDTH) { i ->
+        return ByteArrayMatrix(256) { i ->
             (colorMap[bufferedImage.getRGB(Math.round((((i % REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * widthM1), Math.round((((i / REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
         }
     }

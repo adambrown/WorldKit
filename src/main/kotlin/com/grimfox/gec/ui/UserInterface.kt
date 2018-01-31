@@ -49,7 +49,7 @@ private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsSc
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, beforeDraw: UserInterface.() -> Unit = {}, afterDraw: UserInterface.() -> List<Triple<Boolean, Int, QuadInstance>> = { listOf() }) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, beforeDraw: UserInterface.() -> Unit = {}, afterDraw: UserInterface.() -> Unit = {}) {
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
@@ -64,19 +64,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
         }
         ui.show()
         TextureBuilder.init(ui.nvg)
-        var lastWidth = ui.pixelWidth
-        var lastHeight = ui.pixelHeight
-        var uiRenderer = UiTextureRenderer(ui.pixelWidth, ui.pixelHeight)
-        val composer = ComposeUiShader("/shaders/ui-composer.vert", "/shaders/ui-composer.frag")
         executor.call { Biomes.init() }
-        var lastDraw = System.nanoTime()
-        val renderBlock = { internalWork: () -> Unit ->
-            uiRenderer.bind()
-            glClearColor(ui.layout.background.r, ui.layout.background.g, ui.layout.background.b, 1.0f)
-            glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-            internalWork()
-            uiRenderer.unbind()
-        }
         while (!ui.shouldClose()) {
             TextureBuilder.onDrawFrame()
             ui.handleFrameInput()
@@ -88,39 +76,9 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
             val frameHeight = ui.height
             ui.clearViewport(frameWidth, frameHeight)
             ui.beforeDraw()
-            val currentWidth = ui.pixelWidth
-            val currentHeight = ui.pixelHeight
-            if (lastWidth != currentWidth || lastHeight != currentHeight) {
-                uiRenderer.finalize()
-                uiRenderer = UiTextureRenderer(currentWidth, currentHeight)
-                lastWidth = currentWidth
-                lastHeight = currentHeight
-            }
-            val needToDrawUi = ui.drawFrame(frameWidth, frameHeight, renderBlock)
-            val realTimeItems = ui.afterDraw()
-            val needToDrawRealTimeItems = realTimeItems.any { it.first }
-            if (needToDrawUi || needToDrawRealTimeItems) {
-                composer.use {
-                    realTimeItems.forEach {
-                        render(currentWidth, currentHeight, listOf(it.third to it.second))
-                    }
-                    render(currentWidth, currentHeight, listOf(QuadInstance(0.0f, 0.0f, currentWidth.toFloat(), currentHeight.toFloat()) to uiRenderer.renderTextureId))
-                }
-            }
-            val curTime = System.nanoTime()
-            val timeDif = curTime - lastDraw
-            if (timeDif < 16000000) {
-                val waitFor = 16000000 - timeDif
-                val millis = waitFor / 1000000
-                val nanos = (waitFor % 1000000).toInt()
-                try {
-                    Thread.sleep(millis, nanos)
-                } catch (ignore: InterruptedException) { }
-            }
-            lastDraw = System.nanoTime()
-            if (needToDrawUi || needToDrawRealTimeItems) {
-                ui.swapBuffers()
-            }
+            ui.drawFrame(frameWidth, frameHeight)
+            ui.afterDraw()
+            ui.swapBuffers()
         }
     } catch (e: Throwable) {
         LOG.error("Error in main UI loop", e)
@@ -410,15 +368,18 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
 
-    internal fun drawFrame(width: Int, height: Int, renderBlock: (()->Unit) -> Unit): Boolean {
+    internal fun drawFrame(width: Int, height: Int) {
         if (window.currentPixelWidth < 0 || window.currentPixelHeight < 0 && !isMinimized) {
             window.isMinimized = true
             minimizeHandler()
         }
         if (isMinimized) {
-            return false
+            return
         }
         if (isMac) {
+            glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
+            glEnable(GL_MULTISAMPLE)
+            nvgSave(nvg)
             val scale = if (window.isResizing) {
                 window.resizeScaleFactor
             } else {
@@ -429,22 +390,14 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             root.width = width.toFloat()
             root.height = height.toFloat()
             root.handleNewMousePosition(nvg, relativeMouseX, relativeMouseY)
-            return if (root.movedOrResized) {
-                renderBlock {
-                    glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
-                    glEnable(GL_MULTISAMPLE)
-                    nvgSave(nvg)
-                    nvgBeginFrame(nvg, window.currentPixelWidth, window.currentPixelHeight, 1.0f)
-                    root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
-                    glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
-                    nvgEndFrame(nvg)
-                    nvgRestore(nvg)
-                }
-                true
-            } else {
-                false
-            }
+            nvgBeginFrame(nvg, window.currentPixelWidth, window.currentPixelHeight, 1.0f)
+            root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
+            glViewport(0, 0, width, height)
+            glViewport(0, 0, window.currentPixelWidth, window.currentPixelHeight)
         } else {
+            glViewport(0, 0, width, height)
+            glEnable(GL_MULTISAMPLE)
+            nvgSave(nvg)
             val scaleChanged = window.lastMonitor.scaleFactor != window.currentMonitor.scaleFactor
             val windowChanged = window.lastPixelWidth != window.currentPixelWidth && window.lastPixelHeight != window.currentPixelHeight && !isResizing
             val scale = if (scaleChanged != windowChanged) {
@@ -455,22 +408,12 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
             root.width = width / scale
             root.height = height / scale
             root.handleNewMousePosition(nvg, Math.round(relativeMouseX / scale), Math.round(relativeMouseY / scale))
-            return if (root.movedOrResized) {
-                renderBlock {
-                    glViewport(0, 0, width, height)
-                    glEnable(GL_MULTISAMPLE)
-                    nvgSave(nvg)
-                    nvgBeginFrame(nvg, width, height, 1.0f)
-                    root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
-                    glViewport(0, 0, width, height)
-                    nvgEndFrame(nvg)
-                    nvgRestore(nvg)
-                }
-                true
-            } else {
-                false
-            }
+            nvgBeginFrame(nvg, width, height, 1.0f)
+            root.draw(nvg, scale, scaleChanged || windowChanged, System.nanoTime())
+            glViewport(0, 0, width, height)
         }
+        nvgEndFrame(nvg)
+        nvgRestore(nvg)
     }
 
     internal fun swapBuffers() {

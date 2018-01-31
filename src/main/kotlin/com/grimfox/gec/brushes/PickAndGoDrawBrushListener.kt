@@ -50,7 +50,7 @@ class PickAndGoDrawBrushListener(
             if (texture.value.id < 0) {
                 texture.value = renderRegions(graph, mask)
             } else {
-                texture.value = renderRegions(graph, mask, texture.value)
+                renderRegions(graph, mask, texture.value)
             }
         }
     }
