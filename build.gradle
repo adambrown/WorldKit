@@ -17,9 +17,9 @@ buildscript {
         jcenter()
     }
 
-//    dependencies {
-//        classpath group: 'com.grimfox', name: 'packr-gradle-plugin', version: '1.0.0'
-//    }
+    dependencies {
+        classpath group: 'com.grimfox', name: 'packr-gradle-plugin', version: '1.0.0'
+    }
 }
 
 plugins {
@@ -49,7 +49,7 @@ switch (OperatingSystem.current()) {
         break
 }
 
-//apply plugin: 'com.grimfox.packr-gradle-plugin'
+apply plugin: 'com.grimfox.packr-gradle-plugin'
 
 sourceCompatibility = JavaVersion.VERSION_1_9
 targetCompatibility = JavaVersion.VERSION_1_9
@@ -107,12 +107,12 @@ dependencies {
     runtime group: 'ch.qos.logback', name: 'logback-classic', version: logback_version
 }
 
-//buildExecutables {
-//    executable {
-//        name = 'WorldKit'
-//        platform = 'windows64'
-//        jdk = file('file://D:/sandbox/oracle-jdk-8.zip')
-//        mainClass = 'com.grimfox.gec.MainUi'
-//        minimizeJre = 'oraclejre8'
-//    }
-//}
+buildExecutables {
+    executable {
+        name = 'WorldKit'
+        platform = 'windows64'
+        jdk = file('file://D:/sandbox/oracle-jdk-9-windows64.zip')
+        mainClass = 'com.grimfox.gec.Main'
+        minimizeJre = 'oraclejre8'
+    }
+}

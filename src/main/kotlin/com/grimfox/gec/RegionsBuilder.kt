@@ -9,10 +9,10 @@ import java.util.*
 import javax.imageio.ImageIO
 
 class RegionsBuilder(
-        val regionFile: DynamicTextReference,
-        val useRegionFile: Reference<Boolean>,
-        val displayMode: ObservableMutableReference<DisplayMode>,
-        val defaultToMap: ObservableMutableReference<Boolean>) {
+        private val regionFile: DynamicTextReference,
+        private val useRegionFile: Reference<Boolean>,
+        private val displayMode: ObservableMutableReference<DisplayMode>,
+        private val defaultToMap: ObservableMutableReference<Boolean>) {
 
     fun build(parameters: BuildContinent.RegionParameters, refreshOnly: Boolean = false, rebuildSplines: Boolean = true, updateView: Boolean = true) {
         val currentRegionGraph = currentState.regionGraph.value
@@ -25,7 +25,7 @@ class RegionsBuilder(
                 val mask = loadRegionMaskFromImage(File(finalRegionFile))
                 var water = 0
                 var land = 0
-                for (i in 0..mask.size.toInt() - 1) {
+                for (i in 0 until mask.size.toInt()) {
                     if (mask[i] < 1) {
                         water++
                     } else {
@@ -56,34 +56,42 @@ class RegionsBuilder(
                 val newDeletedEdges = ArrayList(newSplines.deletedEdges)
                 for (i in newRiverOrigins.size - 1 downTo 0) {
                     val it = newRiverOrigins[i]
-                    if (currentSplines.mountainOrigins.contains(it)) {
-                        newMountainOrigins.add(newRiverOrigins.removeAt(i))
-                        newMountainPoints.add(newRiverPoints.removeAt(i))
-                        newMountainEdges.add(newRiverEdges.removeAt(i))
-                    } else if (currentSplines.ignoredOrigins.contains(it)) {
-                        newIgnoredOrigins.add(newRiverOrigins.removeAt(i))
-                        newIgnoredPoints.add(newRiverPoints.removeAt(i))
-                        newIgnoredEdges.add(newRiverEdges.removeAt(i))
-                    } else if (currentSplines.deletedOrigins.contains(it)) {
-                        newDeletedOrigins.add(newRiverOrigins.removeAt(i))
-                        newDeletedPoints.add(newRiverPoints.removeAt(i))
-                        newDeletedEdges.add(newRiverEdges.removeAt(i))
+                    when {
+                        currentSplines.mountainOrigins.contains(it) -> {
+                            newMountainOrigins.add(newRiverOrigins.removeAt(i))
+                            newMountainPoints.add(newRiverPoints.removeAt(i))
+                            newMountainEdges.add(newRiverEdges.removeAt(i))
+                        }
+                        currentSplines.ignoredOrigins.contains(it) -> {
+                            newIgnoredOrigins.add(newRiverOrigins.removeAt(i))
+                            newIgnoredPoints.add(newRiverPoints.removeAt(i))
+                            newIgnoredEdges.add(newRiverEdges.removeAt(i))
+                        }
+                        currentSplines.deletedOrigins.contains(it) -> {
+                            newDeletedOrigins.add(newRiverOrigins.removeAt(i))
+                            newDeletedPoints.add(newRiverPoints.removeAt(i))
+                            newDeletedEdges.add(newRiverEdges.removeAt(i))
+                        }
                     }
                 }
                 for (i in newMountainOrigins.size - 1 downTo 0) {
                     val it = newMountainOrigins[i]
-                    if (currentSplines.riverOrigins.contains(it)) {
-                        newRiverOrigins.add(newMountainOrigins.removeAt(i))
-                        newRiverPoints.add(newMountainPoints.removeAt(i))
-                        newRiverEdges.add(newMountainEdges.removeAt(i))
-                    } else if (currentSplines.ignoredOrigins.contains(it)) {
-                        newIgnoredOrigins.add(newMountainOrigins.removeAt(i))
-                        newIgnoredPoints.add(newMountainPoints.removeAt(i))
-                        newIgnoredEdges.add(newMountainEdges.removeAt(i))
-                    } else if (currentSplines.deletedOrigins.contains(it)) {
-                        newDeletedOrigins.add(newMountainOrigins.removeAt(i))
-                        newDeletedPoints.add(newMountainPoints.removeAt(i))
-                        newDeletedEdges.add(newMountainEdges.removeAt(i))
+                    when {
+                        currentSplines.riverOrigins.contains(it) -> {
+                            newRiverOrigins.add(newMountainOrigins.removeAt(i))
+                            newRiverPoints.add(newMountainPoints.removeAt(i))
+                            newRiverEdges.add(newMountainEdges.removeAt(i))
+                        }
+                        currentSplines.ignoredOrigins.contains(it) -> {
+                            newIgnoredOrigins.add(newMountainOrigins.removeAt(i))
+                            newIgnoredPoints.add(newMountainPoints.removeAt(i))
+                            newIgnoredEdges.add(newMountainEdges.removeAt(i))
+                        }
+                        currentSplines.deletedOrigins.contains(it) -> {
+                            newDeletedOrigins.add(newMountainOrigins.removeAt(i))
+                            newDeletedPoints.add(newMountainPoints.removeAt(i))
+                            newDeletedEdges.add(newMountainEdges.removeAt(i))
+                        }
                     }
                 }
                 newSplines = BuildContinent.RegionSplines(
@@ -163,7 +171,7 @@ class RegionsBuilder(
                 colorMap[value] = i
             }
         }
-        return ByteArrayMatrix(256) { i ->
+        return ByteArrayMatrix(REGION_GRAPH_WIDTH) { i ->
             (colorMap[bufferedImage.getRGB(Math.round((((i % REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * widthM1), Math.round((((i / REGION_GRAPH_WIDTH) + 0.5f) / REGION_GRAPH_WIDTH_F) * heightM1)) and 0X00FFFFFF]!! and 0x00FFFFFF).toByte()
         }
     }

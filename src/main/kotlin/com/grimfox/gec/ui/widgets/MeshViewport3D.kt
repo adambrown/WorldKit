@@ -1,6 +1,6 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.BIOME_COLORS
+import com.grimfox.gec.*
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
@@ -18,24 +18,24 @@ import org.lwjgl.opengl.GL30.*
 import java.lang.Math.round
 import java.lang.Math.sqrt
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 class MeshViewport3D(
-        val resetView: MutableReference<Boolean>,
-        val rotateAroundCamera: Reference<Boolean>,
-        val perspectiveOn: Reference<Boolean>,
-        val waterPlaneOn: Reference<Boolean>,
-        val heightMapScaleFactor: Reference<Float>,
-        val imageMode: Reference<Int>,
-        val disableCursor: MutableReference<Boolean>,
-        val hideCursor: MutableReference<Boolean>,
-        val brushOn: Reference<Boolean>,
-        val brushActive: MutableReference<Boolean>,
-        val brushListener: Reference<BrushListener?>,
-        val brushSize: MutableReference<Float>,
-        val editBrushSizeRef: Reference<Reference<Float>>,
-        val pickerOn: Reference<Boolean>,
-        val pointPicker: Reference<PointPicker?>) {
+        private val resetView: MutableReference<Boolean>,
+        private val rotateAroundCamera: Reference<Boolean>,
+        private val perspectiveOn: Reference<Boolean>,
+        private val waterPlaneOn: Reference<Boolean>,
+        private val heightMapScaleFactor: Reference<Float>,
+        private val imageMode: Reference<Int>,
+        private val disableCursor: MutableReference<Boolean>,
+        private val hideCursor: MutableReference<Boolean>,
+        private val brushOn: Reference<Boolean>,
+        private val brushActive: MutableReference<Boolean>,
+        private val brushListener: Reference<BrushListener?>,
+        private val brushSize: MutableReference<Float>,
+        private val editBrushSizeRef: Reference<Reference<Float>>,
+        private val pickerOn: Reference<Boolean>,
+        private val pointPicker: Reference<PointPicker?>,
+        private val uiRoot: Reference<Block>) {
 
     private val pressedKeys = Collections.synchronizedSet(LinkedHashSet<Int>())
 
@@ -127,7 +127,7 @@ class MeshViewport3D(
 
     private val textureLock = Object()
     private var hasHeightmap = false
-    private var heightmapId: TextureId? = null
+    private var heightMapId: TextureId? = null
     private var rivermapId: TextureId? = null
     private var heightMapResolution = 0
 
@@ -267,10 +267,14 @@ class MeshViewport3D(
         modelMatrix.translate(defaultTranslation)
     }
 
+    private fun refreshUi() {
+        uiRoot.value.movedOrResized = true
+    }
+
     fun reset() {
         synchronized(textureLock) {
             hasHeightmap = false
-            heightmapId = null
+            heightMapId = null
             rivermapId = null
             heightMapResolution = 0
             hasRegions = false
@@ -281,15 +285,17 @@ class MeshViewport3D(
             hasImage = false
             imageTextureId = null
         }
+        refreshUi()
     }
 
     fun setHeightmap(newTexture: Pair<TextureId, TextureId>, resolution: Int) {
         synchronized(textureLock) {
             hasHeightmap = true
-            heightmapId = newTexture.first
+            heightMapId = newTexture.first
             rivermapId = newTexture.second
             heightMapResolution = resolution
         }
+        refreshUi()
     }
 
     fun setRegions(textureId: TextureId) {
@@ -297,6 +303,7 @@ class MeshViewport3D(
             hasRegions = true
             regionTextureId = textureId
         }
+        refreshUi()
     }
 
     fun setBiomes(biomeTextureId: TextureId, splineTextureId: TextureId) {
@@ -305,18 +312,21 @@ class MeshViewport3D(
             this.biomeTextureId = biomeTextureId
             this.splineTextureId = splineTextureId
         }
+        refreshUi()
     }
 
     fun setBiomes(biomeTextureId: TextureId) {
         synchronized(textureLock) {
             this.biomeTextureId = biomeTextureId
         }
+        refreshUi()
     }
 
     fun setSplines(splineTextureId: TextureId) {
         synchronized(textureLock) {
             this.splineTextureId = splineTextureId
         }
+        refreshUi()
     }
 
     fun setImage(textureId: TextureId) {
@@ -324,6 +334,7 @@ class MeshViewport3D(
             hasImage = true
             imageTextureId = textureId
         }
+        refreshUi()
     }
 
     fun onMouseDown(button: Int, x: Int, y: Int) {
@@ -370,6 +381,7 @@ class MeshViewport3D(
                     }
                 }
             }
+            refreshUi()
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
             if (!isRollOn && !isRotateOn && !isTranslateOn) {
                 lastMouseX = x.toFloat()
@@ -380,6 +392,7 @@ class MeshViewport3D(
                 isRotateOn = false
                 isFlyModeOn = true
             }
+            refreshUi()
         }
     }
 
@@ -401,6 +414,7 @@ class MeshViewport3D(
                 brushListener.value?.onLine(lastTexCoordX, lastTexCoordY, texCoordX, texCoordY)
             }
         }
+        refreshUi()
     }
 
     fun onMouseRelease(button: Int, x: Int, y: Int) {
@@ -426,6 +440,7 @@ class MeshViewport3D(
                     eliminateMovement = true
                 }
             }
+            refreshUi()
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
             isTranslateOn = false
             if (isFlyModeOn) {
@@ -433,6 +448,7 @@ class MeshViewport3D(
                 isRotateOn = true
                 eliminateMovement = true
             }
+            refreshUi()
         }
         if (brushActive.value && hideCursor.value) {
             hideCursor.value = false
@@ -455,6 +471,7 @@ class MeshViewport3D(
             tempMatrix.translation(0.0f, 0.0f, scaledScroll)
             tempMatrix.mul(modelMatrix, modelMatrix)
         }
+        refreshUi()
     }
 
     inner class LazyCameraPosition {
@@ -478,50 +495,60 @@ class MeshViewport3D(
         if (isFlyModeOn) {
             if (!disableCursor.value) {
                 disableCursor.value = true
+                refreshUi()
             }
             val lazyCamera = LazyCameraPosition()
             if (pressedKeys.contains(GLFW.GLFW_KEY_W)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(0.0f, 0.0f, increment)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_S)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(0.0f, 0.0f, increment)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_A)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(increment, 0.0f, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_D)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(increment, 0.0f, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_Q)) {
                 deltaRotation.identity()
                 deltaRotation.rotate(0.0f, 0.0f, -2f * deltaTime)
                 modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_E)) {
                 deltaRotation.identity()
                 deltaRotation.rotate(0.0f, 0.0f, 2f * deltaTime)
                 modelMatrix.rotateAroundLocal(deltaRotation, 0.0f, 0.0f, 0.0f)
+                refreshUi()
             }
             if (pressedKeys.contains(GLFW.GLFW_KEY_SPACE)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * -2f * deltaTime
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
-            if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_CONTROL)) {
+            if (pressedKeys.contains(GLFW.GLFW_KEY_LEFT_SHIFT)) {
                 val increment = Math.max(lazyCamera.value.z, 50.0f) * 2f * deltaTime
                 tempMatrix.translation(0.0f, increment, 0.0f)
                 tempMatrix.mul(modelMatrix, modelMatrix)
+                refreshUi()
             }
         } else if (disableCursor.value) {
             disableCursor.value = false
+            refreshUi()
         }
     }
 
@@ -530,14 +557,11 @@ class MeshViewport3D(
     }
 
     fun onDrawFrame(xPosition: Int, yPosition: Int, width: Int, height: Int, rootHeight: Int, scale: Float) {
-        if (imageMode.value == 0) {
-            onDrawFrameInternalRegion(xPosition, yPosition, width, height, rootHeight, scale)
-        } else if (imageMode.value == 1) {
-            onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
-        } else if (imageMode.value == 2) {
-            onDrawFrameInternalBiome(xPosition, yPosition, width, height, rootHeight, scale)
-        } else {
-            onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, rootHeight, scale)
+        when {
+            imageMode.value == 0 -> onDrawFrameInternalRegion(xPosition, yPosition, width, height, rootHeight, scale)
+            imageMode.value == 1 -> onDrawFrameInternalImage(xPosition, yPosition, width, height, rootHeight, scale)
+            imageMode.value == 2 -> onDrawFrameInternalBiome(xPosition, yPosition, width, height, rootHeight, scale)
+            else -> onDrawFrameInternalHeightMap(xPosition, yPosition, width, height, rootHeight, scale)
         }
     }
 
@@ -886,7 +910,7 @@ class MeshViewport3D(
         glUniform1f(uvScaleUniform.location, heightMap.width / heightMapResolution)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, heightmapId?.id ?: -1)
+        glBindTexture(GL_TEXTURE_2D, heightMapId?.id ?: -1)
         glUniform1i(riverMapTextureUniform.location, 1)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, rivermapId?.id ?: -1)
@@ -943,10 +967,10 @@ class MeshViewport3D(
 
     internal class ImagePlane(val width: Float, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute) {
 
-        val minXY = width / -2.0f
-        val maxXY = minXY + width
+        private val minXY = width / -2.0f
+        private val maxXY = minXY + width
 
-        var vao = 0
+        private var vao = 0
 
         init {
             try {
@@ -1009,27 +1033,27 @@ class MeshViewport3D(
         }
     }
 
-    internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute, val useStrips: Boolean) {
+    internal class HexGrid(val width: Float, xResolution: Int, positionAttribute: ShaderAttribute, uvAttribute: ShaderAttribute, private val useStrips: Boolean) {
 
-        val halfXIncrement = width / (xResolution * 2 - 1)
-        val xIncrement = halfXIncrement * 2
-        val yResolution = round(width / (sqrt(3.0) * halfXIncrement)).toInt() + 1
-        val yIncrement = width / (yResolution - 1)
-        val halfUIncrement = 1.0f / (xResolution * 2 - 1)
-        val uIncrement = halfUIncrement * 2
-        val vIncrement = 1.0f / (yResolution - 1)
-        val minXY = width / -2.0f
-        val maxXY = minXY + width
+        private val halfXIncrement = width / (xResolution * 2 - 1)
+        private val xIncrement = halfXIncrement * 2
+        private val yResolution = round(width / (sqrt(3.0) * halfXIncrement)).toInt() + 1
+        private val yIncrement = width / (yResolution - 1)
+        private val halfUIncrement = 1.0f / (xResolution * 2 - 1)
+        private val uIncrement = halfUIncrement * 2
+        private val vIncrement = 1.0f / (yResolution - 1)
+        private val minXY = width / -2.0f
+        private val maxXY = minXY + width
 
-        var vao = 0
-        var indexCount = 0
+        private var vao = 0
+        private var indexCount = 0
 
         init {
             try {
                 val floatsPerVertex = 4
                 val vertexCount = xResolution * yResolution + 2
                 val heightMapVertexData = BufferUtils.createFloatBuffer(vertexCount * floatsPerVertex)
-                for (y in 0..yResolution - 1) {
+                for (y in 0 until yResolution) {
                     if (y == 0) {
                         heightMapVertexData.put(minXY).put(maxXY).put(0.0f).put(0.0f)
                     }
@@ -1038,7 +1062,7 @@ class MeshViewport3D(
                     val isEven = y % 2 == 0
                     val xOffset = minXY + if (isEven) halfXIncrement else 0.0f
                     val uOffset = if (isEven) halfUIncrement else 0.0f
-                    for (x in 0..xResolution - 1) {
+                    for (x in 0 until xResolution) {
                         heightMapVertexData.put(xOffset + x * xIncrement)
                         heightMapVertexData.put(yOffset)
                         heightMapVertexData.put(uOffset + x * uIncrement)
@@ -1067,14 +1091,14 @@ class MeshViewport3D(
 
                 val heightMapIndexData = if (useStrips) {
                     val heightMapIndexData = BufferUtils.createIntBuffer(indexCount)
-                    for (strip in 0..stripCount - 1) {
+                    for (strip in 0 until stripCount) {
                         if (strip == 0) {
                             heightMapIndexData.put(0)
                         }
                         if (strip % 2 == 0) {
                             var topStart = (strip * xResolution) + 1
                             var bottomStart = topStart + xResolution
-                            for (i in 0..xResolution - 1) {
+                            for (i in 0 until xResolution) {
                                 heightMapIndexData.put(bottomStart++)
                                 heightMapIndexData.put(topStart++)
                             }
@@ -1087,7 +1111,7 @@ class MeshViewport3D(
                             val scaffold = bottomStart + xResolution
                             var bottomEnd = scaffold - 1
                             var topEnd = bottomStart - 1
-                            for (i in 0..xResolution - 1) {
+                            for (i in 0 until xResolution) {
                                 heightMapIndexData.put(bottomEnd--)
                                 heightMapIndexData.put(topEnd--)
                             }
@@ -1124,14 +1148,14 @@ class MeshViewport3D(
                             }
                         }
                     }
-                    for (strip in 0..stripCount - 1) {
+                    for (strip in 0 until stripCount) {
                         if (strip == 0) {
                             push(0)
                         }
                         if (strip % 2 == 0) {
                             var topStart = (strip * xResolution) + 1
                             var bottomStart = topStart + xResolution
-                            for (i in 0..xResolution - 1) {
+                            for (i in 0 until xResolution) {
                                 push(bottomStart++)
                                 push(topStart++)
                             }
@@ -1144,7 +1168,7 @@ class MeshViewport3D(
                             val scaffold = bottomStart + xResolution
                             var bottomEnd = scaffold - 1
                             var topEnd = bottomStart - 1
-                            for (i in 0..xResolution - 1) {
+                            for (i in 0 until xResolution) {
                                 push(bottomEnd--)
                                 push(topEnd--)
                             }
@@ -1252,8 +1276,8 @@ class MeshViewport3D(
                             GLFW.GLFW_KEY_SPACE -> {
                                 pressedKeys.add(GLFW.GLFW_KEY_SPACE)
                             }
-                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
-                                pressedKeys.add(GLFW.GLFW_KEY_LEFT_CONTROL)
+                            GLFW.GLFW_KEY_LEFT_SHIFT -> {
+                                pressedKeys.add(GLFW.GLFW_KEY_LEFT_SHIFT)
                             }
                         }
                     }
@@ -1280,8 +1304,8 @@ class MeshViewport3D(
                             GLFW.GLFW_KEY_SPACE -> {
                                 pressedKeys.remove(GLFW.GLFW_KEY_SPACE)
                             }
-                            GLFW.GLFW_KEY_LEFT_CONTROL -> {
-                                pressedKeys.remove(GLFW.GLFW_KEY_LEFT_CONTROL)
+                            GLFW.GLFW_KEY_LEFT_SHIFT -> {
+                                pressedKeys.remove(GLFW.GLFW_KEY_LEFT_SHIFT)
                             }
                         }
                     }

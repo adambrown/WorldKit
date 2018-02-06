@@ -4,8 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
-import com.grimfox.gec.ui.LOG
-import com.grimfox.gec.ui.UserInterface
+import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
@@ -183,8 +182,9 @@ val historyBiomesCurrent: ObservableMutableReference<BiomesHistoryItem?> get() =
 val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForwardQueue ?: HistoryQueue(0)
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
+val rootRef = ref(NO_BLOCK)
 
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker)
+val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
 
 var mainLayer = NO_BLOCK
 var panelLayer = NO_BLOCK
@@ -237,8 +237,13 @@ val errorMessageReference = errorMessageDynamic.reference
 
 var overwriteWarningDialog = NO_BLOCK
 var errorMessageDialog = NO_BLOCK
+var generatingMessageBlock = NO_BLOCK
+var generatingPrimaryMessage = StaticTextReference()
+var generatingSecondaryMessage = StaticTextReference()
 val noop = {}
 val dialogCallback = mRef(noop)
+
+val cancelCurrentRunningTask: ObservableMutableReference<MutableReference<Boolean>?> = ref(null)
 
 class MainThreadTask<T>(val latch: CountDownLatch? = null, val work: () -> T) {
 

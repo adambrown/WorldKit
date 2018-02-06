@@ -8,6 +8,7 @@ build/
 *.iml
 *.iws
 classes/
+out/
 
 ## OSX stuff
 .DS_Store

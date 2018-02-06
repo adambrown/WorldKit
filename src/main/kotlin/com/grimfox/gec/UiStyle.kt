@@ -162,12 +162,17 @@ val SHAPE_BORDER_AND_FRAME_RECTANGLE = ShapeRectangle(FILL_BORDERS_AND_FRAMES, N
 
 val FONT_SIZE_15 = cRef(15.0f)
 val FONT_SIZE_16 = cRef(16.0f)
+val FONT_SIZE_18 = cRef(18.0f)
 val FONT_SIZE_22 = cRef(22.0f)
+val FONT_SIZE_36 = cRef(36.0f)
 
 val TEXT_STYLE_DISABLED = TextStyle(FONT_SIZE_15, textFont, cRef(COLOR_DISABLED_CLICKABLE))
 val TEXT_STYLE_NORMAL = TextStyle(FONT_SIZE_15, textFont, cRef(COLOR_NORMAL_TEXT))
 val TEXT_STYLE_BUTTON = TextStyle(FONT_SIZE_15, textFont, cRef(COLOR_BUTTON_TEXT))
 val TEXT_STYLE_GLYPH = TextStyle(FONT_SIZE_16, glyphFont, cRef(COLOR_BUTTON_TEXT))
+
+val TEXT_STYLE_LARGE_MESSAGE = TextStyle(FONT_SIZE_36, textFont, cRef(COLOR_BUTTON_TEXT))
+val TEXT_STYLE_SMALL_MESSAGE = TextStyle(FONT_SIZE_18, textFont, cRef(COLOR_BUTTON_TEXT))
 
 val TEXT_STYLE_BUTTON_LARGE = TextStyle(FONT_SIZE_22, textFont, cRef(COLOR_BUTTON_TEXT))
 
@@ -703,6 +708,9 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
     val textValue = DynamicTextReference(reference.value.toString(), 18, textStyle)
     val textStyleActive = TextStyle(textStyle.size, textStyle.font, cRef(textColorActive))
     val caret = uiLayout.createCaret(textValue)
+    textValue.reference.addListener { _, _ ->
+        root.movedOrResized = true
+    }
     reference.addListener { old, new ->
         if (new != old) {
             textValue.reference.value = new.toString()
@@ -785,6 +793,7 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
             if (!isActive) {
                 textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_MOUSE_OVER
                 caretText.style = textStyleActive
+                root.movedOrResized = true
             }
         }
         onMouseOut {
@@ -792,6 +801,7 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
             if (!isActive) {
                 textBox.shape = SHAPE_TEXT_BOX_BACKGROUND_NORMAL
                 caretText.style = textStyle
+                root.movedOrResized = true
             }
         }
         var isActivating = false
@@ -817,26 +827,31 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
                     textBlock.hTruncate = TRUNCATE_LEFT
                     ui.keyboardHandler = keyboardHandler
                 }
+                root.movedOrResized = true
             }
         }
         onMouseUp { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
                 isActivating = false
+                root.movedOrResized = true
             }
         }
         onMouseRelease { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActivating && isActive) {
                 isActivating = false
+                root.movedOrResized = true
             }
         }
         onMouseDrag { button, x, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive && !isActivating) {
                 caret.selection = caret.getPosition(x - selectRefBlock.x) - caret.position
+                root.movedOrResized = true
             }
         }
         onMouseDownOverOther { button, _, _, _ ->
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isActive) {
                 completeFun()
+                root.movedOrResized = true
             }
         }
     }

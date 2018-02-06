@@ -12,6 +12,7 @@ import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Utils.LOG
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
+import org.lwjgl.opengl.GL11.*
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.memAddress
@@ -376,6 +377,7 @@ class ShapeCursor(override val fill: Fill, override val stroke: Stroke, private 
             nvgRect(nvg, (block.x + halfStroke + start) * scale, (block.y + halfStroke) * scale, (end - start) * scale, (block.height - stroke.size) * scale)
             selectFill.draw(nvg, block, scale)
         }
+        block.root.movedOrResized = true
     }
 }
 
