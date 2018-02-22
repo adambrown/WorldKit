@@ -280,12 +280,15 @@ fun integerTextInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape
                                     caret.selection = 0
                                     caret.dynamicText.reference.value = caret.dynamicText.reference.value.removeRange(min, max)
                                 }
-                                for (codePoint in ui.getClipboardString().codePoints()) {
-                                    if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint in 0x30..0x39) || (caret.position == 0 && codePoint == 0x2d)) {
-                                        val currentString = ArrayList(caret.dynamicText.reference.value.toCharArray().toList())
-                                        currentString.add(caret.position++, codePoint.toChar())
-                                        caret.dynamicText.reference.value = String(currentString.toCharArray())
-                                        cursorShape.timeOffset = System.currentTimeMillis()
+                                val codePoints = ui.getClipboardString()?.codePoints()
+                                if (codePoints != null) {
+                                    for (codePoint in codePoints) {
+                                        if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint in 0x30..0x39) || (caret.position == 0 && codePoint == 0x2d)) {
+                                            val currentString = ArrayList(caret.dynamicText.reference.value.toCharArray().toList())
+                                            currentString.add(caret.position++, codePoint.toChar())
+                                            caret.dynamicText.reference.value = String(currentString.toCharArray())
+                                            cursorShape.timeOffset = System.currentTimeMillis()
+                                        }
                                     }
                                 }
                             }

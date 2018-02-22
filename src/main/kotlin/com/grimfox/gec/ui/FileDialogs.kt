@@ -35,8 +35,8 @@ object FileDialogs {
         if (r != NFD_OKAY) {
             return arrayOf()
         }
-        val out = Array<String>(NFD_PathSet_GetCount(pathSet).toInt()) { i ->
-            NFD_PathSet_GetPath(pathSet, i.toLong())
+        val out = Array(NFD_PathSet_GetCount(pathSet).toInt()) { i ->
+            NFD_PathSet_GetPath(pathSet, i.toLong())!!
         }
         NFD_PathSet_Free(pathSet)
         return out

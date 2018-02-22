@@ -197,7 +197,7 @@ interface UserInterface {
 
     fun showCursor()
 
-    fun getClipboardString(): String
+    fun getClipboardString(): String?
 
     fun setClipboardString(string: String)
 
@@ -351,7 +351,7 @@ private class UserInterfaceInternal internal constructor(internal val window: Wi
         window.enableCursor()
     }
 
-    override fun getClipboardString(): String = window.getClipboardString()
+    override fun getClipboardString(): String? = window.getClipboardString()
 
     override fun hideCursor() {
         window.hideCursor()
@@ -948,7 +948,7 @@ private class WindowContext(
             Callbacks.glfwFreeCallbacks(id)
             debugProc?.free()
             glfwTerminate()
-            glfwSetErrorCallback(null).free()
+            glfwSetErrorCallback(null)?.free()
         }
     }
 
@@ -968,7 +968,7 @@ private class WindowContext(
         glfwSetInputMode(id, GLFW_CURSOR, GLFW_CURSOR_NORMAL)
     }
 
-    fun getClipboardString(): String = glfwGetClipboardString(id)
+    fun getClipboardString(): String? = glfwGetClipboardString(id)
 
     fun setClipboardString(string: String) {
         glfwSetClipboardString(id, string)
@@ -1282,7 +1282,7 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
     twr(stackPush()) { stack ->
         val intPointer1 = stack.mallocInt(1)
         val intPointer2 = stack.mallocInt(1)
-        val monitorIds = glfwGetMonitors()
+        val monitorIds = glfwGetMonitors()!!
         while (monitorIds.hasRemaining()) {
             val monitorId = monitorIds.get()
             glfwGetMonitorPhysicalSize(monitorId, intPointer1, intPointer2)
@@ -1291,7 +1291,7 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             glfwGetMonitorPos(monitorId, intPointer1, intPointer2)
             val virtualX = intPointer1[0]
             val virtualY = intPointer2[0]
-            val videoMode = glfwGetVideoMode(monitorId)
+            val videoMode = glfwGetVideoMode(monitorId)!!
             val virtualWidth = videoMode.width()
             val virtualHeight = videoMode.height()
             val redBits = videoMode.redBits()

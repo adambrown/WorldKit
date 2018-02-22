@@ -1,26 +1,22 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.util.call
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.ui.JSON
-import com.grimfox.gec.util.Graphs
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import com.grimfox.gec.util.*
+import org.slf4j.*
 import java.io.File
-import java.util.*
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import java.util.concurrent.*
 
 private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)
 
-val WORLD_KIT_DIR = File(File(System.getProperty("user.home")), "WorldKit")
-val WORLD_KIT_DATA_DIR = File(WORLD_KIT_DIR, "data")
-val DEFAULT_TEMP_DIR = File(WORLD_KIT_DATA_DIR, "temp")
-val CACHE_DIR = File(WORLD_KIT_DATA_DIR, "cache")
-val DEFAULT_PROJECTS_DIR = File(WORLD_KIT_DIR, "projects")
-val CONFIG_DIR = File(WORLD_KIT_DATA_DIR, "config")
-val OFFLINE_HELP_DIR = File(WORLD_KIT_DATA_DIR, "offline-help")
+
+val WORLD_KIT_APP_DIR = File(System.getProperty("wk.local.app.dir"))
+val WORLD_KIT_DOC_DIR = File(System.getProperty("wk.local.doc.dir"))
+val DEFAULT_TEMP_DIR = File(WORLD_KIT_APP_DIR, "Temp")
+val CACHE_DIR = File(WORLD_KIT_APP_DIR, "Cache")
+val DEFAULT_PROJECTS_DIR = File(WORLD_KIT_DOC_DIR, "Projects")
+val CONFIG_DIR = File(WORLD_KIT_APP_DIR, "Config")
+val OFFLINE_HELP_DIR = File(WORLD_KIT_APP_DIR, "Offline_Help")
 val OFFLINE_HELP_INDEX_FILE = File(OFFLINE_HELP_DIR, "index.html")
 val PREFERENCES_FILE = File(CONFIG_DIR, "preferences.json")
 val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects.json")
@@ -56,8 +52,7 @@ val executor: ExecutorService = Executors.newWorkStealingPool()
 val preferences = loadPreferences(executor)
 
 fun loadPreferences(executor: ExecutorService): Preferences {
-    ensureDirectoryExists(WORLD_KIT_DIR)
-    ensureDirectoryExists(WORLD_KIT_DATA_DIR)
+    ensureDirectoryExists(WORLD_KIT_APP_DIR)
     ensureDirectoryExists(CONFIG_DIR)
     ensureDirectoryExists(OFFLINE_HELP_DIR)
     ensureDirectoryExists(CACHE_DIR)
@@ -151,8 +146,7 @@ fun loadPreferences(executor: ExecutorService): Preferences {
 
 fun savePreferences(preferences: Preferences) {
     try {
-        ensureDirectoryExists(WORLD_KIT_DIR)
-        ensureDirectoryExists(WORLD_KIT_DATA_DIR)
+        ensureDirectoryExists(WORLD_KIT_APP_DIR)
         ensureDirectoryExists(CONFIG_DIR)
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)

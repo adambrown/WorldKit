@@ -309,12 +309,14 @@ fun addAutosaveToRecentAutosaves(file: File?, dialogLayer: Block, overwriteWarni
 }
 
 fun clearRecentProjects() {
-    sync {
-        recentProjects.forEach {
-            recentProjectsDropdown.value?.removeItem(it.second)
+    doOnMainThread {
+        sync {
+            recentProjects.forEach {
+                recentProjectsDropdown.value?.removeItem(it.second)
+            }
+            recentProjects.clear()
+            recentProjectsAvailable.value = false
         }
-        recentProjects.clear()
-        recentProjectsAvailable.value = false
     }
 }
 
