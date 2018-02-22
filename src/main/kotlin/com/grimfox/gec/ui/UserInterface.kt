@@ -49,7 +49,7 @@ private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsSc
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, beforeDraw: UserInterface.() -> Unit = {}) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, afterShow: UserInterface.() -> Unit = {}, beforeDraw: UserInterface.() -> Unit = {}) {
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
@@ -63,6 +63,7 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
             ui.root.handleDrop(strings)
         }
         ui.show()
+        ui.afterShow()
         TextureBuilder.init(ui.nvg)
         executor.call { Biomes.init() }
         var lastDraw = System.nanoTime()

@@ -18,19 +18,26 @@ import java.util.*
 
 object Main {
 
+    @Volatile private var uiIsShown: Boolean = false
+
     @JvmStatic fun main(vararg args: String) {
         val uiThread = Thread({ runUi() })
         uiThread.isDaemon = false
         uiThread.start()
-    }
-
-    private fun runUi() {
-        val executor = executor
-        val preferences = preferences
-
         for (i in 1..2) {
             task { generateRegions(RegionParameters(regionsSeed = i.toLong()), executor) }
         }
+        while (!uiIsShown) {
+            try {
+                Thread.sleep(200)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+    }
+
+    private fun runUi() {
+        val preferences = preferences
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
 
@@ -548,7 +555,7 @@ object Main {
 //            println()
 //        }
 
-        ui(uiLayout, preferences.windowState) {
+        ui(uiLayout, preferences.windowState, afterShow = { uiIsShown = true }) {
             wasResizing = if (isResizing) {
                 true
             } else {
