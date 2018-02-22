@@ -19,12 +19,12 @@ import java.util.*
 object Main {
 
     @JvmStatic fun main(vararg args: String) {
-        val uiThread = Thread({ runUi(*args) })
+        val uiThread = Thread({ runUi() })
         uiThread.isDaemon = false
         uiThread.start()
     }
 
-    private fun runUi(vararg args: String) {
+    private fun runUi() {
         val executor = executor
         val preferences = preferences
 
