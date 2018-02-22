@@ -23,7 +23,9 @@ import com.grimfox.gec.util.geometry.renderTriangle
 import org.joml.SimplexNoise.noise
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.*
+import java.io.File
 import java.lang.Math.log
+import java.text.DecimalFormat
 import java.util.*
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
@@ -552,6 +554,7 @@ object WaterFlows {
         }
         val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
         doOrCancel { renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount) }
+//        writeObj(executor, graph, nodeIndex, fallback, threadCount, File("D:/sandbox/terrain.obj"))
         val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE))}
         nodes.forEach {
             val (min, max) = biomeExtremes[it.biome]
@@ -1100,6 +1103,68 @@ object WaterFlows {
             }
         }
         futures.forEach(Future<*>::join)
+    }
+
+
+    private fun writeObj(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, threadCount: Int, outputFile: File) {
+        val fWidth = fallback?.width ?: 0
+        val fWidthM1 = fWidth - 1
+        val triangles = graph.triangles
+        val graphVertices = graph.vertices
+        var vertexIndex = 0
+        val meshVertices = Array(graphVertices.size) { i ->
+            val point = graphVertices.getPoint(i)
+            val node = nodeIndex[i]
+            if (node == null) {
+                if (fallback != null) {
+                    val z = fallback[(Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)] - 600
+                    vertexIndex++ to Point3F(point.x, point.y, z)
+                } else {
+                    null
+                }
+            } else {
+                val z = node.height
+                vertexIndex++ to Point3F(point.x, point.y, z)
+            }
+        }
+        val vertexData = FloatArray(vertexIndex * 3)
+        meshVertices.forEach {
+            if (it != null) {
+                val (i, point) = it
+                var index = i * 3
+                vertexData[index++] = point.x * 204800
+                vertexData[index++] = point.y * 204800
+                vertexData[index] = point.z
+            }
+        }
+        val futures = ArrayList<Future<*>>(threadCount)
+        val indexData = IntArray(triangles.size * 3)
+        (0 until threadCount).mapTo(futures) {
+            executor.submit {
+                for (t in it until triangles.size step threadCount) {
+                    val triangleVertices = triangles.getVertices(t)
+                    val a = meshVertices[triangleVertices[0]]
+                    val b = meshVertices[triangleVertices[1]]
+                    val c = meshVertices[triangleVertices[2]]
+                    if (a != null && b != null && c != null) {
+                        var offset = t * 3
+                        indexData[offset++] = a.first
+                        indexData[offset++] = b.first
+                        indexData[offset] = c.first
+                    }
+                }
+            }
+        }
+        futures.forEach(Future<*>::join)
+        val format = DecimalFormat("0.####")
+        outputFile.outputStream().bufferedWriter().use { writer ->
+            for (i in 0 until vertexData.size step 3) {
+                writer.write("v ${format.format(vertexData[i])} ${format.format(vertexData[i + 1])} ${format.format(vertexData[i + 2])}\n")
+            }
+            for (i in 0 until indexData.size step 3) {
+                writer.write("f ${indexData[i] + 1} ${indexData[i + 1] + 1} ${indexData[i + 2] + 1}\n")
+            }
+        }
     }
 
     private fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMap: Matrix<Float>, fallback: Matrix<Float>?, threadCount: Int) {
