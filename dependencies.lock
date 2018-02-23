@@ -179,8 +179,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -189,20 +189,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -396,8 +396,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -406,20 +406,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -623,8 +623,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -633,20 +633,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -933,8 +933,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -943,20 +943,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1161,8 +1161,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -1171,20 +1171,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1379,8 +1379,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -1389,20 +1389,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1596,8 +1596,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -1606,20 +1606,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -1823,8 +1823,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -1833,20 +1833,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
@@ -2051,8 +2051,8 @@
             "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3",
+            "locked": "3.1.6",
+            "requested": "3.1.6",
             "transitive": [
                 "org.lwjgl:lwjgl-glfw",
                 "org.lwjgl:lwjgl-nanovg",
@@ -2061,20 +2061,20 @@
             ]
         },
         "org.lwjgl:lwjgl-glfw": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nanovg": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-nfd": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.lwjgl:lwjgl-opengl": {
-            "locked": "3.1.3",
-            "requested": "3.1.3"
+            "locked": "3.1.6",
+            "requested": "3.1.6"
         },
         "org.reflections:reflections": {
             "locked": "0.9.10",
