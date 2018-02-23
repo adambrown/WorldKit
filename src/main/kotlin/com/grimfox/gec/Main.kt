@@ -22,6 +22,14 @@ object Main {
     @Volatile private var uiIsShown: Boolean = false
 
     @JvmStatic fun main(vararg args: String) {
+        if (args.isNotEmpty()) {
+            val stringBuilder = StringBuilder("Command line args:\n\n")
+            args.forEachIndexed { i, it ->
+                stringBuilder.append("    arg${i + 1}: $it\n")
+            }
+            stringBuilder.append("\n")
+            LOG.info(stringBuilder.toString())
+        }
         val uiThread = Thread({ runUi(*args) })
         uiThread.isDaemon = false
         uiThread.start()
