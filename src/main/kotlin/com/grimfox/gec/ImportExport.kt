@@ -19,7 +19,7 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import javax.imageio.ImageIO
 
-fun importProjectFile(file: File): Project? {
+fun importProjectFile(file: File, biomeTemplates: Biomes): Project? {
     return DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
         val currentState = CurrentState()
         val hasRegionState = stream.readBoolean()
@@ -40,7 +40,7 @@ fun importProjectFile(file: File): Project? {
             currentState.biomeParameters.value = currentBiomeState.parameters
             currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, currentBiomeState.graphSeed, 0.8)
             currentState.biomeMask.value = currentBiomeState.mask
-            currentState.biomes.value = currentBiomeState.parameters.biomes.map { ordinalToBiome(it) }
+            currentState.biomes.value = currentBiomeState.parameters.biomes.map { biomeTemplates.ordinalToBiome(it) }
         }
         val historyRegionsBackQueue = stream.readHistoryQueue { readRegionsHistoryItem() }
         val historyRegionsCurrentValue = if (stream.readBoolean()) {

@@ -29,6 +29,7 @@ data class Preferences(
         var rememberWindowState: Boolean = true,
         var projectDir: File = DEFAULT_PROJECTS_DIR,
         var tempDir: File = DEFAULT_TEMP_DIR,
+        var isFirstRun: Boolean = true,
         var windowState: WindowState? = null,
         var cachedGraph256: Future<Graph>? = null,
         var cachedGraph512: Future<Graph>? = null,

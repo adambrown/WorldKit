@@ -24,11 +24,7 @@ import java.util.*
 import java.util.concurrent.Future
 import javax.imageio.ImageIO
 
-object Biomes {
-
-    fun init() {
-
-    }
+class Biomes {
 
     interface Shader {
 
@@ -208,13 +204,7 @@ object Biomes {
             val startingHeightShader: Shader,
             val soilMobilityShader: Shader? = null)
 
-    private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): Future<TextureId> {
-        return executor.call {
-            loadTextureSync(name, noiseBuilder, width)
-        }
-    }
-
-    private fun loadTextureSync(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): TextureId {
+    private fun loadTexture(name: String, noiseBuilder: (Int, ShortBuffer) -> Any, width: Int): TextureId {
         val data = writeNoiseTextureIfNotExists(name, noiseBuilder, width)
         return buildTextureRedShort(data, width, GL_LINEAR, GL_LINEAR)
     }
@@ -227,12 +217,12 @@ object Biomes {
             val data = BufferUtils.createByteBuffer(size * 2).order(ByteOrder.nativeOrder())
             val shortData = data.asShortBuffer()
             noiseBuilder(width, shortData)
-            val output = BufferedImage(width, width, BufferedImage.TYPE_USHORT_GRAY)
-            val raster = output.raster
-            for (i in 0..size - 1) {
-                raster.setSample(i % raster.width, i / raster.width, 0, shortData[i].toInt() and 0xFFFF)
-            }
-            ImageIO.write(output, "png", File(CACHE_DIR, "$name.png"))
+//            val output = BufferedImage(width, width, BufferedImage.TYPE_USHORT_GRAY)
+//            val raster = output.raster
+//            for (i in 0..size - 1) {
+//                raster.setSample(i % raster.width, i / raster.width, 0, shortData[i].toInt() and 0xFFFF)
+//            }
+//            ImageIO.write(output, "png", File(CACHE_DIR, "$name.png"))
             file.outputStream().channel.use {
                 var written = 0
                 while (written < size2) {
@@ -470,13 +460,11 @@ object Biomes {
         }
     }
 
-    private val basicNoiseTextureFuture = loadTexture("basic-noise", basicNoise, 2048)
-    private val rollingHillsNoiseTextureFuture = loadTexture("rolling-hills-noise", rollingHillsNoise, 2048)
-    private val foothillsNoiseTextureFuture = loadTexture("foothills-noise", foothillsNoise, 2048)
-    private val mountainsNoiseTextureFuture = loadTexture("mountains-noise", mountainsNoise, 2048)
-    private val plainsNoiseTextureFuture = loadTexture("plains-noise", plainsNoise, 2048)
-
-    val basicNoiseTexture by lazy { basicNoiseTextureFuture.value }
+    private val basicNoiseTexture = loadTexture("basic-noise", basicNoise, 1024)
+    private val rollingHillsNoiseTexture = loadTexture("rolling-hills-noise", rollingHillsNoise, 1024)
+    private val foothillsNoiseTexture = loadTexture("foothills-noise", foothillsNoise, 1024)
+    private val mountainsNoiseTexture = loadTexture("mountains-noise", mountainsNoise, 1024)
+    private val plainsNoiseTexture = loadTexture("plains-noise", plainsNoise, 1024)
 
     private val coastalMountainsElevationShader = object : Shader {
 
@@ -604,7 +592,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.basicNoiseTexture.id)
         }
     }
 
@@ -625,8 +613,6 @@ object Biomes {
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.4f,
                     soilMobilityMultiplier = 1.8f))
-
-    val rollingHillsNoiseTexture by lazy { rollingHillsNoiseTextureFuture.value }
 
     private val rollingHillsElevationShader = object : Shader {
 
@@ -684,7 +670,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, rollingHillsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.rollingHillsNoiseTexture.id)
         }
     }
 
@@ -744,7 +730,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, rollingHillsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.rollingHillsNoiseTexture.id)
         }
     }
 
@@ -765,8 +751,6 @@ object Biomes {
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.4f,
                     soilMobilityMultiplier = 2.5f))
-
-    val foothillsNoiseTexture by lazy { foothillsNoiseTextureFuture.value }
 
     private val foothillsElevationShader = object : Shader {
 
@@ -824,7 +808,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, foothillsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.foothillsNoiseTexture.id)
         }
     }
 
@@ -884,7 +868,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, foothillsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.foothillsNoiseTexture.id)
         }
     }
 
@@ -905,8 +889,6 @@ object Biomes {
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.25f,
                     soilMobilityMultiplier = 2.0f))
-
-    val mountainsNoiseTexture by lazy { mountainsNoiseTextureFuture.value }
 
     private val mountainsElevationShader = object : Shader {
 
@@ -964,7 +946,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.mountainsNoiseTexture.id)
         }
     }
 
@@ -1024,7 +1006,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.mountainsNoiseTexture.id)
         }
     }
 
@@ -1045,8 +1027,6 @@ object Biomes {
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.2f,
                     soilMobilityMultiplier = 1.0f))
-
-    val plainsNoiseTexture by lazy { plainsNoiseTextureFuture.value }
 
     private val plainsElevationShader = object : Shader {
 
@@ -1104,7 +1084,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, plainsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.plainsNoiseTexture.id)
         }
     }
 
@@ -1164,7 +1144,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, plainsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.plainsNoiseTexture.id)
         }
     }
 
@@ -1294,7 +1274,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 3)
             glActiveTexture(GL_TEXTURE3)
-            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.basicNoiseTexture.id)
         }
     }
 
@@ -1418,7 +1398,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, coastBorderMask.id)
             glUniform1i(noiseTexture1Uniform.location, 2)
             glActiveTexture(GL_TEXTURE2)
-            glBindTexture(GL_TEXTURE_2D, basicNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.basicNoiseTexture.id)
         }
     }
 
@@ -1680,7 +1660,7 @@ object Biomes {
             glBindTexture(GL_TEXTURE_2D, landMask.id)
             glUniform1i(noiseTexture1Uniform.location, 2)
             glActiveTexture(GL_TEXTURE2)
-            glBindTexture(GL_TEXTURE_2D, mountainsNoiseTexture.id)
+            glBindTexture(GL_TEXTURE_2D, this@Biomes.mountainsNoiseTexture.id)
         }
     }
 

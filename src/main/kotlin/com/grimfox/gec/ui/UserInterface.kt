@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.grimfox.gec.WindowState
-import com.grimfox.gec.executor
-import com.grimfox.gec.saveRecentProjects
-import com.grimfox.gec.saveWindowState
+import com.grimfox.gec.*
 import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
@@ -49,7 +46,7 @@ private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsSc
 
 fun layout(block: UiLayout.(UserInterface) -> Unit) = block
 
-fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, afterShow: UserInterface.() -> Unit = {}, beforeDraw: UserInterface.() -> Unit = {}) {
+fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? = null, afterShow: UserInterface.() -> Unit = {}, afterLoad: UserInterface.() -> Unit = {}, beforeDraw: UserInterface.() -> Unit = {}) {
     val ui = UserInterfaceInternal(createWindow(windowState))
     try {
         ui.layout.layoutBlock(ui)
@@ -64,8 +61,11 @@ fun ui(layoutBlock: UiLayout.(UserInterface) -> Unit, windowState: WindowState? 
         }
         ui.show()
         ui.afterShow()
-        TextureBuilder.init(ui.nvg)
-        executor.call { Biomes.init() }
+        TextureBuilder.init(ui.nvg, Thread.currentThread())
+        executor.call {
+            BIOME_TEMPLATES_REF.value = Biomes()
+            ui.afterLoad()
+        }
         var lastDraw = System.nanoTime()
         val renderBlock = { internalWork: () -> Unit ->
             glClearColor(ui.layout.background.r, ui.layout.background.g, ui.layout.background.b, 1.0f)

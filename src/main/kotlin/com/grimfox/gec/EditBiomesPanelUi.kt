@@ -60,7 +60,7 @@ fun Block.editBiomesPanel(
                             syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
-                            biomesBuilder.build(historyItem.parameters, true)
+                            biomesBuilder.build(historyItem.parameters, BIOME_TEMPLATES_REF.value!!, true)
                             historyBiomesCurrent.value = historyItem.copy()
                         }
                     }
@@ -203,7 +203,7 @@ fun Block.editBiomesPanel(
                     brushListener.value = null
                     brushOn.value = false
                     val parameters = extractCurrentParameters()
-                    biomesBuilder.build(parameters, true)
+                    biomesBuilder.build(parameters, BIOME_TEMPLATES_REF.value!!, true)
                     val currentGraph = currentState.biomeGraph.value
                     val currentMask = currentState.biomeMask.value
                     if (currentGraph != null && currentMask != null) {
@@ -217,7 +217,7 @@ fun Block.editBiomesPanel(
                 editToggleSet.suspend {
                     generationLock.doWithLock {
                         val parameters = extractCurrentParameters()
-                        biomesBuilder.build(parameters)
+                        biomesBuilder.build(parameters, BIOME_TEMPLATES_REF.value!!)
                         val currentGraph = currentState.biomeGraph.value
                         val currentMask = currentState.biomeMask.value
                         if (currentGraph != null && currentMask != null) {
@@ -238,7 +238,7 @@ fun Block.editBiomesPanel(
                             biomesSeed.value = randomSeed
                         }
                         val parameters = extractCurrentParameters()
-                        biomesBuilder.build(parameters)
+                        biomesBuilder.build(parameters, BIOME_TEMPLATES_REF.value!!)
                         val currentGraph = currentState.biomeGraph.value
                         val currentMask = currentState.biomeMask.value
                         if (currentGraph != null && currentMask != null) {
@@ -260,7 +260,7 @@ fun Block.editBiomesPanel(
                             syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
-                            biomesBuilder.build(historyItem.parameters, true)
+                            biomesBuilder.build(historyItem.parameters, BIOME_TEMPLATES_REF.value!!,true)
                             historyBiomesCurrent.value = historyItem.copy()
                         }
                     }
@@ -279,7 +279,7 @@ fun Block.editBiomesPanel(
                             syncBiomeParameterValues(historyItem.parameters)
                             currentState.biomeGraph.value = Graphs.generateGraph(BIOME_GRAPH_WIDTH, historyItem.graphSeed, 0.8)
                             currentState.biomeMask.value = historyItem.mask
-                            biomesBuilder.build(historyItem.parameters, true)
+                            biomesBuilder.build(historyItem.parameters, BIOME_TEMPLATES_REF.value!!, true)
                             historyBiomesCurrent.value = historyItem.copy()
                         }
                     }

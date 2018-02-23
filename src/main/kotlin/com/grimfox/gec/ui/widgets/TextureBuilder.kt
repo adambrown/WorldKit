@@ -23,9 +23,11 @@ import java.util.concurrent.CountDownLatch
 object TextureBuilder {
 
     private var nvg: Long = -1
+    private var executionThread: Thread? = null
 
-    fun init(nvg: Long) {
+    fun init(nvg: Long, thread: Thread) {
         this.nvg = nvg
+        this.executionThread = thread
     }
 
     private val deadTextureQueue = ConcurrentLinkedQueue<Int>()
@@ -106,17 +108,21 @@ object TextureBuilder {
     }
 
     private fun <T : Any> doDeferredOpenglWork(collector: ValueCollector<T>): T {
-        val latch = CountDownLatch(1)
-        val throwableReference = mRef(null as Throwable?)
-        workQueue.add(Triple(latch, collector, throwableReference))
-        while (latch.count > 0) {
-            latch.await()
+        return if (Thread.currentThread() == executionThread) {
+            collector.retriever()
+        } else {
+            val latch = CountDownLatch(1)
+            val throwableReference = mRef(null as Throwable?)
+            workQueue.add(Triple(latch, collector, throwableReference))
+            while (latch.count > 0) {
+                latch.await()
+            }
+            val throwable = throwableReference.value
+            if (throwable != null) {
+                throw throwable
+            }
+            collector.value
         }
-        val throwable = throwableReference.value
-        if (throwable != null) {
-            throw throwable
-        }
-        return collector.value
     }
 
     fun buildShaderProgram(builder: () -> Int): ShaderProgramId {

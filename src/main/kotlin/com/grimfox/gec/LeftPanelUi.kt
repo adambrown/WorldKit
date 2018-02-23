@@ -226,7 +226,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                                         customElevationPowerMap = currentState.customElevationPowerMap.value,
                                                         customStartingHeightsMap = currentState.customStartingHeightsMap.value,
                                                         customSoilMobilityMap = currentState.customSoilMobilityMap.value,
-                                                        canceled = canceled)
+                                                        canceled = canceled,
+                                                        biomeTemplates = BIOME_TEMPLATES_REF.value!!)
                                                 meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
                                                 currentState.heightMapTexture.value = heightMapTexId
                                                 currentState.riverMapTexture.value = riverMapTexId

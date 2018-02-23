@@ -405,7 +405,7 @@ fun openProject(file: File,
     ui.ignoreInput = true
     dialogLayer.isVisible = true
     try {
-        val project = importProjectFile(file)
+        val project = importProjectFile(file, BIOME_TEMPLATES_REF.value!!)
         if (project != null) {
             project.file = file
         }
@@ -423,15 +423,19 @@ fun openProject(dialogLayer: Block,
                 preferences: Preferences,
                 ui: UserInterface): Project? {
     return selectFile(dialogLayer, true, ui, preferences.projectDir, "wkp") { file ->
-        if (file == null) {
-            null
-        } else {
-            val project = importProjectFile(file)
-            if (project != null) {
-                project.file = file
-            }
-            project
+        openProject(file)
+    }
+}
+
+fun openProject(file: File?): Project? {
+    return if (file == null) {
+        null
+    } else {
+        val project = importProjectFile(file, BIOME_TEMPLATES_REF.value!!)
+        if (project != null) {
+            project.file = file
         }
+        project
     }
 }
 

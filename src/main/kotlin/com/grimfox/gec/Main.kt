@@ -14,6 +14,7 @@ import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.system.MemoryUtil
+import java.io.File
 import java.util.*
 
 object Main {
@@ -21,7 +22,7 @@ object Main {
     @Volatile private var uiIsShown: Boolean = false
 
     @JvmStatic fun main(vararg args: String) {
-        val uiThread = Thread({ runUi() })
+        val uiThread = Thread({ runUi(*args) })
         uiThread.isDaemon = false
         uiThread.start()
         for (i in 1..2) {
@@ -36,10 +37,22 @@ object Main {
         }
     }
 
-    private fun runUi() {
+    private fun runUi(vararg args: String) {
         val preferences = preferences
 
         val titleText = DynamicTextReference("WorldKit - No Project", 67, TEXT_STYLE_NORMAL)
+
+        val errorHandler: ErrorDialog = object : ErrorDialog {
+
+            override fun displayErrorMessage(message: String?) {
+                errorMessageReference.value = message ?: "An unknown error occurred."
+                dialogLayer.isVisible = true
+                errorMessageDialog.isVisible = true
+                dialogCallback.value = {
+                    dialogCallback.value = noop
+                }
+            }
+        }
 
         val uiLayout = layout { ui ->
             val uiLayout = this
@@ -136,17 +149,6 @@ object Main {
                     }
                 }
                 rootRef.value = root
-                val errorHandler: ErrorDialog = object : ErrorDialog {
-
-                    override fun displayErrorMessage(message: String?) {
-                        errorMessageReference.value = message ?: "An unknown error occurred."
-                        dialogLayer.isVisible = true
-                        errorMessageDialog.isVisible = true
-                        dialogCallback.value = {
-                            dialogCallback.value = noop
-                        }
-                    }
-                }
                 dialogLayer {
                     overwriteWarningDialog = dialog(400.0f, 160.0f, overwriteWarningText, BLOCK_GLYPH_WARNING(60.0f)) {
                         button(text("Yes"), DIALOG_BUTTON_STYLE) {
@@ -203,6 +205,15 @@ object Main {
                         isVisible = false
                     }
                 }
+                if (preferences.isFirstRun) {
+                    generatingPrimaryMessage.reference.value = text("Performing one-time setup tasks... 0:00", TEXT_STYLE_LARGE_MESSAGE)
+                    generatingSecondaryMessage.reference.value = text("This may take a few minutes.", TEXT_STYLE_SMALL_MESSAGE)
+                } else {
+                    generatingPrimaryMessage.reference.value = text("Loading... 0:00", TEXT_STYLE_LARGE_MESSAGE)
+                    generatingSecondaryMessage.reference.value = text("  ", TEXT_STYLE_SMALL_MESSAGE)
+                }
+                generatingMessageBlock.isVisible = true
+                dialogLayer.isVisible = true
                 currentProject.addListener { _, new ->
                     doOnMainThread {
                         updateTitle(titleText, new)
@@ -278,6 +289,7 @@ object Main {
                                 }
                                 menuItem("Restore default preferences") {
                                     val defaults = Preferences()
+                                    defaults.isFirstRun = false
                                     preferences.rememberWindowState = defaults.rememberWindowState
                                     preferences.projectDir = defaults.projectDir
                                     preferences.tempDir = defaults.tempDir
@@ -554,8 +566,41 @@ object Main {
 //            (0..3).map { indexColors[i + it] }.forEach { it -> print("color(${it.rInt}, ${it.gInt}, ${it.bInt}), ") }
 //            println()
 //        }
-
-        ui(uiLayout, preferences.windowState, afterShow = { uiIsShown = true }) {
+        val loadTimer = Timer(true)
+        ui(uiLayout, preferences.windowState, afterShow = {
+            val ui = this
+            val message = if (preferences.isFirstRun) {
+                "Performing one-time setup tasks..."
+            } else {
+                "Loading..."
+            }
+            val startTime = System.currentTimeMillis()
+            loadTimer.schedule(object: TimerTask() {
+                override fun run() {
+                    val currentTime = System.currentTimeMillis()
+                    val elapsedTime = (currentTime - startTime)
+                    val seconds = String.format("%02d", (elapsedTime / 1000).toInt() % 60)
+                    val minutes = (elapsedTime / (1000 * 60) % 60).toInt()
+                    generatingPrimaryMessage.reference.value = text("$message $minutes:$seconds", TEXT_STYLE_LARGE_MESSAGE)
+                    ui.layout.root.movedOrResized = true
+                }
+            }, 1000, 1000)
+            uiIsShown = true
+        }, afterLoad = {
+            doOnMainThread {
+                if (args.isNotEmpty()) {
+                    val projectFile = File(args[0])
+                    openProject(errorHandler, projectFile)
+                }
+                if (preferences.isFirstRun) {
+                    preferences.isFirstRun = false
+                    savePreferences(preferences)
+                }
+                loadTimer.cancel()
+                generatingMessageBlock.isVisible = false
+                dialogLayer.isVisible = false
+            }
+        }) {
             wasResizing = if (isResizing) {
                 true
             } else {

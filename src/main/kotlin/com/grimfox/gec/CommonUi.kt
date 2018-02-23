@@ -13,12 +13,12 @@ import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import java.awt.Desktop
-import java.io.IOException
+import java.io.*
 import java.net.URI
 import java.net.URISyntaxException
 import java.net.URL
 import java.util.*
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.*
 
 val EXPERIMENTAL_BUILD = false
 
@@ -81,6 +81,8 @@ val REGION_COLOR_INTS = Array(REGION_COLORS.size) { i ->
     colorToInt(i)
 }.toList()
 
+val BIOME_TEMPLATES_REF = ref<Biomes?>(null)
+
 val BIOME_NAMES = linkedMapOf(
         "Mountains" to 0,
         "Coastal mountains" to 1,
@@ -96,17 +98,17 @@ val BIOME_NAMES_AS_TEXT = BIOME_NAMES.keys.map { text(it, TEXT_STYLE_BUTTON) }
 
 val BIOME_ORDINALS = linkedMapOf(*BIOME_NAMES.map { it.value  to it.key }.toTypedArray())
 
-fun ordinalToBiome(it: Int): Biome {
+fun Biomes.ordinalToBiome(it: Int): Biome {
     return when (it) {
-        0 -> Biomes.MOUNTAINS_BIOME
-        1 -> Biomes.COASTAL_MOUNTAINS_BIOME
-        2 -> Biomes.FOOTHILLS_BIOME
-        3 -> Biomes.ROLLING_HILLS_BIOME
-        4 -> Biomes.PLAINS_BIOME
-        5 -> Biomes.PLATEAU_BIOME
-        6 -> Biomes.SHARP_PLATEAU_BIOME
-        7 -> Biomes.CUSTOM_BIOME
-        else -> Biomes.MOUNTAINS_BIOME
+        0 -> MOUNTAINS_BIOME
+        1 -> COASTAL_MOUNTAINS_BIOME
+        2 -> FOOTHILLS_BIOME
+        3 -> ROLLING_HILLS_BIOME
+        4 -> PLAINS_BIOME
+        5 -> PLATEAU_BIOME
+        6 -> SHARP_PLATEAU_BIOME
+        7 -> CUSTOM_BIOME
+        else -> MOUNTAINS_BIOME
     }
 }
 
@@ -261,19 +263,21 @@ class MainThreadTask<T>(val latch: CountDownLatch? = null, val work: () -> T) {
     }
 }
 
-private var mainThreadTasks = Collections.synchronizedList(ArrayList<MainThreadTask<*>>())
+private val mainThreadTasksLock = Object()
+private var mainThreadTasks = ArrayList<MainThreadTask<*>>()
 
 fun performMainThreadTasks() {
-    synchronized(mainThreadTasks) {
-        mainThreadTasks.forEach(MainThreadTask<*>::perform)
-        mainThreadTasks.clear()
+    synchronized(mainThreadTasksLock) {
+        val copy = mainThreadTasks
+        mainThreadTasks = ArrayList()
+        copy.forEach(MainThreadTask<*>::perform)
     }
 }
 
 fun <T> doOnMainThreadAndWait(callable: () -> T): T {
     val latch = CountDownLatch(1)
     val task = MainThreadTask(latch, callable)
-    synchronized(mainThreadTasks) {
+    synchronized(mainThreadTasksLock) {
         mainThreadTasks.add(task)
     }
     while (latch.count > 0) {
@@ -288,7 +292,7 @@ fun <T> doOnMainThreadAndWait(callable: () -> T): T {
 }
 
 fun doOnMainThread(callable: () -> Unit) {
-    synchronized(mainThreadTasks) {
+    synchronized(mainThreadTasksLock) {
         mainThreadTasks.add(MainThreadTask(null, callable))
     }
 }
@@ -318,6 +322,34 @@ fun openProject(ui: UserInterface, errorHandler: ErrorDialog) {
             if (openedProject != null) {
                 currentProject.value = openedProject
                 afterProjectOpen()
+            }
+        } catch (e: JsonParseException) {
+            errorHandler.displayErrorMessage("The selected file is not a valid project.")
+        } catch (e: IOException) {
+            errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
+        } catch (e: Exception) {
+            errorHandler.displayErrorMessage("Encountered an unexpected error while trying to open project.")
+        }
+    }
+    if (currentProject.value != null && currentProjectHasModifications.value) {
+        dialogLayer.isVisible = true
+        overwriteWarningReference.value = "Do you want to save the current project before opening a different one?"
+        overwriteWarningDialog.isVisible = true
+        dialogCallback.value = openFun
+    } else {
+        openFun()
+    }
+}
+
+fun openProject(errorHandler: ErrorDialog, projectFile: File?) {
+    val openFun = {
+        try {
+            val openedProject = openProject(projectFile)
+            if (openedProject != null) {
+                currentProject.value = openedProject
+                afterProjectOpen()
+            } else {
+                errorHandler.displayErrorMessage("The selected file \"${projectFile?.canonicalPath}\" could not be opened.")
             }
         } catch (e: JsonParseException) {
             errorHandler.displayErrorMessage("The selected file is not a valid project.")

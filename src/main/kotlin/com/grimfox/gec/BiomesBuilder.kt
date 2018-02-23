@@ -14,7 +14,7 @@ class BiomesBuilder(
         val useBiomeFile: ObservableMutableReference<Boolean>,
         val displayMode: ObservableMutableReference<DisplayMode>) {
 
-    fun build(parameters: BiomeParameters, refreshOnly: Boolean = false) {
+    fun build(parameters: BiomeParameters, biomeTemplates: Biomes, refreshOnly: Boolean = false) {
         val currentBiomeGraph = currentState.biomeGraph.value
         val currentBiomeMask = currentState.biomeMask.value
         val (biomeGraph, biomeMask) = if (refreshOnly && currentBiomeGraph != null && currentBiomeMask != null) {
@@ -38,7 +38,7 @@ class BiomesBuilder(
         currentState.biomeParameters.value = parameters
         currentState.biomeGraph.value = biomeGraph
         currentState.biomeMask.value = biomeMask
-        currentState.biomes.value = parameters.biomes.map { ordinalToBiome(it) }
+        currentState.biomes.value = parameters.biomes.map { biomeTemplates.ordinalToBiome(it) }
         currentState.heightMapTexture.value = null
         currentState.riverMapTexture.value = null
         val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
