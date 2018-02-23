@@ -29,6 +29,8 @@ object Main {
             }
             stringBuilder.append("\n")
             LOG.info(stringBuilder.toString())
+        } else {
+            LOG.info("No command line args")
         }
         val uiThread = Thread({ runUi(*args) })
         uiThread.isDaemon = false
