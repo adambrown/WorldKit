@@ -20,6 +20,7 @@ import java.net.URL
 import java.util.*
 import java.util.concurrent.*
 
+val DEMO_BUILD = true
 val EXPERIMENTAL_BUILD = false
 
 val REGION_GRAPH_WIDTH = 128
@@ -95,22 +96,6 @@ val BIOME_NAMES = linkedMapOf(
 )
 
 val BIOME_NAMES_AS_TEXT = BIOME_NAMES.keys.map { text(it, TEXT_STYLE_BUTTON) }
-
-val BIOME_ORDINALS = linkedMapOf(*BIOME_NAMES.map { it.value  to it.key }.toTypedArray())
-
-fun Biomes.ordinalToBiome(it: Int): Biome {
-    return when (it) {
-        0 -> MOUNTAINS_BIOME
-        1 -> COASTAL_MOUNTAINS_BIOME
-        2 -> FOOTHILLS_BIOME
-        3 -> ROLLING_HILLS_BIOME
-        4 -> PLAINS_BIOME
-        5 -> PLATEAU_BIOME
-        6 -> SHARP_PLATEAU_BIOME
-        7 -> CUSTOM_BIOME
-        else -> MOUNTAINS_BIOME
-    }
-}
 
 val RANDOM = Random()
 val DEFAULT_HEIGHT_SCALE = 50.0f
@@ -193,6 +178,7 @@ var panelLayer = NO_BLOCK
 var menuLayer = NO_BLOCK
 var dropdownLayer = NO_BLOCK
 var dialogLayer = NO_BLOCK
+var dialogDropdownLayer = NO_BLOCK
 var mouseOverlayLayer = NO_BLOCK
 var brushShapeOuter = NO_BLOCK
 var brushShapeInner = NO_BLOCK

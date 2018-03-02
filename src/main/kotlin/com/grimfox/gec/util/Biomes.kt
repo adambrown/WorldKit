@@ -45,6 +45,20 @@ class Biomes {
                 customSoilMobilityMap: TextureId)
     }
 
+    fun ordinalToBiome(it: Int): Biome {
+        return when (it) {
+            0 -> MOUNTAINS_BIOME
+            1 -> COASTAL_MOUNTAINS_BIOME
+            2 -> FOOTHILLS_BIOME
+            3 -> ROLLING_HILLS_BIOME
+            4 -> PLAINS_BIOME
+            5 -> PLATEAU_BIOME
+            6 -> SHARP_PLATEAU_BIOME
+            7 -> CUSTOM_BIOME
+            else -> MOUNTAINS_BIOME
+        }
+    }
+
     val DEGREES_TO_SLOPES = degreesToSlopes()
 
     private val TALUS_ANGLES_SHARP_PLATEAU = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)

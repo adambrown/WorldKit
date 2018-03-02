@@ -14,7 +14,7 @@ private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useBiomeFile = ref(false)
 private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val biomes = ref(emptyList<Int>())
-private val selectedBiomes = Array(64) { ref(it % BIOME_NAMES.size) }.toList()
+private val selectedBiomes = Array(64) { ref(if (it >= BIOME_NAMES.size) 0  else it) }.toList()
 
 fun syncBiomeParameterValues(parameters: BuildContinent.BiomeParameters) {
     val randomSeed = parameters.biomesSeed

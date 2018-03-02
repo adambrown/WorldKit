@@ -34,7 +34,7 @@ object WaterFlows {
     private val SIMPLEX_SCALE = 96.0f
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
-    class WaterNode(val id: Int,
+    class WaterNode constructor(val id: Int,
                     var isExternal: Boolean,
                     val area: Float,
                     val adjacents: ArrayList<Pair<WaterNode, Float>>,
@@ -747,7 +747,7 @@ object WaterFlows {
                     val height = if (isExternal) 0.0f else if (isPinned) 600.0f else heightMap[hIndex] * 600.0f
                     val eIndex = (Math.round(point.y * eWidthM1) * eWidth) + Math.round(point.x * eWidthM1)
                     val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, height, area, 0, soilMobility, isPinned)
+                    val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, height, area, 0, soilMobility, isPinned)
                     nodeIndex[landId] = node
                 }
             }

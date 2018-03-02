@@ -154,6 +154,9 @@ object Main {
                         isVisible = false
                         shape = FILL_GREY_OUT
                     }
+                    dialogDropdownLayer = block {
+                        isFallThrough = true
+                    }
                     mouseOverlayLayer = block {
                         isFallThrough = true
                     }
@@ -314,21 +317,17 @@ object Main {
                                     openHelp(errorHandler)
                                 }
                                 menuDivider()
+                                menuItem("Online help") {
+                                    openWebPage("https://www.intellirithmic.com/worldkit/help", errorHandler)
+                                }
                                 menuItem("Getting started") {
-                                    openWebPage("http://www.google.com", errorHandler)
+                                    openWebPage("https://www.intellirithmic.com/worldkit/help/getting-started.html", errorHandler)
                                 }
                                 menuItem("Tutorials") {
-                                    openWebPage("http://www.google.com", errorHandler)
+                                    openWebPage("https://www.intellirithmic.com/worldkit/help/tutorials.html", errorHandler)
                                 }
-                                menuDivider()
                                 menuItem("Website") {
-                                    openWebPage("http://www.google.com", errorHandler)
-                                }
-                                menuItem("Wiki") {
-                                    openWebPage("http://www.google.com", errorHandler)
-                                }
-                                menuItem("Forum") {
-                                    openWebPage("http://www.google.com", errorHandler)
+                                    openWebPage("https://www.intellirithmic.com/worldkit", errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("Install offline help") {
