@@ -13,10 +13,6 @@ open class Point3F(x: Float, y: Float, val z: Float): Point2F(x, y) {
         return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ)
     }
 
-    fun distance(other: Point3F): Float {
-        return Math.sqrt(distance2(other).toDouble()).toFloat()
-    }
-
     override operator fun times(s: Float) = Point3F(x * s, y * s, z * s)
 
     override fun equals(other: Any?): Boolean {
@@ -34,10 +30,6 @@ open class Point3F(x: Float, y: Float, val z: Float): Point2F(x, y) {
         result = 31 * result + y.hashCode()
         result = 31 * result + z.hashCode()
         return result
-    }
-
-    fun epsilonEquals(other: Point3F, epsilon: Float = 0.000001f): Boolean {
-        return Math.abs(x - other.x) < epsilon && Math.abs(y - other.y) < epsilon && Math.abs(z - other.z) < epsilon
     }
 
     override fun toString(): String {

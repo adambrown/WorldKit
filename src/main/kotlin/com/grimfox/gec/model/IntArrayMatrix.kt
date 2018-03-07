@@ -4,7 +4,6 @@ import com.grimfox.gec.util.Utils.pow
 
 class IntArrayMatrix(override val width: Int, init: ((Int) -> Int)? = null) : Matrix<Int> {
 
-    override val exponent: Int get() = throw UnsupportedOperationException()
     override val size = width.toLong().pow(2)
 
     val array = if (init != null) IntArray(size.toInt(), init) else IntArray(size.toInt())

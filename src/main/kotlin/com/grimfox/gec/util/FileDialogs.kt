@@ -1,9 +1,9 @@
 package com.grimfox.gec.util
 
 import com.grimfox.gec.ui.FileDialogs
-import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
+import com.grimfox.logging.LOG
 import java.io.File
 
 object FileDialogs {

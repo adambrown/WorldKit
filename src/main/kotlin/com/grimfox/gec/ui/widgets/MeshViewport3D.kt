@@ -5,6 +5,7 @@ import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
+import com.grimfox.logging.LOG
 import org.joml.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW
@@ -1014,7 +1015,7 @@ class MeshViewport3D(
                     throw RuntimeException("error generating vao")
                 }
             } catch (t: Throwable) {
-                LOG.error(t.message, t)
+                LOG.error(t)
                 throw t
             }
         }
@@ -1226,7 +1227,7 @@ class MeshViewport3D(
                     throw RuntimeException("error generating vao")
                 }
             } catch (t: Throwable) {
-                LOG.error(t.message, t)
+                LOG.error(t)
                 throw t
             }
         }

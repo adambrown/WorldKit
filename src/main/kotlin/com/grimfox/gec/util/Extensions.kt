@@ -1,5 +1,6 @@
 package com.grimfox.gec.util
 
+import kotlinx.coroutines.experimental.*
 import java.io.Serializable
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -99,3 +100,7 @@ data class Quintuple<out A, out B, out C, out D, out E>(
 }
 
 fun <T> Quintuple<T, T, T, T, T>.toList(): List<T> = listOf(first, second, third, fourth)
+
+fun <T> task(task: () -> T): Deferred<T> {
+    return async { task() }
+}

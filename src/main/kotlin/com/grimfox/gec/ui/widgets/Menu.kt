@@ -3,7 +3,6 @@ package com.grimfox.gec.ui.widgets
 import com.grimfox.gec.*
 import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.util.*
-import nl.komponents.kovenant.task
 import org.lwjgl.glfw.GLFW
 import java.util.*
 

@@ -1,11 +1,9 @@
 package com.grimfox.gec
 
-import com.fasterxml.jackson.core.JsonParseException
 import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.ObservableCollection.ModificationEvent
-import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.DropdownList
@@ -22,15 +20,11 @@ import com.grimfox.gec.util.FileDialogs.selectFile
 import com.grimfox.gec.util.ObservableMutableReference
 import com.grimfox.gec.util.MutableReference
 import com.grimfox.gec.util.ref
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import java.io.File
-import java.io.IOException
+import com.grimfox.logging.LOG
+import java.io.*
 import java.util.*
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
-
-private val log: Logger = LoggerFactory.getLogger(Project::class.java)
 
 class CurrentState(
         val regionParameters: ObservableMutableReference<RegionParameters?> = ref(null),
@@ -154,13 +148,33 @@ val currentProject = ref<Project?>(null).addListener { old, new ->
 }
 val doesActiveProjectExist = ref(false)
 
-private class RecentProjects(val recentProjects: List<String>)
+private class RecentProjects(val recentProjects: List<String>) {
+
+    companion object {
+
+        fun deserialize(input: DataInputStream): RecentProjects {
+            val recentCount = input.readInt()
+            val recentProjects = ArrayList<String>(recentCount)
+            for (i in 0 until recentCount) {
+                recentProjects.add(input.readUTF())
+            }
+            return RecentProjects(recentProjects)
+        }
+    }
+
+    fun serialize(output: DataOutputStream) {
+        output.writeInt(recentProjects.size)
+        recentProjects.forEach {
+            output.writeUTF(it)
+        }
+    }
+}
 
 fun loadRecentProjects(dialogLayer: Block, overwriteWarningReference: MutableReference<String>, overwriteWarningDialog: Block, dialogCallback: MutableReference<() -> Unit>, ui: UserInterface, errorHandler: ErrorDialog) {
     if (RECENT_PROJECTS_FILE.isFile && RECENT_PROJECTS_FILE.canRead()) {
-        RECENT_PROJECTS_FILE.inputStream().buffered().use {
-            JSON.readValue(it, RecentProjects::class.java)
-        }?.recentProjects?.map(::File)?.reversed()?.forEach {
+        DataInputStream(RECENT_PROJECTS_FILE.inputStream().buffered()).use {
+            RecentProjects.deserialize(it)
+        }.recentProjects.map(::File).reversed().forEach {
             addProjectToRecentProjects(it, dialogLayer, overwriteWarningReference, overwriteWarningDialog, dialogCallback, ui, errorHandler)
         }
     }
@@ -179,11 +193,11 @@ fun loadRecentAutosaves(dialogLayer: Block, overwriteWarningReference: MutableRe
 
 fun saveRecentProjects() {
     try {
-        RECENT_PROJECTS_FILE.outputStream().buffered().use {
-            JSON.writeValue(it, RecentProjects(recentProjects.map { it.first.canonicalPath }))
+        DataOutputStream(RECENT_PROJECTS_FILE.outputStream().buffered()).use {
+            RecentProjects(recentProjects.map { it.first.canonicalPath }).serialize(it)
         }
     } catch (e: Exception) {
-        log.error("Error writing recent projects file.")
+        LOG.error("Error writing recent projects file.")
     }
 }
 
@@ -214,8 +228,6 @@ fun addProjectToRecentProjects(file: File?, dialogLayer: Block, overwriteWarning
                         currentProject.value = openedProject
                         afterProjectOpen()
                     }
-                } catch (e: JsonParseException) {
-                    errorHandler.displayErrorMessage("The selected file is not a valid project.")
                 } catch (e: IOException) {
                     errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
                 } catch (e: Exception) {
@@ -275,8 +287,6 @@ fun addAutosaveToRecentAutosaves(file: File?, dialogLayer: Block, overwriteWarni
                         currentProject.value = openedProject
                         afterProjectOpen()
                     }
-                } catch (e: JsonParseException) {
-                    errorHandler.displayErrorMessage("The selected file is not a valid project.")
                 } catch (e: IOException) {
                     errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
                 } catch (e: Exception) {
@@ -411,7 +421,7 @@ fun openProject(file: File,
         }
         return project
     } catch (e: Exception) {
-        log.error("Unexpected error opening project.", e)
+        LOG.error("Unexpected error opening project.", e)
         throw e
     } finally {
         dialogLayer.isVisible = false

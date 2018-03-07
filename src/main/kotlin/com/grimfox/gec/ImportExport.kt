@@ -4,7 +4,6 @@ import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
@@ -316,22 +315,12 @@ private fun <T> DataInputStream.readHistoryQueue(deserializer: DataInputStream.(
 
 private fun DataOutputStream.writeRegionsHistoryItem(regions: RegionsHistoryItem) {
     writeInt(1)
-    val parameters = JSON.writeValueAsString(regions.parameters)
-    writeUTF(parameters)
-    writeLong(regions.graphSeed)
-    writeInt(regions.mask.width)
-    write(regions.mask.array)
+    regions.serialize(this)
 }
 
 private fun DataInputStream.readRegionsHistoryItem(): RegionsHistoryItem {
     readInt()
-    val parameters = JSON.readValue(readUTF(), BuildContinent.RegionParameters::class.java)
-    val graphSeed = readLong()
-    val maskWidth = readInt()
-    val maskBytes = ByteArray(maskWidth * maskWidth)
-    readFully(maskBytes)
-    val regionMask = ByteArrayMatrix(maskWidth, maskBytes)
-    return RegionsHistoryItem(parameters, graphSeed, regionMask)
+    return RegionsHistoryItem.deserialize(this)
 }
 
 private fun DataOutputStream.writeRegionSplines(splines: RegionSplines) {
@@ -388,22 +377,12 @@ private fun DataInputStream.readRegionSplines(): RegionSplines {
 
 private fun DataOutputStream.writeBiomesHistoryItem(biomes: BiomesHistoryItem) {
     writeInt(1)
-    val parameters = JSON.writeValueAsString(biomes.parameters)
-    writeUTF(parameters)
-    writeLong(biomes.graphSeed)
-    writeInt(biomes.mask.width)
-    write(biomes.mask.array)
+    biomes.serialize(this)
 }
 
 private fun DataInputStream.readBiomesHistoryItem(): BiomesHistoryItem {
     readInt()
-    val parameters = JSON.readValue(readUTF(), BuildContinent.BiomeParameters::class.java)
-    val graphSeed = readLong()
-    val maskWidth = readInt()
-    val maskBytes = ByteArray(maskWidth * maskWidth)
-    readFully(maskBytes)
-    val biomesMask = ByteArrayMatrix(maskWidth, maskBytes)
-    return BiomesHistoryItem(parameters, graphSeed, biomesMask)
+    return BiomesHistoryItem.deserialize(this)
 }
 
 private fun DataOutputStream.writeCoastEdges(coastEdges: List<Pair<List<LineSegment2F>, List<List<LineSegment2F>>>>) {

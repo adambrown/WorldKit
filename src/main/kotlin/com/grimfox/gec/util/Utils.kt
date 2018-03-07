@@ -1,9 +1,9 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.Main
+import com.grimfox.gec.MainUi
 import com.grimfox.gec.model.Graph
+import com.grimfox.logging.LOG
 import org.lwjgl.BufferUtils
-import org.slf4j.LoggerFactory
 import java.io.InputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -241,8 +241,6 @@ fun timer(message: String? = null, accumulator: AtomicLong? = null): StopWatch {
 
 object Utils {
 
-    val LOG = LoggerFactory.getLogger(Main::class.java)!!
-
     fun Int.pow(exponent: Int): Int {
         val value = BigInteger.valueOf(this.toLong()).pow(exponent)
         if (value > BigInteger.valueOf(Int.MAX_VALUE.toLong())) throw IllegalStateException("Value too large for int: $value")
@@ -258,9 +256,7 @@ object Utils {
     fun ByteBuffer.disposeDirect() {
         if (!isDirect) return
         var logFail = true
-        if (LOG.isDebugEnabled) {
-            LOG.debug("Disposing of direct buffer.")
-        }
+        LOG.debug("Disposing of direct buffer.")
         try {
             val cleaner = javaClass.getMethod("cleaner") ?: return
             cleaner.isAccessible = true
@@ -269,19 +265,13 @@ object Utils {
             clean.invoke(cleaner.invoke(this))
             logFail = false
         } catch(e: Exception) {
-            if (LOG.isDebugEnabled) {
-                LOG.debug("Failed to dispose of direct buffer.", e)
-            }
+            LOG.debug("Failed to dispose of direct buffer.", e)
             logFail = false
         } finally {
             if (logFail) {
-                if (LOG.isDebugEnabled) {
-                    LOG.debug("Failed to dispose of direct buffer.")
-                }
+                LOG.debug("Failed to dispose of direct buffer.")
             } else {
-                if (LOG.isDebugEnabled) {
-                    LOG.debug("Disposed of direct buffer.")
-                }
+                LOG.debug("Disposed of direct buffer.")
             }
         }
     }

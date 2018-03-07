@@ -1243,7 +1243,6 @@ object WaterFlows {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max()?.toFloat() ?: 0.0f
-        println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         for (y in (0 until width)) {
@@ -1263,7 +1262,6 @@ object WaterFlows {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it].toInt() and 0xFF }.max()?.toFloat() ?: 0.0f
-        println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         for (y in (0 until width)) {
@@ -1283,7 +1281,6 @@ object WaterFlows {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it].toInt() and 0xFFFF }.max()?.toFloat() ?: 0.0f
-        println("maxLandValue = $maxLandValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         for (y in (0 until width)) {
@@ -1303,9 +1300,7 @@ object WaterFlows {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
-        println("maxLandValue = $maxLandValue")
         val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
-        println("minWaterValue = $minWaterValue")
         val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         val waterFactor = (1.0f / minWaterValue) * waterLine

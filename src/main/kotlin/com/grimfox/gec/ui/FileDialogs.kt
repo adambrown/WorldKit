@@ -1,14 +1,12 @@
 package com.grimfox.gec.ui
 
+import com.grimfox.logging.LOG
 import org.lwjgl.util.nfd.NFDPathSet
-import org.slf4j.LoggerFactory
 import org.lwjgl.system.MemoryUtil.memFree
 import org.lwjgl.util.nfd.NativeFileDialog.*
 import org.lwjgl.system.MemoryUtil.*
 
 object FileDialogs {
-
-    private val LOG = LoggerFactory.getLogger(FileDialogs::class.java)
 
     private fun wrapError(r: Int): Int {
         if (r == NFD_ERROR) {

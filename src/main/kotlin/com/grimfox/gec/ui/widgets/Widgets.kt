@@ -9,7 +9,7 @@ import com.grimfox.gec.ui.widgets.Sizing.*
 import com.grimfox.gec.ui.widgets.VerticalAlignment.*
 import com.grimfox.gec.ui.widgets.VerticalTruncation.*
 import com.grimfox.gec.util.*
-import com.grimfox.gec.util.Utils.LOG
+import com.grimfox.logging.LOG
 import org.joml.Vector4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*

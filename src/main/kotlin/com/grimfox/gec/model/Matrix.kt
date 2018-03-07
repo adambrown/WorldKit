@@ -2,7 +2,6 @@ package com.grimfox.gec.model
 
 interface Matrix<T> {
 
-    val exponent: Int
     val width: Int
     val size: Long
 

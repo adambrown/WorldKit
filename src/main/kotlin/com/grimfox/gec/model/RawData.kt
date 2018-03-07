@@ -124,10 +124,6 @@ class RawData(private val bitsPerFragment: Int, fragmentCount: Long, channel: Fi
         }
     }
 
-    private fun printBinary(name: String, value: Int) {
-        println(name + " = " + String.format("%08d", Integer.parseInt(Integer.toBinaryString(value))))
-    }
-
     operator fun set(index: Long, value: Byte) {
         if (useFullBytes) {
             val chunkIndex = (index / fragmentsPerChunk).toInt()

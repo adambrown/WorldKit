@@ -1,13 +1,8 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertices
-import com.grimfox.gec.model.Matrix
-import com.grimfox.gec.model.geometry.LineSegment2F
-import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.model.geometry.Polygon2F
-import com.grimfox.gec.model.geometry.Vector2F
+import com.grimfox.gec.model.geometry.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.Coastline.applyMask
@@ -15,8 +10,9 @@ import com.grimfox.gec.util.Coastline.refineCoastline
 import com.grimfox.gec.util.Graphs.generateGraph
 import com.grimfox.gec.util.Regions.buildRegions
 import com.grimfox.gec.util.WaterFlows.generateWaterFlows
+import java.io.*
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.ExecutorService
 import kotlin.collections.ArrayList
 import kotlin.collections.LinkedHashSet
 
@@ -31,7 +27,38 @@ object BuildContinent {
             var protectedRadius: Float,
             var minRegionSize: Float,
             var largeIsland: Float,
-            var smallIsland: Float)
+            var smallIsland: Float) {
+
+        companion object {
+
+            fun deserialize(input: DataInputStream): RegionIterationParameters {
+                return RegionIterationParameters(
+                        stride = input.readInt(),
+                        landPercent = input.readFloat(),
+                        minPerturbation = input.readFloat(),
+                        maxIterations = input.readInt(),
+                        protectedInset = input.readFloat(),
+                        protectedRadius = input.readFloat(),
+                        minRegionSize = input.readFloat(),
+                        largeIsland = input.readFloat(),
+                        smallIsland = input.readFloat()
+
+                )
+            }
+        }
+
+        fun serialize(output: DataOutputStream) {
+            output.writeInt(stride)
+            output.writeFloat(landPercent)
+            output.writeFloat(minPerturbation)
+            output.writeInt(maxIterations)
+            output.writeFloat(protectedInset)
+            output.writeFloat(protectedRadius)
+            output.writeFloat(minRegionSize)
+            output.writeFloat(largeIsland)
+            output.writeFloat(smallIsland)
+        }
+    }
 
     data class RegionParameters(
             var regionsSeed: Long = System.currentTimeMillis(),
@@ -54,27 +81,104 @@ object BuildContinent {
 //                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
 //                    RegionIterationParameters(256, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
             ),
-            var currentIteration: Int = 0)
+            var currentIteration: Int = 0) {
+
+        companion object {
+
+            fun deserialize(input: DataInputStream): RegionParameters {
+                return RegionParameters(
+                        regionsSeed = input.readLong(),
+                        edgeDetailScale = input.readInt(),
+                        stride = input.readInt(),
+                        regionCount = input.readInt(),
+                        connectedness = input.readFloat(),
+                        regionSize = input.readFloat(),
+                        initialReduction = input.readInt(),
+                        regionPoints = input.readInt(),
+                        maxRegionTries = input.readInt(),
+                        maxIslandTries = input.readInt(),
+                        islandDesire = input.readInt(),
+                        parameters = deserializeParametersList(input)
+                )
+            }
+
+            private fun deserializeParametersList(input: DataInputStream): ArrayList<RegionIterationParameters> {
+                val parameterCount = input.readInt()
+                val parameters = ArrayList<RegionIterationParameters>(parameterCount)
+                for (i in 0 until parameterCount) {
+                    parameters.add(RegionIterationParameters.deserialize(input))
+                }
+                return parameters
+            }
+        }
+
+        fun serialize(output: DataOutputStream) {
+            output.writeLong(regionsSeed)
+            output.writeInt(edgeDetailScale)
+            output.writeInt(stride)
+            output.writeInt(regionCount)
+            output.writeFloat(connectedness)
+            output.writeFloat(regionSize)
+            output.writeInt(initialReduction)
+            output.writeInt(regionPoints)
+            output.writeInt(maxRegionTries)
+            output.writeInt(maxIslandTries)
+            output.writeInt(islandDesire)
+            serializeParametersList(output, parameters)
+        }
+
+        private fun serializeParametersList(output: DataOutputStream, parameters: ArrayList<RegionIterationParameters>) {
+            output.writeInt(parameters.size)
+            parameters.forEach {
+                it.serialize(output)
+            }
+        }
+    }
 
     data class BiomeParameters(
             var biomesSeed: Long = System.currentTimeMillis(),
             var biomesMapScale: Int = 4,
-            var biomes: List<Int> = arrayListOf(0))
+            var biomes: List<Int> = arrayListOf(0)) {
+
+        companion object {
+
+            fun deserialize(input: DataInputStream): BiomeParameters {
+                val biomesSeed = input.readLong()
+                val biomesMapScale = input.readInt()
+                val biomesCount = input.readInt()
+                val biomes = ArrayList<Int>(biomesCount)
+                for (i in 0 until biomesCount) {
+                    biomes.add(input.readInt())
+                }
+                return BiomeParameters(
+                        biomesSeed = biomesSeed,
+                        biomesMapScale = biomesMapScale,
+                        biomes = biomes)
+            }
+        }
+
+        fun serialize(output: DataOutputStream) {
+            output.writeLong(biomesSeed)
+            output.writeInt(biomesMapScale)
+            output.writeInt(biomes.size)
+            biomes.forEach {
+                output.writeInt(it)
+            }
+        }
+    }
 
     fun generateRegions(parameterSet: RegionParameters = RegionParameters(), executor: ExecutorService): Pair<Graph, ByteArrayMatrix> {
-        return timeIt("generated regions in") {
-            val random = Random(parameterSet.regionsSeed)
-            var (graph, regionMask) = buildRegions(parameterSet)
-            parameterSet.parameters.forEachIndexed { i, parameters ->
-                parameterSet.currentIteration = i
-                val localGraph = generateGraph(parameters.stride, random.nextLong(), 0.8)
-                val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
-                regionMask = mask
-                refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
-                graph = localGraph
-            }
-            Pair(graph, regionMask)
+        val random = Random(parameterSet.regionsSeed)
+        var (graph, regionMask) = buildRegions(parameterSet)
+        parameterSet.parameters.forEachIndexed { i, parameters ->
+            parameterSet.currentIteration = i
+            val localGraph = generateGraph(parameters.stride, random.nextLong(), 0.8)
+            val (mask, water, borderPoints) = applyMask(localGraph, graph, regionMask, executor)
+            regionMask = mask
+            refineCoastline(localGraph, random, regionMask, water, borderPoints, parameters)
+            graph = localGraph
         }
+        return Pair(graph, regionMask)
     }
 
     fun buildBiomeMaps(executor: ExecutorService, randomSeed: Long, inputGraph: Graph, biomeCount: Int, biomeScale: Int): Pair<Graph, ByteArrayMatrix> {
@@ -764,24 +868,22 @@ object BuildContinent {
             customSoilMobilityMap: TextureId,
             canceled: Reference<Boolean>,
             biomeTemplates: Biomes): Pair<TextureId, TextureId> {
-        return timeIt("generated water flow in") {
-            generateWaterFlows(
-                    random = Random(parameterSet.regionsSeed),
-                    regionSplines = regionSplines,
-                    biomeGraph = biomeGraph,
-                    biomeMask = biomeMask,
-                    flowGraphSmall = flowGraphSmall,
-                    flowGraphMedium = flowGraphMedium,
-                    flowGraphLarge = flowGraphLarge,
-                    executor = executor,
-                    outputWidth = 4096,
-                    mapScale = mapScale,
-                    biomes = biomes,
-                    customElevationPowerMap = customElevationPowerMap,
-                    customStartingHeightsMap = customStartingHeightsMap,
-                    customSoilMobilityMap = customSoilMobilityMap,
-                    canceled = canceled,
-                    biomeTemplates = biomeTemplates)
-        }
+        return generateWaterFlows(
+                random = Random(parameterSet.regionsSeed),
+                regionSplines = regionSplines,
+                biomeGraph = biomeGraph,
+                biomeMask = biomeMask,
+                flowGraphSmall = flowGraphSmall,
+                flowGraphMedium = flowGraphMedium,
+                flowGraphLarge = flowGraphLarge,
+                executor = executor,
+                outputWidth = 4096,
+                mapScale = mapScale,
+                biomes = biomes,
+                customElevationPowerMap = customElevationPowerMap,
+                customStartingHeightsMap = customStartingHeightsMap,
+                customSoilMobilityMap = customSoilMobilityMap,
+                canceled = canceled,
+                biomeTemplates = biomeTemplates)
     }
 }

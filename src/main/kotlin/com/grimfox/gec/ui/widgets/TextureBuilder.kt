@@ -1,9 +1,9 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.model.geometry.Point2F
-import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.util.*
+import com.grimfox.logging.LOG
 import org.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
@@ -822,7 +822,7 @@ object TextureBuilder {
                     throw RuntimeException("error generating vao")
                 }
             } catch (t: Throwable) {
-                LOG.error(t.message, t)
+                LOG.error(t)
                 throw t
             }
         }
@@ -884,7 +884,7 @@ object TextureBuilder {
                     throw RuntimeException("error generating vao")
                 }
             } catch (t: Throwable) {
-                LOG.error(t.message, t)
+                LOG.error(t)
                 throw t
             }
         }

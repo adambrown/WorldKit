@@ -1,9 +1,5 @@
 package com.grimfox.gec.ui
 
-import com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.grimfox.gec.*
 import com.grimfox.gec.ui.nvgproxy.NPColor
 import com.grimfox.gec.ui.widgets.*
@@ -27,8 +23,6 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryStack.stackPush
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.Platform
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import java.io.PrintStream
 import java.lang.Math.round
 import java.lang.Thread.sleep
@@ -37,9 +31,7 @@ import java.nio.IntBuffer
 import java.util.*
 
 import com.grimfox.gec.ui.nvgproxy.*
-
-val LOG: Logger = LoggerFactory.getLogger(UserInterface::class.java)
-val JSON: ObjectMapper = jacksonObjectMapper().setSerializationInclusion(ALWAYS).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+import com.grimfox.logging.LOG
 
 private val isMac = System.getProperty("os.name").toLowerCase().contains("mac")
 private val screenInfoFetcher = if (isMac) MacScreenInfoFetcher() else WindowsScreenInfoFetcher()
@@ -1373,7 +1365,6 @@ private fun getMonitorInfo(screens: Map<ScreenIdentity, ScreenSpec>): Pair<List<
             }
         }
         currentMonitor = monitors[0]
-        LOG.info(JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Pair(screens, monitors)))
     }
     return Pair(monitors, currentMonitor)
 }

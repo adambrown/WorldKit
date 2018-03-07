@@ -1,24 +1,19 @@
 package com.grimfox.gec
 
-import com.fasterxml.jackson.core.JsonParseException
-import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.HistoryQueue
+import com.grimfox.gec.model.*
 import com.grimfox.gec.ui.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
-import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.BuildContinent.BiomeParameters
 import com.grimfox.gec.util.BuildContinent.RegionParameters
 import com.grimfox.gec.util.BuildContinent.RegionSplines
+import com.grimfox.logging.LOG
 import java.awt.Desktop
 import java.io.*
-import java.net.URI
-import java.net.URISyntaxException
-import java.net.URL
+import java.net.*
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.CountDownLatch
 
 val DEMO_BUILD = true
 val EXPERIMENTAL_BUILD = false
@@ -122,12 +117,44 @@ val heightScaleFunctionInverse = { value: Float ->
 
 class RegionsHistoryItem(val parameters: RegionParameters, val graphSeed: Long, val mask: ByteArrayMatrix) {
 
+    companion object {
+
+        fun deserialize(input: DataInputStream): RegionsHistoryItem {
+            return RegionsHistoryItem(
+                    parameters = RegionParameters.deserialize(input),
+                    graphSeed = input.readLong(),
+                    mask = ByteArrayMatrix.deserialize(input))
+        }
+    }
+
+    fun serialize(output: DataOutputStream) {
+        parameters.serialize(output)
+        output.writeLong(graphSeed)
+        mask.serialize(output)
+    }
+
     fun copy(): RegionsHistoryItem {
         return RegionsHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
     }
 }
 
 class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, val mask: ByteArrayMatrix) {
+
+    companion object {
+
+        fun deserialize(input: DataInputStream): BiomesHistoryItem {
+            return BiomesHistoryItem(
+                    parameters = BiomeParameters.deserialize(input),
+                    graphSeed = input.readLong(),
+                    mask = ByteArrayMatrix.deserialize(input))
+        }
+    }
+
+    fun serialize(output: DataOutputStream) {
+        parameters.serialize(output)
+        output.writeLong(graphSeed)
+        mask.serialize(output)
+    }
 
     fun copy(): BiomesHistoryItem {
         return BiomesHistoryItem(parameters.copy(), graphSeed, ByteArrayMatrix(mask.width, mask.array.copyOf()))
@@ -309,8 +336,6 @@ fun openProject(ui: UserInterface, errorHandler: ErrorDialog) {
                 currentProject.value = openedProject
                 afterProjectOpen()
             }
-        } catch (e: JsonParseException) {
-            errorHandler.displayErrorMessage("The selected file is not a valid project.")
         } catch (e: IOException) {
             errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
         } catch (e: Exception) {
@@ -337,8 +362,6 @@ fun openProject(errorHandler: ErrorDialog, projectFile: File?) {
             } else {
                 errorHandler.displayErrorMessage("The selected file \"${projectFile?.canonicalPath}\" could not be opened.")
             }
-        } catch (e: JsonParseException) {
-            errorHandler.displayErrorMessage("The selected file is not a valid project.")
         } catch (e: IOException) {
             errorHandler.displayErrorMessage("Unable to read from the selected file while trying to open project.")
         } catch (e: Exception) {

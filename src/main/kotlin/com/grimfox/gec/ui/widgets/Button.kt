@@ -1,11 +1,11 @@
 package com.grimfox.gec.ui.widgets
 
-import com.grimfox.gec.ui.LOG
 import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
 import com.grimfox.gec.ui.widgets.Layout.HORIZONTAL
 import com.grimfox.gec.ui.widgets.Sizing.SHRINK
 import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
-import nl.komponents.kovenant.task
+import com.grimfox.gec.util.task
+import com.grimfox.logging.LOG
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT
 
 data class ButtonStyle(

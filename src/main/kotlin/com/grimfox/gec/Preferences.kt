@@ -1,14 +1,10 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.model.Graph
-import com.grimfox.gec.ui.JSON
 import com.grimfox.gec.util.*
-import org.slf4j.*
-import java.io.File
+import com.grimfox.logging.LOG
+import java.io.*
 import java.util.concurrent.*
-
-private val LOG: Logger = LoggerFactory.getLogger(Preferences::class.java)
-
 
 val WORLD_KIT_APP_DIR = File(System.getProperty("wk.local.app.dir"))
 val WORLD_KIT_DOC_DIR = File(System.getProperty("wk.local.doc.dir"))
@@ -18,9 +14,9 @@ val DEFAULT_PROJECTS_DIR = File(WORLD_KIT_DOC_DIR, "Projects")
 val CONFIG_DIR = File(WORLD_KIT_APP_DIR, "Config")
 val OFFLINE_HELP_DIR = File(WORLD_KIT_APP_DIR, "Offline_Help")
 val OFFLINE_HELP_INDEX_FILE = File(OFFLINE_HELP_DIR, "index.html")
-val PREFERENCES_FILE = File(CONFIG_DIR, "preferences.json")
-val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects.json")
-val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state.json")
+val PREFERENCES_FILE = File(CONFIG_DIR, "preferences")
+val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects")
+val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state")
 val CACHED_GRAPH_256_FILE = File(CACHE_DIR, "cached-graph-256.graph")
 val CACHED_GRAPH_512_FILE = File(CACHE_DIR, "cached-graph-512.graph")
 val CACHED_GRAPH_1024_FILE = File(CACHE_DIR, "cached-graph-1024.graph")
@@ -36,6 +32,28 @@ data class Preferences(
         var cachedGraph1024: Future<Graph>? = null
 ) {
     val autosaveDir: File get() = File(projectDir, "autosaves").canonicalFile
+
+    companion object {
+
+        fun deserialize(input: DataInputStream): Preferences {
+            val rememberWindowState = input.readBoolean()
+            val projectDir = File(input.readUTF())
+            val tempDir = File(input.readUTF())
+            val isFirstRun = input.readBoolean()
+            return Preferences(
+                    rememberWindowState = rememberWindowState,
+                    projectDir = projectDir,
+                    tempDir = tempDir,
+                    isFirstRun = isFirstRun)
+        }
+    }
+
+    fun serialize(output: DataOutputStream) {
+        output.writeBoolean(rememberWindowState)
+        output.writeUTF(projectDir.canonicalPath)
+        output.writeUTF(tempDir.canonicalPath)
+        output.writeBoolean(isFirstRun)
+    }
 }
 
 data class WindowState(
@@ -45,8 +63,33 @@ data class WindowState(
         var height: Int,
         var isMaximized: Boolean,
         var monitorIndex: Int,
-        var autoSaveIndex: Int = 0
-)
+        var autoSaveIndex: Int = 0) {
+
+    companion object {
+
+        fun deserialize(input: DataInputStream): WindowState {
+            return WindowState(
+                    x = input.readInt(),
+                    y = input.readInt(),
+                    width = input.readInt(),
+                    height = input.readInt(),
+                    isMaximized = input.readBoolean(),
+                    monitorIndex = input.readInt(),
+                    autoSaveIndex = input.readInt()
+            )
+        }
+    }
+
+    fun serialize(output: DataOutputStream) {
+        output.writeInt(x)
+        output.writeInt(y)
+        output.writeInt(width)
+        output.writeInt(height)
+        output.writeBoolean(isMaximized)
+        output.writeInt(monitorIndex)
+        output.writeInt(autoSaveIndex)
+    }
+}
 
 val threadCount = Runtime.getRuntime().availableProcessors()
 val executor: ExecutorService = Executors.newWorkStealingPool()
@@ -64,8 +107,8 @@ fun loadPreferences(executor: ExecutorService): Preferences {
         Preferences()
     } else {
         try {
-            val preferences = PREFERENCES_FILE.inputStream().buffered().use {
-                JSON.readValue(it, Preferences::class.java)
+            val preferences = DataInputStream(PREFERENCES_FILE.inputStream().buffered()).use {
+                Preferences.deserialize(it)
             }
             preferences
         } catch (e: Exception) {
@@ -151,8 +194,8 @@ fun savePreferences(preferences: Preferences) {
         ensureDirectoryExists(CONFIG_DIR)
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)
-        PREFERENCES_FILE.outputStream().buffered().use {
-            JSON.writeValue(it, preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null))
+        DataOutputStream(PREFERENCES_FILE.outputStream().buffered()).use {
+            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null).serialize(it)
         }
         ensureDirectoryExists(preferences.tempDir)
         val tempDir = preferences.tempDir
@@ -166,27 +209,27 @@ fun savePreferences(preferences: Preferences) {
 }
 
 fun loadWindowState(): WindowState? {
-    if (!WINDOW_STATE_FILE.isFile) {
-        return null
-    } else if (!WINDOW_STATE_FILE.canRead()) {
-        LOG.warn("Unable to read from existing window state file.")
-        return null
-    } else {
-        try {
-            return WINDOW_STATE_FILE.inputStream().buffered().use {
-                JSON.readValue(it, WindowState::class.java)
+    return when {
+        !WINDOW_STATE_FILE.isFile -> null
+        !WINDOW_STATE_FILE.canRead() -> {
+            LOG.warn("Unable to read from existing window state file.")
+            null
+        }
+        else -> try {
+            DataInputStream(WINDOW_STATE_FILE.inputStream().buffered()).use {
+                WindowState.deserialize(it)
             }
         } catch (e: Exception) {
             LOG.warn("Error reading from window state file.")
-            return null
+            null
         }
     }
 }
 
 fun saveWindowState(windowState: WindowState) {
     try {
-        WINDOW_STATE_FILE.outputStream().buffered().use {
-            JSON.writeValue(it, windowState)
+        DataOutputStream(WINDOW_STATE_FILE.outputStream().buffered()).use {
+            windowState.serialize(it)
         }
     } catch (e: Exception) {
         LOG.error("Error writing window state file.")

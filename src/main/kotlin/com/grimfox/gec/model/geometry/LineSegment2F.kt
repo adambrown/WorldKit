@@ -318,17 +318,6 @@ open class LineSegment2F(open var a: Point2F, open var b: Point2F) {
                 }
             }
             if (!doBreak) {
-                val unconPoints = unconnected.flatMap { listOf(it.a, it.b) }
-                val conPoints = connected.flatMap { listOf(it.a, it.b) }
-                var anyConnected = false
-                unconPoints.forEach { un ->
-                    conPoints.forEach { con ->
-                        if (un.epsilonEquals(con, epsilon)) {
-                            anyConnected = true
-                        }
-                    }
-                }
-                println(anyConnected)
                 return connected
             }
         }
