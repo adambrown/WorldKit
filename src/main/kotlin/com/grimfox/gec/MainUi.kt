@@ -398,46 +398,6 @@ object MainUi {
                                             }
                                             collapseToolbarButton.isVisible = false
                                         }
-//                                        tools = block {
-//                                            isVisible = false
-//                                            hSizing = GROW
-//                                            layout = HORIZONTAL
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hToggleRow(heightColorsOn, text("Colors:"), MEDIUM_SPACER_SIZE)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hToggleRow(riversOn, text("Rivers:"), MEDIUM_SPACER_SIZE)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hButtonRow {
-//                                                button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-//                                            }
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hDivider()
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                            hButtonRow {
-//                                                button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
-//                                            }
-//                                            hSpacer(MEDIUM_SPACER_SIZE)
-//                                        }
                                         tools = block {
                                             isVisible = false
                                             vSizing = SHRINK

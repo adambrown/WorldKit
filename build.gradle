@@ -1,8 +1,6 @@
 
 buildscript {
 
-    ext.triangle_version = '1.7.1'
-    ext.joml_version = '1.9.8'
     ext.lwjgl_version = '3.1.6'
     ext.kotlinx_coroutines_version = '0.22.3'
 
@@ -76,8 +74,6 @@ dependencies {
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-core', version: kotlinx_coroutines_version
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-jdk8', version: kotlinx_coroutines_version
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-nio', version: kotlinx_coroutines_version
-
-    compile group: 'org.joml', name: 'joml', version: joml_version
 
     compile group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version

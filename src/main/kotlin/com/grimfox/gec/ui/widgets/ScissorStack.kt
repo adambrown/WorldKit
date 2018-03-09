@@ -1,7 +1,7 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.ui.nvgproxy.*
-import org.joml.Vector4f
+import com.grimfox.joml.Vector4f
 import java.util.*
 
 class ScissorStack(val nvg: Long) {

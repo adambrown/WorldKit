@@ -9,8 +9,8 @@ import com.grimfox.gec.threadCount
 import com.grimfox.gec.ui.widgets.TextureBuilder
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
-import org.joml.Matrix4f
-import org.joml.SimplexNoise.noise
+import com.grimfox.joml.Matrix4f
+import com.grimfox.joml.SimplexNoise.noise
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*

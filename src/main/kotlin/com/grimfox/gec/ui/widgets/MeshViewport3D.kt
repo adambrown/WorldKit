@@ -6,7 +6,7 @@ import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import com.grimfox.logging.LOG
-import org.joml.*
+import com.grimfox.joml.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT

@@ -30,10 +30,6 @@
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
         },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
-        },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
             "requested": "3.1.6",
@@ -92,10 +88,6 @@
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
         },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
-        },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
             "requested": "3.1.6",
@@ -153,10 +145,6 @@
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
@@ -298,10 +286,6 @@
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
         },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
-        },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
             "requested": "3.1.6",
@@ -359,10 +343,6 @@
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
@@ -422,10 +402,6 @@
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
         },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
-        },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
             "requested": "3.1.6",
@@ -483,10 +459,6 @@
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
@@ -546,10 +518,6 @@
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
         },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
-        },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",
             "requested": "3.1.6",
@@ -607,10 +575,6 @@
             "transitive": [
                 "org.jetbrains.kotlin:kotlin-stdlib"
             ]
-        },
-        "org.joml:joml": {
-            "locked": "1.9.8",
-            "requested": "1.9.8"
         },
         "org.lwjgl:lwjgl": {
             "locked": "3.1.6",

@@ -20,7 +20,7 @@ import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.geometry.renderTriangle
 import kotlinx.coroutines.experimental.*
-import org.joml.SimplexNoise.noise
+import com.grimfox.joml.SimplexNoise.noise
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.*
 import java.io.File

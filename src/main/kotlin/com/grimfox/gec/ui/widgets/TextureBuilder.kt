@@ -4,7 +4,7 @@ import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.util.*
 import com.grimfox.logging.LOG
-import org.joml.Matrix4f
+import com.grimfox.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
