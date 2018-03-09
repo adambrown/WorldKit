@@ -1185,7 +1185,7 @@ fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<B
     }
 }
 
-fun Block.vButtonRow(height: Float, buttons: Block.() -> Unit): Block {
+fun Block.vButtonRow(height: Float, horizontalAlignment: HorizontalAlignment = CENTER, verticalAlignment: VerticalAlignment = MIDDLE, buttons: Block.() -> Unit): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -1193,8 +1193,8 @@ fun Block.vButtonRow(height: Float, buttons: Block.() -> Unit): Block {
         block {
             hSizing = SHRINK
             vSizing = SHRINK
-            hAlign = CENTER
-            vAlign = MIDDLE
+            hAlign = horizontalAlignment
+            vAlign = verticalAlignment
             buttons()
         }
     }

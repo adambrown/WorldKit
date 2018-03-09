@@ -104,3 +104,5 @@ fun <T> Quintuple<T, T, T, T, T>.toList(): List<T> = listOf(first, second, third
 fun <T> task(task: () -> T): Deferred<T> {
     return async { task() }
 }
+
+typealias QuadFloat = Quadruple<Float, Float, Float, Float>

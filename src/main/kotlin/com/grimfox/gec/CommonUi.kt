@@ -167,6 +167,8 @@ val experimentalWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
 val waterPlaneOn = ref(true)
 val perspectiveOn = ref(true)
+val heightColorsOn = ref(true)
+val riversOn = ref(true)
 val rotateAroundCamera = ref(false)
 val resetView = mRef(false)
 val imageMode = ref(3)
@@ -198,7 +200,7 @@ val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 val rootRef = ref(NO_BLOCK)
 
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
+val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightColorsOn, riversOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
 
 var mainLayer = NO_BLOCK
 var panelLayer = NO_BLOCK

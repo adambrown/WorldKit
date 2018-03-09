@@ -135,7 +135,7 @@ object TextureBuilder {
         })
     }
 
-    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
             mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 2.0f)
             glDisable(GL_BLEND)
@@ -145,7 +145,7 @@ object TextureBuilder {
             glDisable(GL_SCISSOR_TEST)
             glDisable(GL_MULTISAMPLE)
             textureRenderer.bind()
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+            glClearColor(clearColor.first, clearColor.second, clearColor.third, clearColor.fourth)
             glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
             drawTriangles(input)
             val retVal = collector(textureRenderer)
@@ -428,7 +428,7 @@ object TextureBuilder {
     }
 
     private fun drawLines(nvg: Long, points: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean, multiplier: Float) {
-        for (i in if (isClosed) 1..points.size else 1..points.size - 1) {
+        for (i in if (isClosed) 1..points.size else 1 until points.size) {
             val id = i % points.size
             val lastId = i - 1
             val lastPoint = points[lastId]
@@ -442,8 +442,8 @@ object TextureBuilder {
         }
     }
 
-    fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>): FloatArray {
-        return renderTrianglesInternal(input, {
+    fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureFloat(GL_NEAREST, GL_NEAREST)
             val retVal = extractTextureRedFloat(id, 4096)
             id.free()
@@ -451,12 +451,12 @@ object TextureBuilder {
         })
     }
 
-    fun renderTrianglesRedFloat(vertices: FloatArray, indices: IntArray): FloatArray {
-        return renderTrianglesRedFloat(vertices to indices)
+    fun renderTrianglesRedFloat(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
+        return renderTrianglesRedFloat(vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRedShort(input: Pair<FloatArray, IntArray>): ShortArray {
-        return renderTrianglesInternal(input, {
+    fun renderTrianglesRedShort(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureShort(GL_NEAREST, GL_NEAREST)
             val retVal = extractTextureRedShort(id, 4096)
             id.free()
@@ -464,12 +464,12 @@ object TextureBuilder {
         })
     }
 
-    fun renderTrianglesRedShort(vertices: FloatArray, indices: IntArray): ShortArray {
-        return renderTrianglesRedShort(vertices to indices)
+    fun renderTrianglesRedShort(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
+        return renderTrianglesRedShort(vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRedByte(input: Pair<FloatArray, IntArray>): ByteBuffer {
-        return renderTrianglesInternal(input, {
+    fun renderTrianglesRedByte(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureByte(GL_NEAREST, GL_NEAREST)
             val retVal = extractTextureRedByte(id, 4096)
             id.free()
@@ -477,12 +477,12 @@ object TextureBuilder {
         })
     }
 
-    fun renderTrianglesRedByte(vertices: FloatArray, indices: IntArray): ByteBuffer {
-        return renderTrianglesRedByte(vertices to indices)
+    fun renderTrianglesRedByte(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesRedByte(vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRgbaByte(input: Pair<FloatArray, IntArray>): ByteBuffer {
-        return renderTrianglesInternal(input, {
+    fun renderTrianglesRgbaByte(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesInternal(input, clearColor, {
             val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
             val retVal = extractTextureRgbaByte(id, 4096)
             id.free()
@@ -490,49 +490,49 @@ object TextureBuilder {
         })
     }
 
-    fun renderTrianglesRgbaByte(vertices: FloatArray, indices: IntArray): ByteBuffer {
-        return renderTrianglesRgbaByte(vertices to indices)
+    fun renderTrianglesRgbaByte(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesRgbaByte(vertices to indices, clearColor)
     }
 
 
-    fun renderTrianglesTexRedFloat(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesInternal(input, { it.newRedTextureFloat(minFilter, magFilter) })
+    fun renderTrianglesTexRedFloat(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureFloat(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedFloat(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesTexRedFloat(vertices to indices, minFilter, magFilter)
+    fun renderTrianglesTexRedFloat(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedFloat(vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRedShort(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesInternal(input, { it.newRedTextureShort(minFilter, magFilter) })
+    fun renderTrianglesTexRedShort(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureShort(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedShort(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesTexRedShort(vertices to indices, minFilter, magFilter)
+    fun renderTrianglesTexRedShort(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedShort(vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRedByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesInternal(input, { it.newRedTextureByte(minFilter, magFilter) })
+    fun renderTrianglesTexRedByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(input, clearColor, { it.newRedTextureByte(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesTexRedByte(vertices to indices, minFilter, magFilter)
+    fun renderTrianglesTexRedByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedByte(vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRgbaByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesInternal(input, { it.newRgbaTextureByte(minFilter, magFilter) })
+    fun renderTrianglesTexRgbaByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(input, clearColor, { it.newRgbaTextureByte(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRgbaByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int): TextureId {
-        return renderTrianglesTexRgbaByte(vertices to indices, minFilter, magFilter)
+    fun renderTrianglesTexRgbaByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRgbaByte(vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesToTexture(vertices: FloatArray, indices: IntArray, textureId: TextureId): TextureId {
-        return renderTrianglesToTexture(vertices to indices, textureId)
+    fun renderTrianglesToTexture(vertices: FloatArray, indices: IntArray, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesToTexture(vertices to indices, textureId, clearColor)
     }
 
-    fun renderTrianglesToTexture(input: Pair<FloatArray, IntArray>, textureId: TextureId): TextureId {
-        return renderTrianglesInternal(input, {
+    fun renderTrianglesToTexture(input: Pair<FloatArray, IntArray>, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(input, clearColor, {
             it.copyTexture(textureId)
             textureId
         })

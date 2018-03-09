@@ -25,6 +25,8 @@ class MeshViewport3D(
         private val rotateAroundCamera: Reference<Boolean>,
         private val perspectiveOn: Reference<Boolean>,
         private val waterPlaneOn: Reference<Boolean>,
+        private val heightColorsOn: Reference<Boolean>,
+        private val riversOn: Reference<Boolean>,
         private val heightMapScaleFactor: Reference<Float>,
         private val imageMode: Reference<Int>,
         private val disableCursor: MutableReference<Boolean>,
@@ -85,6 +87,7 @@ class MeshViewport3D(
     private val shininessUniform = ShaderUniform("shininess")
     private val heightScaleUniform = ShaderUniform("heightScale")
     private val uvScaleUniform = ShaderUniform("uvScale")
+    private val renderOptionsUniform = ShaderUniform("renderOptions")
     private val heightMapTextureUniform = ShaderUniform("heightMapTexture")
     private val riverMapTextureUniform = ShaderUniform("riverMapTexture")
 
@@ -231,7 +234,7 @@ class MeshViewport3D(
         heightMapProgram = createAndLinkProgram(
                 listOf(heightMapVertexShader, heightMapFragmentShader),
                 listOf(positionAttribute, uvAttribute),
-                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, color1Uniform, color2Uniform, color3Uniform, color4Uniform, color5Uniform, color6Uniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, heightMapTextureUniform, riverMapTextureUniform))
+                listOf(mvpMatrixUniform, mvMatrixUniform, nMatrixUniform, lightDirectionUniform, color1Uniform, color2Uniform, color3Uniform, color4Uniform, color5Uniform, color6Uniform, ambientUniform, diffuseUniform, specularUniform, shininessUniform, heightScaleUniform, uvScaleUniform, renderOptionsUniform, heightMapTextureUniform, riverMapTextureUniform))
 
         waterPlaneProgram = createAndLinkProgram(
                 listOf(waterVertexShader, waterFragmentShader),
@@ -789,6 +792,8 @@ class MeshViewport3D(
                 val flippedY = rootHeight - (yPosition + height)
 
                 val waterOn = waterPlaneOn.value
+                val heightColorsOn = heightColorsOn.value
+                val riversOn = riversOn.value
                 val doReset = resetView.value
                 if (doReset) {
                     resetView.value = false
@@ -869,6 +874,10 @@ class MeshViewport3D(
                 normalMatrix.set(mvMatrix).invert().transpose()
                 projectionMatrix.mul(mvMatrix, mvpMatrix)
 
+                lightDirection.set(1.0f, 1.0f, 2.0f).normalize()
+                val lightDirection4f = Vector4f(lightDirection.x, lightDirection.y, lightDirection.z, 0.0f).mul(mvMatrix)
+                lightDirection.set(lightDirection4f.x, lightDirection4f.y, lightDirection4f.z)
+
                 glDisable(GL_BLEND)
                 glDisable(GL_CULL_FACE)
                 glEnable(GL_DEPTH_TEST)
@@ -882,16 +891,17 @@ class MeshViewport3D(
                 glViewport(xPosition, flippedY, width, height)
 
                 if (waterOn) {
-                    drawWaterPlane()
+                    drawWaterPlane(heightColorsOn)
                 }
-                drawHeightMap()
+                val renderOptions = (if (heightColorsOn) 0 else 1) + (if (riversOn) 0 else 2)
+                drawHeightMap(renderOptions)
 
                 glDisable(GL_SCISSOR_TEST)
             }
         }
     }
 
-    private fun drawHeightMap() {
+    private fun drawHeightMap(renderOptions: Int) {
         glUseProgram(heightMapProgram)
         glUniformMatrix4fv(mvMatrixUniform.location, false, mvMatrix.get(0, floatBuffer))
         glUniformMatrix3fv(nMatrixUniform.location, false, normalMatrix.get(0, floatBuffer))
@@ -909,6 +919,7 @@ class MeshViewport3D(
         glUniform1f(shininessUniform.location, 1.7f)
         glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value)
         glUniform1f(uvScaleUniform.location, heightMap.width / heightMapResolution)
+        glUniform1i(renderOptionsUniform.location, renderOptions)
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, heightMapId?.id ?: -1)
@@ -918,17 +929,25 @@ class MeshViewport3D(
         heightMap.render()
     }
 
-    private fun drawWaterPlane() {
+    private fun drawWaterPlane(heightColorsOn: Boolean) {
         glUseProgram(waterPlaneProgram)
         glUniformMatrix4fv(mvMatrixUniformWater.location, false, mvMatrix.get(0, floatBuffer))
         glUniformMatrix3fv(nMatrixUniformWater.location, false, normalMatrix.get(0, floatBuffer))
         glUniformMatrix4fv(mvpMatrixUniformWater.location, false, mvpMatrix.get(0, floatBuffer))
         glUniform3f(lightDirectionUniformWater.location, lightDirection.x, lightDirection.y, lightDirection.z)
-        glUniform4f(colorUniformWater.location, 0.1f, 0.2f, 0.5f, 1.0f)
-        glUniform4f(ambientUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
-        glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
-        glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
-        glUniform1f(shininessUniformWater.location, 5.0f)
+        if (heightColorsOn) {
+            glUniform4f(colorUniformWater.location, 0.1f, 0.2f, 0.5f, 1.0f)
+            glUniform4f(ambientUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
+            glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
+            glUniform4f(specularUniformWater.location, 0.95f, 0.95f, 0.95f, 1.0f)
+            glUniform1f(shininessUniformWater.location, 5.0f)
+        } else {
+            glUniform4f(colorUniformWater.location, 0.459f, 0.761f, 0.859f, 1.0f)
+            glUniform4f(ambientUniformWater.location, 0.1f, 0.1f, 0.1f, 1.0f)
+            glUniform4f(diffuseUniformWater.location, 0.6f, 0.6f, 0.6f, 1.0f)
+            glUniform4f(specularUniformWater.location, 0.85f, 0.85f, 0.85f, 1.0f)
+            glUniform1f(shininessUniformWater.location, 60.0f)
+        }
         glUniform1f(heightScaleUniformWater.location, heightMapScaleFactor.value)
         waterPlane.render()
     }

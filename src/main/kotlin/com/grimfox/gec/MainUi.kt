@@ -371,13 +371,13 @@ object MainUi {
                                     meshViewport3D(meshViewport, ui)
                                     block {
                                         val toolbar = this
-                                        vSizing = STATIC
-                                        height = MEDIUM_ROW_HEIGHT
+                                        hSizing = STATIC
+                                        width = 300.0f
                                         var tools = NO_BLOCK
                                         var expandToolbarButton = NO_BLOCK
                                         var collapseToolbarButton = NO_BLOCK
                                         isFallThrough = true
-                                        hButtonRow {
+                                        vButtonRow(LARGE_ROW_HEIGHT, LEFT, TOP) {
                                             expandToolbarButton = button(text("+"), LARGE_TEXT_BUTTON_STYLE) {
                                                 tools.isVisible = true
                                                 tools.isMouseAware = true
@@ -398,37 +398,64 @@ object MainUi {
                                             }
                                             collapseToolbarButton.isVisible = false
                                         }
+//                                        tools = block {
+//                                            isVisible = false
+//                                            hSizing = GROW
+//                                            layout = HORIZONTAL
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hToggleRow(heightColorsOn, text("Colors:"), MEDIUM_SPACER_SIZE)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hToggleRow(riversOn, text("Rivers:"), MEDIUM_SPACER_SIZE)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hButtonRow {
+//                                                button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
+//                                            }
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hDivider()
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                            hButtonRow {
+//                                                button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+//                                            }
+//                                            hSpacer(MEDIUM_SPACER_SIZE)
+//                                        }
                                         tools = block {
                                             isVisible = false
-                                            hSizing = GROW
-                                            layout = HORIZONTAL
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hToggleRow(waterPlaneOn, text("Water:"), MEDIUM_SPACER_SIZE)
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hDivider()
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hToggleRow(perspectiveOn, text("Perspective:"), MEDIUM_SPACER_SIZE)
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hDivider()
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hToggleRow(rotateAroundCamera, text("Rotate camera:"), MEDIUM_SPACER_SIZE)
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hDivider()
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hSliderRow(heightMapScaleFactor, 144.0f, text("Height scale:"), MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hDivider()
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hButtonRow {
+                                            vSizing = SHRINK
+                                            xOffset = SMALL_SPACER_SIZE
+                                            yOffset = SMALL_SPACER_SIZE
+                                            width = -2 * SMALL_SPACER_SIZE
+                                            layout = VERTICAL
+                                            val shrinkGroup = hShrinkGroup()
+                                            vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(heightColorsOn, LARGE_ROW_HEIGHT, text("Colors:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(riversOn, LARGE_ROW_HEIGHT, text("Rivers:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                            vButtonRow(LARGE_ROW_HEIGHT) {
                                                 button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-                                            }
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hDivider()
-                                            hSpacer(MEDIUM_SPACER_SIZE)
-                                            hButtonRow {
                                                 button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
                                             }
-                                            hSpacer(MEDIUM_SPACER_SIZE)
                                         }
                                     }
                                 }

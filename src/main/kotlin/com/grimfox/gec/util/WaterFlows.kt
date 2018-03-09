@@ -10,6 +10,7 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedFloat
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesRedFloat
 import com.grimfox.gec.util.Biomes.Biome
 import com.grimfox.gec.util.Biomes.ErosionSettings
 import com.grimfox.gec.util.Biomes.RegionData
@@ -18,6 +19,7 @@ import com.grimfox.gec.util.Rendering.renderEdges
 import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.geometry.renderTriangle
+import kotlinx.coroutines.experimental.*
 import org.joml.SimplexNoise.noise
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.*
@@ -26,8 +28,10 @@ import java.lang.Math.log
 import java.text.DecimalFormat
 import java.util.*
 import java.util.concurrent.*
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.ArrayList
+import kotlin.math.min
 
 object WaterFlows {
 
@@ -278,14 +282,14 @@ object WaterFlows {
             doOrCancel { prepareGraphNodesUnderWater(canceled, executor, flowGraphLarge, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
         }
         val midMapsFuture = executor.call {
-            val heightMap = smallMapsFuture.value
+            val (heightMap) = smallMapsFuture.value
             val (nodeIndex, nodes, rivers) = midNodesFuture.value
             val erosionSettings = doOrCancel { biomes.map { it.midPassSettings } }
             doOrCancel { applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
             doOrCancel { performErosion(canceled, executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 2048, null, -1.0f, biomeTemplates) }
         }
         val midWaterMapsFuture = executor.call {
-            val heightMap = smallWaterMapsFuture.value
+            val (heightMap) = smallWaterMapsFuture.value
             val (nodeIndex, nodes, rivers, water, border) = midWaterNodesFuture.value
             doOrCancel { applyMapsToUnderWaterNodes(executor, flowGraphMedium.vertices, heightMap, nodes) }
             val unused = LinkedHashSet(water)
@@ -321,7 +325,7 @@ object WaterFlows {
             doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.midPassSettings), 2048, null, 0.0f, biomeTemplates) }
         }
         val highWaterMapsFuture = executor.call {
-            val heightMap = midWaterMapsFuture.value
+            val (heightMap) = midWaterMapsFuture.value
             val (nodeIndex, nodes, rivers, water, border) = highWaterNodesFuture.value
             doOrCancel {  applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes) }
             val unused = LinkedHashSet(water)
@@ -357,19 +361,24 @@ object WaterFlows {
             doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), outputWidth, null, 0.0f, biomeTemplates) }
         }
         val highMapsFuture = executor.call {
-            val heightMap = midMapsFuture.value
+            val (heightMap) = midMapsFuture.value
             val (nodeIndex, nodes, rivers) = highNodesFuture.value
             val erosionSettings = doOrCancel { biomes.map { it.highPassSettings } }
             doOrCancel { applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
-            val underWaterMask = highWaterMapsFuture.value
-            val retVal = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, outputWidth, underWaterMask, -600.0f, biomeTemplates) }
-            val riverEdges = ArrayList<LineSegment2F>()
-            rivers.forEach {
-                doOrCancel { riverEdges.addAll(recurseFindRiverEdges(flowGraphLarge.vertices, it, minFlowScale)) }
-            }
-            Pair(retVal, riverEdges)
+            val (underWaterMask) = highWaterMapsFuture.value
+            val (heights, riverEdges) = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, outputWidth, underWaterMask, -600.0f, biomeTemplates, true) }
+//            val riverEdges = ArrayList<LineSegment2F>()
+//            rivers.forEach {
+//                doOrCancel { riverEdges.addAll(recurseFindRiverEdges(flowGraphLarge.vertices, it, minFlowScale)) }
+//            }
+            Pair(heights, riverEdges!!)
         }
-        return Pair(doOrCancel { writeHeightMap(highMapsFuture.value.first) }, doOrCancel { renderEdges(executor, highMapsFuture.value.second, threadCount, GL_LINEAR, GL_LINEAR) })
+        val firstDeferred = doOrCancel { task { writeHeightMap(highMapsFuture.value.first) } }
+        val secondDeferred = doOrCancel { task { writeHeightMap(highMapsFuture.value.second, 0.0f) } }
+        return runBlocking {
+            Pair(firstDeferred.await(), secondDeferred.await())
+        }
+//        return Pair(doOrCancel { writeHeightMap(highMapsFuture.value.first) }, doOrCancel { renderEdges(executor, highMapsFuture.value.second, threadCount, GL_LINEAR, GL_LINEAR) })
 //        return Pair(writeHeightMap(highMapsFuture.value.first), renderEdges(executor, emptyList(), threadCount, GL_LINEAR, GL_LINEAR))
 //        return Pair(writeHeightMapUShorts(biomeMasksFuture.value.second), renderEdges(executor, emptyList(), threadCount, GL_LINEAR, GL_LINEAR))
 //        return writeHeightMapUBytes(elevationMask)
@@ -533,7 +542,7 @@ object WaterFlows {
         return Triple(nodeIndex, nodes, rivers)
     }
 
-    private fun performErosion(canceled: Reference<Boolean>, executor: ExecutorService, graph: Graph, biomeMask: Matrix<Byte>?, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, biomes: List<Biome>, erosionSettings: List<ErosionSettings>, heightMapWidth: Int, fallback: Matrix<Float>? = null, defaultValue: Float = 0.0f, biomeTemplates: Biomes): FloatArrayMatrix {
+    private fun performErosion(canceled: Reference<Boolean>, executor: ExecutorService, graph: Graph, biomeMask: Matrix<Byte>?, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, biomes: List<Biome>, erosionSettings: List<ErosionSettings>, heightMapWidth: Int, fallback: Matrix<Float>? = null, defaultValue: Float = 0.0f, biomeTemplates: Biomes, returnRivers: Boolean = false): Pair<FloatArrayMatrix, FloatArrayMatrix?> {
         fun <T> doOrCancel(work: () -> T): T {
             if (!canceled.value) {
                 return work()
@@ -551,8 +560,17 @@ object WaterFlows {
             doOrCancel { computeAreas(executor, rivers) }
             doOrCancel { computeHeights(executor, rivers, biomes, erosionSettings, biomeTemplates) }
         }
-        val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
-        doOrCancel { renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount) }
+        var riverMapDeferred: Deferred<FloatArrayMatrix>? = null
+        val heightMap = if (heightMapWidth == 4096) {
+            if (returnRivers) {
+                riverMapDeferred = doOrCancel { task { renderHeightMap(executor, graph, nodeIndex, null, 0.0f, heightMapWidth, threadCount, 0.5f) { drainageArea } } }
+            }
+            doOrCancel { renderHeightMap(executor, graph, nodeIndex, fallback, defaultValue, heightMapWidth, threadCount) }
+        } else {
+            val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
+            doOrCancel { renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount) }
+            heightMap
+        }
 //        writeObj(executor, graph, nodeIndex, fallback, threadCount, File("D:/sandbox/terrain.obj"))
         val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE))}
         nodes.forEach {
@@ -568,7 +586,13 @@ object WaterFlows {
         if (biomeMask != null) {
             doOrCancel { applyTerracing(executor, heightMap, biomeMask, erosionSettings, biomeExtremes, threadCount) }
         }
-        return heightMap
+        return if (returnRivers) {
+            runBlocking {
+                heightMap to riverMapDeferred?.await()
+            }
+        } else {
+            heightMap to null
+        }
     }
 
     private fun prepareGraphNodesUnderWater(canceled: Reference<Boolean>, executor: ExecutorService, graph: Graph, landMask: Matrix<Byte>, soilMobilityMap: Matrix<Short>, distanceScale: Float): Quintuple<Array<WaterNode?>, ArrayList<WaterNode>, ArrayList<WaterNode>, ArrayList<Int>, LinkedHashSet<Int>> {
@@ -1166,6 +1190,81 @@ object WaterFlows {
         }
     }
 
+    private inline fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, defaultValue: Float, heightMapWidth: Int, threadCount: Int, cap: Float = 1.0f, property: WaterNode.() -> Float =  { height }): FloatArrayMatrix {
+        val fWidth = fallback?.width ?: 0
+        val fWidthM1 = fWidth - 1
+        val triangles = graph.triangles
+        val graphVertices = graph.vertices
+        var vertexIndex = 0
+        var minHeight = defaultValue
+        var maxHeight = defaultValue
+        val meshVertices = Array(graphVertices.size) { i ->
+            val point = graphVertices.getPoint(i)
+            val node = nodeIndex[i]
+            if (node == null) {
+                if (fallback != null) {
+                    val z = fallback[(Math.round(point.y * fWidthM1) * fWidth) + Math.round(point.x * fWidthM1)] - 600
+                    if (z < minHeight) {
+                        minHeight = z
+                    }
+                    if (z > maxHeight) {
+                        maxHeight = z
+                    }
+                    vertexIndex++ to Point3F(point.x, point.y, z)
+                } else {
+                    null
+                }
+            } else {
+                val z = node.property()
+                if (z < minHeight) {
+                    minHeight = z
+                }
+                if (z > maxHeight) {
+                    maxHeight = z
+                }
+                vertexIndex++ to Point3F(point.x, point.y, z)
+            }
+        }
+        val deltaHeight = maxHeight - minHeight
+        val capInverse = 1.0f / cap
+        val vertexData = FloatArray(vertexIndex * 3)
+        meshVertices.forEach {
+            if (it != null) {
+                val (i, point) = it
+                var index = i * 3
+                vertexData[index++] = point.x
+                vertexData[index++] = point.y
+                vertexData[index] = min(1.0f, (((point.z - minHeight) / deltaHeight) * capInverse))
+            }
+        }
+        val futures = ArrayList<Future<*>>(threadCount)
+        val indexData = IntArray(triangles.size * 3)
+        (0 until threadCount).mapTo(futures) {
+            executor.submit {
+                for (t in it until triangles.size step threadCount) {
+                    val triangleVertices = triangles.getVertices(t)
+                    val a = meshVertices[triangleVertices[0]]
+                    val b = meshVertices[triangleVertices[1]]
+                    val c = meshVertices[triangleVertices[2]]
+                    if (a != null && b != null && c != null) {
+                        var offset = t * 3
+                        indexData[offset++] = a.first
+                        indexData[offset++] = b.first
+                        indexData[offset] = c.first
+                    }
+                }
+            }
+        }
+        futures.forEach(Future<*>::join)
+        val adjustedDefault = (defaultValue - minHeight) / deltaHeight
+        val array = renderTrianglesRedFloat(vertexData, indexData, QuadFloat(adjustedDefault, adjustedDefault, adjustedDefault, 1.0f))
+        for (i in 0 until array.size) {
+            array[i] = (array[i] * deltaHeight) + minHeight
+        }
+        return FloatArrayMatrix(heightMapWidth, array)
+    }
+
+
     private fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMap: Matrix<Float>, fallback: Matrix<Float>?, threadCount: Int) {
         val fWidth = fallback?.width ?: 0
         val fWidthM1 = fWidth - 1
@@ -1296,12 +1395,11 @@ object WaterFlows {
         return buildTextureRedShort(output, width, GL_LINEAR, GL_LINEAR)
     }
 
-    private fun writeHeightMap(heightMap: Matrix<Float>): TextureId {
+    private fun writeHeightMap(heightMap: Matrix<Float>, waterLine: Float = 0.3f): TextureId {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
         val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
-        val waterLine = 0.30f
         val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
         val waterFactor = (1.0f / minWaterValue) * waterLine
         for (y in (0 until width)) {

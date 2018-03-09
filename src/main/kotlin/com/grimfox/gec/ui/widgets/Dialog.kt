@@ -1,11 +1,13 @@
 package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.*
+import com.grimfox.gec.ui.widgets.HorizontalAlignment.CENTER
+import com.grimfox.gec.ui.widgets.VerticalAlignment.MIDDLE
 
 fun Block.dialog(width: Float, height: Float, text: Text, glyph: Block.() -> Block, buttons: Block.() -> Unit): Block {
     val dialog = block {
-        hAlign = HorizontalAlignment.CENTER
-        vAlign = VerticalAlignment.MIDDLE
+        hAlign = CENTER
+        vAlign = MIDDLE
         hSizing = Sizing.STATIC
         vSizing = Sizing.STATIC
         this.width = width
@@ -41,8 +43,8 @@ fun Block.dialog(width: Float, height: Float, text: Text, glyph: Block.() -> Blo
                     block {
                         hSizing = Sizing.SHRINK
                         vSizing = Sizing.SHRINK
-                        hAlign = HorizontalAlignment.CENTER
-                        vAlign = VerticalAlignment.MIDDLE
+                        hAlign = CENTER
+                        vAlign = MIDDLE
                         canOverflow = true
                         glyph()
                     }
@@ -52,12 +54,12 @@ fun Block.dialog(width: Float, height: Float, text: Text, glyph: Block.() -> Blo
                     hSizing = Sizing.GROW
                     layout = Layout.HORIZONTAL
                     hAlign = HorizontalAlignment.LEFT
-                    vAlign = VerticalAlignment.MIDDLE
+                    vAlign = MIDDLE
                     this.text = text
                 }
             }
             vSpacer(MEDIUM_SPACER_SIZE)
-            vButtonRow(LARGE_ROW_HEIGHT, buttons)
+            vButtonRow(LARGE_ROW_HEIGHT, CENTER, MIDDLE, buttons)
             vSpacer(MEDIUM_SPACER_SIZE)
         }
     }

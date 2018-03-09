@@ -16,6 +16,7 @@ uniform vec4 specularColor;
 uniform float shininess;
 uniform float heightScale;
 uniform float uvScale;
+uniform int renderOptions;
 uniform sampler2D heightMapTexture;
 uniform sampler2D riverMapTexture;
 
@@ -49,7 +50,7 @@ vec4 toGamma(vec4 v) {
 
 void main() {
     if (!gl_FrontFacing) {
-        colorOut = vec4(0.076f, 0.082f, 0.212f, 1.0f);
+        colorOut = vec4(0.076, 0.082, 0.212, 1.0);
         return;
     }
     vec2 size = vec2(uvScale * 2, 0.0);
@@ -74,56 +75,96 @@ void main() {
     vec3 modelNormal = normalize(xNormal + crossNormal);
     vec3 normal = normalize(normalMatrix * modelNormal);
     float diffuse = max(dot(normal, lightDirection), 0.0) + 0.06;
+    float adjustedShine = shininess;
+    vec4 riverColor;
     vec4 lowColor;
     vec4 highColor;
     float interpolation;
-    float distanceToRiver = texture(riverMapTexture, VertexIn.uv).r;
-    if (unscaledHeight <= 0.05 || distanceToRiver > 0.99965) {
-        lowColor = color1;
-        highColor = color1;
-        interpolation = 0.5;
-    } else if (unscaledHeight <= 0.19) {
-        lowColor = color1;
-        highColor = color2;
-        interpolation = (unscaledHeight - 0.05) * 7.1426;
-    } else if (unscaledHeight <= 0.24) {
-        lowColor = color2;
-        highColor = color2;
-        interpolation = 0.5;
-    } else if (unscaledHeight <= 0.38) {
-        lowColor = color2;
-        highColor = color3;
-        interpolation = (unscaledHeight - 0.24) * 7.1426;
-    } else if (unscaledHeight <= 0.43) {
-        lowColor = color3;
-        highColor = color3;
-        interpolation = 0.5;
-    } else if (unscaledHeight <= 0.57) {
-        lowColor = color3;
-        highColor = color4;
-        interpolation = (unscaledHeight - 0.43) * 7.1426;
-    } else if (unscaledHeight <= 0.62) {
-        lowColor = color4;
-        highColor = color4;
-        interpolation = 0.5;
-    } else if (unscaledHeight <= 0.76) {
-        lowColor = color4;
-        highColor = color5;
-        interpolation = (unscaledHeight - 0.62) * 7.1426;
-    } else if (unscaledHeight <= 0.81) {
-        lowColor = color5;
-        highColor = color5;
-        interpolation = 0.5;
-    } else if (unscaledHeight <= 0.95) {
-        lowColor = color5;
-        highColor = color6;
-        interpolation = (unscaledHeight - 0.81) * 7.1426;
+    vec4 baseColor;
+    bool hasColor;
+    bool hasRivers;
+    if (renderOptions == 1) {
+        hasColor = false;
+        hasRivers = true;
+    } else if (renderOptions == 2) {
+        hasColor = true;
+        hasRivers = false;
+    } else if (renderOptions == 3) {
+        hasColor = false;
+        hasRivers = false;
     } else {
-        lowColor = color6;
-        highColor = color6;
-        interpolation = 0.5;
+        hasColor = true;
+        hasRivers = true;
     }
-    vec4 baseColor = mix(toLinear(lowColor), toLinear(highColor), interpolation);
+    if (!hasColor) {
+        adjustedShine = 60.0;
+    }
+    if (hasColor) {
+        if (unscaledHeight <= 0.05) {
+            lowColor = color1;
+            highColor = color1;
+            interpolation = 0.5;
+        } else if (unscaledHeight <= 0.19) {
+            lowColor = color1;
+            highColor = color2;
+            interpolation = (unscaledHeight - 0.05) * 7.1426;
+        } else if (unscaledHeight <= 0.24) {
+            lowColor = color2;
+            highColor = color2;
+            interpolation = 0.5;
+        } else if (unscaledHeight <= 0.38) {
+            lowColor = color2;
+            highColor = color3;
+            interpolation = (unscaledHeight - 0.24) * 7.1426;
+        } else if (unscaledHeight <= 0.43) {
+            lowColor = color3;
+            highColor = color3;
+            interpolation = 0.5;
+        } else if (unscaledHeight <= 0.57) {
+            lowColor = color3;
+            highColor = color4;
+            interpolation = (unscaledHeight - 0.43) * 7.1426;
+        } else if (unscaledHeight <= 0.62) {
+            lowColor = color4;
+            highColor = color4;
+            interpolation = 0.5;
+        } else if (unscaledHeight <= 0.76) {
+            lowColor = color4;
+            highColor = color5;
+            interpolation = (unscaledHeight - 0.62) * 7.1426;
+        } else if (unscaledHeight <= 0.81) {
+            lowColor = color5;
+            highColor = color5;
+            interpolation = 0.5;
+        } else if (unscaledHeight <= 0.95) {
+            lowColor = color5;
+            highColor = color6;
+            interpolation = (unscaledHeight - 0.81) * 7.1426;
+        } else {
+            lowColor = color6;
+            highColor = color6;
+            interpolation = 0.5;
+        }
+        baseColor = mix(toLinear(lowColor), toLinear(highColor), interpolation);
+        riverColor = color1;
+    } else {
+        if (unscaledHeight < 0.299) {
+            baseColor = toLinear(color2);
+        } else {
+            baseColor = vec4(0.24, 0.052, 0.014, 1.0);
+        }
+        riverColor = color2;
+    }
+    if (hasRivers) {
+        float riverAlpha = texture(riverMapTexture, VertexIn.uv).r;
+        riverAlpha = min(1.0f, max(0.0f, riverAlpha - 0.00002) * 25.0);
+        baseColor = mix(baseColor, toLinear(riverColor), riverAlpha);
+        if (unscaledHeight >= 0.299) {
+            adjustedShine = adjustedShine * riverAlpha + shininess * (1 - riverAlpha);
+        }
+    } else if (unscaledHeight >= 0.299) {
+        adjustedShine = shininess;
+    }
     vec4 lightColor = toLinear(vec4(1.0));
     vec4 diffuseColor = vec4(baseColor.rgb * lightColor.rgb * diffuse, 1.0);
     vec4 spec = vec4(0.0);
@@ -131,7 +172,7 @@ void main() {
     float intensity = max(dot(normal, lightDirection), 0.0);
     if (intensity > 0.0) {
         vec3 halfVector = normalize(lightDirection + eye);
-        spec = toLinear(specularColor) * pow(max(dot(halfVector, normal), 0.0), shininess);
+        spec = toLinear(specularColor) * pow(max(dot(halfVector, normal), 0.0), adjustedShine);
     }
     colorOut = toGamma(diffuseColor * max(intensity * toLinear(diffuseColor) + spec, toLinear(ambientColor)));
 }
