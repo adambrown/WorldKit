@@ -179,18 +179,6 @@ public interface Matrix3fc {
 
     /**
      * Get the current values of <code>this</code> matrix and store the represented rotation
-     * into the given {@link AxisAngle4f}.
-     * 
-     * @see AxisAngle4f#set(Matrix3fc)
-     * 
-     * @param dest
-     *          the destination {@link AxisAngle4f}
-     * @return the passed in destination
-     */
-    AxisAngle4f getRotation(AxisAngle4f dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store the represented rotation
      * into the given {@link Quaternionf}.
      * <p>
      * This method assumes that the three column vectors of this matrix are not normalized and
@@ -217,35 +205,6 @@ public interface Matrix3fc {
      * @return the passed in destination
      */
     Quaternionf getNormalizedRotation(Quaternionf dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store the represented rotation
-     * into the given {@link Quaterniond}.
-     * <p>
-     * This method assumes that the three column vectors of this matrix are not normalized and
-     * thus allows to ignore any additional scaling factor that is applied to the matrix.
-     * 
-     * @see Quaterniond#setFromUnnormalized(Matrix3fc)
-     * 
-     * @param dest
-     *          the destination {@link Quaterniond}
-     * @return the passed in destination
-     */
-    Quaterniond getUnnormalizedRotation(Quaterniond dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store the represented rotation
-     * into the given {@link Quaterniond}.
-     * <p>
-     * This method assumes that the three column vectors of this matrix are normalized.
-     * 
-     * @see Quaterniond#setFromNormalized(Matrix3fc)
-     * 
-     * @param dest
-     *          the destination {@link Quaterniond}
-     * @return the passed in destination
-     */
-    Quaterniond getNormalizedRotation(Quaterniond dest);
 
 //#ifdef __HAS_NIO__
     /**
@@ -375,21 +334,6 @@ public interface Matrix3fc {
      * @return the passed in buffer
      */
     ByteBuffer getTransposed(int index, ByteBuffer buffer);
-//#endif
-
-//#ifndef __GWT__
-    /**
-     * Store this matrix in column-major order at the given off-heap address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *            the off-heap address where to store this matrix
-     * @return this
-     */
-    Matrix3fc getToAddress(long address);
 //#endif
 
     /**
@@ -890,30 +834,6 @@ public interface Matrix3fc {
      * @return dest
      */
     Matrix3f rotateLocal(Quaternionfc quat, Matrix3f dest);
-
-    /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f} and store the result in <code>dest</code>.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float, Matrix3f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Matrix3f rotate(AxisAngle4f axisAngle, Matrix3f dest);
 
     /**
      * Apply a rotation transformation, rotating the given radians about the specified axis and store the result in <code>dest</code>.

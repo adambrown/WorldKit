@@ -112,17 +112,6 @@ public interface Quaternionfc {
     /**
      * Set the given destination matrix to the rotation represented by <code>this</code>.
      * 
-     * @see Matrix3d#set(Quaternionfc)
-     * 
-     * @param dest
-     *          the matrix to write the rotation into
-     * @return the passed in destination
-     */
-    Matrix3d get(Matrix3d dest);
-
-    /**
-     * Set the given destination matrix to the rotation represented by <code>this</code>.
-     * 
      * @see Matrix4f#set(Quaternionfc)
      * 
      * @param dest
@@ -130,60 +119,6 @@ public interface Quaternionfc {
      * @return the passed in destination
      */
     Matrix4f get(Matrix4f dest);
-
-    /**
-     * Set the given destination matrix to the rotation represented by <code>this</code>.
-     * 
-     * @see Matrix4d#set(Quaternionfc)
-     * 
-     * @param dest
-     *          the matrix to write the rotation into
-     * @return the passed in destination
-     */
-    Matrix4d get(Matrix4d dest);
-
-    /**
-     * Set the given destination matrix to the rotation represented by <code>this</code>.
-     * 
-     * @see Matrix4x3f#set(Quaternionfc)
-     * 
-     * @param dest
-     *          the matrix to write the rotation into
-     * @return the passed in destination
-     */
-    Matrix4x3f get(Matrix4x3f dest);
-
-    /**
-     * Set the given destination matrix to the rotation represented by <code>this</code>.
-     * 
-     * @see Matrix4x3d#set(Quaternionfc)
-     * 
-     * @param dest
-     *          the matrix to write the rotation into
-     * @return the passed in destination
-     */
-    Matrix4x3d get(Matrix4x3d dest);
-
-    /**
-     * Set the given {@link AxisAngle4f} to represent the rotation of
-     * <code>this</code> quaternion.
-     * 
-     * @param dest
-     *            the {@link AxisAngle4f} to set
-     * @return the passed in destination
-     */
-    AxisAngle4f get(AxisAngle4f dest);
-
-    /**
-     * Set the given {@link Quaterniond} to the values of <code>this</code>.
-     * 
-     * @see Quaterniond#set(Quaternionfc)
-     * 
-     * @param dest
-     *          the {@link Quaterniond} to set
-     * @return the passed in destination
-     */
-    Quaterniond get(Quaterniond dest);
 
     /**
      * Set the given {@link Quaternionf} to the values of <code>this</code>.

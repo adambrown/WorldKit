@@ -33,11 +33,6 @@ import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import com.grimfox.joml.Math;
-import com.grimfox.joml.internal.MemUtil;
-import com.grimfox.joml.internal.Options;
-import com.grimfox.joml.internal.Runtime;
-
 /**
  * Contains the definition of a Vector comprising 4 floats and associated
  * transformations.
@@ -91,16 +86,6 @@ public class Vector4f implements Externalizable, Vector4fc {
     }
 
     /**
-     * Create a new {@link Vector4f} with the same values as <code>v</code>.
-     * 
-     * @param v
-     *          the {@link Vector4ic} to copy the values from
-     */
-    public Vector4f(Vector4ic v) {
-    	this(v.x(), v.y(), v.z(), v.w());
-    }
-
-    /**
      * Create a new {@link Vector4f} with the first three components from the
      * given <code>v</code> and the given <code>w</code>.
      * 
@@ -111,49 +96,6 @@ public class Vector4f implements Externalizable, Vector4fc {
      */
     public Vector4f(Vector3fc v, float w) {
     	this(v.x(), v.y(), v.z(), w);
-    }
-
-    /**
-     * Create a new {@link Vector4f} with the first three components from the
-     * given <code>v</code> and the given <code>w</code>.
-     * 
-     * @param v
-     *          the {@link Vector3ic}
-     * @param w
-     *          the w component
-     */
-    public Vector4f(Vector3ic v, float w) {
-    	this(v.x(), v.y(), v.z(), w);
-    }
-
-    /**
-     * Create a new {@link Vector4f} with the first two components from the
-     * given <code>v</code> and the given <code>z</code>, and <code>w</code>.
-     * 
-     * @param v
-     *          the {@link Vector2fc}
-     * @param z
-     *          the z component
-     * @param w
-     *          the w component
-     */
-    public Vector4f(Vector2fc v, float z, float w) {
-    	this(v.x(), v.y(), z, w);
-    }
-
-    /**
-     * Create a new {@link Vector4f} with the first two components from the
-     * given <code>v</code> and the given <code>z</code>, and <code>w</code>.
-     * 
-     * @param v
-     *          the {@link Vector2ic}
-     * @param z
-     *          the z component
-     * @param w
-     *          the w component
-     */
-    public Vector4f(Vector2ic v, float z, float w) {
-    	this(v.x(), v.y(), z, w);
     }
 
     /**
@@ -305,31 +247,6 @@ public class Vector4f implements Externalizable, Vector4fc {
     }
 
     /**
-     * Set this {@link Vector4f} to the values of the given <code>v</code>.
-     * 
-     * @param v
-     *          the vector whose values will be copied into this
-     * @return this
-     */
-    public Vector4f set(Vector4ic v) {
-        return set(v.x(), v.y(), v.z(), v.w());
-    }
-
-    /**
-     * Set this {@link Vector4f} to the values of the given <code>v</code>.
-     * <p>
-     * Note that due to the given vector <code>v</code> storing the components in double-precision,
-     * there is the possibility to lose precision.
-     * 
-     * @param v
-     *          the vector whose values will be copied into this
-     * @return this
-     */
-    public Vector4f set(Vector4dc v) {
-        return set((float) v.x(), (float) v.y(), (float) v.z(), (float) v.w());
-    }
-
-    /**
      * Set the first three components of this to the components of
      * <code>v</code> and the last component to <code>w</code>.
      * 
@@ -341,52 +258,6 @@ public class Vector4f implements Externalizable, Vector4fc {
      */
     public Vector4f set(Vector3fc v, float w) {
         return set(v.x(), v.y(), v.z(), w);
-    }
-
-    /**
-     * Set the first three components of this to the components of
-     * <code>v</code> and the last component to <code>w</code>.
-     * 
-     * @param v
-     *          the {@link Vector3ic} to copy
-     * @param w
-     *          the w component
-     * @return this
-     */
-    public Vector4f set(Vector3ic v, float w) {
-        return set(v.x(), v.y(), v.z(), w);
-    }
-
-    /**
-     * Sets the first two components of this to the components of given <code>v</code>
-     * and last two components to the given <code>z</code>, and <code>w</code>.
-     *
-     * @param v
-     *          the {@link Vector2fc}
-     * @param z
-     *          the z component
-     * @param w
-     *          the w component
-     * @return this
-     */
-    public Vector4f set(Vector2fc v, float z, float w) {
-        return set(v.x(), v.y(), z, w);
-    }
-
-    /**
-     * Sets the first two components of this to the components of given <code>v</code>
-     * and last two components to the given <code>z</code>, and <code>w</code>.
-     *
-     * @param v
-     *          the {@link Vector2ic}
-     * @param z
-     *          the z component
-     * @param w
-     *          the w component
-     * @return this
-     */
-    public Vector4f set(Vector2ic v, float z, float w) {
-    	return set(v.x(), v.y(), z, w);
     }
 
     /**
@@ -496,28 +367,6 @@ public class Vector4f implements Externalizable, Vector4fc {
     }
 //#endif
 
-//#ifndef __GWT__
-    /**
-     * Set the values of this vector by reading 4 float values from off-heap memory,
-     * starting at the given address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *              the off-heap memory address to read the vector values from
-     * @return this
-     */
-    public Vector4f setFromAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.get(this, address);
-        return this;
-    }
-//#endif
-
     /**
      * Set the value of the specified component of this vector.
      *
@@ -577,16 +426,6 @@ public class Vector4f implements Externalizable, Vector4fc {
     public ByteBuffer get(int index, ByteBuffer buffer) {
         MemUtil.INSTANCE.put(this, index, buffer);
         return buffer;
-    }
-//#endif
-
-//#ifndef __GWT__
-    public Vector4fc getToAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.put(this, address);
-        return this;
     }
 //#endif
 
@@ -822,32 +661,6 @@ public class Vector4f implements Externalizable, Vector4fc {
         dest.y = ry;
         dest.z = rz;
         dest.w = rw;
-        return dest;
-    }
-
-    /**
-     * Multiply the given matrix mat with this Vector4f and store the result in
-     * <code>this</code>.
-     * 
-     * @param mat
-     *          the matrix to multiply the vector with
-     * @return a vector holding the result
-     */
-    public Vector4f mul(Matrix4x3fc mat) {
-        return mul(mat, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector4fc#mul(com.grimfox.joml.Matrix4x3fc, com.grimfox.joml.Vector4f)
-     */
-    public Vector4f mul(Matrix4x3fc mat, Vector4f dest) {
-        float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z + mat.m30() * w;
-        float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z + mat.m31() * w;
-        float rz = mat.m02() * x + mat.m12() * y + mat.m22() * z + mat.m32() * w;
-        dest.x = rx;
-        dest.y = ry;
-        dest.z = rz;
-        dest.w = w;
         return dest;
     }
 
@@ -1282,7 +1095,7 @@ public class Vector4f implements Externalizable, Vector4fc {
      * @return the string representation
      */
     public String toString() {
-        return Runtime.formatNumbers(toString(Options.NUMBER_FORMAT));
+        return Runtime.formatNumbers(toString(Runtime.NUMBER_FORMAT));
     }
 
     /**

@@ -33,9 +33,6 @@ import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import com.grimfox.joml.internal.MemUtil;
-import com.grimfox.joml.internal.Options;
-
 /**
  * Contains the definition of a 3x3 matrix of floats, and associated functions to transform
  * it. The matrix is column-major to match OpenGL's interpretation, and it looks like this:
@@ -449,26 +446,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
     }
 
     /**
-     * Set the elements of this matrix to the left 3x3 submatrix of <code>m</code>.
-     * 
-     * @param m
-     *          the matrix to copy the elements from
-     * @return this
-     */
-    public Matrix3f set(Matrix4x3fc m) {
-        m00 = m.m00();
-        m01 = m.m01();
-        m02 = m.m02();
-        m10 = m.m10();
-        m11 = m.m11();
-        m12 = m.m12();
-        m20 = m.m20();
-        m21 = m.m21();
-        m22 = m.m22();
-        return this;
-    }
-
-    /**
      * Set the elements of this matrix to the upper left 3x3 of the given {@link Matrix4fc}.
      *
      * @param mat
@@ -496,80 +473,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
     }
 
     /**
-     * Set this matrix to be equivalent to the rotation specified by the given {@link AxisAngle4f}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f}
-     * @return this
-     */
-    public Matrix3f set(AxisAngle4f axisAngle) {
-        float x = axisAngle.x;
-        float y = axisAngle.y;
-        float z = axisAngle.z;
-        float angle = axisAngle.angle;
-        float invLength = (float) (1.0 / Math.sqrt(x*x + y*y + z*z));
-        x *= invLength;
-        y *= invLength;
-        z *= invLength;
-        float s = (float) Math.sin(angle);
-        float c = (float) Math.cosFromSin(s, angle);
-        float omc = 1.0f - c;
-        m00 = c + x*x*omc;
-        m11 = c + y*y*omc;
-        m22 = c + z*z*omc;
-        float tmp1 = x*y*omc;
-        float tmp2 = z*s;
-        m10 = tmp1 - tmp2;
-        m01 = tmp1 + tmp2;
-        tmp1 = x*z*omc;
-        tmp2 = y*s;
-        m20 = tmp1 + tmp2;
-        m02 = tmp1 - tmp2;
-        tmp1 = y*z*omc;
-        tmp2 = x*s;
-        m21 = tmp1 - tmp2;
-        m12 = tmp1 + tmp2;
-        return this;
-    }
-
-    /**
-     * Set this matrix to be equivalent to the rotation specified by the given {@link AxisAngle4d}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4d}
-     * @return this
-     */
-    public Matrix3f set(AxisAngle4d axisAngle) {
-        double x = axisAngle.x;
-        double y = axisAngle.y;
-        double z = axisAngle.z;
-        double angle = axisAngle.angle;
-        double invLength = 1.0 / Math.sqrt(x*x + y*y + z*z);
-        x *= invLength;
-        y *= invLength;
-        z *= invLength;
-        double s = Math.sin(angle);
-        double c = Math.cosFromSin(s, angle);
-        double omc = 1.0f - c;
-        m00 = (float)(c + x*x*omc);
-        m11 = (float)(c + y*y*omc);
-        m22 = (float)(c + z*z*omc);
-        double tmp1 = x*y*omc;
-        double tmp2 = z*s;
-        m10 = (float)(tmp1 - tmp2);
-        m01 = (float)(tmp1 + tmp2);
-        tmp1 = x*z*omc;
-        tmp2 = y*s;
-        m20 = (float)(tmp1 + tmp2);
-        m02 = (float)(tmp1 - tmp2);
-        tmp1 = y*z*omc;
-        tmp2 = x*s;
-        m21 = (float)(tmp1 - tmp2);
-        m12 = (float)(tmp1 + tmp2);
-        return this;
-    }
-
-    /**
      * Set this matrix to be equivalent to the rotation - and possibly scaling - specified by the given {@link Quaternionfc}.
      * <p>
      * This method is equivalent to calling: <tt>rotation(q)</tt>
@@ -584,38 +487,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
      */
     public Matrix3f set(Quaternionfc q) {
         return rotation(q);
-    }
-
-    /**
-     * Set this matrix to a rotation - and possibly scaling - equivalent to the given quaternion.
-     * <p>
-     * Reference: <a href="http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/">http://www.euclideanspace.com/</a>
-     * 
-     * @param q
-     *          the quaternion
-     * @return this
-     */
-    public Matrix3f set(Quaterniondc q) {
-        double w2 = q.w() * q.w();
-        double x2 = q.x() * q.x();
-        double y2 = q.y() * q.y();
-        double z2 = q.z() * q.z();
-        double zw = q.z() * q.w();
-        double xy = q.x() * q.y();
-        double xz = q.x() * q.z();
-        double yw = q.y() * q.w();
-        double yz = q.y() * q.z();
-        double xw = q.x() * q.w();
-        m00 = (float) (w2 + x2 - z2 - y2);
-        m01 = (float) (xy + zw + zw + xy);
-        m02 = (float) (xz - yw + xz - yw);
-        m10 = (float) (-zw + xy - zw + xy);
-        m11 = (float) (y2 - z2 + w2 - x2);
-        m12 = (float) (yz + yz + xw + xw);
-        m20 = (float) (yw + xz + xz + yw);
-        m21 = (float) (yz + yz - xw - xw);
-        m22 = (float) (z2 - y2 - x2 + w2);
-        return this;
     }
 
     /**
@@ -916,13 +787,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
     }
 
     /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix3fc#getRotation(com.grimfox.joml.AxisAngle4f)
-     */
-    public AxisAngle4f getRotation(AxisAngle4f dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
      * @see com.grimfox.joml.Matrix3fc#getUnnormalizedRotation(com.grimfox.joml.Quaternionf)
      */
     public Quaternionf getUnnormalizedRotation(Quaternionf dest) {
@@ -933,20 +797,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
      * @see com.grimfox.joml.Matrix3fc#getNormalizedRotation(com.grimfox.joml.Quaternionf)
      */
     public Quaternionf getNormalizedRotation(Quaternionf dest) {
-        return dest.setFromNormalized(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix3fc#getUnnormalizedRotation(com.grimfox.joml.Quaterniond)
-     */
-    public Quaterniond getUnnormalizedRotation(Quaterniond dest) {
-        return dest.setFromUnnormalized(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix3fc#getNormalizedRotation(com.grimfox.joml.Quaterniond)
-     */
-    public Quaterniond getNormalizedRotation(Quaterniond dest) {
         return dest.setFromNormalized(this);
     }
 
@@ -1012,16 +862,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
     }
 //#endif
 
-//#ifndef __GWT__
-    public Matrix3fc getToAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.put(this, address);
-        return this;
-    }
-//#endif
-
     /* (non-Javadoc)
      * @see com.grimfox.joml.Matrix3fc#get(float[], int)
      */
@@ -1069,28 +909,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
      */
     public Matrix3f set(ByteBuffer buffer) {
         MemUtil.INSTANCE.get(this, buffer.position(), buffer);
-        return this;
-    }
-//#endif
-
-//#ifndef __GWT__
-    /**
-     * Set the values of this matrix by reading 9 float values from off-heap memory in column-major order,
-     * starting at the given address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *              the off-heap memory address to read the matrix values from in column-major order
-     * @return this
-     */
-    public Matrix3f setFromAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.get(this, address);
         return this;
     }
 //#endif
@@ -1336,31 +1154,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
      */
     public Matrix3f rotation(float angle, Vector3fc axis) {
         return rotation(angle, axis.x(), axis.y(), axis.z());
-    }
-
-    /**
-     * Set this matrix to a rotation transformation using the given {@link AxisAngle4f}.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * The resulting matrix can be multiplied against another transformation
-     * matrix to obtain an additional rotation.
-     * <p>
-     * In order to apply the rotation transformation to an existing transformation,
-     * use {@link #rotate(AxisAngle4f) rotate()} instead.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     *
-     * @see #rotate(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @return this
-     */
-    public Matrix3f rotation(AxisAngle4f axisAngle) {
-        return rotation(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
     }
 
     /**
@@ -2811,64 +2604,6 @@ public class Matrix3f implements Externalizable, Matrix3fc {
      */
     public Matrix3f rotateLocal(Quaternionfc quat) {
         return rotateLocal(quat, this);
-    }
-
-    /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f}, to this matrix.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * In order to set the matrix to a rotation transformation without post-multiplying,
-     * use {@link #rotation(AxisAngle4f)}.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float)
-     * @see #rotation(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @return this
-     */
-    public Matrix3f rotate(AxisAngle4f axisAngle) {
-        return rotate(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
-    }
-
-    /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f} and store the result in <code>dest</code>.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * In order to set the matrix to a rotation transformation without post-multiplying,
-     * use {@link #rotation(AxisAngle4f)}.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float)
-     * @see #rotation(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    public Matrix3f rotate(AxisAngle4f axisAngle, Matrix3f dest) {
-        return rotate(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z, dest);
     }
 
     /**

@@ -97,6 +97,12 @@ shadowJar {
     exclude 'META-INF/NOTICE'
     exclude 'org/lwjgl/glfw/GLFWVulcan.class'
     exclude 'org/lwjgl/glfw/GLFWVulcan$Function.class'
+    exclude '*.so'
+    exclude '*.dylib'
+    exclude '*.sha1'
+    exclude '*.git'
+    exclude '*.git'
+    exclude '*32.dll'
 }
 
 buildExecutables {

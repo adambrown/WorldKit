@@ -33,10 +33,6 @@ import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import com.grimfox.joml.internal.MemUtil;
-import com.grimfox.joml.internal.Options;
-import com.grimfox.joml.internal.Runtime;
-
 /**
  * Quaternion of 4 single-precision floats which can represent rotation and uniform scaling.
  *
@@ -99,21 +95,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
      */
     public Quaternionf(Quaternionf source) {
         MemUtil.INSTANCE.copy(source, this);
-    }
-
-    /**
-     * Create a new {@link Quaternionf} which represents the rotation of the given {@link AxisAngle4f}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f}
-     */
-    public Quaternionf(AxisAngle4f axisAngle) {
-        float sin = (float) Math.sin(axisAngle.angle * 0.5);
-        float cos = (float) Math.cosFromSin(sin, axisAngle.angle * 0.5);
-        x = axisAngle.x * sin;
-        y = axisAngle.y * sin;
-        z = axisAngle.z * sin;
-        w = cos;
     }
 
     /**
@@ -251,74 +232,9 @@ public class Quaternionf implements Externalizable, Quaternionfc {
     }
 
     /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Matrix3d)
-     */
-    public Matrix3d get(Matrix3d dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
      * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Matrix4f)
      */
     public Matrix4f get(Matrix4f dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Matrix4d)
-     */
-    public Matrix4d get(Matrix4d dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Matrix4x3f)
-     */
-    public Matrix4x3f get(Matrix4x3f dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Matrix4x3d)
-     */
-    public Matrix4x3d get(Matrix4x3d dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.AxisAngle4f)
-     */
-    public AxisAngle4f get(AxisAngle4f dest) {
-        float x = this.x;
-        float y = this.y;
-        float z = this.z;
-        float w = this.w;
-        if (w > 1.0f) {
-            float invNorm = (float) (1.0 / Math.sqrt(x * x + y * y + z * z + w * w));
-            x *= invNorm;
-            y *= invNorm;
-            z *= invNorm;
-            w *= invNorm;
-        }
-        dest.angle = (float) (2.0f * Math.acos(w));
-        float s = (float) Math.sqrt(1.0 - w * w);
-        if (s < 0.001f) {
-            dest.x = x;
-            dest.y = y;
-            dest.z = z;
-        } else {
-            s = 1.0f / s;
-            dest.x = x * s;
-            dest.y = y * s;
-            dest.z = z * s;
-        }
-        return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#get(com.grimfox.joml.Quaterniond)
-     */
-    public Quaterniond get(Quaterniond dest) {
         return dest.set(this);
     }
 
@@ -426,28 +342,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
     }
 
     /**
-     * Set this quaternion to a rotation equivalent to the given {@link AxisAngle4f}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f}
-     * @return this
-     */
-    public Quaternionf set(AxisAngle4f axisAngle) {
-        return setAngleAxis(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
-    }
-
-    /**
-     * Set this quaternion to a rotation equivalent to the given {@link AxisAngle4d}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4d}
-     * @return this
-     */
-    public Quaternionf set(AxisAngle4d axisAngle) {
-        return setAngleAxis(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
-    }
-
-    /**
      * Set this quaternion to a rotation equivalent to the supplied axis and
      * angle (in radians).
      * <p>
@@ -495,20 +389,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
         this.z = (float) (z * s);
         this.w = (float) Math.cosFromSin(s, angle * 0.5);
         return this;
-    }
-
-    /**
-     * Set this {@link Quaternionf} to a rotation of the given angle in radians about the supplied
-     * axis, all of which are specified via the {@link AxisAngle4f}.
-     * 
-     * @see #rotationAxis(float, float, float, float)
-     * 
-     * @param axisAngle
-     *            the {@link AxisAngle4f} giving the rotation angle in radians and the axis to rotate about
-     * @return this
-     */
-    public Quaternionf rotationAxis(AxisAngle4f axisAngle) {
-        return rotationAxis(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
     }
 
     /**
@@ -750,34 +630,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
     /**
      * Set this quaternion to be a representation of the rotational component of the given matrix.
      * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are no unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromUnnormalized(Matrix4x3fc mat) {
-        setFromUnnormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are no unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromUnnormalized(Matrix4x3dc mat) {
-        setFromUnnormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
      * This method assumes that the first three columns of the upper left 3x3 submatrix are unit vectors.
      * 
      * @param mat
@@ -785,62 +637,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
      * @return this
      */
     public Quaternionf setFromNormalized(Matrix4fc mat) {
-        setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromNormalized(Matrix4x3fc mat) {
-        setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromNormalized(Matrix4x3dc mat) {
-        setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are no unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromUnnormalized(Matrix4dc mat) {
-        setFromUnnormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromNormalized(Matrix4dc mat) {
         setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
         return this;
     }
@@ -869,32 +665,6 @@ public class Quaternionf implements Externalizable, Quaternionfc {
      * @return this
      */
     public Quaternionf setFromNormalized(Matrix3fc mat) {
-        setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * <p>
-     * This method assumes that the first three columns of the upper left 3x3 submatrix are no unit vectors.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromUnnormalized(Matrix3dc mat) {
-        setFromUnnormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
-        return this;
-    }
-
-    /**
-     * Set this quaternion to be a representation of the rotational component of the given matrix.
-     * 
-     * @param mat
-     *          the matrix whose rotational component is used to set this quaternion
-     * @return this
-     */
-    public Quaternionf setFromNormalized(Matrix3dc mat) {
         setFromNormalized(mat.m00(), mat.m01(), mat.m02(), mat.m10(), mat.m11(), mat.m12(), mat.m20(), mat.m21(), mat.m22());
         return this;
     }
@@ -1292,45 +1062,9 @@ public class Quaternionf implements Externalizable, Quaternionfc {
     }
 
     /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#transform(com.grimfox.joml.Vector3dc, com.grimfox.joml.Vector3d)
-     */
-    public Vector3d transform(Vector3dc vec, Vector3d dest) {
-        return transform(vec.x(), vec.y(), vec.z(), dest);
-    }
-
-    /* (non-Javadoc)
      * @see com.grimfox.joml.Quaternionfc#transform(float, float, float, com.grimfox.joml.Vector3f)
      */
     public Vector3f transform(float x, float y, float z, Vector3f dest) {
-        float w2 = this.w * this.w;
-        float x2 = this.x * this.x;
-        float y2 = this.y * this.y;
-        float z2 = this.z * this.z;
-        float zw = this.z * this.w;
-        float xy = this.x * this.y;
-        float xz = this.x * this.z;
-        float yw = this.y * this.w;
-        float yz = this.y * this.z;
-        float xw = this.x * this.w;
-        float m00 = w2 + x2 - z2 - y2;
-        float m01 = xy + zw + zw + xy;
-        float m02 = xz - yw + xz - yw;
-        float m10 = -zw + xy - zw + xy;
-        float m11 = y2 - z2 + w2 - x2;
-        float m12 = yz + yz + xw + xw;
-        float m20 = yw + xz + xz + yw;
-        float m21 = yz + yz - xw - xw;
-        float m22 = z2 - y2 - x2 + w2;
-        dest.x = m00 * x + m10 * y + m20 * z;
-        dest.y = m01 * x + m11 * y + m21 * z;
-        dest.z = m02 * x + m12 * y + m22 * z;
-        return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Quaternionfc#transform(double, double, double, com.grimfox.joml.Vector3d)
-     */
-    public Vector3d transform(double x, double y, double z, Vector3d dest) {
         float w2 = this.w * this.w;
         float x2 = this.x * this.x;
         float y2 = this.y * this.y;
@@ -2772,7 +2506,7 @@ public class Quaternionf implements Externalizable, Quaternionfc {
      * @return the string representation
      */
     public String toString() {
-        return Runtime.formatNumbers(toString(Options.NUMBER_FORMAT));
+        return Runtime.formatNumbers(toString(Runtime.NUMBER_FORMAT));
     }
 
     /**

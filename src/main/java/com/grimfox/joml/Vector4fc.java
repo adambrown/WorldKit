@@ -118,21 +118,6 @@ public interface Vector4fc {
     ByteBuffer get(int index, ByteBuffer buffer);
 //#endif
 
-//#ifndef __GWT__
-    /**
-     * Store this vector at the given off-heap memory address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *            the off-heap address where to store this vector
-     * @return this
-     */
-    Vector4fc getToAddress(long address);
-//#endif
-
     /**
      * Subtract the supplied vector from this one and store the result in <code>dest</code>.
      * 
@@ -262,18 +247,6 @@ public interface Vector4fc {
      * @return dest
      */
     Vector4f mulAffine(Matrix4fc mat, Vector4f dest);
-
-    /**
-     * Multiply the given matrix mat with this Vector4f and store the result in
-     * <code>dest</code>.
-     * 
-     * @param mat
-     *          the matrix to multiply the vector with
-     * @param dest
-     *          the destination vector to hold the result
-     * @return dest
-     */
-    Vector4f mul(Matrix4x3fc mat, Vector4f dest);
 
     /**
      * Multiply the given matrix <code>mat</code> with this Vector4f, perform perspective division

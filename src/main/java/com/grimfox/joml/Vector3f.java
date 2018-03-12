@@ -33,10 +33,6 @@ import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import com.grimfox.joml.internal.MemUtil;
-import com.grimfox.joml.internal.Options;
-import com.grimfox.joml.internal.Runtime;
-
 /**
  * Contains the definition of a Vector comprising 3 floats and associated
  * transformations.
@@ -101,42 +97,6 @@ public class Vector3f implements Externalizable, Vector3fc {
      */
     public Vector3f(Vector3fc v) {
     	this(v.x(), v.y(), v.z());
-    }
-
-    /**
-     * Create a new {@link Vector3f} with the same values as <code>v</code>.
-     * 
-     * @param v
-     *          the {@link Vector3ic} to copy the values from
-     */
-    public Vector3f(Vector3ic v) {
-    	this(v.x(), v.y(), v.z());
-    }
-
-    /**
-     * Create a new {@link Vector3f} with the first two components from the
-     * given <code>v</code> and the given <code>z</code>
-     * 
-     * @param v
-     *          the {@link Vector2fc} to copy the values from
-     * @param z
-     *          the z component
-     */
-    public Vector3f(Vector2fc v, float z) {
-    	this(v.x(), v.y(), z);
-    }
-
-    /**
-     * Create a new {@link Vector3f} with the first two components from the
-     * given <code>v</code> and the given <code>z</code>
-     * 
-     * @param v
-     *          the {@link Vector2ic} to copy the values from
-     * @param z
-     *          the z component
-     */
-    public Vector3f(Vector2ic v, float z) {
-    	this(v.x(), v.y(), z);
     }
 
 //#ifdef __HAS_NIO__
@@ -235,59 +195,6 @@ public class Vector3f implements Externalizable, Vector3fc {
      */
     public Vector3f set(Vector3fc v) {
         return set(v.x(), v.y(), v.z());
-    }
-
-    /**
-     * Set the x, y and z components to match the supplied vector.
-     * <p>
-     * Note that due to the given vector <code>v</code> storing the components in double-precision,
-     * there is the possibility to lose precision.
-     * 
-     * @param v
-     *          contains the values of x, y and z to set
-     * @return this
-     */
-    public Vector3f set(Vector3dc v) {
-        return set((float) v.x(), (float) v.y(), (float) v.z());
-    }
-
-    /**
-     * Set the x, y and z components to match the supplied vector.
-     * 
-     * @param v
-     *          contains the values of x, y and z to set
-     * @return this
-     */
-    public Vector3f set(Vector3ic v) {
-        return set(v.x(), v.y(), v.z());
-    }
-
-    /**
-     * Set the first two components from the given <code>v</code>
-     * and the z component from the given <code>z</code>
-     *
-     * @param v
-     *          the {@link Vector2fc} to copy the values from
-     * @param z
-     *          the z component
-     * @return this
-     */
-    public Vector3f set(Vector2fc v, float z) {
-        return set(v.x(), v.y(), z);
-    }
-
-    /**
-     * Set the first two components from the given <code>v</code>
-     * and the z component from the given <code>z</code>
-     *
-     * @param v
-     *          the {@link Vector2ic} to copy the values from
-     * @param z
-     *          the z component
-     * @return this
-     */
-    public Vector3f set(Vector2ic v, float z) {
-        return set(v.x(), v.y(), z);
     }
 
     /**
@@ -393,28 +300,6 @@ public class Vector3f implements Externalizable, Vector3fc {
     }
 //#endif
 
-//#ifndef __GWT__
-    /**
-     * Set the values of this vector by reading 3 float values from off-heap memory,
-     * starting at the given address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *              the off-heap memory address to read the vector values from
-     * @return this
-     */
-    public Vector3f setFromAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.get(this, address);
-        return this;
-    }
-//#endif
-
     /**
      * Set the value of the specified component of this vector.
      *
@@ -471,16 +356,6 @@ public class Vector3f implements Externalizable, Vector3fc {
     public ByteBuffer get(int index, ByteBuffer buffer) {
         MemUtil.INSTANCE.put(this, index, buffer);
         return buffer;
-    }
-//#endif
-
-//#ifndef __GWT__
-    public Vector3fc getToAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.put(this, address);
-        return this;
     }
 //#endif
 
@@ -716,53 +591,6 @@ public class Vector3f implements Externalizable, Vector3fc {
     }
 
     /**
-     * Multiply the given matrix with this Vector3f and store the result in <code>this</code>.
-     * 
-     * @param mat
-     *          the matrix
-     * @return a vector holding the result
-     */
-    public Vector3f mul(Matrix3dc mat) {
-        return mul(mat, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector3fc#mul(com.grimfox.joml.Matrix3dc, com.grimfox.joml.Vector3f)
-     */
-    public Vector3f mul(Matrix3dc mat, Vector3f dest) {
-        double rx = mat.m00() * x + mat.m10() * y + mat.m20() * z;
-        double ry = mat.m01() * x + mat.m11() * y + mat.m21() * z;
-        double rz = mat.m02() * x + mat.m12() * y + mat.m22() * z;
-        dest.x = (float) rx;
-        dest.y = (float) ry;
-        dest.z = (float) rz;
-        return dest;
-    }
-
-    /**
-     * Multiply the given matrix with this Vector3f and store the result in <code>this</code>.
-     * 
-     * @param mat
-     *          the matrix
-     * @return a vector holding the result
-     */
-    public Vector3f mul(Matrix3x2fc mat) {
-        return mul(mat, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector3fc#mul(com.grimfox.joml.Matrix3x2fc, com.grimfox.joml.Vector3f)
-     */
-    public Vector3f mul(Matrix3x2fc mat, Vector3f dest) {
-        float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z;
-        float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z;
-        dest.x = rx;
-        dest.y = ry;
-        dest.z = z;
-        return dest;
-    }
-
-    /**
      * Multiply the transpose of the given matrix with this Vector3f store the result in <code>this</code>.
      * 
      * @param mat
@@ -799,36 +627,10 @@ public class Vector3f implements Externalizable, Vector3fc {
         return mulPosition(mat, thisOrNew());
     }
 
-    /**
-     * Multiply the given 4x3 matrix <code>mat</code> with <code>this</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>1.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @return a vector holding the result
-     */
-    public Vector3f mulPosition(Matrix4x3fc mat) {
-        return mulPosition(mat, thisOrNew());
-    }
-
     /* (non-Javadoc)
      * @see com.grimfox.joml.Vector3fc#mulPosition(com.grimfox.joml.Matrix4fc, com.grimfox.joml.Vector3f)
      */
     public Vector3f mulPosition(Matrix4fc mat, Vector3f dest) {
-        float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z + mat.m30();
-        float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z + mat.m31();
-        float rz = mat.m02() * x + mat.m12() * y + mat.m22() * z + mat.m32();
-        dest.x = rx;
-        dest.y = ry;
-        dest.z = rz;
-        return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector3fc#mulPosition(com.grimfox.joml.Matrix4x3fc, com.grimfox.joml.Vector3f)
-     */
-    public Vector3f mulPosition(Matrix4x3fc mat, Vector3f dest) {
         float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z + mat.m30();
         float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z + mat.m31();
         float rz = mat.m02() * x + mat.m12() * y + mat.m22() * z + mat.m32();
@@ -901,66 +703,14 @@ public class Vector3f implements Externalizable, Vector3fc {
      *          the matrix to multiply this vector by
      * @return a vector holding the result
      */
-    public Vector3f mulDirection(Matrix4dc mat) {
-        return mulDirection(mat, thisOrNew());
-    }
-
-    /**
-     * Multiply the given 4x4 matrix <code>mat</code> with <code>this</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>0.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @return a vector holding the result
-     */
     public Vector3f mulDirection(Matrix4fc mat) {
         return mulDirection(mat, thisOrNew());
-    }
-
-    /**
-     * Multiply the given 4x3 matrix <code>mat</code> with <code>this</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>0.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @return a vector holding the result
-     */
-    public Vector3f mulDirection(Matrix4x3fc mat) {
-        return mulDirection(mat, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector3fc#mulDirection(com.grimfox.joml.Matrix4dc, com.grimfox.joml.Vector3f)
-     */
-    public Vector3f mulDirection(Matrix4dc mat, Vector3f dest) {
-        double rx = mat.m00() * x + mat.m10() * y + mat.m20() * z;
-        double ry = mat.m01() * x + mat.m11() * y + mat.m21() * z;
-        double rz = mat.m02() * x + mat.m12() * y + mat.m22() * z;
-        dest.x = (float) rx;
-        dest.y = (float) ry;
-        dest.z = (float) rz;
-        return dest;
     }
 
     /* (non-Javadoc)
      * @see com.grimfox.joml.Vector3fc#mulDirection(com.grimfox.joml.Matrix4fc, com.grimfox.joml.Vector3f)
      */
     public Vector3f mulDirection(Matrix4fc mat, Vector3f dest) {
-        float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z;
-        float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z;
-        float rz = mat.m02() * x + mat.m12() * y + mat.m22() * z;
-        dest.x = rx;
-        dest.y = ry;
-        dest.z = rz;
-        return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Vector3fc#mulDirection(com.grimfox.joml.Matrix4x3fc, com.grimfox.joml.Vector3f)
-     */
-    public Vector3f mulDirection(Matrix4x3fc mat, Vector3f dest) {
         float rx = mat.m00() * x + mat.m10() * y + mat.m20() * z;
         float ry = mat.m01() * x + mat.m11() * y + mat.m21() * z;
         float rz = mat.m02() * x + mat.m12() * y + mat.m22() * z;
@@ -1463,7 +1213,7 @@ public class Vector3f implements Externalizable, Vector3fc {
      * @return the string representation
      */
     public String toString() {
-        return Runtime.formatNumbers(toString(Options.NUMBER_FORMAT));
+        return Runtime.formatNumbers(toString(Runtime.NUMBER_FORMAT));
     }
 
     /**

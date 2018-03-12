@@ -33,9 +33,6 @@ import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import com.grimfox.joml.internal.MemUtil;
-import com.grimfox.joml.internal.Options;
-
 /**
  * Contains the definition of a 4x4 matrix of floats, and associated functions to transform
  * it. The matrix is column-major to match OpenGL's interpretation, and it looks like this:
@@ -99,52 +96,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
         } else {
             setMatrix4fc(mat);
         }
-        properties = mat.properties();
-    }
-
-    /**
-     * Create a new {@link Matrix4f} and set its upper 4x3 submatrix to the given matrix <code>mat</code>
-     * and all other elements to identity.
-     * 
-     * @param mat
-     *          the {@link Matrix4x3fc} to copy the values from
-     */
-    public Matrix4f(Matrix4x3fc mat) {
-        if (mat instanceof Matrix4x3f) {
-            MemUtil.INSTANCE.copy4x3((Matrix4x3f) mat, this);
-        } else {
-            set4x3Matrix4x3fc(mat);
-        }
-        this.m33 = 1.0f;
-        properties = mat.properties() | PROPERTY_AFFINE;
-    }
-
-    /**
-     * Create a new {@link Matrix4f} and make it a copy of the given matrix.
-     * <p>
-     * Note that due to the given {@link Matrix4dc} storing values in double-precision and the constructed {@link Matrix4f} storing them
-     * in single-precision, there is the possibility of losing precision.
-     * 
-     * @param mat
-     *          the {@link Matrix4dc} to copy the values from
-     */
-    public Matrix4f(Matrix4dc mat) {
-        m00 = (float) mat.m00();
-        m01 = (float) mat.m01();
-        m02 = (float) mat.m02();
-        m03 = (float) mat.m03();
-        m10 = (float) mat.m10();
-        m11 = (float) mat.m11();
-        m12 = (float) mat.m12();
-        m13 = (float) mat.m13();
-        m20 = (float) mat.m20();
-        m21 = (float) mat.m21();
-        m22 = (float) mat.m22();
-        m23 = (float) mat.m23();
-        m30 = (float) mat.m30();
-        m31 = (float) mat.m31();
-        m32 = (float) mat.m32();
-        m33 = (float) mat.m33();
         properties = mat.properties();
     }
 
@@ -883,78 +834,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /**
-     * Store the values of the given matrix <code>m</code> into <code>this</code> matrix
-     * and set the other matrix elements to identity.
-     * 
-     * @see #Matrix4f(Matrix4x3fc)
-     * 
-     * @param m
-     *          the matrix to copy the values from
-     * @return this
-     */
-    public Matrix4f set(Matrix4x3fc m) {
-        if (m instanceof Matrix4x3f) {
-            MemUtil.INSTANCE.copy((Matrix4x3f) m, this);
-        } else {
-            setMatrix4x3fc(m);
-        }
-        this._properties(m.properties() | PROPERTY_AFFINE);
-        return this;
-    }
-    private void setMatrix4x3fc(Matrix4x3fc mat) {
-        _m00(mat.m00());
-        _m01(mat.m01());
-        _m02(mat.m02());
-        _m03(0.0f);
-        _m10(mat.m10());
-        _m11(mat.m11());
-        _m12(mat.m12());
-        _m13(0.0f);
-        _m20(mat.m20());
-        _m21(mat.m21());
-        _m22(mat.m22());
-        _m23(0.0f);
-        _m30(mat.m30());
-        _m31(mat.m31());
-        _m32(mat.m32());
-        _m33(1.0f);
-    }
-
-    /**
-     * Store the values of the given matrix <code>m</code> into <code>this</code> matrix.
-     * <p>
-     * Note that due to the given matrix <code>m</code> storing values in double-precision and <code>this</code> matrix storing
-     * them in single-precision, there is the possibility to lose precision.
-     * 
-     * @see #Matrix4f(Matrix4dc)
-     * @see #get(Matrix4d)
-     * 
-     * @param m
-     *          the matrix to copy the values from
-     * @return this
-     */
-    public Matrix4f set(Matrix4dc m) {
-        this._m00((float) m.m00());
-        this._m01((float) m.m01());
-        this._m02((float) m.m02());
-        this._m03((float) m.m03());
-        this._m10((float) m.m10());
-        this._m11((float) m.m11());
-        this._m12((float) m.m12());
-        this._m13((float) m.m13());
-        this._m20((float) m.m20());
-        this._m21((float) m.m21());
-        this._m22((float) m.m22());
-        this._m23((float) m.m23());
-        this._m30((float) m.m30());
-        this._m31((float) m.m31());
-        this._m32((float) m.m32());
-        this._m33((float) m.m33());
-        this._properties(m.properties());
-        return this;
-    }
-
-    /**
      * Set the upper left 3x3 submatrix of this {@link Matrix4f} to the given {@link Matrix3fc} 
      * and the rest to identity.
      * 
@@ -993,98 +872,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /**
-     * Set this matrix to be equivalent to the rotation specified by the given {@link AxisAngle4f}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f}
-     * @return this
-     */
-    public Matrix4f set(AxisAngle4f axisAngle) {
-        float x = axisAngle.x;
-        float y = axisAngle.y;
-        float z = axisAngle.z;
-        double angle = axisAngle.angle;
-        double n = Math.sqrt(x*x + y*y + z*z);
-        n = 1/n;
-        x *= n;
-        y *= n;
-        z *= n;
-        double s = Math.sin(angle);
-        double c = Math.cosFromSin(s, angle);
-        double omc = 1.0 - c;
-        this._m00((float)(c + x*x*omc));
-        this._m11((float)(c + y*y*omc));
-        this._m22((float)(c + z*z*omc));
-        double tmp1 = x*y*omc;
-        double tmp2 = z*s;
-        this._m10((float)(tmp1 - tmp2));
-        this._m01((float)(tmp1 + tmp2));
-        tmp1 = x*z*omc;
-        tmp2 = y*s;
-        this._m20((float)(tmp1 + tmp2));
-        this._m02((float)(tmp1 - tmp2));
-        tmp1 = y*z*omc;
-        tmp2 = x*s;
-        this._m21((float)(tmp1 - tmp2));
-        this._m12((float)(tmp1 + tmp2));
-        this._m03(0.0f);
-        this._m13(0.0f);
-        this._m23(0.0f);
-        this._m30(0.0f);
-        this._m31(0.0f);
-        this._m32(0.0f);
-        this._m33(1.0f);
-        this._properties(PROPERTY_AFFINE | PROPERTY_ORTHONORMAL);
-        return this;
-    }
-
-    /**
-     * Set this matrix to be equivalent to the rotation specified by the given {@link AxisAngle4d}.
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4d}
-     * @return this
-     */
-    public Matrix4f set(AxisAngle4d axisAngle) {
-        double x = axisAngle.x;
-        double y = axisAngle.y;
-        double z = axisAngle.z;
-        double angle = axisAngle.angle;
-        double n = Math.sqrt(x*x + y*y + z*z);
-        n = 1/n;
-        x *= n;
-        y *= n;
-        z *= n;
-        double s = Math.sin(angle);
-        double c = Math.cosFromSin(s, angle);
-        double omc = 1.0 - c;
-        this._m00((float)(c + x*x*omc));
-        this._m11((float)(c + y*y*omc));
-        this._m22((float)(c + z*z*omc));
-        double tmp1 = x*y*omc;
-        double tmp2 = z*s;
-        this._m10((float)(tmp1 - tmp2));
-        this._m01((float)(tmp1 + tmp2));
-        tmp1 = x*z*omc;
-        tmp2 = y*s;
-        this._m20((float)(tmp1 + tmp2));
-        this._m02((float)(tmp1 - tmp2));
-        tmp1 = y*z*omc;
-        tmp2 = x*s;
-        this._m21((float)(tmp1 - tmp2));
-        this._m12((float)(tmp1 + tmp2));
-        this._m03(0.0f);
-        this._m13(0.0f);
-        this._m23(0.0f);
-        this._m30(0.0f);
-        this._m31(0.0f);
-        this._m32(0.0f);
-        this._m33(1.0f);
-        this._properties(PROPERTY_AFFINE | PROPERTY_ORTHONORMAL);
-        return this;
-    }
-
-    /**
      * Set this matrix to be equivalent to the rotation specified by the given {@link Quaternionfc}.
      * <p>
      * This method is equivalent to calling: <tt>rotation(q)</tt>
@@ -1102,45 +889,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /**
-     * Set this matrix to be equivalent to the rotation specified by the given {@link Quaterniondc}.
-     * <p>
-     * Reference: <a href="http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/">http://www.euclideanspace.com/</a>
-     * 
-     * @param q
-     *          the {@link Quaterniondc}
-     * @return this
-     */
-    public Matrix4f set(Quaterniondc q) {
-        double w2 = q.w() * q.w();
-        double x2 = q.x() * q.x();
-        double y2 = q.y() * q.y();
-        double z2 = q.z() * q.z();
-        double zw = q.z() * q.w();
-        double xy = q.x() * q.y();
-        double xz = q.x() * q.z();
-        double yw = q.y() * q.w();
-        double yz = q.y() * q.z();
-        double xw = q.x() * q.w();
-        _m00((float) (w2 + x2 - z2 - y2));
-        _m01((float) (xy + zw + zw + xy));
-        _m02((float) (xz - yw + xz - yw));
-        _m03(0.0f);
-        _m10((float) (-zw + xy - zw + xy));
-        _m11((float) (y2 - z2 + w2 - x2));
-        _m12((float) (yz + yz + xw + xw));
-        _m13(0.0f);
-        _m20((float) (yw + xz + xz + yw));
-        _m21((float) (yz + yz - xw - xw));
-        _m22((float) (z2 - y2 - x2 + w2));
-        _m30(0.0f);
-        _m31(0.0f);
-        _m32(0.0f);
-        _m33(1.0f);
-        this._properties(PROPERTY_AFFINE | PROPERTY_ORTHONORMAL);
-        return this;
-    }
-
-    /**
      * Set the upper left 3x3 submatrix of this {@link Matrix4f} to that of the given {@link Matrix4f} 
      * and don't change the other elements.
      * 
@@ -1154,40 +902,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
         return this;
     }
 
-
-    /**
-     * Set the upper 4x3 submatrix of this {@link Matrix4f} to the given {@link Matrix4x3fc} 
-     * and don't change the other elements.
-     * 
-     * @see Matrix4x3f#get(Matrix4f)
-     * 
-     * @param mat
-     *          the {@link Matrix4x3fc}
-     * @return this
-     */
-    public Matrix4f set4x3(Matrix4x3fc mat) {
-        if (mat instanceof Matrix4x3f) {
-            MemUtil.INSTANCE.copy4x3((Matrix4x3f) mat, this);
-        } else {
-            set4x3Matrix4x3fc(mat);
-        }
-        properties &= mat.properties() & ~(PROPERTY_PERSPECTIVE);
-        return this;
-    }
-    private void set4x3Matrix4x3fc(Matrix4x3fc mat) {
-        _m00(mat.m00());
-        _m01(mat.m01());
-        _m02(mat.m02());
-        _m10(mat.m10());
-        _m11(mat.m11());
-        _m12(mat.m12());
-        _m20(mat.m20());
-        _m21(mat.m21());
-        _m22(mat.m22());
-        _m30(mat.m30());
-        _m31(mat.m31());
-        _m32(mat.m32());
-    }
 
     /**
      * Set the upper 4x3 submatrix of this {@link Matrix4f} to the upper 4x3 submatrix of the given {@link Matrix4f} 
@@ -1402,123 +1116,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /**
-     * Multiply this matrix by the supplied <code>right</code> matrix and store the result in <code>this</code>.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>R</code> the <code>right</code> matrix,
-     * then the new matrix will be <code>M * R</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * R * v</code>, the
-     * transformation of the right matrix will be applied first!
-     *
-     * @param right
-     *          the right operand of the matrix multiplication
-     * @return a matrix holding the result
-     */
-    public Matrix4f mul(Matrix4x3fc right) {
-        return mul(right, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#mul(com.grimfox.joml.Matrix4x3fc, com.grimfox.joml.Matrix4f)
-     */
-    public Matrix4f mul(Matrix4x3fc right, Matrix4f dest) {
-        if ((properties & PROPERTY_IDENTITY) != 0)
-            return dest.set(right);
-        else if ((right.properties() & PROPERTY_IDENTITY) != 0)
-            return dest.set(this);
-        else if ((properties & PROPERTY_PERSPECTIVE) != 0 && (right.properties() & PROPERTY_AFFINE) != 0)
-            return mulPerspectiveAffine(right, dest);
-        return mulGeneric(right, dest);
-    }
-    private Matrix4f mulGeneric(Matrix4x3fc right, Matrix4f dest) {
-        float nm00 = m00 * right.m00() + m10 * right.m01() + m20 * right.m02();
-        float nm01 = m01 * right.m00() + m11 * right.m01() + m21 * right.m02();
-        float nm02 = m02 * right.m00() + m12 * right.m01() + m22 * right.m02();
-        float nm03 = m03 * right.m00() + m13 * right.m01() + m23 * right.m02();
-        float nm10 = m00 * right.m10() + m10 * right.m11() + m20 * right.m12();
-        float nm11 = m01 * right.m10() + m11 * right.m11() + m21 * right.m12();
-        float nm12 = m02 * right.m10() + m12 * right.m11() + m22 * right.m12();
-        float nm13 = m03 * right.m10() + m13 * right.m11() + m23 * right.m12();
-        float nm20 = m00 * right.m20() + m10 * right.m21() + m20 * right.m22();
-        float nm21 = m01 * right.m20() + m11 * right.m21() + m21 * right.m22();
-        float nm22 = m02 * right.m20() + m12 * right.m21() + m22 * right.m22();
-        float nm23 = m03 * right.m20() + m13 * right.m21() + m23 * right.m22();
-        float nm30 = m00 * right.m30() + m10 * right.m31() + m20 * right.m32() + m30;
-        float nm31 = m01 * right.m30() + m11 * right.m31() + m21 * right.m32() + m31;
-        float nm32 = m02 * right.m30() + m12 * right.m31() + m22 * right.m32() + m32;
-        float nm33 = m03 * right.m30() + m13 * right.m31() + m23 * right.m32() + m33;
-        dest._m00(nm00);
-        dest._m01(nm01);
-        dest._m02(nm02);
-        dest._m03(nm03);
-        dest._m10(nm10);
-        dest._m11(nm11);
-        dest._m12(nm12);
-        dest._m13(nm13);
-        dest._m20(nm20);
-        dest._m21(nm21);
-        dest._m22(nm22);
-        dest._m23(nm23);
-        dest._m30(nm30);
-        dest._m31(nm31);
-        dest._m32(nm32);
-        dest._m33(nm33);
-        dest._properties(properties & ~(PROPERTY_IDENTITY | PROPERTY_PERSPECTIVE | PROPERTY_TRANSLATION | PROPERTY_ORTHONORMAL));
-        return dest;
-    }
-
-    /**
-     * Multiply this matrix by the supplied <code>right</code> matrix and store the result in <code>this</code>.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>R</code> the <code>right</code> matrix,
-     * then the new matrix will be <code>M * R</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * R * v</code>, the
-     * transformation of the right matrix will be applied first!
-     *
-     * @param right
-     *          the right operand of the matrix multiplication
-     * @return a matrix holding the result
-     */
-    public Matrix4f mul(Matrix3x2fc right) {
-        return mul(right, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#mul(com.grimfox.joml.Matrix3x2fc, com.grimfox.joml.Matrix4f)
-     */
-    public Matrix4f mul(Matrix3x2fc right, Matrix4f dest) {
-        float nm00 = m00 * right.m00() + m10 * right.m01();
-        float nm01 = m01 * right.m00() + m11 * right.m01();
-        float nm02 = m02 * right.m00() + m12 * right.m01();
-        float nm03 = m03 * right.m00() + m13 * right.m01();
-        float nm10 = m00 * right.m10() + m10 * right.m11();
-        float nm11 = m01 * right.m10() + m11 * right.m11();
-        float nm12 = m02 * right.m10() + m12 * right.m11();
-        float nm13 = m03 * right.m10() + m13 * right.m11();
-        float nm30 = m00 * right.m20() + m10 * right.m21() + m30;
-        float nm31 = m01 * right.m20() + m11 * right.m21() + m31;
-        float nm32 = m02 * right.m20() + m12 * right.m21() + m32;
-        float nm33 = m03 * right.m20() + m13 * right.m21() + m33;
-        dest._m00(nm00);
-        dest._m01(nm01);
-        dest._m02(nm02);
-        dest._m03(nm03);
-        dest._m10(nm10);
-        dest._m11(nm11);
-        dest._m12(nm12);
-        dest._m13(nm13);
-        dest._m20(m20);
-        dest._m21(m21);
-        dest._m22(m22);
-        dest._m23(m23);
-        dest._m30(nm30);
-        dest._m31(nm31);
-        dest._m32(nm32);
-        dest._m33(nm33);
-        dest._properties(properties & ~(PROPERTY_IDENTITY | PROPERTY_PERSPECTIVE | PROPERTY_TRANSLATION | PROPERTY_ORTHONORMAL));
-        return dest;
-    }
-
-    /**
      * Multiply <code>this</code> symmetric perspective projection matrix by the supplied {@link #isAffine() affine} <code>view</code> matrix.
      * <p>
      * If <code>P</code> is <code>this</code> matrix and <code>V</code> the <code>view</code> matrix,
@@ -1538,62 +1135,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
      * @see com.grimfox.joml.Matrix4fc#mulPerspectiveAffine(com.grimfox.joml.Matrix4fc, com.grimfox.joml.Matrix4f)
      */
     public Matrix4f mulPerspectiveAffine(Matrix4fc view, Matrix4f dest) {
-        float nm00 = m00 * view.m00();
-        float nm01 = m11 * view.m01();
-        float nm02 = m22 * view.m02();
-        float nm03 = m23 * view.m02();
-        float nm10 = m00 * view.m10();
-        float nm11 = m11 * view.m11();
-        float nm12 = m22 * view.m12();
-        float nm13 = m23 * view.m12();
-        float nm20 = m00 * view.m20();
-        float nm21 = m11 * view.m21();
-        float nm22 = m22 * view.m22();
-        float nm23 = m23 * view.m22();
-        float nm30 = m00 * view.m30();
-        float nm31 = m11 * view.m31();
-        float nm32 = m22 * view.m32() + m32;
-        float nm33 = m23 * view.m32();
-        dest._m00(nm00);
-        dest._m01(nm01);
-        dest._m02(nm02);
-        dest._m03(nm03);
-        dest._m10(nm10);
-        dest._m11(nm11);
-        dest._m12(nm12);
-        dest._m13(nm13);
-        dest._m20(nm20);
-        dest._m21(nm21);
-        dest._m22(nm22);
-        dest._m23(nm23);
-        dest._m30(nm30);
-        dest._m31(nm31);
-        dest._m32(nm32);
-        dest._m33(nm33);
-        dest._properties(0);
-        return dest;
-    }
-
-    /**
-     * Multiply <code>this</code> symmetric perspective projection matrix by the supplied <code>view</code> matrix.
-     * <p>
-     * If <code>P</code> is <code>this</code> matrix and <code>V</code> the <code>view</code> matrix,
-     * then the new matrix will be <code>P * V</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>P * V * v</code>, the
-     * transformation of the <code>view</code> matrix will be applied first!
-     *
-     * @param view
-     *          the matrix to multiply <code>this</code> symmetric perspective projection matrix by
-     * @return a matrix holding the result
-     */
-    public Matrix4f mulPerspectiveAffine(Matrix4x3fc view) {
-       return mulPerspectiveAffine(view, thisOrNew());
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#mulPerspectiveAffine(com.grimfox.joml.Matrix4x3fc, com.grimfox.joml.Matrix4f)
-     */
-    public Matrix4f mulPerspectiveAffine(Matrix4x3fc view, Matrix4f dest) {
         float nm00 = m00 * view.m00();
         float nm01 = m11 * view.m01();
         float nm02 = m22 * view.m02();
@@ -2246,29 +1787,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 //#endif
 
-//#ifndef __GWT__
-    /**
-     * Set the values of this matrix by reading 16 float values from off-heap memory in column-major order,
-     * starting at the given address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *              the off-heap memory address to read the matrix values from in column-major order
-     * @return this
-     */
-    public Matrix4f setFromAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.get(this, address);
-        _properties(0);
-        return this;
-    }
-//#endif
-
     /**
      * Set the four columns of this matrix to the supplied vectors, respectively.
      * 
@@ -2597,64 +2115,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
      * @return dest
      */
     public Matrix4f invertPerspectiveView(Matrix4fc view, Matrix4f dest) {
-        float a =  1.0f / (m00 * m11);
-        float l = -1.0f / (m23 * m32);
-        float pm00 =  m11 * a;
-        float pm11 =  m00 * a;
-        float pm23 = -m23 * l;
-        float pm32 = -m32 * l;
-        float pm33 =  m22 * l;
-        float vm30 = -view.m00() * view.m30() - view.m01() * view.m31() - view.m02() * view.m32();
-        float vm31 = -view.m10() * view.m30() - view.m11() * view.m31() - view.m12() * view.m32();
-        float vm32 = -view.m20() * view.m30() - view.m21() * view.m31() - view.m22() * view.m32();
-        float nm00 = view.m00() * pm00, nm01 = view.m10() * pm00, nm02 = view.m20() * pm00;
-        float nm10 = view.m01() * pm11, nm11 = view.m11() * pm11, nm12 = view.m21() * pm11;
-        float nm20 = vm30 * pm23, nm21 = vm31 * pm23, nm22 = vm32 * pm23;
-        float nm30 = view.m02() * pm32 + vm30 * pm33;
-        float nm31 = view.m12() * pm32 + vm31 * pm33;
-        float nm32 = view.m22() * pm32 + vm32 * pm33;
-        dest.m00 = nm00;
-        dest.m01 = nm01;
-        dest.m02 = nm02;
-        dest.m03 = 0.0f;
-        dest.m10 = nm10;
-        dest.m11 = nm11;
-        dest.m12 = nm12;
-        dest.m13 = 0.0f;
-        dest.m20 = nm20;
-        dest.m21 = nm21;
-        dest.m22 = nm22;
-        dest.m23 = pm23;
-        dest.m30 = nm30;
-        dest.m31 = nm31;
-        dest.m32 = nm32;
-        dest.m33 = pm33;
-        dest._properties(0);
-        return dest;
-    }
-
-    /**
-     * If <code>this</code> is a perspective projection matrix obtained via one of the {@link #perspective(float, float, float, float) perspective()} methods
-     * or via {@link #setPerspective(float, float, float, float) setPerspective()}, that is, if <code>this</code> is a symmetrical perspective frustum transformation
-     * and the given <code>view</code> matrix has unit scaling,
-     * then this method builds the inverse of <tt>this * view</tt> and stores it into the given <code>dest</code>.
-     * <p>
-     * This method can be used to quickly obtain the inverse of the combination of the view and projection matrices, when both were obtained
-     * via the common methods {@link #perspective(float, float, float, float) perspective()} and {@link #lookAt(float, float, float, float, float, float, float, float, float) lookAt()} or
-     * other methods, that build affine matrices, such as {@link #translate(float, float, float) translate} and {@link #rotate(float, float, float, float)}, except for {@link #scale(float, float, float) scale()}.
-     * <p>
-     * For the special cases of the matrices <code>this</code> and <code>view</code> mentioned above, this method is equivalent to the following code:
-     * <pre>
-     * dest.set(this).mul(view).invert();
-     * </pre>
-     * 
-     * @param view
-     *          the view transformation (must have unit scaling)
-     * @param dest
-     *          will hold the inverse of <tt>this * view</tt>
-     * @return dest
-     */
-    public Matrix4f invertPerspectiveView(Matrix4x3fc view, Matrix4f dest) {
         float a =  1.0f / (m00 * m11);
         float l = -1.0f / (m23 * m32);
         float pm00 =  m11 * a;
@@ -3026,54 +2486,9 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#get4x3(com.grimfox.joml.Matrix4x3f)
-     */
-    public Matrix4x3f get4x3(Matrix4x3f dest) {
-        return dest.set(this);
-    }
-
-    /**
-     * Get the current values of <code>this</code> matrix and store them into
-     * <code>dest</code>.
-     * <p>
-     * This is the reverse method of {@link #set(Matrix4dc)} and allows to obtain
-     * intermediate calculation results when chaining multiple transformations.
-     * 
-     * @see #set(Matrix4dc)
-     * 
-     * @param dest
-     *            the destination matrix
-     * @return the passed in destination
-     */
-    public Matrix4d get(Matrix4d dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
      * @see com.grimfox.joml.Matrix4fc#get3x3(com.grimfox.joml.Matrix3f)
      */
     public Matrix3f get3x3(Matrix3f dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#get3x3(com.grimfox.joml.Matrix3d)
-     */
-    public Matrix3d get3x3(Matrix3d dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#getRotation(com.grimfox.joml.AxisAngle4f)
-     */
-    public AxisAngle4f getRotation(AxisAngle4f dest) {
-        return dest.set(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#getRotation(com.grimfox.joml.AxisAngle4d)
-     */
-    public AxisAngle4d getRotation(AxisAngle4d dest) {
         return dest.set(this);
     }
 
@@ -3088,20 +2503,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
      * @see com.grimfox.joml.Matrix4fc#getNormalizedRotation(com.grimfox.joml.Quaternionf)
      */
     public Quaternionf getNormalizedRotation(Quaternionf dest) {
-        return dest.setFromNormalized(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#getUnnormalizedRotation(com.grimfox.joml.Quaterniond)
-     */
-    public Quaterniond getUnnormalizedRotation(Quaterniond dest) {
-        return dest.setFromUnnormalized(this);
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#getNormalizedRotation(com.grimfox.joml.Quaterniond)
-     */
-    public Quaterniond getNormalizedRotation(Quaterniond dest) {
         return dest.setFromNormalized(this);
     }
 
@@ -3194,16 +2595,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     public ByteBuffer get4x3Transposed(int index, ByteBuffer buffer) {
         MemUtil.INSTANCE.put4x3Transposed(this, index, buffer);
         return buffer;
-    }
-//#endif
-
-//#ifndef __GWT__
-    public Matrix4fc getToAddress(long address) {
-        if (Options.NO_UNSAFE)
-            throw new UnsupportedOperationException("Not supported when using joml.nounsafe");
-        MemUtil.MemUtilUnsafe unsafe = (MemUtil.MemUtilUnsafe) MemUtil.INSTANCE;
-        unsafe.put(this, address);
-        return this;
     }
 //#endif
 
@@ -3327,31 +2718,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
      */
     public Matrix4f rotation(float angle, Vector3fc axis) {
         return rotation(angle, axis.x(), axis.y(), axis.z());
-    }
-
-    /**
-     * Set this matrix to a rotation transformation using the given {@link AxisAngle4f}.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * The resulting matrix can be multiplied against another transformation
-     * matrix to obtain an additional rotation.
-     * <p>
-     * In order to apply the rotation transformation to an existing transformation,
-     * use {@link #rotate(AxisAngle4f) rotate()} instead.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     *
-     * @see #rotate(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @return this
-     */
-    public Matrix4f rotation(AxisAngle4f axisAngle) {
-        return rotation(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
     }
 
     /**
@@ -10833,64 +10199,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f}, to this matrix.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * In order to set the matrix to a rotation transformation without post-multiplying,
-     * use {@link #rotation(AxisAngle4f)}.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float)
-     * @see #rotation(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @return this
-     */
-    public Matrix4f rotate(AxisAngle4f axisAngle) {
-        return rotate(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z);
-    }
-
-    /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f} and store the result in <code>dest</code>.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * In order to set the matrix to a rotation transformation without post-multiplying,
-     * use {@link #rotation(AxisAngle4f)}.
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float)
-     * @see #rotation(AxisAngle4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    public Matrix4f rotate(AxisAngle4f axisAngle, Matrix4f dest) {
-        return rotate(axisAngle.angle, axisAngle.x, axisAngle.y, axisAngle.z, dest);
-    }
-
-    /**
      * Apply a rotation transformation, rotating the given radians about the specified axis, to this matrix.
      * <p>
      * The axis described by the <code>axis</code> vector needs to be a unit vector.
@@ -11112,13 +10420,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
     }
 
     /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#unprojectRay(com.grimfox.joml.Vector2fc, int[], com.grimfox.joml.Vector3f, com.grimfox.joml.Vector3f)
-     */
-    public Matrix4f unprojectRay(Vector2fc winCoords, int[] viewport, Vector3f originDest, Vector3f dirDest) {
-        return unprojectRay(winCoords.x(), winCoords.y(), viewport, originDest, dirDest);
-    }
-
-    /* (non-Javadoc)
      * @see com.grimfox.joml.Matrix4fc#unprojectInv(com.grimfox.joml.Vector3fc, int[], com.grimfox.joml.Vector4f)
      */
     public Vector4f unprojectInv(Vector3fc winCoords, int[] viewport, Vector4f dest) {
@@ -11138,13 +10439,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
         dest.z = (m02 * ndcX + m12 * ndcY + m22 * ndcZ + m32) * invW;
         dest.w = 1.0f;
         return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#unprojectInvRay(com.grimfox.joml.Vector2fc, int[], com.grimfox.joml.Vector3f, com.grimfox.joml.Vector3f)
-     */
-    public Matrix4f unprojectInvRay(Vector2fc winCoords, int[] viewport, Vector3f originDest, Vector3f dirDest) {
-        return unprojectInvRay(winCoords.x(), winCoords.y(), viewport, originDest, dirDest);
     }
 
     /* (non-Javadoc)
@@ -11896,64 +11190,6 @@ public class Matrix4f implements Externalizable, Matrix4fc {
         dest.m10(m10 * invYlen); dest.m11(m11 * invYlen); dest.m12(m12 * invYlen);
         dest.m20(m20 * invZlen); dest.m21(m21 * invZlen); dest.m22(m22 * invZlen);
         return dest;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#frustumPlane(int, com.grimfox.joml.Vector4f)
-     */
-    public Vector4f frustumPlane(int plane, Vector4f planeEquation) {
-        switch (plane) {
-        case PLANE_NX:
-            planeEquation.set(m03 + m00, m13 + m10, m23 + m20, m33 + m30).normalize3(planeEquation);
-            break;
-        case PLANE_PX:
-            planeEquation.set(m03 - m00, m13 - m10, m23 - m20, m33 - m30).normalize3(planeEquation);
-            break;
-        case PLANE_NY:
-            planeEquation.set(m03 + m01, m13 + m11, m23 + m21, m33 + m31).normalize3(planeEquation);
-            break;
-        case PLANE_PY:
-            planeEquation.set(m03 - m01, m13 - m11, m23 - m21, m33 - m31).normalize3(planeEquation);
-            break;
-        case PLANE_NZ:
-            planeEquation.set(m03 + m02, m13 + m12, m23 + m22, m33 + m32).normalize3(planeEquation);
-            break;
-        case PLANE_PZ:
-            planeEquation.set(m03 - m02, m13 - m12, m23 - m22, m33 - m32).normalize3(planeEquation);
-            break;
-        default:
-            throw new IllegalArgumentException("plane"); //$NON-NLS-1$
-        }
-        return planeEquation;
-    }
-
-    /* (non-Javadoc)
-     * @see com.grimfox.joml.Matrix4fc#frustumPlane(int, com.grimfox.joml.Planef)
-     */
-    public Planef frustumPlane(int which, Planef plane) {
-        switch (which) {
-        case PLANE_NX:
-            plane.set(m03 + m00, m13 + m10, m23 + m20, m33 + m30).normalize(plane);
-            break;
-        case PLANE_PX:
-            plane.set(m03 - m00, m13 - m10, m23 - m20, m33 - m30).normalize(plane);
-            break;
-        case PLANE_NY:
-            plane.set(m03 + m01, m13 + m11, m23 + m21, m33 + m31).normalize(plane);
-            break;
-        case PLANE_PY:
-            plane.set(m03 - m01, m13 - m11, m23 - m21, m33 - m31).normalize(plane);
-            break;
-        case PLANE_NZ:
-            plane.set(m03 + m02, m13 + m12, m23 + m22, m33 + m32).normalize(plane);
-            break;
-        case PLANE_PZ:
-            plane.set(m03 - m02, m13 - m12, m23 - m22, m33 - m32).normalize(plane);
-            break;
-        default:
-            throw new IllegalArgumentException("which"); //$NON-NLS-1$
-        }
-        return plane;
     }
 
     /* (non-Javadoc)

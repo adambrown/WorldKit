@@ -35,42 +35,6 @@ import java.nio.FloatBuffer;
 public interface Matrix4fc {
 
     /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>x=-1</tt> when using the identity matrix.  
-     */
-    int PLANE_NX = 0;
-    /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>x=1</tt> when using the identity matrix.  
-     */
-    int PLANE_PX = 1;
-    /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>y=-1</tt> when using the identity matrix.  
-     */
-    int PLANE_NY = 2;
-    /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>y=1</tt> when using the identity matrix.  
-     */
-    int PLANE_PY = 3;
-    /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>z=-1</tt> when using the identity matrix.  
-     */
-    int PLANE_NZ = 4;
-    /**
-     * Argument to the first parameter of {@link #frustumPlane(int, Vector4f)} and
-     * {@link #frustumPlane(int, Planef)}
-     * identifying the plane with equation <tt>z=1</tt> when using the identity matrix.  
-     */
-    int PLANE_PZ = 5;
-    /**
      * Argument to the first parameter of {@link #frustumCorner(int, Vector3f)}
      * identifying the corner <tt>(-1, -1, -1)</tt> when using the identity matrix.
      */
@@ -310,40 +274,6 @@ public interface Matrix4fc {
     Matrix4f mulLocalAffine(Matrix4fc left, Matrix4f dest);
 
     /**
-     * Multiply this matrix by the supplied <code>right</code> matrix and store the result in <code>dest</code>.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>R</code> the <code>right</code> matrix,
-     * then the new matrix will be <code>M * R</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * R * v</code>, the
-     * transformation of the right matrix will be applied first!
-     *
-     * @param right
-     *          the right operand of the matrix multiplication
-     * @param dest
-     *          the destination matrix, which will hold the result
-     * @return dest
-     */
-    Matrix4f mul(Matrix3x2fc right, Matrix4f dest);
-
-    /**
-     * Multiply this matrix by the supplied <code>right</code> matrix and store the result in <code>dest</code>.
-     * <p>
-     * The last row of the <code>right</code> matrix is assumed to be <tt>(0, 0, 0, 1)</tt>.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>R</code> the <code>right</code> matrix,
-     * then the new matrix will be <code>M * R</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * R * v</code>, the
-     * transformation of the right matrix will be applied first!
-     *
-     * @param right
-     *          the right operand of the matrix multiplication
-     * @param dest
-     *          the destination matrix, which will hold the result
-     * @return dest
-     */
-    Matrix4f mul(Matrix4x3fc right, Matrix4f dest);
-
-    /**
      * Multiply <code>this</code> symmetric perspective projection matrix by the supplied {@link #isAffine() affine} <code>view</code> matrix and store the result in <code>dest</code>.
      * <p>
      * If <code>P</code> is <code>this</code> matrix and <code>V</code> the <code>view</code> matrix,
@@ -358,22 +288,6 @@ public interface Matrix4fc {
      * @return dest
      */
     Matrix4f mulPerspectiveAffine(Matrix4fc view, Matrix4f dest);
-
-    /**
-     * Multiply <code>this</code> symmetric perspective projection matrix by the supplied <code>view</code> matrix and store the result in <code>dest</code>.
-     * <p>
-     * If <code>P</code> is <code>this</code> matrix and <code>V</code> the <code>view</code> matrix,
-     * then the new matrix will be <code>P * V</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>P * V * v</code>, the
-     * transformation of the <code>view</code> matrix will be applied first!
-     *
-     * @param view
-     *          the matrix to multiply <code>this</code> symmetric perspective projection matrix by
-     * @param dest
-     *          the destination matrix, which will hold the result
-     * @return dest
-     */
-    Matrix4f mulPerspectiveAffine(Matrix4x3fc view, Matrix4f dest);
 
     /**
      * Multiply this matrix by the supplied <code>right</code> matrix, which is assumed to be {@link #isAffine() affine}, and store the result in <code>dest</code>.
@@ -657,29 +571,6 @@ public interface Matrix4fc {
     Matrix4f invertPerspectiveView(Matrix4fc view, Matrix4f dest);
 
     /**
-     * If <code>this</code> is a perspective projection matrix obtained via one of the {@link #perspective(float, float, float, float, Matrix4f) perspective()} methods,
-     * that is, if <code>this</code> is a symmetrical perspective frustum transformation
-     * and the given <code>view</code> matrix has unit scaling,
-     * then this method builds the inverse of <tt>this * view</tt> and stores it into the given <code>dest</code>.
-     * <p>
-     * This method can be used to quickly obtain the inverse of the combination of the view and projection matrices, when both were obtained
-     * via the common methods {@link #perspective(float, float, float, float, Matrix4f) perspective()} and {@link #lookAt(float, float, float, float, float, float, float, float, float, Matrix4f) lookAt()} or
-     * other methods, that build affine matrices, such as {@link #translate(float, float, float, Matrix4f) translate} and {@link #rotate(float, float, float, float, Matrix4f)}, except for {@link #scale(float, float, float, Matrix4f) scale()}.
-     * <p>
-     * For the special cases of the matrices <code>this</code> and <code>view</code> mentioned above, this method is equivalent to the following code:
-     * <pre>
-     * dest.set(this).mul(view).invert();
-     * </pre>
-     * 
-     * @param view
-     *          the view transformation (must have unit scaling)
-     * @param dest
-     *          will hold the inverse of <tt>this * view</tt>
-     * @return dest
-     */
-    Matrix4f invertPerspectiveView(Matrix4x3fc view, Matrix4f dest);
-
-    /**
      * Invert this matrix by assuming that it is an {@link #isAffine() affine} transformation (i.e. its last row is equal to <tt>(0, 0, 0, 1)</tt>)
      * and write the result into <code>dest</code>.
      * 
@@ -747,28 +638,6 @@ public interface Matrix4fc {
     Matrix4f get(Matrix4f dest);
 
     /**
-     * Get the current values of the upper 4x3 submatrix of <code>this</code> matrix and store them into
-     * <code>dest</code>.
-     * 
-     * @see Matrix4x3f#set(Matrix4fc)
-     * 
-     * @param dest
-     *            the destination matrix
-     * @return the passed in destination
-     */
-    Matrix4x3f get4x3(Matrix4x3f dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store them into
-     * <code>dest</code>.
-     * 
-     * @param dest
-     *            the destination matrix
-     * @return the passed in destination
-     */
-    Matrix4d get(Matrix4d dest);
-
-    /**
      * Get the current values of the upper left 3x3 submatrix of <code>this</code> matrix and store them into
      * <code>dest</code>.
      * 
@@ -779,42 +648,6 @@ public interface Matrix4fc {
      * @return the passed in destination
      */
     Matrix3f get3x3(Matrix3f dest);
-
-    /**
-     * Get the current values of the upper left 3x3 submatrix of <code>this</code> matrix and store them into
-     * <code>dest</code>.
-     * 
-     * @see Matrix3d#set(Matrix4fc)
-     * 
-     * @param dest
-     *            the destination matrix
-     * @return the passed in destination
-     */
-    Matrix3d get3x3(Matrix3d dest);
-
-    /**
-     * Get the rotational component of <code>this</code> matrix and store the represented rotation
-     * into the given {@link AxisAngle4f}.
-     * 
-     * @see AxisAngle4f#set(Matrix4fc)
-     * 
-     * @param dest
-     *          the destination {@link AxisAngle4f}
-     * @return the passed in destination
-     */
-    AxisAngle4f getRotation(AxisAngle4f dest);
-
-    /**
-     * Get the rotational component of <code>this</code> matrix and store the represented rotation
-     * into the given {@link AxisAngle4d}.
-     * 
-     * @see AxisAngle4f#set(Matrix4fc)
-     * 
-     * @param dest
-     *          the destination {@link AxisAngle4d}
-     * @return the passed in destination
-     */
-    AxisAngle4d getRotation(AxisAngle4d dest);
 
     /**
      * Get the current values of <code>this</code> matrix and store the represented rotation
@@ -844,35 +677,6 @@ public interface Matrix4fc {
      * @return the passed in destination
      */
     Quaternionf getNormalizedRotation(Quaternionf dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store the represented rotation
-     * into the given {@link Quaterniond}.
-     * <p>
-     * This method assumes that the first three column vectors of the upper left 3x3 submatrix are not normalized and
-     * thus allows to ignore any additional scaling factor that is applied to the matrix.
-     * 
-     * @see Quaterniond#setFromUnnormalized(Matrix4fc)
-     * 
-     * @param dest
-     *          the destination {@link Quaterniond}
-     * @return the passed in destination
-     */
-    Quaterniond getUnnormalizedRotation(Quaterniond dest);
-
-    /**
-     * Get the current values of <code>this</code> matrix and store the represented rotation
-     * into the given {@link Quaterniond}.
-     * <p>
-     * This method assumes that the first three column vectors of the upper left 3x3 submatrix are normalized.
-     * 
-     * @see Quaterniond#setFromNormalized(Matrix4fc)
-     * 
-     * @param dest
-     *          the destination {@link Quaterniond}
-     * @return the passed in destination
-     */
-    Quaterniond getNormalizedRotation(Quaterniond dest);
 
 //#ifdef __HAS_NIO__
     /**
@@ -1066,21 +870,6 @@ public interface Matrix4fc {
      * @return the passed in buffer
      */
     ByteBuffer get4x3Transposed(int index, ByteBuffer buffer);
-//#endif
-
-//#ifndef __GWT__
-    /**
-     * Store this matrix in column-major order at the given off-heap address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *            the off-heap address where to store this matrix
-     * @return this
-     */
-    Matrix4fc getToAddress(long address);
 //#endif
 
     /**
@@ -3092,30 +2881,6 @@ public interface Matrix4fc {
     Matrix4f rotateAroundLocal(Quaternionfc quat, float ox, float oy, float oz, Matrix4f dest);
 
     /**
-     * Apply a rotation transformation, rotating about the given {@link AxisAngle4f} and store the result in <code>dest</code>.
-     * <p>
-     * When used with a right-handed coordinate system, the produced rotation will rotate a vector 
-     * counter-clockwise around the rotation axis, when viewing along the negative axis direction towards the origin.
-     * When used with a left-handed coordinate system, the rotation is clockwise.
-     * <p>
-     * If <code>M</code> is <code>this</code> matrix and <code>A</code> the rotation matrix obtained from the given {@link AxisAngle4f},
-     * then the new matrix will be <code>M * A</code>. So when transforming a
-     * vector <code>v</code> with the new matrix by using <code>M * A * v</code>,
-     * the {@link AxisAngle4f} rotation will be applied first!
-     * <p>
-     * Reference: <a href="http://en.wikipedia.org/wiki/Rotation_matrix#Axis_and_angle">http://en.wikipedia.org</a>
-     * 
-     * @see #rotate(float, float, float, float, Matrix4f)
-     * 
-     * @param axisAngle
-     *          the {@link AxisAngle4f} (needs to be {@link AxisAngle4f#normalize() normalized})
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Matrix4f rotate(AxisAngle4f axisAngle, Matrix4f dest);
-
-    /**
      * Apply a rotation transformation, rotating the given radians about the specified axis and store the result in <code>dest</code>.
      * <p>
      * The axis described by the <code>axis</code> vector needs to be a unit vector.
@@ -3282,33 +3047,6 @@ public interface Matrix4fc {
     Matrix4f unprojectRay(float winX, float winY, int[] viewport, Vector3f originDest, Vector3f dirDest);
 
     /**
-     * Unproject the given 2D window coordinates <code>winCoords</code> by <code>this</code> matrix using the specified viewport
-     * and compute the origin and the direction of the resulting ray which starts at NDC <tt>z = -1.0</tt> and goes through NDC <tt>z = +1.0</tt>.
-     * <p>
-     * This method first converts the given window coordinates to normalized device coordinates in the range <tt>[-1..1]</tt>
-     * and then transforms those NDC coordinates by the inverse of <code>this</code> matrix.  
-     * <p>
-     * As a necessary computation step for unprojecting, this method computes the inverse of <code>this</code> matrix.
-     * In order to avoid computing the matrix inverse with every invocation, the inverse of <code>this</code> matrix can be built
-     * once outside using {@link #invert(Matrix4f)} and then the method {@link #unprojectInvRay(float, float, int[], Vector3f, Vector3f) unprojectInvRay()} can be invoked on it.
-     * 
-     * @see #unprojectInvRay(float, float, int[], Vector3f, Vector3f)
-     * @see #unprojectRay(float, float, int[], Vector3f, Vector3f)
-     * @see #invert(Matrix4f)
-     * 
-     * @param winCoords
-     *          the window coordinates to unproject
-     * @param viewport
-     *          the viewport described by <tt>[x, y, width, height]</tt>
-     * @param originDest
-     *          will hold the ray origin
-     * @param dirDest
-     *          will hold the (unnormalized) ray direction
-     * @return this
-     */
-    Matrix4f unprojectRay(Vector2fc winCoords, int[] viewport, Vector3f originDest, Vector3f dirDest);
-
-    /**
      * Unproject the given window coordinates <code>winCoords</code> by <code>this</code> matrix using the specified viewport.
      * <p>
      * This method differs from {@link #unproject(Vector3fc, int[], Vector4f) unproject()} 
@@ -3355,28 +3093,6 @@ public interface Matrix4fc {
      * @return dest
      */
     Vector4f unprojectInv(float winX, float winY, float winZ, int[] viewport, Vector4f dest);
-
-    /**
-     * Unproject the given window coordinates <code>winCoords</code> by <code>this</code> matrix using the specified viewport
-     * and compute the origin and the direction of the resulting ray which starts at NDC <tt>z = -1.0</tt> and goes through NDC <tt>z = +1.0</tt>.
-     * <p>
-     * This method differs from {@link #unprojectRay(Vector2fc, int[], Vector3f, Vector3f) unprojectRay()} 
-     * in that it assumes that <code>this</code> is already the inverse matrix of the original projection matrix.
-     * It exists to avoid recomputing the matrix inverse with every invocation.
-     * 
-     * @see #unprojectRay(Vector2fc, int[], Vector3f, Vector3f)
-     * 
-     * @param winCoords
-     *          the window coordinates to unproject
-     * @param viewport
-     *          the viewport described by <tt>[x, y, width, height]</tt>
-     * @param originDest
-     *          will hold the ray origin
-     * @param dirDest
-     *          will hold the (unnormalized) ray direction
-     * @return this
-     */
-    Matrix4f unprojectInvRay(Vector2fc winCoords, int[] viewport, Vector3f originDest, Vector3f dirDest);
 
     /**
      * Unproject the given 2D window coordinates <tt>(winX, winY)</tt> by <code>this</code> matrix using the specified viewport
@@ -3702,85 +3418,6 @@ public interface Matrix4fc {
     Matrix4f normalize3x3(Matrix4f dest);
 
     /**
-     * Normalize the upper left 3x3 submatrix of this matrix and store the result in <code>dest</code>.
-     * <p>
-     * The resulting matrix will map unit vectors to unit vectors, though a pair of orthogonal input unit
-     * vectors need not be mapped to a pair of orthogonal output vectors if the original matrix was not orthogonal itself
-     * (i.e. had <i>skewing</i>).
-     * 
-     * @param dest
-     *             will hold the result
-     * @return dest
-     */
-    Matrix3f normalize3x3(Matrix3f dest);
-
-    /**
-     * Calculate a frustum plane of <code>this</code> matrix, which
-     * can be a projection matrix or a combined modelview-projection matrix, and store the result
-     * in the given <code>planeEquation</code>.
-     * <p>
-     * Generally, this method computes the frustum plane in the local frame of
-     * any coordinate system that existed before <code>this</code>
-     * transformation was applied to it in order to yield homogeneous clipping space.
-     * <p>
-     * The frustum plane will be given in the form of a general plane equation:
-     * <tt>a*x + b*y + c*z + d = 0</tt>, where the given {@link Vector4f} components will
-     * hold the <tt>(a, b, c, d)</tt> values of the equation.
-     * <p>
-     * The plane normal, which is <tt>(a, b, c)</tt>, is directed "inwards" of the frustum.
-     * Any plane/point test using <tt>a*x + b*y + c*z + d</tt> therefore will yield a result greater than zero
-     * if the point is within the frustum (i.e. at the <i>positive</i> side of the frustum plane).
-     * <p>
-     * For performing frustum culling, the class {@link FrustumIntersection} should be used instead of 
-     * manually obtaining the frustum planes and testing them against points, spheres or axis-aligned boxes.
-     * <p>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     *
-     * @param plane
-     *          one of the six possible planes, given as numeric constants
-     *          {@link #PLANE_NX}, {@link #PLANE_PX},
-     *          {@link #PLANE_NY}, {@link #PLANE_PY},
-     *          {@link #PLANE_NZ} and {@link #PLANE_PZ}
-     * @param planeEquation
-     *          will hold the computed plane equation.
-     *          The plane equation will be normalized, meaning that <tt>(a, b, c)</tt> will be a unit vector
-     * @return planeEquation
-     */
-    Vector4f frustumPlane(int plane, Vector4f planeEquation);
-
-    /**
-     * Calculate a frustum plane of <code>this</code> matrix, which
-     * can be a projection matrix or a combined modelview-projection matrix, and store the result
-     * in the given <code>plane</code>.
-     * <p>
-     * Generally, this method computes the frustum plane in the local frame of
-     * any coordinate system that existed before <code>this</code>
-     * transformation was applied to it in order to yield homogeneous clipping space.
-     * <p>
-     * The plane normal, which is <tt>(a, b, c)</tt>, is directed "inwards" of the frustum.
-     * Any plane/point test using <tt>a*x + b*y + c*z + d</tt> therefore will yield a result greater than zero
-     * if the point is within the frustum (i.e. at the <i>positive</i> side of the frustum plane).
-     * <p>
-     * For performing frustum culling, the class {@link FrustumIntersection} should be used instead of 
-     * manually obtaining the frustum planes and testing them against points, spheres or axis-aligned boxes.
-     * <p>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     *
-     * @param which
-     *          one of the six possible planes, given as numeric constants
-     *          {@link #PLANE_NX}, {@link #PLANE_PX},
-     *          {@link #PLANE_NY}, {@link #PLANE_PY}, 
-     *          {@link #PLANE_NZ} and {@link #PLANE_PZ}
-     * @param plane
-     *          will hold the computed plane equation.
-     *          The plane equation will be normalized, meaning that <tt>(a, b, c)</tt> will be a unit vector
-     * @return planeEquation
-     */
-    Planef frustumPlane(int which, Planef plane);
-
-    /**
      * Compute the corner coordinates of the frustum defined by <code>this</code> matrix, which
      * can be a projection matrix or a combined modelview-projection matrix, and store the result
      * in the given <code>point</code>.
@@ -3862,36 +3499,6 @@ public interface Matrix4fc {
      * @return the far clip plane distance
      */
     float perspectiveFar();
-
-    /**
-     * Obtain the direction of a ray starting at the center of the coordinate system and going 
-     * through the near frustum plane.
-     * <p>
-     * This method computes the <code>dir</code> vector in the local frame of
-     * any coordinate system that existed before <code>this</code>
-     * transformation was applied to it in order to yield homogeneous clipping space.
-     * <p>
-     * The parameters <code>x</code> and <code>y</code> are used to interpolate the generated ray direction
-     * from the bottom-left to the top-right frustum corners.
-     * <p>
-     * For optimal efficiency when building many ray directions over the whole frustum,
-     * it is recommended to use this method only in order to compute the four corner rays at
-     * <tt>(0, 0)</tt>, <tt>(1, 0)</tt>, <tt>(0, 1)</tt> and <tt>(1, 1)</tt>
-     * and then bilinearly interpolating between them; or to use the {@link FrustumRayBuilder}.
-     * <p>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     * 
-     * @param x
-     *          the interpolation factor along the left-to-right frustum planes, within <tt>[0..1]</tt>
-     * @param y
-     *          the interpolation factor along the bottom-to-top frustum planes, within <tt>[0..1]</tt>
-     * @param dir
-     *          will hold the normalized ray direction in the local frame of the coordinate system before 
-     *          transforming to homogeneous clipping space using <code>this</code> matrix
-     * @return dir
-     */
-    Vector3f frustumRayDir(float x, float y, Vector3f dir);
 
     /**
      * Obtain the direction of <tt>+Z</tt> before the transformation represented by <code>this</code> matrix is applied.
@@ -4463,92 +4070,5 @@ public interface Matrix4fc {
      * @return dest
      */
     Vector3f getEulerAnglesZYX(Vector3f dest);
-
-    /**
-     * Test whether the given point <tt>(x, y, z)</tt> is within the frustum defined by <code>this</code> matrix.
-     * <p>
-     * This method assumes <code>this</code> matrix to be a transformation from any arbitrary coordinate system/space <tt>M</tt>
-     * into standard OpenGL clip space and tests whether the given point with the coordinates <tt>(x, y, z)</tt> given
-     * in space <tt>M</tt> is within the clip space.
-     * <p>
-     * When testing multiple points using the same transformation matrix, {@link FrustumIntersection} should be used instead.
-     * <p>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     * 
-     * @param x
-     *          the x-coordinate of the point
-     * @param y
-     *          the y-coordinate of the point
-     * @param z
-     *          the z-coordinate of the point
-     * @return <code>true</code> if the given point is inside the frustum; <code>false</code> otherwise
-     */
-    boolean testPoint(float x, float y, float z);
-
-    /**
-     * Test whether the given sphere is partly or completely within or outside of the frustum defined by <code>this</code> matrix.
-     * <p>
-     * This method assumes <code>this</code> matrix to be a transformation from any arbitrary coordinate system/space <tt>M</tt>
-     * into standard OpenGL clip space and tests whether the given sphere with the coordinates <tt>(x, y, z)</tt> given
-     * in space <tt>M</tt> is within the clip space.
-     * <p>
-     * When testing multiple spheres using the same transformation matrix, or more sophisticated/optimized intersection algorithms are required,
-     * {@link FrustumIntersection} should be used instead.
-     * <p>
-     * The algorithm implemented by this method is conservative. This means that in certain circumstances a <i>false positive</i>
-     * can occur, when the method returns <tt>true</tt> for spheres that are actually not visible.
-     * See <a href="http://iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm">iquilezles.org</a> for an examination of this problem.
-     * <p>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     * 
-     * @param x
-     *          the x-coordinate of the sphere's center
-     * @param y
-     *          the y-coordinate of the sphere's center
-     * @param z
-     *          the z-coordinate of the sphere's center
-     * @param r
-     *          the sphere's radius
-     * @return <code>true</code> if the given sphere is partly or completely inside the frustum; <code>false</code> otherwise
-     */
-    boolean testSphere(float x, float y, float z, float r);
-
-    /**
-     * Test whether the given axis-aligned box is partly or completely within or outside of the frustum defined by <code>this</code> matrix.
-     * The box is specified via its min and max corner coordinates.
-     * <p>
-     * This method assumes <code>this</code> matrix to be a transformation from any arbitrary coordinate system/space <tt>M</tt>
-     * into standard OpenGL clip space and tests whether the given axis-aligned box with its minimum corner coordinates <tt>(minX, minY, minZ)</tt>
-     * and maximum corner coordinates <tt>(maxX, maxY, maxZ)</tt> given in space <tt>M</tt> is within the clip space.
-     * <p>
-     * When testing multiple axis-aligned boxes using the same transformation matrix, or more sophisticated/optimized intersection algorithms are required,
-     * {@link FrustumIntersection} should be used instead.
-     * <p>
-     * The algorithm implemented by this method is conservative. This means that in certain circumstances a <i>false positive</i>
-     * can occur, when the method returns <tt>-1</tt> for boxes that are actually not visible/do not intersect the frustum.
-     * See <a href="http://iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm">iquilezles.org</a> for an examination of this problem.
-     * <p>
-     * Reference: <a href="http://old.cescg.org/CESCG-2002/DSykoraJJelinek/">Efficient View Frustum Culling</a>
-     * <br>
-     * Reference: <a href="http://gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf">
-     * Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix</a>
-     * 
-     * @param minX
-     *          the x-coordinate of the minimum corner
-     * @param minY
-     *          the y-coordinate of the minimum corner
-     * @param minZ
-     *          the z-coordinate of the minimum corner
-     * @param maxX
-     *          the x-coordinate of the maximum corner
-     * @param maxY
-     *          the y-coordinate of the maximum corner
-     * @param maxZ
-     *          the z-coordinate of the maximum corner
-     * @return <code>true</code> if the axis-aligned box is completely or partly inside of the frustum; <code>false</code> otherwise
-     */
-    boolean testAab(float minX, float minY, float minZ, float maxX, float maxY, float maxZ);
 
 }

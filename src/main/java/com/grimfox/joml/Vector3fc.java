@@ -117,21 +117,6 @@ public interface Vector3fc {
     ByteBuffer get(int index, ByteBuffer buffer);
 //#endif
 
-//#ifndef __GWT__
-    /**
-     * Store this vector at the given off-heap memory address.
-     * <p>
-     * This method will throw an {@link UnsupportedOperationException} when JOML is used with `-Djoml.nounsafe`.
-     * <p>
-     * <em>This method is unsafe as it can result in a crash of the JVM process when the specified address range does not belong to this process.</em>
-     * 
-     * @param address
-     *            the off-heap address where to store this vector
-     * @return this
-     */
-    Vector3fc getToAddress(long address);
-//#endif
-
     /**
      * Subtract the supplied vector from this one and store the result in <code>dest</code>.
      * 
@@ -260,29 +245,6 @@ public interface Vector3fc {
     Vector3f mul(Matrix3fc mat, Vector3f dest);
 
     /**
-     * Multiply the given matrix with this Vector3f and store the result in <code>dest</code>.
-     * 
-     * @param mat
-     *          the matrix
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Vector3f mul(Matrix3dc mat, Vector3f dest);
-
-    /**
-     * Multiply the given matrix <code>mat</code> with <code>this</code> by assuming a
-     * third row in the matrix of <tt>(0, 0, 1)</tt> and store the result in <code>dest</code>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Vector3f mul(Matrix3x2fc mat, Vector3f dest);
-
-    /**
      * Multiply the transpose of the given matrix with this Vector3f and store the result in <code>dest</code>.
      * 
      * @param mat
@@ -306,20 +268,6 @@ public interface Vector3fc {
      * @return dest
      */
     Vector3f mulPosition(Matrix4fc mat, Vector3f dest);
-
-    /**
-     * Multiply the given 4x3 matrix <code>mat</code> with <code>this</code> and store the
-     * result in <code>dest</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>1.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Vector3f mulPosition(Matrix4x3fc mat, Vector3f dest);
 
     /**
      * Multiply the transpose of the given 4x4 matrix <code>mat</code> with <code>this</code> and store the
@@ -361,35 +309,7 @@ public interface Vector3fc {
      *          will hold the result
      * @return dest
      */
-    Vector3f mulDirection(Matrix4dc mat, Vector3f dest);
-
-    /**
-     * Multiply the given 4x4 matrix <code>mat</code> with <code>this</code> and store the
-     * result in <code>dest</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>0.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
     Vector3f mulDirection(Matrix4fc mat, Vector3f dest);
-
-    /**
-     * Multiply the given 4x3 matrix <code>mat</code> with <code>this</code> and store the
-     * result in <code>dest</code>.
-     * <p>
-     * This method assumes the <tt>w</tt> component of <code>this</code> to be <tt>0.0</tt>.
-     * 
-     * @param mat
-     *          the matrix to multiply this vector by
-     * @param dest
-     *          will hold the result
-     * @return dest
-     */
-    Vector3f mulDirection(Matrix4x3fc mat, Vector3f dest);
 
     /**
      * Multiply the transpose of the given 4x4 matrix <code>mat</code> with <code>this</code> and store the
