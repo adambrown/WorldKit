@@ -104,7 +104,7 @@ object MainUi {
                         "/textures/icon/64.png",
                         "/textures/icon/32.png",
                         "/textures/icon/16.png")
-                val icon = createImage(texId, texWidth, texHeight, 0)
+                icon.value = createImage(texId, texWidth, texHeight, 0)
 
                 setWindowIcon(createGlfwImages(
                         "/textures/icon/16.png",
@@ -243,12 +243,13 @@ object MainUi {
                 }
                 preferencesPanel(ui)
                 exportPanel(ui)
+                aboutPanel(ui)
                 mainLayer {
                     block {
                         vSizing = STATIC
                         height = MEDIUM_ROW_HEIGHT
                         layout = VERTICAL
-                        icon(icon, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT)
+                        icon(icon.value, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT)
                         hSpacer(SMALL_SPACER_SIZE)
                         menuBar(menuLayer, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
                             menu("File") {
@@ -331,11 +332,11 @@ object MainUi {
                                 }
                                 menuDivider()
                                 menuItem("Install offline help") {
-                                    openWebPage("http://www.google.com", errorHandler)
+                                    downloadOfflineHelp(errorHandler)
                                 }
                                 menuDivider()
                                 menuItem("About WorldKit") {
-                                    println("About WorldKit")
+                                    openAboutPanel()
                                 }
                             }
                         }

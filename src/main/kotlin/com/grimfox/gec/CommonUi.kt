@@ -214,6 +214,9 @@ var brushShapeInner = NO_BLOCK
 
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
+var aboutPanel = NO_BLOCK
+val icon = ref(-1)
+
 
 var onWindowResize: () -> Unit = {}
 
@@ -409,6 +412,15 @@ fun openHelp(errorHandler: ErrorDialog) {
     } else {
         errorHandler.displayErrorMessage("The offline help files are not currently installed. Please install the offline help files, or select one of the online help options.")
     }
+}
+
+fun openAboutPanel() {
+    panelLayer.isVisible = true
+    aboutPanel.isVisible = true
+}
+
+fun downloadOfflineHelp(errorHandler: ErrorDialog) {
+    errorHandler.displayErrorMessage("Offline help is not currently available for this version of WorldKit. Please select one of the online help options.")
 }
 
 fun updateRegionsHistory(parameters: RegionParameters, graph: Graph, regionMask: ByteArrayMatrix) {
