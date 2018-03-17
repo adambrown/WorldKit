@@ -8,7 +8,8 @@ import com.grimfox.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
-import org.lwjgl.opengl.GL13.GL_MULTISAMPLE
+import org.lwjgl.opengl.GL13
+import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
@@ -91,6 +92,14 @@ object TextureBuilder {
     private var dynamicGeometryProgram: Int = 0
     private var dynamicGeometry3D: DynamicGeometry3D
     private var dynamicGeometry2D: DynamicGeometry2D
+    private val mvpMatrixUniformNormalAndSlope = ShaderUniform("modelViewProjectionMatrix")
+    private val heightScaleUniformNormalAndSlope = ShaderUniform("heightScale")
+    private val uvScaleUniformNormalAndSlope = ShaderUniform("uvScale")
+    private val heightMapTextureUniformNormalAndSlope = ShaderUniform("heightMapTexture")
+    private val positionAttributeNormalAndSlope = ShaderAttribute("position")
+    private val uvAttributeNormalAndSlope = ShaderAttribute("uv")
+    private var normalAndSlopeProgram: Int = 0
+    private var normalAndSlopeImagePlane: ImagePlane
     private var textureRenderer: TextureRenderer
 
     init {
@@ -102,8 +111,20 @@ object TextureBuilder {
                 listOf(positionAttributeDynamicGeometry),
                 listOf(mvpMatrixUniformDynamicGeometry))
 
+        val normalAndSlopeVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/normal-slope.vert"))
+        val normalAndSlopeFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/normal-slope.frag"))
+
+        normalAndSlopeProgram = createAndLinkProgram(
+                listOf(normalAndSlopeVertexShader, normalAndSlopeFragmentShader),
+                listOf(positionAttributeNormalAndSlope, uvAttributeNormalAndSlope),
+                listOf(mvpMatrixUniformNormalAndSlope, heightScaleUniformNormalAndSlope, uvScaleUniformNormalAndSlope, heightMapTextureUniformNormalAndSlope))
+
+
         dynamicGeometry3D = DynamicGeometry3D()
         dynamicGeometry2D = DynamicGeometry2D()
+
+        normalAndSlopeImagePlane = ImagePlane(1.0f, positionAttributeNormalAndSlope, uvAttributeNormalAndSlope, 0.5f)
+
         textureRenderer = TextureRenderer(4096, 4096)
     }
 
@@ -143,7 +164,6 @@ object TextureBuilder {
             glDisable(GL_MULTISAMPLE)
             glEnable(GL_DEPTH_TEST)
             glDisable(GL_SCISSOR_TEST)
-            glDisable(GL_MULTISAMPLE)
             textureRenderer.bind()
             glClearColor(clearColor.first, clearColor.second, clearColor.third, clearColor.fourth)
             glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
@@ -153,6 +173,25 @@ object TextureBuilder {
             retVal
         })
     }
+
+    private fun <T : Any> renderNormalAndSlopeInternal(heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
+        return doDeferredOpenglWork(ValueCollector {
+            mvpMatrix.setOrtho(0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 2.0f)
+            glDisable(GL_BLEND)
+            glDisable(GL_CULL_FACE)
+            glDisable(GL_MULTISAMPLE)
+            glDisable(GL_DEPTH_TEST)
+            glDisable(GL_SCISSOR_TEST)
+            textureRenderer.bind()
+            glClearColor(clearColor.first, clearColor.second, clearColor.third, clearColor.fourth)
+            glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
+            drawNormalsAndSlope(heightMapTexture, heightScale, uvScale)
+            val retVal = collector(textureRenderer)
+            textureRenderer.unbind()
+            retVal
+        })
+    }
+
 
     private fun <T : Any> renderNvgInternal(collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector { collector(textureRenderer) })
@@ -442,6 +481,15 @@ object TextureBuilder {
         }
     }
 
+    fun renderNormalAndSlopeRgbaByte(heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderNormalAndSlopeInternal(heightMapTexture, heightScale, uvScale, clearColor, {
+            val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
+            val retVal = extractTextureRgbaByte(id, 4096)
+            id.free()
+            retVal
+        })
+    }
+
     fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
         return renderTrianglesInternal(input, clearColor, {
             val id = it.newRedTextureFloat(GL_NEAREST, GL_NEAREST)
@@ -681,6 +729,17 @@ object TextureBuilder {
         glUseProgram(dynamicGeometryProgram)
         glUniformMatrix4fv(mvpMatrixUniformDynamicGeometry.location, false, mvpMatrix.get(0, floatBuffer))
         dynamicGeometry3D.render(triangles.first, triangles.second, positionAttributeDynamicGeometry)
+    }
+
+    private fun drawNormalsAndSlope(heightMapTexture: TextureId, heightScale: Float, uvScale: Float) {
+        glUseProgram(normalAndSlopeProgram)
+        glUniformMatrix4fv(mvpMatrixUniformNormalAndSlope.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform1f(heightScaleUniformNormalAndSlope.location, heightScale)
+        glUniform1f(uvScaleUniformNormalAndSlope.location, uvScale)
+        glUniform1i(heightMapTextureUniformNormalAndSlope.location, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, heightMapTexture.id)
+        normalAndSlopeImagePlane.render()
     }
 
     class TextureRenderer(val width: Int, val height: Int) {

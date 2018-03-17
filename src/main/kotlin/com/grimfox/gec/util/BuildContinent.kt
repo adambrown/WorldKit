@@ -867,7 +867,8 @@ object BuildContinent {
             customStartingHeightsMap: TextureId,
             customSoilMobilityMap: TextureId,
             canceled: Reference<Boolean>,
-            biomeTemplates: Biomes): Pair<TextureId, TextureId> {
+            biomeTemplates: Biomes,
+            exportFiles: WaterFlows.ExportFiles? = null): Pair<TextureId?, TextureId?> {
         return generateWaterFlows(
                 random = Random(parameterSet.regionsSeed),
                 regionSplines = regionSplines,
@@ -877,13 +878,13 @@ object BuildContinent {
                 flowGraphMedium = flowGraphMedium,
                 flowGraphLarge = flowGraphLarge,
                 executor = executor,
-                outputWidth = 4096,
                 mapScale = mapScale,
                 biomes = biomes,
                 customElevationPowerMap = customElevationPowerMap,
                 customStartingHeightsMap = customStartingHeightsMap,
                 customSoilMobilityMap = customSoilMobilityMap,
                 canceled = canceled,
-                biomeTemplates = biomeTemplates)
+                biomeTemplates = biomeTemplates,
+                exportFiles = exportFiles)
     }
 }

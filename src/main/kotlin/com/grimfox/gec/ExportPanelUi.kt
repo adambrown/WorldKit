@@ -1,26 +1,29 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.ui.*
-import com.grimfox.gec.ui.nvgproxy.bInt
-import com.grimfox.gec.ui.nvgproxy.gInt
-import com.grimfox.gec.ui.nvgproxy.rInt
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
-import com.grimfox.gec.util.FileDialogs
-import java.awt.image.BufferedImage
 import java.io.File
-import javax.imageio.ImageIO
+import java.util.*
+
+private val cachedGraph256 = preferences.cachedGraph256!!
+private val cachedGraph512 = preferences.cachedGraph512!!
+private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 fun exportPanel(ui: UserInterface) {
     val shrinkGroup = hShrinkGroup()
-    val regionFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
-    val useRegionFile = ref(false)
+    val elevationFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useElevationFile = ref(false)
+    val slopeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useSlopeFile = ref(false)
+    val normalFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useNormalFile = ref(false)
+    val soilDensityFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useSoilDensityFile = ref(false)
     val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useBiomeFile = ref(false)
-    val mapFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
-    val useMapFile = ref(false)
-    val heightFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
-    val useHeightFile = ref(false)
+    val waterFlowFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useWaterFlowFile = ref(false)
     val objFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useObjFile = ref(false)
     fun pngExtensionFilter(textReference: DynamicTextReference): (String, String) -> Unit = { old, new ->
@@ -37,20 +40,36 @@ fun exportPanel(ui: UserInterface) {
             }
         }
     }
-    regionFile.reference.addListener(pngExtensionFilter(regionFile))
+    fun fileFromTextReference(useFile: Reference<Boolean>, fileReference: DynamicTextReference): File? {
+        return if (useFile.value) {
+            val file = File(fileReference.reference.value)
+            if ((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) {
+                file
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
+    elevationFile.reference.addListener(pngExtensionFilter(elevationFile))
+    slopeFile.reference.addListener(pngExtensionFilter(slopeFile))
+    normalFile.reference.addListener(pngExtensionFilter(normalFile))
+    soilDensityFile.reference.addListener(pngExtensionFilter(soilDensityFile))
     biomeFile.reference.addListener(pngExtensionFilter(biomeFile))
-    mapFile.reference.addListener(pngExtensionFilter(mapFile))
-    heightFile.reference.addListener(pngExtensionFilter(heightFile))
+    waterFlowFile.reference.addListener(pngExtensionFilter(waterFlowFile))
     objFile.reference.addListener(objExtensionFilter(objFile))
     panelLayer {
         exportPanel = panel(650.0f) {
             vSizing = Sizing.SHRINK
             vSpacer(LARGE_SPACER_SIZE)
-            vSaveFileRowWithToggle(regionFile, useRegionFile, LARGE_ROW_HEIGHT, text("Region file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(elevationFile, useElevationFile, LARGE_ROW_HEIGHT, text("Elevation file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(normalFile, useNormalFile, LARGE_ROW_HEIGHT, text("Normal file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(slopeFile, useSlopeFile, LARGE_ROW_HEIGHT, text("Slope file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(soilDensityFile, useSoilDensityFile, LARGE_ROW_HEIGHT, text("Soil density file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Biome file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            vSaveFileRowWithToggle(mapFile, useMapFile, LARGE_ROW_HEIGHT, text("Map file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            vSaveFileRowWithToggle(heightFile, useHeightFile, LARGE_ROW_HEIGHT, text("Height file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            vSaveFileRowWithToggle(objFile, useObjFile, LARGE_ROW_HEIGHT, text("Terrain mesh:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
+            vSaveFileRowWithToggle(waterFlowFile, useWaterFlowFile, LARGE_ROW_HEIGHT, text("Water flow file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(objFile, useObjFile, LARGE_ROW_HEIGHT, text("Mesh file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
             val outputSizes = arrayOf(256, 512, 1024, 2048, 4096)
             val outputSizesAsText = outputSizes.map { text("$it x $it px", TEXT_STYLE_BUTTON) }
             val selectedOutputSize: ObservableMutableReference<Int> = ref(0)
@@ -84,83 +103,19 @@ fun exportPanel(ui: UserInterface) {
             vButtonRow(LARGE_ROW_HEIGHT) {
                 button(text("Export"), DIALOG_BUTTON_STYLE) {
                     var outputSize = outputSizes[selectedOutputSize.value]
-                    if (useRegionFile.value) {
-                        val file = File(regionFile.reference.value)
-                        val regionMask = currentState.regionMask.value
-                        if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && regionMask != null) {
-                            val output = BufferedImage(regionMask.width, regionMask.width, BufferedImage.TYPE_4BYTE_ABGR)
-                            val raster = output.raster
-                            for (y in 0 until regionMask.width) {
-                                for (x in 0 until regionMask.width) {
-                                    val region = regionMask[x, y].toInt()
-                                    val color = REGION_COLORS[region]
-                                    raster.setPixel(x, y, intArrayOf(color.rInt, color.gInt, color.bInt, 255))
-                                }
-                            }
-                            ImageIO.write(output, "png", file)
-                        }
+                    if (DEMO_BUILD) {
+                        outputSize = 256
                     }
-                    if (useBiomeFile.value) {
-                        val file = File(biomeFile.reference.value)
-                        val biomeMask = currentState.biomeMask.value
-                        if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && biomeMask != null) {
-                            val output = BufferedImage(biomeMask.width, biomeMask.width, BufferedImage.TYPE_4BYTE_ABGR)
-                            val raster = output.raster
-                            for (y in 0 until biomeMask.width) {
-                                for (x in 0 until biomeMask.width) {
-                                    val biome = biomeMask[x, y].toInt()
-                                    val color = BIOME_COLORS[biome]
-                                    raster.setPixel(x, y, intArrayOf(color.rInt, color.gInt, color.bInt, 255))
-                                }
-                            }
-                            ImageIO.write(output, "png", file)
-                        }
-                    }
-                    if (useMapFile.value) {
-                        if (DEMO_BUILD) {
-                            outputSize = 256
-                        }
-                        val file = File(mapFile.reference.value)
-                        val regionSplines = currentState.regionSplines.value
-                        if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && regionSplines != null) {
-                            val textureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
-                            val bytes = TextureBuilder.extractTextureRgbaByte(textureId, 4096)
-                            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_4BYTE_ABGR)
-                            val raster = output.raster
-                            for (y in 0 until outputSize) {
-                                val yOff = Math.round((y / (outputSize - 1).toFloat()) * 4095.0f)
-                                for (x in 0 until outputSize) {
-                                    var offset = (yOff + Math.round((x / (outputSize - 1).toFloat()) * 4095.0f)) * 4
-                                    val r = bytes[offset++]
-                                    val g = bytes[offset++]
-                                    val b = bytes[offset]
-                                    raster.setPixel(x, y, intArrayOf(r.toInt() and 0xFF, g.toInt() and 0xFF, b.toInt() and 0xFF, 255))
-                                }
-                            }
-                            ImageIO.write(output, "png", file)
-                        }
-                    }
-                    if (useHeightFile.value) {
-                        if (DEMO_BUILD) {
-                            outputSize = 256
-                        }
-                        val file = File(heightFile.reference.value)
-                        val heightMap = currentState.heightMapTexture.value
-                        if (((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) && heightMap != null) {
-                            val shorts = TextureBuilder.extractTextureRedShort(heightMap, 4096)
-                            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_USHORT_GRAY)
-                            val raster = output.raster
-                            for (y in 0 until outputSize) {
-                                val yOff = Math.round((y / (outputSize - 1).toFloat()) * 4095.0f) * 4096
-                                for (x in 0 until outputSize) {
-                                    val xOff = Math.round((x / (outputSize - 1).toFloat()) * 4095.0f)
-                                    val offset = yOff + xOff
-                                    raster.setSample(x, y, 0, shorts[offset].toInt() and 0xFFFF)
-                                }
-                            }
-                            ImageIO.write(output, "png", file)
-                        }
-                    }
+                    val exportFiles = WaterFlows.ExportFiles(
+                            outputSize = outputSize,
+                            elevationFile = fileFromTextReference(useElevationFile, elevationFile),
+                            slopeFile = fileFromTextReference(useSlopeFile, slopeFile),
+                            normalFile = fileFromTextReference(useNormalFile, normalFile),
+                            soilDensityFile = fileFromTextReference(useSoilDensityFile, soilDensityFile),
+                            biomeFile = fileFromTextReference(useBiomeFile, biomeFile),
+                            waterFlowFile = fileFromTextReference(useWaterFlowFile, waterFlowFile),
+                            objFile = fileFromTextReference(useObjFile, objFile))
+                    export(exportFiles)
                     exportPanel.isVisible = false
                     panelLayer.isVisible = false
                 }.with { width = 60.0f }
@@ -171,6 +126,70 @@ fun exportPanel(ui: UserInterface) {
                 }.with { width = 60.0f }
             }
             vSpacer(MEDIUM_SPACER_SIZE)
+        }
+    }
+}
+
+private fun export(exportFiles: WaterFlows.ExportFiles) {
+    val currentParameters = currentState.regionParameters.value
+    val currentRegionGraph = currentState.regionGraph.value
+    val currentRegionMask = currentState.regionMask.value
+    val currentRegionSplines = currentState.regionSplines.value
+    val currentBiomeGraph = currentState.biomeGraph.value
+    val currentBiomeMask = currentState.biomeMask.value
+    val currentBiomes = currentState.biomes.value
+    val currentMapScale = mapDetailScale.value
+    if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
+        dialogLayer.isVisible = true
+        generatingPrimaryMessage.reference.value = text("Exporting maps... 0:00", TEXT_STYLE_LARGE_MESSAGE)
+        generatingSecondaryMessage.reference.value = text("Press ESC to cancel.", TEXT_STYLE_SMALL_MESSAGE)
+        generatingMessageBlock.isVisible = true
+        val startTime = System.currentTimeMillis()
+        val generationTimer = Timer(true)
+        generationTimer.schedule(object : TimerTask() {
+            override fun run() {
+                val currentTime = System.currentTimeMillis()
+                val elapsedTime = (currentTime - startTime)
+                val seconds = String.format("%02d", (elapsedTime / 1000).toInt() % 60)
+                val minutes = (elapsedTime / (1000 * 60) % 60).toInt()
+                generatingPrimaryMessage.reference.value = text("Exporting maps... $minutes:$seconds", TEXT_STYLE_LARGE_MESSAGE)
+                rootRef.value.movedOrResized = true
+            }
+        }, 1000, 1000)
+        try {
+            val canceled = ref(false)
+            cancelCurrentRunningTask.value = canceled
+            try {
+                BuildContinent.generateWaterFlows(
+                        parameterSet = currentParameters,
+                        regionSplines = currentRegionSplines,
+                        biomeGraph = currentBiomeGraph,
+                        biomeMask = currentBiomeMask,
+                        biomes = currentBiomes,
+                        flowGraphSmall = cachedGraph256.value,
+                        flowGraphMedium = cachedGraph512.value,
+                        flowGraphLarge = cachedGraph1024.value,
+                        executor = executor,
+                        mapScale = currentMapScale,
+                        customElevationPowerMap = currentState.customElevationPowerMap.value,
+                        customStartingHeightsMap = currentState.customStartingHeightsMap.value,
+                        customSoilMobilityMap = currentState.customSoilMobilityMap.value,
+                        canceled = canceled,
+                        biomeTemplates = BIOME_TEMPLATES_REF.value!!,
+                        exportFiles = exportFiles)
+            } catch (w: Exception) {
+                if (!causedByCancellation(w)) {
+                    throw w
+                }
+            } finally {
+                if (cancelCurrentRunningTask.value == canceled) {
+                    cancelCurrentRunningTask.value = null
+                }
+            }
+        } finally {
+            generationTimer.cancel()
+            generatingMessageBlock.isVisible = false
+            dialogLayer.isVisible = false
         }
     }
 }

@@ -10,26 +10,28 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedFloat
 import com.grimfox.gec.ui.widgets.TextureBuilder.extractTextureRedShort
 import com.grimfox.gec.ui.widgets.TextureBuilder.render
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderLandImage
+import com.grimfox.gec.ui.widgets.TextureBuilder.renderNormalAndSlopeRgbaByte
 import com.grimfox.gec.ui.widgets.TextureBuilder.renderTrianglesRedFloat
-import com.grimfox.gec.util.Biomes.Biome
-import com.grimfox.gec.util.Biomes.ErosionSettings
-import com.grimfox.gec.util.Biomes.RegionData
+import com.grimfox.gec.util.Biomes.*
 import com.grimfox.gec.util.BuildContinent.RegionSplines
 import com.grimfox.gec.util.Rendering.renderEdges
 import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.geometry.renderTriangle
-import kotlinx.coroutines.experimental.*
 import com.grimfox.joml.SimplexNoise.noise
+import kotlinx.coroutines.experimental.*
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.*
+import java.awt.image.BufferedImage
 import java.io.File
-import java.lang.Math.log
+import java.lang.Math.*
+import java.nio.ByteBuffer
 import java.text.DecimalFormat
 import java.util.*
 import java.util.concurrent.*
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicInteger
+import javax.imageio.ImageIO
 import kotlin.collections.ArrayList
 import kotlin.math.min
 
@@ -39,17 +41,17 @@ object WaterFlows {
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
     class WaterNode constructor(val id: Int,
-                    var isExternal: Boolean,
-                    val area: Float,
-                    val adjacents: ArrayList<Pair<WaterNode, Float>>,
-                    val simplexX: Float,
-                    val simplexY: Float,
-                    var elevationPower: Float,
-                    var height: Float,
-                    var drainageArea: Float,
-                    var biome: Int,
-                    val soilMobility: Float,
-                    val isPinned: Boolean) {
+                                var isExternal: Boolean,
+                                val area: Float,
+                                val adjacents: ArrayList<Pair<WaterNode, Float>>,
+                                val simplexX: Float,
+                                val simplexY: Float,
+                                var elevationPower: Float,
+                                var height: Float,
+                                var drainageArea: Float,
+                                var biome: Int,
+                                val soilMobility: Float,
+                                val isPinned: Boolean) {
 
         var lake: Int = -1
         var parent: WaterNode = this
@@ -63,6 +65,16 @@ object WaterFlows {
 
     class Masks(val biomeMask: Matrix<Byte>, val landMask: Matrix<Byte>, val underWaterMask: Matrix<Float>, val elevationPowerMask: Matrix<Short>, val startingHeightsMask: Matrix<Short>, val soilMobilityMask: Matrix<Short>)
 
+    class ExportFiles(
+            val outputSize: Int = 256,
+            val elevationFile: File?,
+            val slopeFile: File?,
+            val normalFile: File?,
+            val soilDensityFile: File?,
+            val biomeFile: File?,
+            val waterFlowFile: File?,
+            val objFile: File?)
+
     fun generateWaterFlows(
             random: Random,
             regionSplines: RegionSplines,
@@ -72,14 +84,14 @@ object WaterFlows {
             flowGraphMedium: Graph,
             flowGraphLarge: Graph,
             executor: ExecutorService,
-            outputWidth: Int,
             mapScale: Int,
             biomes: List<Biome>,
             customElevationPowerMap: TextureId,
             customStartingHeightsMap: TextureId,
             customSoilMobilityMap: TextureId,
             canceled: Reference<Boolean>,
-            biomeTemplates: Biomes): Pair<TextureId, TextureId> {
+            biomeTemplates: Biomes,
+            exportFiles: ExportFiles? = null): Pair<TextureId?, TextureId?> {
         fun <T> doOrCancel(work: () -> T): T {
             if (!canceled.value) {
                 return work()
@@ -87,12 +99,12 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val scale = ((mapScale * mapScale) / 400.0f).coerceIn(0.0f, 1.0f)
         val distanceScale = scale * 990000 + 10000
         val shaderTextureScale = ((mapScale / 20.0f).coerceIn(0.0f, 1.0f) * 0.75f) + 0.25f
         val shaderBorderDistanceScale = ((1.0f - ((mapScale / 20.0f).coerceIn(0.0f, 1.0f))) * 0.5f) + 0.5f
         val heightScale = ((log(shaderTextureScale - 0.21) * 0.4) + 1.59).toFloat()
-        val minFlowScale = ((mapScale * mapScale * mapScale) / 8000.0f).coerceIn(0.0f, 1.0f) * 600000000 + 250000
 
         val randomSeeds = Array(2) { random.nextLong() }
 
@@ -263,7 +275,7 @@ object WaterFlows {
         }
         val smallMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapErosion(canceled, executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.biomeMask, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]), biomeTemplates) }
-            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, null,-1.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, null, -1.0f, biomeTemplates) }
         }
         val smallWaterMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapUnderWaterErosion(executor, flowGraphSmall, regionDataFuture.value, biomeMasksFuture.value.underWaterMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]), biomeTemplates) }
@@ -299,35 +311,35 @@ object WaterFlows {
             var lastUnusedCount = unused.size
             while (unused.isNotEmpty()) {
                 doOrCancel {
-                val nextOrder = ArrayList(next)
-                next.clear()
-                nextOrder.forEach { id ->
-                    val node = nodeIndex[id]!!
-                    node.adjacents.forEach { (otherNode) ->
-                        if (!used.contains(otherNode.id)) {
-                            next.add(otherNode.id)
-                            used.add(otherNode.id)
-                            unused.remove(otherNode.id)
+                    val nextOrder = ArrayList(next)
+                    next.clear()
+                    nextOrder.forEach { id ->
+                        val node = nodeIndex[id]!!
+                        node.adjacents.forEach { (otherNode) ->
+                            if (!used.contains(otherNode.id)) {
+                                next.add(otherNode.id)
+                                used.add(otherNode.id)
+                                unused.remove(otherNode.id)
+                            }
                         }
                     }
+                    if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                        val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                        makeSink.isExternal = true
+                        rivers.add(makeSink)
+                        used.add(makeSink.id)
+                        unused.remove(makeSink.id)
+                        next.add(makeSink.id)
+                    }
+                    lastUnusedCount = unused.size
                 }
-                if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
-                    val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
-                    makeSink.isExternal = true
-                    rivers.add(makeSink)
-                    used.add(makeSink.id)
-                    unused.remove(makeSink.id)
-                    next.add(makeSink.id)
-                }
-                lastUnusedCount = unused.size
-            }
             }
             doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.midPassSettings), 2048, null, 0.0f, biomeTemplates) }
         }
         val highWaterMapsFuture = executor.call {
             val (heightMap) = midWaterMapsFuture.value
             val (nodeIndex, nodes, rivers, water, border) = highWaterNodesFuture.value
-            doOrCancel {  applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes) }
+            doOrCancel { applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes) }
             val unused = LinkedHashSet(water)
             val used = LinkedHashSet(border)
             unused.removeAll(used)
@@ -335,30 +347,30 @@ object WaterFlows {
             var lastUnusedCount = unused.size
             while (unused.isNotEmpty()) {
                 doOrCancel {
-                val nextOrder = ArrayList(next)
-                next.clear()
-                nextOrder.forEach { id ->
-                    val node = nodeIndex[id]!!
-                    node.adjacents.forEach { (otherNode) ->
-                        if (!used.contains(otherNode.id)) {
-                            next.add(otherNode.id)
-                            used.add(otherNode.id)
-                            unused.remove(otherNode.id)
+                    val nextOrder = ArrayList(next)
+                    next.clear()
+                    nextOrder.forEach { id ->
+                        val node = nodeIndex[id]!!
+                        node.adjacents.forEach { (otherNode) ->
+                            if (!used.contains(otherNode.id)) {
+                                next.add(otherNode.id)
+                                used.add(otherNode.id)
+                                unused.remove(otherNode.id)
+                            }
                         }
                     }
+                    if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                        val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                        makeSink.isExternal = true
+                        rivers.add(makeSink)
+                        used.add(makeSink.id)
+                        unused.remove(makeSink.id)
+                        next.add(makeSink.id)
+                    }
+                    lastUnusedCount = unused.size
                 }
-                if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
-                    val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
-                    makeSink.isExternal = true
-                    rivers.add(makeSink)
-                    used.add(makeSink.id)
-                    unused.remove(makeSink.id)
-                    next.add(makeSink.id)
-                }
-                lastUnusedCount = unused.size
             }
-            }
-            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), outputWidth, null, 0.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), 4096, null, 0.0f, biomeTemplates) }
         }
         val highMapsFuture = executor.call {
             val (heightMap) = midMapsFuture.value
@@ -366,58 +378,96 @@ object WaterFlows {
             val erosionSettings = doOrCancel { biomes.map { it.highPassSettings } }
             doOrCancel { applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
             val (underWaterMask) = highWaterMapsFuture.value
-            val (heights, riverEdges) = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, outputWidth, underWaterMask, -600.0f, biomeTemplates, true) }
-//            val riverEdges = ArrayList<LineSegment2F>()
-//            rivers.forEach {
-//                doOrCancel { riverEdges.addAll(recurseFindRiverEdges(flowGraphLarge.vertices, it, minFlowScale)) }
-//            }
-            Pair(heights, riverEdges!!)
+            val exportRivers = exportFiles?.waterFlowFile != null
+            val returnRivers = exportRivers || exportFiles == null
+            val (heights, flows) = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 4096, underWaterMask, -600.0f, biomeTemplates, returnRivers, exportRivers, exportFiles?.outputSize ?: 4096) }
+            Pair(heights, flows)
         }
-        val firstDeferred = doOrCancel { task { writeHeightMap(highMapsFuture.value.first) } }
-        val secondDeferred = doOrCancel { task { writeHeightMap(highMapsFuture.value.second, 0.0f) } }
-        return runBlocking {
-            Pair(firstDeferred.await(), secondDeferred.await())
-        }
-//        return Pair(doOrCancel { writeHeightMap(highMapsFuture.value.first) }, doOrCancel { renderEdges(executor, highMapsFuture.value.second, threadCount, GL_LINEAR, GL_LINEAR) })
-//        return Pair(writeHeightMap(highMapsFuture.value.first), renderEdges(executor, emptyList(), threadCount, GL_LINEAR, GL_LINEAR))
-//        return Pair(writeHeightMapUShorts(biomeMasksFuture.value.second), renderEdges(executor, emptyList(), threadCount, GL_LINEAR, GL_LINEAR))
-//        return writeHeightMapUBytes(elevationMask)
-//        return Biomes.rollingHillsNoiseTexture
-//        return writeHeightMap(coastalBorderMap)
-//        val heightMap = timeIt("rendered regions in") {
-//            val heightMap = FloatArrayMatrix(outputWidth) { -1.0f }
-//            renderRegions(executor, inputGraph, inputMask, heightMap, threadCount)
-//            heightMap
-//        }
-//        return writeHeightMap(heightMap)
-
-//        val heightMap = timeIt("rendered region borders in") {
-//            val heightMap = FloatArrayMatrix(outputWidth)
-//            renderRegionBorders(executor, inputGraph, inputMask, heightMap, threadCount)
-//            heightMap
-//        }
-//        return writeHeightMap(heightMap)
-
-//        return timeIt("rendered region borders in") {
-//            renderRegionBorders(executor, inputGraph, inputMask, threadCount)
-//        }
-//        return regionBorderTextureId
-    }
-
-    private fun recurseFindRiverEdges(vertices: Vertices, river: WaterNode, minFlow: Float): List<LineSegment2F> {
-        val riverEdges = ArrayList<LineSegment2F>()
-        river.children.forEach {
-            makeEdgeIfSufficientFlow(vertices, it, riverEdges, minFlow)
-        }
-        return riverEdges
-    }
-
-    private fun makeEdgeIfSufficientFlow(vertices: Vertices, river: WaterNode, riverEdges: ArrayList<LineSegment2F>, minFlow: Float) {
-        if (river.drainageArea > minFlow) {
-            riverEdges.add(LineSegment2F(vertices[river.id].point, vertices[river.parent.id].point))
-            river.children.forEach {
-                makeEdgeIfSufficientFlow(vertices, it, riverEdges, minFlow)
+        val firstDeferred = doOrCancel {
+            task {
+                val heightMap = highMapsFuture.value.first
+                val heightMapAsShortArray = if (exportFiles == null || exportFiles.elevationFile != null || exportFiles.slopeFile != null || exportFiles.normalFile != null) {
+                    writeHeightMapAsShortArray(heightMap)
+                } else {
+                    null
+                }
+                val textureId = if ((exportFiles == null && heightMapAsShortArray != null) || (exportFiles != null && heightMapAsShortArray != null && (exportFiles.slopeFile != null || exportFiles.normalFile != null))) {
+                    heightMapToTextureId(heightMapAsShortArray, heightMap)
+                } else {
+                    null
+                }
+                textureId to heightMapAsShortArray
             }
+        }
+        val flowMap = highMapsFuture.value.second
+        val secondDeferred = if (flowMap != null) {
+            doOrCancel {
+                task {
+                    val flowMapAsShortArray = if (exportFiles == null || exportFiles.waterFlowFile != null) {
+                        writeHeightMapAsShortArray(flowMap, 0.0f)
+                    } else {
+                        null
+                    }
+                    val textureId = if (exportFiles == null && flowMapAsShortArray != null) {
+                        heightMapToTextureId(flowMapAsShortArray, flowMap)
+                    } else {
+                        null
+                    }
+                    textureId to flowMapAsShortArray
+                }
+            }
+        } else {
+            null
+        }
+        val thirdDeferred = if (exportFiles?.slopeFile != null || exportFiles?.normalFile != null) {
+            doOrCancel {
+                task {
+                    runBlocking {
+                        val uvScale = (4096.0f / exportFiles.outputSize) * 0.625f
+                        val first = firstDeferred.await()
+                        val textureId = first.first
+                        if (textureId != null) {
+                            val linearDistanceScaleInKilometers = (((mapScale * mapScale) / 400.0f) * 990000 + 10000) / 1000
+                            val scaleFactor = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+                            renderNormalAndSlopeRgbaByte(textureId, scaleFactor, uvScale, QuadFloat(0.5f, 0.5f, 1.0f, 1.0f))
+                        } else {
+                            null
+                        }
+                    }
+                }
+            }
+        } else {
+            null
+        }
+        return runBlocking {
+            val first = firstDeferred.await()
+            val second = secondDeferred?.await()
+            val third = thirdDeferred?.await()
+            val task1 = doOrCancel {
+                task {
+                    exportFiles?.elevationFile?.exportMap16Bit(exportFiles.outputSize, first.second, 4096)
+                }
+            }
+            val task2 = doOrCancel {
+                task {
+                    exportFiles?.waterFlowFile?.exportMap16Bit(exportFiles.outputSize, second?.second, 4096)
+                }
+            }
+            val task3 = doOrCancel {
+                task {
+                    exportFiles?.normalFile?.exportMap8BitRGB(exportFiles.outputSize, third, 4096)
+                }
+            }
+            val task4 = doOrCancel {
+                task {
+                    exportFiles?.slopeFile?.exportMap8BitA(exportFiles.outputSize, third, 4096)
+                }
+            }
+            task1.await()
+            task2.await()
+            task3.await()
+            task4.await()
+            Pair(first.first, second?.first)
         }
     }
 
@@ -503,6 +553,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val vertices = graph.vertices
         val land = regionData.land
         val beach = regionData.beach
@@ -521,20 +572,20 @@ object WaterFlows {
             next.clear()
             nextOrder.forEach { id ->
                 doOrCancel {
-                val node = nodeIndex[id]!!
-                node.adjacents.forEach { (otherNode, second) ->
-                    if (!used.contains(otherNode.id)) {
-                        otherNode.parent.children.remove(otherNode)
-                        otherNode.parent = node
-                        otherNode.distanceToParent = second
-                        node.children.add(otherNode)
-                        next.add(otherNode.id)
-                        used.add(otherNode.id)
-                        unused.remove(otherNode.id)
+                    val node = nodeIndex[id]!!
+                    node.adjacents.forEach { (otherNode, second) ->
+                        if (!used.contains(otherNode.id)) {
+                            otherNode.parent.children.remove(otherNode)
+                            otherNode.parent = node
+                            otherNode.distanceToParent = second
+                            node.children.add(otherNode)
+                            next.add(otherNode.id)
+                            used.add(otherNode.id)
+                            unused.remove(otherNode.id)
+                        }
                     }
                 }
             }
-        }
         }
         doOrCancel { computeAreas(executor, rivers) }
         val bootstrapErosion = ErosionSettings(1.0f, 1.0f, 1.0f)
@@ -542,7 +593,24 @@ object WaterFlows {
         return Triple(nodeIndex, nodes, rivers)
     }
 
-    private fun performErosion(canceled: Reference<Boolean>, executor: ExecutorService, graph: Graph, biomeMask: Matrix<Byte>?, nodeIndex: Array<WaterNode?>, nodes: ArrayList<WaterNode>, rivers: ArrayList<WaterNode>, iterations: Int, biomes: List<Biome>, erosionSettings: List<ErosionSettings>, heightMapWidth: Int, fallback: Matrix<Float>? = null, defaultValue: Float = 0.0f, biomeTemplates: Biomes, returnRivers: Boolean = false): Pair<FloatArrayMatrix, FloatArrayMatrix?> {
+    private fun performErosion(
+            canceled: Reference<Boolean>,
+            executor: ExecutorService,
+            graph: Graph,
+            biomeMask: Matrix<Byte>?,
+            nodeIndex: Array<WaterNode?>,
+            nodes: ArrayList<WaterNode>,
+            rivers: ArrayList<WaterNode>,
+            iterations: Int,
+            biomes: List<Biome>,
+            erosionSettings: List<ErosionSettings>,
+            heightMapWidth: Int,
+            fallback: Matrix<Float>? = null,
+            defaultValue: Float = 0.0f,
+            biomeTemplates: Biomes,
+            returnRivers: Boolean = false,
+            forExport: Boolean = false,
+            outputWidth: Int = heightMapWidth): Pair<FloatArrayMatrix, FloatArrayMatrix?> {
         fun <T> doOrCancel(work: () -> T): T {
             if (!canceled.value) {
                 return work()
@@ -550,6 +618,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val lakes = ArrayList<WaterNode>()
         val passes = LinkedHashMap<PassKey, Pass>()
         for (i in 0 until iterations) {
@@ -563,16 +632,16 @@ object WaterFlows {
         var riverMapDeferred: Deferred<FloatArrayMatrix>? = null
         val heightMap = if (heightMapWidth == 4096) {
             if (returnRivers) {
-                riverMapDeferred = doOrCancel { task { renderHeightMap(executor, graph, nodeIndex, null, 0.0f, heightMapWidth, threadCount, 0.5f) { drainageArea } } }
+                riverMapDeferred = doOrCancel { task { renderHeightMap(executor, graph, nodeIndex, null, 0.0f, heightMapWidth, outputWidth, threadCount, if (forExport) 1.0f else 0.5f) { drainageArea } } }
             }
-            doOrCancel { renderHeightMap(executor, graph, nodeIndex, fallback, defaultValue, heightMapWidth, threadCount) }
+            doOrCancel { renderHeightMap(executor, graph, nodeIndex, fallback, defaultValue, heightMapWidth, outputWidth, threadCount) }
         } else {
             val heightMap = FloatArrayMatrix(heightMapWidth) { defaultValue }
             doOrCancel { renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount) }
             heightMap
         }
 //        writeObj(executor, graph, nodeIndex, fallback, threadCount, File("D:/sandbox/terrain.obj"))
-        val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE))}
+        val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE)) }
         nodes.forEach {
             val (min, max) = biomeExtremes[it.biome]
             val height = it.height
@@ -586,12 +655,8 @@ object WaterFlows {
         if (biomeMask != null) {
             doOrCancel { applyTerracing(executor, heightMap, biomeMask, erosionSettings, biomeExtremes, threadCount) }
         }
-        return if (returnRivers) {
-            runBlocking {
-                heightMap to riverMapDeferred?.await()
-            }
-        } else {
-            heightMap to null
+        return runBlocking {
+            Pair(heightMap, if (returnRivers) riverMapDeferred?.await() else null)
         }
     }
 
@@ -603,6 +668,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val vertices = graph.vertices
         val land = LinkedHashSet<Int>(vertices.size)
         val water = ArrayList<Int>(vertices.size)
@@ -610,14 +676,14 @@ object WaterFlows {
         val landMaskWidthM1 = landMaskWidth - 1
         for (i in 0 until vertices.size) {
             doOrCancel {
-            val point = vertices.getPoint(i)
-            val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
-            if (landMask[index].toInt() and 0xFF < 128) {
-                water.add(i)
-            } else {
-                land.add(i)
+                val point = vertices.getPoint(i)
+                val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
+                if (landMask[index].toInt() and 0xFF < 128) {
+                    water.add(i)
+                } else {
+                    land.add(i)
+                }
             }
-        }
         }
         val border = doOrCancel { LinkedHashSet(graph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toList()) }
         val coast = doOrCancel { extractBeachFromGraphAndWater(graph.vertices, LinkedHashSet(water)) }
@@ -643,6 +709,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val vertices = graph.vertices
         val land = ArrayList<Int>(vertices.size)
         val water = LinkedHashSet<Int>(vertices.size)
@@ -650,14 +717,14 @@ object WaterFlows {
         val landMaskWidthM1 = landMaskWidth - 1
         for (i in 0 until vertices.size) {
             doOrCancel {
-            val point = vertices.getPoint(i)
-            val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
-            if (landMask[index].toInt() and 0xFF < 128) {
-                water.add(i)
-            } else {
-                land.add(i)
+                val point = vertices.getPoint(i)
+                val index = (Math.round(point.y * landMaskWidthM1) * landMaskWidth) + Math.round(point.x * landMaskWidthM1)
+                if (landMask[index].toInt() and 0xFF < 128) {
+                    water.add(i)
+                } else {
+                    land.add(i)
+                }
             }
-        }
         }
         val beach = doOrCancel { extractBeachFromGraphAndWater(vertices, water) }
 
@@ -683,9 +750,9 @@ object WaterFlows {
         val expandedPasses = ArrayList<Pass>(passes.size * 2)
         passes.values.forEach {
             doOrCancel {
-            expandedPasses.add(it)
-            expandedPasses.add(Pass(PassKey(it.passKey.lake2, it.passKey.lake1), it.id2, it.id1, it.height))
-        }
+                expandedPasses.add(it)
+                expandedPasses.add(Pass(PassKey(it.passKey.lake2, it.passKey.lake1), it.id2, it.id1, it.height))
+            }
         }
         expandedPasses.sortByDescending { it.height }
         val outflowing = LinkedHashSet<Int>()
@@ -700,13 +767,13 @@ object WaterFlows {
                     continue
                 } else if (outflowing.contains(currentPass.passKey.lake2)) {
                     doOrCancel {
-                    outflowing.add(currentPass.passKey.lake1)
-                    expandedPasses.removeAt(j)
-                    val childNode = recurseFindRoot(nodeIndex[currentPass.id1]!!)
-                    val parentNode = nodeIndex[currentPass.id2]!!
-                    parentNode.children.add(childNode)
-                    childNode.parent = parentNode
-                    childNode.distanceToParent = vertices.getPoint(childNode.id).distance(vertices.getPoint(parentNode.id))
+                        outflowing.add(currentPass.passKey.lake1)
+                        expandedPasses.removeAt(j)
+                        val childNode = recurseFindRoot(nodeIndex[currentPass.id1]!!)
+                        val parentNode = nodeIndex[currentPass.id2]!!
+                        parentNode.children.add(childNode)
+                        childNode.parent = parentNode
+                        childNode.distanceToParent = vertices.getPoint(childNode.id).distance(vertices.getPoint(parentNode.id))
                     }
                     break
                 }
@@ -809,6 +876,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val areaScale = distanceScale * distanceScale
         val nodeIndex = arrayOfNulls<WaterNode>(vertices.size)
         val biomeWidth = biomeMask.width
@@ -823,24 +891,24 @@ object WaterFlows {
             executor.call {
                 for (id in i until land.size step threadCount) {
                     doOrCancel {
-                    val landId = land[id]
-                    val isExternal = riverMouths.contains(landId)
-                    val area = vertices.getArea(landId) * areaScale
-                    val point = vertices.getPoint(landId)
-                    val bIndex = (Math.round(point.y * biomeWidthM1) * biomeWidth) + Math.round(point.x * biomeWidthM1)
-                    val biomeId = Math.max(0, biomeMask[bIndex].toInt() - 1)
-                    val biome = biomes[biomeId]
-                    val uIndex = (Math.round(point.y * elevationWidthM1) * elevationWidth) + Math.round(point.x * elevationWidthM1)
-                    val elevationPower = toElevationPower(elevationMask[uIndex], biome.lowPassSettings.elevationPowerMultiplier)
-                    val hIndex = (Math.round(point.y * heightWidthM1) * heightWidth) + Math.round(point.x * heightWidthM1)
-                    val height = ((startingHeights[hIndex].toInt() and 0xFFFF) / 65536.0f) * 3000.0f
-                    val eIndex = (Math.round(point.y * soilMobilityWidthM1) * soilMobilityWidth) + Math.round(point.x * soilMobilityWidthM1)
-                    val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, elevationPower, height, area, biomeId, soilMobility, isExternal || pinned?.contains(landId) ?: false)
-                    nodeIndex[landId] = node
+                        val landId = land[id]
+                        val isExternal = riverMouths.contains(landId)
+                        val area = vertices.getArea(landId) * areaScale
+                        val point = vertices.getPoint(landId)
+                        val bIndex = (Math.round(point.y * biomeWidthM1) * biomeWidth) + Math.round(point.x * biomeWidthM1)
+                        val biomeId = Math.max(0, biomeMask[bIndex].toInt() - 1)
+                        val biome = biomes[biomeId]
+                        val uIndex = (Math.round(point.y * elevationWidthM1) * elevationWidth) + Math.round(point.x * elevationWidthM1)
+                        val elevationPower = toElevationPower(elevationMask[uIndex], biome.lowPassSettings.elevationPowerMultiplier)
+                        val hIndex = (Math.round(point.y * heightWidthM1) * heightWidth) + Math.round(point.x * heightWidthM1)
+                        val height = ((startingHeights[hIndex].toInt() and 0xFFFF) / 65536.0f) * 3000.0f
+                        val eIndex = (Math.round(point.y * soilMobilityWidthM1) * soilMobilityWidth) + Math.round(point.x * soilMobilityWidthM1)
+                        val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
+                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, elevationPower, height, area, biomeId, soilMobility, isExternal || pinned?.contains(landId) ?: false)
+                        nodeIndex[landId] = node
+                    }
                 }
             }
-        }
         }
         nodeFutures.forEach { it.join() }
         val nodes = ArrayList<WaterNode>(land.size)
@@ -853,17 +921,17 @@ object WaterFlows {
             executor.call {
                 for (id in i until nodes.size step threadCount) {
                     doOrCancel {
-                    val node = nodes[id]
-                    val position = vertices.getPoint(node.id)
-                    vertices.getAdjacentVertices(node.id).forEach { adjacent ->
-                        val otherNode = nodeIndex[adjacent]
-                        if (otherNode != null) {
-                            node.adjacents.add(Pair(otherNode, position.distance(vertices.getPoint(adjacent)) * distanceScale))
+                        val node = nodes[id]
+                        val position = vertices.getPoint(node.id)
+                        vertices.getAdjacentVertices(node.id).forEach { adjacent ->
+                            val otherNode = nodeIndex[adjacent]
+                            if (otherNode != null) {
+                                node.adjacents.add(Pair(otherNode, position.distance(vertices.getPoint(adjacent)) * distanceScale))
+                            }
                         }
                     }
                 }
             }
-        }
         }
         nodeFutures2.forEach { it.join() }
         return Pair(nodeIndex, nodes)
@@ -886,6 +954,7 @@ object WaterFlows {
                 throw CancellationException()
             }
         }
+
         val eWidth = soilMobilityMap.width
         val eWidthM1 = eWidth - 1
         val areaScale = distanceScale * distanceScale
@@ -894,18 +963,18 @@ object WaterFlows {
             executor.call {
                 for (id in i until land.size step threadCount) {
                     doOrCancel {
-                    val landId = land[id]
-                    val isExternal = riverMouths.contains(landId)
-                    val area = vertices.getArea(landId) * areaScale
-                    val point = vertices.getPoint(landId)
-                    val isPinned = isExternal || pinned?.contains(landId) ?: false
-                    val eIndex = (Math.round(point.y * eWidthM1) * eWidth) + Math.round(point.x * eWidthM1)
-                    val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                    val node = WaterNode(landId, isExternal, area, ArrayList<Pair<WaterNode, Float>>(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0, soilMobility, isPinned)
-                    nodeIndex[landId] = node
+                        val landId = land[id]
+                        val isExternal = riverMouths.contains(landId)
+                        val area = vertices.getArea(landId) * areaScale
+                        val point = vertices.getPoint(landId)
+                        val isPinned = isExternal || pinned?.contains(landId) ?: false
+                        val eIndex = (Math.round(point.y * eWidthM1) * eWidth) + Math.round(point.x * eWidthM1)
+                        val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
+                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0, soilMobility, isPinned)
+                        nodeIndex[landId] = node
+                    }
                 }
             }
-        }
         }
         nodeFutures.forEach { it.join() }
         val nodes = ArrayList<WaterNode>(land.size)
@@ -918,17 +987,17 @@ object WaterFlows {
             executor.call {
                 for (id in i until nodes.size step threadCount) {
                     doOrCancel {
-                    val node = nodes[id]
-                    val position = vertices.getPoint(node.id)
-                    vertices.getAdjacentVertices(node.id).forEach { adjacent ->
-                        val otherNode = nodeIndex[adjacent]
-                        if (otherNode != null) {
-                            node.adjacents.add(Pair(otherNode, position.distance(vertices.getPoint(adjacent)) * distanceScale))
+                        val node = nodes[id]
+                        val position = vertices.getPoint(node.id)
+                        vertices.getAdjacentVertices(node.id).forEach { adjacent ->
+                            val otherNode = nodeIndex[adjacent]
+                            if (otherNode != null) {
+                                node.adjacents.add(Pair(otherNode, position.distance(vertices.getPoint(adjacent)) * distanceScale))
+                            }
                         }
                     }
                 }
             }
-        }
         }
         nodeFutures2.forEach { it.join() }
         return Pair(nodeIndex, nodes)
@@ -937,7 +1006,7 @@ object WaterFlows {
     private fun applyMapsToUnderWaterNodes(executor: ExecutorService, vertices: Vertices, heightMap: Matrix<Float>, nodes: ArrayList<WaterNode>) {
         val hWidth = heightMap.width
         val hWidthM1 = hWidth - 1
-        val nodeFutures = (0..threadCount - 1).map { i ->
+        val nodeFutures = (0 until threadCount).map { i ->
             executor.call {
                 for (id in i until nodes.size step threadCount) {
                     val node = nodes[id]
@@ -979,7 +1048,7 @@ object WaterFlows {
                         val shIndex = (Math.round(point.y * startHeightWidthM1) * startHeightWidth) + Math.round(point.x * startHeightWidthM1)
                         val height2 = ((startingHeights[shIndex].toInt() and 0xFFFF) / 65536.0f) * 3000.0f
                         val bIndex = (Math.round(point.y * biomeWidthM1) * biomeWidth) + Math.round(point.x * biomeWidthM1)
-                        val biomeId = Math.max(0 , biomeMask[bIndex].toInt() - 1)
+                        val biomeId = Math.max(0, biomeMask[bIndex].toInt() - 1)
                         val uIndex = (Math.round(point.y * elevationWidthM1) * elevationWidth) + Math.round(point.x * elevationWidthM1)
                         node.biome = biomeId
                         val settings = erosionSettings[biomeId]
@@ -1190,7 +1259,8 @@ object WaterFlows {
         }
     }
 
-    private inline fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, defaultValue: Float, heightMapWidth: Int, threadCount: Int, cap: Float = 1.0f, property: WaterNode.() -> Float =  { height }): FloatArrayMatrix {
+    private inline fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, defaultValue: Float, heightMapWidth: Int, outputWidth: Int, threadCount: Int, cap: Float = 1.0f, property: WaterNode.() -> Float = { height }): FloatArrayMatrix {
+        val outputMultiplier = outputWidth / heightMapWidth.toFloat()
         val fWidth = fallback?.width ?: 0
         val fWidthM1 = fWidth - 1
         val triangles = graph.triangles
@@ -1210,7 +1280,7 @@ object WaterFlows {
                     if (z > maxHeight) {
                         maxHeight = z
                     }
-                    vertexIndex++ to Point3F(point.x, point.y, z)
+                    vertexIndex++ to Point3F(point.x * outputMultiplier, point.y * outputMultiplier, z)
                 } else {
                     null
                 }
@@ -1222,7 +1292,7 @@ object WaterFlows {
                 if (z > maxHeight) {
                     maxHeight = z
                 }
-                vertexIndex++ to Point3F(point.x, point.y, z)
+                vertexIndex++ to Point3F(point.x * outputMultiplier, point.y * outputMultiplier, z)
             }
         }
         val deltaHeight = maxHeight - minHeight
@@ -1396,6 +1466,15 @@ object WaterFlows {
     }
 
     private fun writeHeightMap(heightMap: Matrix<Float>, waterLine: Float = 0.3f): TextureId {
+        val output = writeHeightMapAsShortArray(heightMap, waterLine)
+        return heightMapToTextureId(output, heightMap)
+    }
+
+    private fun heightMapToTextureId(output: ShortArray, heightMap: Matrix<Float>): TextureId {
+        return buildTextureRedShort(output, heightMap.width, GL_LINEAR, GL_LINEAR)
+    }
+
+    private fun writeHeightMapAsShortArray(heightMap: Matrix<Float>, waterLine: Float = 0.3f): ShortArray {
         val width = heightMap.width
         val output = ShortArray(width * width)
         val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
@@ -1412,7 +1491,7 @@ object WaterFlows {
                 }
             }
         }
-        return buildTextureRedShort(output, width, GL_LINEAR, GL_LINEAR)
+        return output
     }
 
     private fun buildTriangles(graph: Graph, regionMask: Matrix<Byte>): List<Pair<FloatArray, IntArray>> {
@@ -1456,5 +1535,145 @@ object WaterFlows {
             }
         }
         return regions.map { it.first.toFloatArray() to it.second.toIntArray() }
+    }
+
+    private fun File.exportMap16Bit(outputSize: Int, heightMap: ShortArray?, heightMapWidth: Int) {
+        if (heightMap == null) return
+        if ((!this.exists() && this.parentFile.isDirectory && this.parentFile.canWrite()) || this.canWrite()) {
+            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_USHORT_GRAY)
+            val raster = output.raster
+            for (y in 0 until outputSize) {
+                val yOff = y * heightMapWidth
+                for (x in 0 until outputSize) {
+                    raster.setSample(x, y, 0, heightMap[yOff + x].toInt() and 0xFFFF)
+                }
+            }
+            ImageIO.write(output, "png", this)
+        }
+    }
+
+    private fun File.exportMap8BitRGB(outputSize: Int, heightMap: ByteBuffer?, heightMapWidth: Int) {
+        if (heightMap == null) return
+        if ((!this.exists() && this.parentFile.isDirectory && this.parentFile.canWrite()) || this.canWrite()) {
+            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_3BYTE_BGR)
+            val raster = output.raster
+            for (y in 0 until outputSize) {
+                val yOff = y * heightMapWidth
+                for (x in 0 until outputSize) {
+                    val index = (yOff + x) * 4
+                    raster.setSample(x, y, 0, heightMap[index].toInt() and 0xFF)
+                    raster.setSample(x, y, 1, heightMap[index + 1].toInt() and 0xFF)
+                    raster.setSample(x, y, 2, heightMap[index + 2].toInt() and 0xFF)
+                }
+            }
+            ImageIO.write(output, "png", this)
+        }
+    }
+
+    private fun File.exportMap8BitA(outputSize: Int, heightMap: ByteBuffer?, heightMapWidth: Int) {
+        if (heightMap == null) return
+        if ((!this.exists() && this.parentFile.isDirectory && this.parentFile.canWrite()) || this.canWrite()) {
+            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_BYTE_GRAY)
+            val raster = output.raster
+            for (y in 0 until outputSize) {
+                val yOff = y * heightMapWidth
+                for (x in 0 until outputSize) {
+                    val index = (yOff + x) * 4
+                    raster.setSample(x, y, 0, heightMap[index + 3].toInt() and 0xFF)
+                }
+            }
+            ImageIO.write(output, "png", this)
+        }
+    }
+
+    private fun shrinkTemp(currentSize: Int, heightMap: ShortArray, sharpen: Double): Pair<Int, ShortArray> {
+        val outputSize = currentSize / 2
+        val output = ShortArray(outputSize * outputSize)
+        for (y in 0 until outputSize) {
+            val yi = (((y + 0.5f) / outputSize) * currentSize + 0.1f).toInt()
+            for (x in 0 until outputSize) {
+                val xi = (((x + 0.5f) / outputSize) * currentSize + 0.1f).toInt()
+                output[y * outputSize + x] = interpolateNew(heightMap, currentSize, xi, yi, sharpen).toShort()
+            }
+        }
+        return outputSize to output
+    }
+
+    private fun interpolateNew(heightMap: ShortArray, stride: Int, x: Int, y: Int, sharpen: Double): Int {
+        if (sharpen == 0.0) {
+            var sum = 0.0f
+            for (m in -1..0) {
+                for (n in -1..0) {
+                    sum += sample(heightMap, stride, x + m, y + n)
+                }
+            }
+            return round(sum * 0.25f).coerceIn(0, 65535)
+        } else {
+            val samples = FloatArrayMatrix(4)
+            for (m in -2..1) {
+                for (n in -2..1) {
+                    samples[m + 2, n + 2] = sample(heightMap, stride, x + m, y + n).toFloat()
+                }
+            }
+            val horizontal = FloatArray(4)
+            for (i in 0..3) {
+                column(horizontal, samples, i)
+            }
+            val vertical = FloatArray(4)
+            for (i in 0..3) {
+                row(vertical, samples, i)
+            }
+            val (diag1) = interpolateCubic(QuadFloat(samples[0, 0], samples[1, 1], samples[2, 2], samples[3, 3]), sharpen)
+            val (diag2) = interpolateCubic(QuadFloat(samples[0, 3], samples[1, 2], samples[2, 1], samples[3, 0]), sharpen)
+            val (comp1) = interpolateCubic(QuadFloat(horizontal[0], horizontal[1], horizontal[2], horizontal[3]), sharpen)
+            val (comp2) = interpolateCubic(QuadFloat(vertical[0], vertical[1], vertical[2], vertical[3]), sharpen)
+            return round((diag1 + diag2 + comp1 + comp2) * 0.25f).coerceIn(0, 65535)
+        }
+    }
+
+    private fun column(horizontal: FloatArray, samples: FloatArrayMatrix, col: Int) {
+        horizontal[col] = interpolateCubic(QuadFloat(samples[col, 0], samples[col, 1], samples[col, 2], samples[col, 3]), 1.0).first
+    }
+
+    private fun row(vertical: FloatArray, samples: FloatArrayMatrix, row: Int) {
+        vertical[row] = interpolateCubic(QuadFloat(samples[0, row], samples[1, row], samples[2, row], samples[3, row]), 1.0).first
+    }
+
+    private fun interpolateCubic(heights: QuadFloat, sharpen: Double): Pair<Float, Float> {
+        if (sharpen == 0.0) {
+            return (heights.second + heights.third) * 0.5f to 0.0f
+        } else {
+            val controlHeights = computeControlHeights(heights)
+
+            val p1y = controlHeights.first * 0.5
+            val p2y = controlHeights.second * 0.5
+            val p3y = controlHeights.third * 0.5
+            val p4y = controlHeights.fourth * 0.5
+
+            val d1a = (p1y + p2y) * 0.5
+            val d1b = (p2y + p3y) * 0.5
+            val d1c = (p3y + p4y) * 0.5
+
+            val avg = p1y + p4y
+            val diff = (((d1a + d1b) * 0.5) + ((d1b + d1c) * 0.5)) - avg
+            return (avg + (diff * sharpen)).toFloat() to diff.toFloat()
+        }
+    }
+
+    private fun computeControlHeights(heights: QuadFloat): QuadFloat {
+        val r0 = heights.first + 2 * heights.second
+        val r1 = (4 * heights.second + 2 * heights.third) - 0.5f * r0
+        val r2 = (8 * heights.third + heights.fourth) - 0.57142857142f * r1
+
+        val p12 = r2 / 6.42857142858f
+
+        val p11 = (r1 - p12) / 3.5f
+        val p21 = 2 * heights.third - p12
+
+        return QuadFloat(heights.second, p11, p21, heights.third)
+    }
+
+    private fun sample(heightMap: ShortArray, stride: Int, x: Int, y: Int): Int {
+        return heightMap[(y.coerceIn(0, stride - 1) * stride) + x.coerceIn(0, stride - 1)].toInt() and 0xFFFF
     }
 }

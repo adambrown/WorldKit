@@ -15,7 +15,6 @@ private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 private val leftPanelLabelShrinkGroup = hShrinkGroup()
-private val mapDetailScale = ref(4)
 
 enum class DisplayMode { REGIONS, MAP, BIOMES, MESH }
 

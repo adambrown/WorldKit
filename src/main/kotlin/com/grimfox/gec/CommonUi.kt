@@ -15,7 +15,7 @@ import java.net.*
 import java.util.*
 import java.util.concurrent.CountDownLatch
 
-val DEMO_BUILD = true
+val DEMO_BUILD = false
 val EXPERIMENTAL_BUILD = false
 
 val REGION_GRAPH_WIDTH = 128
@@ -199,6 +199,8 @@ val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForward
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 val rootRef = ref(NO_BLOCK)
+val mapDetailScale = ref(4)
+
 
 val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightColorsOn, riversOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
 
