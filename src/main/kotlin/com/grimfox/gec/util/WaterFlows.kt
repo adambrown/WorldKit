@@ -50,6 +50,7 @@ object WaterFlows {
                                 var height: Float,
                                 var drainageArea: Float,
                                 var biome: Int,
+                                var density: Float,
                                 val soilMobility: Float,
                                 val isPinned: Boolean) {
 
@@ -275,11 +276,11 @@ object WaterFlows {
         }
         val smallMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapErosion(canceled, executor, flowGraphSmall, regionDataFuture.value, biomes, biomeMasksFuture.value.biomeMask, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]), biomeTemplates) }
-            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, null, -1.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSmall, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 50, biomes, biomes.map { it.lowPassSettings }, 1024, mapScale,null, -1.0f, biomeTemplates) }
         }
         val smallWaterMapsFuture = executor.call {
             val (nodeIndex, nodes, rivers) = doOrCancel { bootstrapUnderWaterErosion(executor, flowGraphSmall, regionDataFuture.value, biomeMasksFuture.value.underWaterMask, biomeMasksFuture.value.soilMobilityMask, distanceScale, Random(randomSeeds[1]), biomeTemplates) }
-            doOrCancel { performErosion(canceled, executor, flowGraphSmall, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.lowPassSettings), 1024, null, 0.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSmall, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.lowPassSettings), 1024, mapScale, null, 0.0f, biomeTemplates) }
         }
         val midNodesFuture = executor.call {
             doOrCancel { prepareGraphNodes(canceled, executor, flowGraphMedium, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
@@ -298,7 +299,7 @@ object WaterFlows {
             val (nodeIndex, nodes, rivers) = midNodesFuture.value
             val erosionSettings = doOrCancel { biomes.map { it.midPassSettings } }
             doOrCancel { applyMapsToNodes(executor, flowGraphMedium.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
-            doOrCancel { performErosion(canceled, executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 2048, null, -1.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphMedium, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 2048, mapScale, null, -1.0f, biomeTemplates) }
         }
         val midWaterMapsFuture = executor.call {
             val (heightMap) = smallWaterMapsFuture.value
@@ -334,7 +335,7 @@ object WaterFlows {
                     lastUnusedCount = unused.size
                 }
             }
-            doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.midPassSettings), 2048, null, 0.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.midPassSettings), 2048, mapScale, null, 0.0f, biomeTemplates) }
         }
         val highWaterMapsFuture = executor.call {
             val (heightMap) = midWaterMapsFuture.value
@@ -370,7 +371,7 @@ object WaterFlows {
                     lastUnusedCount = unused.size
                 }
             }
-            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), 4096, null, 0.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), 4096, mapScale, null, 0.0f, biomeTemplates) }
         }
         val highMapsFuture = executor.call {
             val (heightMap) = midMapsFuture.value
@@ -380,8 +381,9 @@ object WaterFlows {
             val (underWaterMask) = highWaterMapsFuture.value
             val exportRivers = exportFiles?.waterFlowFile != null
             val returnRivers = exportRivers || exportFiles == null
-            val (heights, flows) = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 4096, underWaterMask, -600.0f, biomeTemplates, returnRivers, exportRivers, exportFiles?.outputSize ?: 4096) }
-            Pair(heights, flows)
+            val returnSoilDensity = exportFiles?.soilDensityFile != null
+            val (heights, flows, densities) = doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 4096, mapScale, underWaterMask, -600.0f, biomeTemplates, returnRivers, returnSoilDensity, exportRivers, exportFiles?.objFile, exportFiles?.outputSize ?: 4096) }
+            Triple(heights, flows, densities)
         }
         val firstDeferred = doOrCancel {
             task {
@@ -419,7 +421,21 @@ object WaterFlows {
         } else {
             null
         }
-        val thirdDeferred = if (exportFiles?.slopeFile != null || exportFiles?.normalFile != null) {
+        val densityMap = highMapsFuture.value.third
+        val thirdDeferred = if (densityMap != null) {
+            doOrCancel {
+                task {
+                    if (exportFiles == null || exportFiles.soilDensityFile != null) {
+                        writeHeightMapAsShortArray(densityMap, normalize = false)
+                    } else {
+                        null
+                    }
+                }
+            }
+        } else {
+            null
+        }
+        val fourthDeferred = if (exportFiles?.slopeFile != null || exportFiles?.normalFile != null) {
             doOrCancel {
                 task {
                     runBlocking {
@@ -439,10 +455,42 @@ object WaterFlows {
         } else {
             null
         }
+        val fifthDeferred = if (exportFiles?.biomeFile != null) {
+            doOrCancel {
+                task {
+                    runBlocking {
+                        val outputSize = exportFiles.outputSize
+                        val renderScale = outputSize / 4096.0f
+                        val biomeTextureId = doOrCancel { renderRegions(biomeGraph, biomeMask, scale = renderScale) }
+                        val biomeMap = doOrCancel { extractTextureRedByte(biomeTextureId, 4096) }
+                        val landMapTextureId = doOrCancel { renderLandImage(regionSplines.coastPoints, scale = renderScale) }
+                        val landMap = doOrCancel { extractTextureRedByte(landMapTextureId, 4096) }
+                        for (y in 0 until outputSize) {
+                            val yOff = y * 4096
+                            for (x in 0 until outputSize) {
+                                val index = yOff + x
+                                val land = landMap[index].toInt() and 0xFF
+                                val biome = biomeMap[index].toInt() and 0xFF
+                                if (land > 0) {
+                                    biomeMap.put(index, (biome + 1).toByte())
+                                } else {
+                                    biomeMap.put(index, 0.toByte())
+                                }
+                            }
+                        }
+                        biomeMap
+                    }
+                }
+            }
+        } else {
+            null
+        }
         return runBlocking {
             val first = firstDeferred.await()
             val second = secondDeferred?.await()
             val third = thirdDeferred?.await()
+            val fourth = fourthDeferred?.await()
+            val fifth = fifthDeferred?.await()
             val task1 = doOrCancel {
                 task {
                     exportFiles?.elevationFile?.exportMap16Bit(exportFiles.outputSize, first.second, 4096)
@@ -455,18 +503,30 @@ object WaterFlows {
             }
             val task3 = doOrCancel {
                 task {
-                    exportFiles?.normalFile?.exportMap8BitRGB(exportFiles.outputSize, third, 4096)
+                    exportFiles?.soilDensityFile?.exportMap16Bit(exportFiles.outputSize, third, 4096)
                 }
             }
             val task4 = doOrCancel {
                 task {
-                    exportFiles?.slopeFile?.exportMap8BitA(exportFiles.outputSize, third, 4096)
+                    exportFiles?.normalFile?.exportMap8BitRGB(exportFiles.outputSize, fourth, 4096)
+                }
+            }
+            val task5 = doOrCancel {
+                task {
+                    exportFiles?.slopeFile?.exportMap8BitA(exportFiles.outputSize, fourth, 4096)
+                }
+            }
+            val task6 = doOrCancel {
+                task {
+                    exportFiles?.biomeFile?.exportMap8BitGrey(exportFiles.outputSize, fifth, 4096)
                 }
             }
             task1.await()
             task2.await()
             task3.await()
             task4.await()
+            task5.await()
+            task6.await()
             Pair(first.first, second?.first)
         }
     }
@@ -605,12 +665,15 @@ object WaterFlows {
             biomes: List<Biome>,
             erosionSettings: List<ErosionSettings>,
             heightMapWidth: Int,
+            mapScale: Int,
             fallback: Matrix<Float>? = null,
             defaultValue: Float = 0.0f,
             biomeTemplates: Biomes,
             returnRivers: Boolean = false,
+            returnSoilDensity: Boolean = false,
             forExport: Boolean = false,
-            outputWidth: Int = heightMapWidth): Pair<FloatArrayMatrix, FloatArrayMatrix?> {
+            objFile: File? = null,
+            outputWidth: Int = heightMapWidth): Triple<FloatArrayMatrix, FloatArrayMatrix?, FloatArrayMatrix?> {
         fun <T> doOrCancel(work: () -> T): T {
             if (!canceled.value) {
                 return work()
@@ -630,9 +693,13 @@ object WaterFlows {
             doOrCancel { computeHeights(executor, rivers, biomes, erosionSettings, biomeTemplates) }
         }
         var riverMapDeferred: Deferred<FloatArrayMatrix>? = null
+        var densityMapDeferred: Deferred<FloatArrayMatrix>? = null
         val heightMap = if (heightMapWidth == 4096) {
             if (returnRivers) {
                 riverMapDeferred = doOrCancel { task { renderHeightMap(executor, graph, nodeIndex, null, 0.0f, heightMapWidth, outputWidth, threadCount, if (forExport) 1.0f else 0.5f) { drainageArea } } }
+            }
+            if (returnSoilDensity) {
+                densityMapDeferred = doOrCancel { task { renderHeightMap(executor, graph, nodeIndex, null, 0.0f, heightMapWidth, outputWidth, threadCount, 1.0f) { density / 65536.0f } } }
             }
             doOrCancel { renderHeightMap(executor, graph, nodeIndex, fallback, defaultValue, heightMapWidth, outputWidth, threadCount) }
         } else {
@@ -640,7 +707,11 @@ object WaterFlows {
             doOrCancel { renderHeightMap(executor, graph, nodeIndex, heightMap, fallback, threadCount) }
             heightMap
         }
-//        writeObj(executor, graph, nodeIndex, fallback, threadCount, File("D:/sandbox/terrain.obj"))
+        if (objFile != null && (objFile.canWrite() || (!objFile.exists() && objFile.parentFile.isDirectory && objFile.parentFile.canWrite()))) {
+            val linearDistanceScaleInKilometers = (((mapScale * mapScale) / 400.0f) * 990000 + 10000) / 1000
+            val scaleFactor = (((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122) * 2600).toFloat()
+            writeObj(executor, graph, nodeIndex, fallback, threadCount, objFile, scaleFactor)
+        }
         val biomeExtremes = Array(erosionSettings.size) { Pair(mRef(Float.MAX_VALUE), mRef(-Float.MAX_VALUE)) }
         nodes.forEach {
             val (min, max) = biomeExtremes[it.biome]
@@ -656,7 +727,7 @@ object WaterFlows {
             doOrCancel { applyTerracing(executor, heightMap, biomeMask, erosionSettings, biomeExtremes, threadCount) }
         }
         return runBlocking {
-            Pair(heightMap, if (returnRivers) riverMapDeferred?.await() else null)
+            Triple(heightMap, if (returnRivers) riverMapDeferred?.await() else null, if (returnSoilDensity) densityMapDeferred?.await() else null)
         }
     }
 
@@ -838,7 +909,7 @@ object WaterFlows {
                     val height = if (isExternal) 0.0f else if (isPinned) 600.0f else heightMap[hIndex] * 600.0f
                     val eIndex = (Math.round(point.y * eWidthM1) * eWidth) + Math.round(point.x * eWidthM1)
                     val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                    val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, height, area, 0, soilMobility, isPinned)
+                    val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, height, area, 0, 0.0f, soilMobility, isPinned)
                     nodeIndex[landId] = node
                 }
             }
@@ -904,7 +975,7 @@ object WaterFlows {
                         val height = ((startingHeights[hIndex].toInt() and 0xFFFF) / 65536.0f) * 3000.0f
                         val eIndex = (Math.round(point.y * soilMobilityWidthM1) * soilMobilityWidth) + Math.round(point.x * soilMobilityWidthM1)
                         val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, elevationPower, height, area, biomeId, soilMobility, isExternal || pinned?.contains(landId) ?: false)
+                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, elevationPower, height, area, biomeId, 0.0f, soilMobility, isExternal || pinned?.contains(landId) ?: false)
                         nodeIndex[landId] = node
                     }
                 }
@@ -970,7 +1041,7 @@ object WaterFlows {
                         val isPinned = isExternal || pinned?.contains(landId) ?: false
                         val eIndex = (Math.round(point.y * eWidthM1) * eWidth) + Math.round(point.x * eWidthM1)
                         val soilMobility = ((soilMobilityMap[eIndex].toInt() and 0xFFFF) / 65535.0f) * 0.000001122f
-                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0, soilMobility, isPinned)
+                        val node = WaterNode(landId, isExternal, area, ArrayList(vertices.getAdjacentVertices(landId).size), point.x * SIMPLEX_SCALE, point.y * SIMPLEX_SCALE, 0.0f, 0.0f, area, 0, 0.0f, soilMobility, isPinned)
                         nodeIndex[landId] = node
                     }
                 }
@@ -1145,11 +1216,34 @@ object WaterFlows {
                 val numerator = node.height + (250000.0f * (node.elevationPower + (erosion * parentHeight)))
                 node.height = (numerator / denominator).toFloat()
                 val variance = noise(node.simplexX, node.simplexY, node.height / 10.0f)
-                val (talusSet, talusVarianceSet) = biome.talusAngles
-                val heightIndex = Math.round(node.height * biome.heightMultiplier).coerceIn(0, 1023)
-                val talus = biomeTemplates.DEGREES_TO_SLOPES[Math.round((talusSet[heightIndex] + talusVarianceSet[heightIndex] * variance) * 65535.0f).coerceIn(0, 65535)]
-                if ((node.height - parent.height) / node.distanceToParent > talus) {
-                    node.height = (node.distanceToParent * talus) + parent.height
+                val (talusSet, talusVarianceSet, talusThresholds) = biome.talusAngles
+                val nodeHeightIndex = Math.round(node.height * biome.heightMultiplier).coerceIn(0, 1023)
+                if (talusThresholds != null) {
+                    val talusDegrees = Math.round((talusSet[nodeHeightIndex] + talusVarianceSet[nodeHeightIndex] * variance) * 65535.0f).coerceIn(0, 65535)
+                    node.density = talusDegrees.toFloat()
+                    val talusSlope = biomeTemplates.DEGREES_TO_SLOPES[talusDegrees]
+                    val currentSlope = (node.height - parent.height) / node.distanceToParent
+                    if (currentSlope > talusSlope) {
+                        val parentHeightIndex = Math.round(parent.height * biome.heightMultiplier).coerceIn(0, 1023)
+                        val parentTalusDegrees = Math.round((talusSet[parentHeightIndex] + talusVarianceSet[parentHeightIndex] * variance) * 65535.0f).coerceIn(0, 65535)
+                        if (currentSlope > parentTalusDegrees) {
+                            node.height = (node.distanceToParent * talusSlope) + parent.height
+                        } else {
+                            val threshold = talusThresholds[nodeHeightIndex]
+                            if (parentHeightIndex < threshold && nodeHeightIndex >= threshold) {
+                                node.height = threshold / biome.heightMultiplier
+                            } else {
+                                node.height = (node.distanceToParent * talusSlope) + parent.height
+                            }
+                        }
+                    }
+                } else {
+                    val talusDegrees = Math.round((talusSet[nodeHeightIndex] + talusVarianceSet[nodeHeightIndex] * variance) * 65535.0f).coerceIn(0, 65535)
+                    node.density = talusDegrees.toFloat()
+                    val talusSlope = biomeTemplates.DEGREES_TO_SLOPES[talusDegrees]
+                    if ((node.height - parent.height) / node.distanceToParent > talusSlope) {
+                        node.height = (node.distanceToParent * talusSlope) + parent.height
+                    }
                 }
             }
             node.children.forEach { recurseHeights(it, biomes, erosionSettings, biomeTemplates) }
@@ -1198,7 +1292,7 @@ object WaterFlows {
     }
 
 
-    private fun writeObj(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, threadCount: Int, outputFile: File) {
+    private fun writeObj(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, threadCount: Int, outputFile: File, scaleFactor: Float) {
         val fWidth = fallback?.width ?: 0
         val fWidthM1 = fWidth - 1
         val triangles = graph.triangles
@@ -1224,8 +1318,8 @@ object WaterFlows {
             if (it != null) {
                 val (i, point) = it
                 var index = i * 3
-                vertexData[index++] = point.x * 204800
-                vertexData[index++] = point.y * 204800
+                vertexData[index++] = point.x * scaleFactor
+                vertexData[index++] = point.y * scaleFactor
                 vertexData[index] = point.z
             }
         }
@@ -1474,20 +1568,29 @@ object WaterFlows {
         return buildTextureRedShort(output, heightMap.width, GL_LINEAR, GL_LINEAR)
     }
 
-    private fun writeHeightMapAsShortArray(heightMap: Matrix<Float>, waterLine: Float = 0.3f): ShortArray {
+    private fun writeHeightMapAsShortArray(heightMap: Matrix<Float>, waterLine: Float = 0.3f, normalize: Boolean = true): ShortArray {
         val width = heightMap.width
         val output = ShortArray(width * width)
-        val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
-        val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
-        val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
-        val waterFactor = (1.0f / minWaterValue) * waterLine
-        for (y in (0 until width)) {
-            for (x in (0 until width)) {
-                val heightValue = heightMap[x, y]
-                if (heightValue < 0.0f) {
-                    output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
-                } else {
-                    output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
+        if (normalize) {
+            val maxLandValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.max() ?: 0.0f
+            val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
+            val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
+            val waterFactor = (1.0f / minWaterValue) * waterLine
+            for (y in (0 until width)) {
+                for (x in (0 until width)) {
+                    val heightValue = heightMap[x, y]
+                    if (heightValue < 0.0f) {
+                        output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
+                    } else {
+                        output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
+                    }
+                }
+            }
+        } else {
+            for (y in (0 until width)) {
+                for (x in (0 until width)) {
+                    val heightValue = heightMap[x, y]
+                    output[y * width + x] = (heightValue * 65535).toInt().coerceIn(0, 65535).toShort()
                 }
             }
         }
@@ -1580,6 +1683,22 @@ object WaterFlows {
                 for (x in 0 until outputSize) {
                     val index = (yOff + x) * 4
                     raster.setSample(x, y, 0, heightMap[index + 3].toInt() and 0xFF)
+                }
+            }
+            ImageIO.write(output, "png", this)
+        }
+    }
+
+    private fun File.exportMap8BitGrey(outputSize: Int, heightMap: ByteBuffer?, heightMapWidth: Int) {
+        if (heightMap == null) return
+        if ((!this.exists() && this.parentFile.isDirectory && this.parentFile.canWrite()) || this.canWrite()) {
+            val output = BufferedImage(outputSize, outputSize, BufferedImage.TYPE_BYTE_GRAY)
+            val raster = output.raster
+            for (y in 0 until outputSize) {
+                val yOff = y * heightMapWidth
+                for (x in 0 until outputSize) {
+                    val index = yOff + x
+                    raster.setSample(x, y, 0, heightMap[index].toInt() and 0xFF)
                 }
             }
             ImageIO.write(output, "png", this)

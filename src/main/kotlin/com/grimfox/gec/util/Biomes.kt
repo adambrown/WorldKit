@@ -79,14 +79,14 @@ class Biomes {
 
     private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0f, 15.0f, 0.0f)
 
-    private fun buildPlateauTalusAngles(): Pair<FloatArray, FloatArray> {
+    private fun buildPlateauTalusAngles(): Triple<FloatArray, FloatArray, FloatArray> {
         val profile = arrayOf(
                 240 to 30.0f,
-                520 to 89.0f,
-                760 to 45.0f,
-                990 to 89.0f,
-                2000 to 0.05f)
-        return FloatArray(1024) { computePlateauTalusAngle(it, profile) } to FloatArray(1024) { 0.0f }
+                520 to 60.0f,
+                760 to 30.0f,
+                990 to 60.0f,
+                2000 to 8.0f)
+        return Triple(FloatArray(1024) { computePlateauTalusAngle(it, profile) }, FloatArray(1024) { 0.0f }, FloatArray(1024) { computePlateauThresholds(it, profile) })
     }
 
     private fun computePlateauTalusAngle(i: Int, profile: Array<Pair<Int, Float>>): Float {
@@ -100,11 +100,25 @@ class Biomes {
         return (currentLayer.second / 90.0f).coerceIn(0.0f, 1.0f)
     }
 
+    private fun computePlateauThresholds(i: Int, profile: Array<Pair<Int, Float>>): Float {
+        var currentLayer = 0 to profile.first().second
+        var lastLayer = 0 to profile.first().second
+        for (layer in profile) {
+            if (i < layer.first) {
+                lastLayer = currentLayer
+                break
+            } else {
+                currentLayer = layer
+            }
+        }
+        return (lastLayer.first.toFloat()).coerceIn(0.0f, 1023.0f)
+    }
+
     private fun degreesToSlopes(): FloatArray {
         return FloatArray(65536) { tan(toRadians(((it + 2.0) / 65540.0) * 90.0)).toFloat() }
     }
 
-    private fun buildParabolicTalusAngles(minAngle: Float, deltaAngle: Float, jitter: Float): Pair<FloatArray, FloatArray> {
+    private fun buildParabolicTalusAngles(minAngle: Float, deltaAngle: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
         val angleIncrement = deltaAngle / 1023.0f
         val baseAngles = FloatArray(1024) { ((minAngle + (it * angleIncrement)) / 90.0f).coerceIn(0.0f, 1.0f) }
         val jitters = FloatArray(1024) {
@@ -113,10 +127,10 @@ class Biomes {
             val high = Math.abs(1.0f - baseAngle)
             Math.min(jitter / 90.0f, Math.min(low, high)).coerceIn(0.0f, 1.0f)
         }
-        return baseAngles to jitters
+        return Triple(baseAngles, jitters, null)
     }
 
-    private fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Pair<FloatArray, FloatArray> {
+    private fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
         val term0 = -2.0 * standardDeviation * standardDeviation
         val term1 = scale * (1.0 / Math.sqrt(Math.PI * -term0))
         val baseAngles = FloatArray(1024)
@@ -126,7 +140,7 @@ class Biomes {
             baseAngles[it] = baseAngle
             jitters[it] = variance
         }
-        return baseAngles to jitters
+        return Triple(baseAngles, jitters, null)
     }
 
     private fun computeNormalTalusAngle(i: Int, term0: Double, term1: Double, mean: Float, jitter: Float): Pair<Float, Float> {
@@ -209,7 +223,8 @@ class Biomes {
             val terraceFunction: ((Float, Float) -> TerraceFunction)? = null)
 
     class Biome(
-            val talusAngles: Pair<FloatArray, FloatArray>,
+            val name: String,
+            val talusAngles: Triple<FloatArray, FloatArray, FloatArray?>,
             val heightMultiplier: Float,
             val lowPassSettings: ErosionSettings,
             val midPassSettings: ErosionSettings,
@@ -611,6 +626,7 @@ class Biomes {
     }
 
     val COASTAL_MOUNTAINS_BIOME = Biome(
+            name = "Coastal mountains",
             elevationPowerShader = coastalMountainsElevationShader,
             startingHeightShader = coastalMountainsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_COASTAL_MOUNTAINS,
@@ -749,6 +765,7 @@ class Biomes {
     }
 
     val ROLLING_HILLS_BIOME = Biome(
+            name = "Rolling hills",
             elevationPowerShader = rollingHillsElevationShader,
             startingHeightShader = rollingHillsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_ROLLING_HILLS,
@@ -887,6 +904,7 @@ class Biomes {
     }
 
     val FOOTHILLS_BIOME = Biome(
+            name = "Foothills",
             elevationPowerShader = foothillsElevationShader,
             startingHeightShader = foothillsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_FOOTHILLS,
@@ -1025,6 +1043,7 @@ class Biomes {
     }
 
     val MOUNTAINS_BIOME = Biome(
+            name = "Mountains",
             elevationPowerShader = mountainsElevationShader,
             startingHeightShader = mountainsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_MOUNTAINS,
@@ -1163,6 +1182,7 @@ class Biomes {
     }
 
     val PLAINS_BIOME = Biome(
+            name = "Plains",
             elevationPowerShader = plainsElevationShader,
             startingHeightShader = plainsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_PLAINS,
@@ -1293,6 +1313,7 @@ class Biomes {
     }
 
     val PLATEAU_BIOME = Biome(
+            name = "Plateaus",
             elevationPowerShader = plateauBiomeElevationShader,
             startingHeightShader = plateauBiomeStartingHeightsShader,
             talusAngles = TALUS_ANGLES_PLATEAU,
@@ -1307,8 +1328,8 @@ class Biomes {
                     soilMobilityMultiplier = 0.2f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.1f,
-                    soilMobilityMultiplier = 0.1f))
+                    elevationPowerMultiplier = 0.6f,
+                    soilMobilityMultiplier = 0.2f))
 
     private val sharpPlateauBiomeElevationShader = object : Shader {
 
@@ -1417,6 +1438,7 @@ class Biomes {
     }
 
     val SHARP_PLATEAU_BIOME = Biome(
+            name = "Sharp plateaus",
             elevationPowerShader = sharpPlateauBiomeElevationShader,
             startingHeightShader = sharpPlateauBiomeStartingHeightsShader,
             talusAngles = TALUS_ANGLES_SHARP_PLATEAU,
@@ -1578,6 +1600,7 @@ class Biomes {
     }
 
     val CUSTOM_BIOME = Biome(
+            name = "Custom",
             elevationPowerShader = customElevationPowerShader,
             startingHeightShader = customStartingHeightsShader,
             soilMobilityShader = customSoilMobilityShader,
@@ -1679,6 +1702,7 @@ class Biomes {
     }
 
     val UNDER_WATER_BIOME = Biome(
+            name = "Under water",
             elevationPowerShader = underWaterElevationShader,
             startingHeightShader = underWaterElevationShader,
             talusAngles = TALUS_ANGLES_UNDERWATER,

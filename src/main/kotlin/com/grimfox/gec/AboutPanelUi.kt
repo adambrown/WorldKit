@@ -22,7 +22,7 @@ fun aboutPanel(ui: UserInterface) {
                     vSpacer(MEDIUM_SPACER_SIZE)
                     vLabelRow(LARGE_ROW_HEIGHT, text("WorldKit", TEXT_STYLE_LARGE_MESSAGE))
                     vSpacer(LARGE_SPACER_SIZE)
-                    vLabelRow(LARGE_ROW_HEIGHT, text("Version 0.12.0-alpha", TEXT_STYLE_NORMAL))
+                    vLabelRow(LARGE_ROW_HEIGHT, text("Version: 0.12.0-alpha", TEXT_STYLE_NORMAL))
                     vLabelRow(LARGE_ROW_HEIGHT, text("Copyright 2018 Intellirithmic Inc. All rights reserved.", TEXT_STYLE_NORMAL))
                 }
             }

@@ -197,7 +197,7 @@ object TextureBuilder {
         return doDeferredOpenglWork(ValueCollector { collector(textureRenderer) })
     }
 
-    fun renderLandImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>): TextureId {
+    fun renderLandImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, scale: Float = 1.0f): TextureId {
         return renderNvgInternal { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
@@ -206,7 +206,7 @@ object TextureBuilder {
             glDisable(GL_MULTISAMPLE)
 
             nvgSave(nvg)
-            glViewport(0, 0, width, height)
+            glViewport(0, 0, Math.round(width * scale), Math.round(height * scale))
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
             glClear(GL_COLOR_BUFFER_BIT or GL_STENCIL_BUFFER_BIT)
             nvgBeginFrame(nvg, width, height, 1.0f)

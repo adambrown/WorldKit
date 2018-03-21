@@ -18,18 +18,18 @@ import java.util.concurrent.Future
 
 object Rendering {
 
-    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
-        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
+    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
+        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor, scale)
         return renderTrianglesTexRedByte(vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
     }
 
-    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0): TextureId {
-        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor)
+    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
+        val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor, scale)
         renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
         return textureId
     }
 
-    private fun renderInternal(offset: Float, graph: Graph, regionMask: Matrix<Byte>, skips: Int, divisor: Float): Pair<ArrayList<Float>, ArrayList<Int>> {
+    private fun renderInternal(offset: Float, graph: Graph, regionMask: Matrix<Byte>, skips: Int, divisor: Float, scale: Float = 1.0f): Pair<ArrayList<Float>, ArrayList<Int>> {
         val base = 1.0f - offset
         val vertexData = ArrayList<Float>()
         val indexData = ArrayList<Int>()
@@ -45,8 +45,8 @@ object Rendering {
             val border = vertex.cell.border
 
             fun buildVertex(point: Point2F): Int {
-                vertexData.add(point.x)
-                vertexData.add(point.y)
+                vertexData.add(point.x * scale)
+                vertexData.add(point.y * scale)
                 vertexData.add(region)
                 return vertexIndex++
             }
