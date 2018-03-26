@@ -15,7 +15,7 @@ import java.net.*
 import java.util.*
 import java.util.concurrent.CountDownLatch
 
-const val DEMO_BUILD = false
+const val DEMO_BUILD = true
 const val EXPERIMENTAL_BUILD = false
 
 val REGION_GRAPH_WIDTH = 128
