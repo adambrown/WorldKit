@@ -7,7 +7,7 @@ import com.grimfox.gec.ui.widgets.Sizing.SHRINK
 
 fun aboutPanel(ui: UserInterface) {
     panelLayer {
-        aboutPanel = panel(650.0f) {
+        aboutPanel = panel(PANEL_WIDTH) {
             vSizing = SHRINK
             vSpacer(LARGE_SPACER_SIZE)
             block {

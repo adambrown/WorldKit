@@ -45,7 +45,11 @@ object FileDialogs {
     }
 
     fun saveFileDialog(defaultFolder: File, vararg filters: String): File? {
-        val saveFileName = FileDialogs.saveFile(filters.joinToString(","), defaultFolder.canonicalPath)
+        val saveFileName = if (filters.isEmpty()) {
+            FileDialogs.saveFile(null, defaultFolder.canonicalPath)
+        } else {
+            FileDialogs.saveFile(filters.joinToString(","), defaultFolder.canonicalPath)
+        }
         if (saveFileName != null && saveFileName.isNotBlank()) {
             return File(saveFileName)
         }

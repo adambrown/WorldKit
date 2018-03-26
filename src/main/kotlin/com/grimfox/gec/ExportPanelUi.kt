@@ -12,6 +12,8 @@ private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 fun exportPanel(ui: UserInterface) {
     val shrinkGroup = hShrinkGroup()
+    val baseFile = DynamicTextReference("${preferences.projectDir}${File.separator}exports${File.separator}export", 1024, TEXT_STYLE_NORMAL)
+    val useBaseFile = ref(false)
     val elevationFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useElevationFile = ref(false)
     val slopeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
@@ -24,8 +26,11 @@ fun exportPanel(ui: UserInterface) {
     val useBiomeFile = ref(false)
     val waterFlowFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useWaterFlowFile = ref(false)
-    val objFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
-    val useObjFile = ref(false)
+    val meshFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useMeshFile = ref(false)
+    if (DEMO_BUILD) {
+        meshFile.reference.value = "Mesh export is disabled for the demo."
+    }
     fun pngExtensionFilter(textReference: DynamicTextReference): (String, String) -> Unit = { old, new ->
         if (old != new) {
             if (new.isNotBlank() && !new.endsWith(".png", true)) {
@@ -35,8 +40,20 @@ fun exportPanel(ui: UserInterface) {
     }
     fun objExtensionFilter(textReference: DynamicTextReference): (String, String) -> Unit = { old, new ->
         if (old != new) {
-            if (new.isNotBlank() && !new.endsWith(".obj", true)) {
-                textReference.reference.value = "$new.obj"
+            if (DEMO_BUILD) {
+                textReference.reference.value = "Mesh export is disabled for the demo."
+            } else {
+                if (new.isNotBlank() && !new.endsWith(".obj", true)) {
+                    textReference.reference.value = "$new.obj"
+                }
+            }
+        }
+    }
+    fun fileNameChangeListener(useFileReference: ObservableMutableReference<Boolean>): (String, String) -> Unit = { old, new ->
+        if (old.isBlank() && new.isNotBlank()) {
+            val file = File(new)
+            if ((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) {
+                useFileReference.value = true
             }
         }
     }
@@ -58,21 +75,75 @@ fun exportPanel(ui: UserInterface) {
     soilDensityFile.reference.addListener(pngExtensionFilter(soilDensityFile))
     biomeFile.reference.addListener(pngExtensionFilter(biomeFile))
     waterFlowFile.reference.addListener(pngExtensionFilter(waterFlowFile))
-    objFile.reference.addListener(objExtensionFilter(objFile))
+    meshFile.reference.addListener(objExtensionFilter(meshFile))
+    if (DEMO_BUILD) {
+        useMeshFile.addListener { old, new ->
+            if (old != new && new) {
+                task {
+                    useMeshFile.value = false
+                }
+            }
+        }
+    }
     panelLayer {
-        exportPanel = panel(650.0f) {
+        exportPanel = panel(PANEL_WIDTH) {
             vSizing = Sizing.SHRINK
             vSpacer(LARGE_SPACER_SIZE)
+            vSaveFileRowWithToggle(baseFile, useBaseFile, LARGE_ROW_HEIGHT, text("Base name:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui)
             vSaveFileRowWithToggle(elevationFile, useElevationFile, LARGE_ROW_HEIGHT, text("Elevation file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(normalFile, useNormalFile, LARGE_ROW_HEIGHT, text("Normal file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(slopeFile, useSlopeFile, LARGE_ROW_HEIGHT, text("Slope file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(soilDensityFile, useSoilDensityFile, LARGE_ROW_HEIGHT, text("Soil density file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Biome file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(waterFlowFile, useWaterFlowFile, LARGE_ROW_HEIGHT, text("Water flow file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
-            vSaveFileRowWithToggle(objFile, useObjFile, LARGE_ROW_HEIGHT, text("Mesh file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
-            val outputSizes = arrayOf(256, 512, 1024, 2048, 4096)
-            val outputSizesAsText = outputSizes.map { text("$it x $it px", TEXT_STYLE_BUTTON) }
+            vSaveFileRowWithToggle(meshFile, useMeshFile, LARGE_ROW_HEIGHT, text("Mesh file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
+            val outputSizes = if (DEMO_BUILD) {
+                arrayOf(256, 256)
+            } else {
+                arrayOf(4096, 2048, 1024, 512, 256)
+            }
+            val outputSizesAsText = if (DEMO_BUILD) {
+                listOf(text("256 x 256 px", TEXT_STYLE_BUTTON), text("Output size is limited to 256 x 256 px for the demo.", TEXT_STYLE_BUTTON))
+            } else {
+                outputSizes.map { text("$it x $it px", TEXT_STYLE_BUTTON) }
+            }
             val selectedOutputSize: ObservableMutableReference<Int> = ref(0)
+            fun updateOutputs() {
+                val file = fileFromTextReference(useBaseFile, baseFile)
+                if (file != null) {
+                    val baseName = file.absolutePath
+                    val outputSize = outputSizes[selectedOutputSize.value]
+                    elevationFile.reference.value = "$baseName-elevation-$outputSize.png"
+                    slopeFile.reference.value = "$baseName-slope-$outputSize.png"
+                    normalFile.reference.value = "$baseName-normal-$outputSize.png"
+                    soilDensityFile.reference.value = "$baseName-density-$outputSize.png"
+                    biomeFile.reference.value = "$baseName-biome-$outputSize.png"
+                    waterFlowFile.reference.value = "$baseName-flow-$outputSize.png"
+                    meshFile.reference.value = "$baseName-mesh.obj"
+                }
+            }
+            useBaseFile.addListener { old, new ->
+                if (new && old != new) {
+                    updateOutputs()
+                }
+            }
+            selectedOutputSize.addListener { old, new ->
+                if (old != new && useBaseFile.value) {
+                    updateOutputs()
+                }
+            }
+            baseFile.reference.addListener { old, new ->
+                if (old != new && useBaseFile.value) {
+                    updateOutputs()
+                }
+            }
+            elevationFile.reference.addListener(fileNameChangeListener(useElevationFile))
+            slopeFile.reference.addListener(fileNameChangeListener(useSlopeFile))
+            normalFile.reference.addListener(fileNameChangeListener(useNormalFile))
+            soilDensityFile.reference.addListener(fileNameChangeListener(useSoilDensityFile))
+            biomeFile.reference.addListener(fileNameChangeListener(useBiomeFile))
+            waterFlowFile.reference.addListener(fileNameChangeListener(useWaterFlowFile))
+            meshFile.reference.addListener(fileNameChangeListener(useMeshFile))
             block {
                 vSizing = Sizing.STATIC
                 this.height = LARGE_ROW_HEIGHT
@@ -103,8 +174,11 @@ fun exportPanel(ui: UserInterface) {
             vButtonRow(LARGE_ROW_HEIGHT) {
                 button(text("Export"), DIALOG_BUTTON_STYLE) {
                     var outputSize = outputSizes[selectedOutputSize.value]
-                    if (DEMO_BUILD) {
+                    val objFileValue = if (DEMO_BUILD) {
                         outputSize = 256
+                        null
+                    } else {
+                        fileFromTextReference(useMeshFile, meshFile)
                     }
                     val exportFiles = WaterFlows.ExportFiles(
                             outputSize = outputSize,
@@ -114,7 +188,7 @@ fun exportPanel(ui: UserInterface) {
                             soilDensityFile = fileFromTextReference(useSoilDensityFile, soilDensityFile),
                             biomeFile = fileFromTextReference(useBiomeFile, biomeFile),
                             waterFlowFile = fileFromTextReference(useWaterFlowFile, waterFlowFile),
-                            objFile = fileFromTextReference(useObjFile, objFile))
+                            objFile = objFileValue)
                     export(exportFiles)
                     exportPanel.isVisible = false
                     panelLayer.isVisible = false

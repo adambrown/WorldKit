@@ -52,7 +52,7 @@ object FileDialogs {
         return str
     }
 
-    fun saveFile(filter: String, defaultPath: String): String? {
+    fun saveFile(filter: String?, defaultPath: String): String? {
         val out = memAllocPointer(1)
         val r = wrapError(NFD_SaveDialog(filter, defaultPath, out))
         val ptr = out.get(0)

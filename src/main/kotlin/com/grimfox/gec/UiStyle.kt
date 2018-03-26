@@ -32,6 +32,8 @@ val SMALL_ROW_HEIGHT = 20.0f
 val MEDIUM_ROW_HEIGHT = 26.0f
 val LARGE_ROW_HEIGHT = 32.0f
 
+val PANEL_WIDTH = 800.0f
+
 val COLOR_DROP_SHADOW_BLACK = color(5, 5, 6, 72)
 val COLOR_DROP_SHADOW_BLACK_TRANSPARENT = color(5, 5, 6, 0)
 
@@ -940,7 +942,9 @@ fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: Observ
                 hSizing = GROW
                 layout = HORIZONTAL
                 block {
+                    layout = HORIZONTAL
                     hAlign = LEFT
+                    hTruncate = TRUNCATE_LEFT
                     vAlign = MIDDLE
                     hSizing = SHRINK
                     vSizing = SHRINK
@@ -951,7 +955,13 @@ fun Block.vSaveFileRowWithToggle(file: DynamicTextReference, toggleValue: Observ
             }
             hSpacer(MEDIUM_SPACER_SIZE)
             val button = button(text("Select file"), NORMAL_TEXT_BUTTON_STYLE) {
-                file.reference.value = saveFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { it }?.canonicalPath ?: file.reference.value
+                saveFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { callbackFile ->
+                    file.reference.value = callbackFile?.canonicalPath ?: file.reference.value
+                    if (callbackFile != null && ((!callbackFile.exists() && callbackFile.parentFile.isDirectory && callbackFile.parentFile.canWrite()) || callbackFile.canWrite())) {
+                        toggleValue.value = true
+                    }
+                    callbackFile
+                }
             }
             row.supplantEvents(button)
             isMouseAware = false

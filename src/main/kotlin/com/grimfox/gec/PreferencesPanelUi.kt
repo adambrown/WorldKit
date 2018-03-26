@@ -6,7 +6,7 @@ import java.io.File
 
 fun preferencesPanel(ui: UserInterface) {
     panelLayer {
-        preferencesPanel = panel(650.0f) {
+        preferencesPanel = panel(PANEL_WIDTH) {
             vSizing = Sizing.SHRINK
             val shrinkGroup = hShrinkGroup()
             vSpacer(LARGE_SPACER_SIZE)
