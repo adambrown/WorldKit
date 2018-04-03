@@ -606,6 +606,28 @@ class Graph(val seed: Long,
         return pointsWithin
     }
 
+    fun getClosePoints(id: Int, radius: Float, keepSeed: Boolean = true): Set<Int> {
+        if (stride == null) throw UnsupportedOperationException()
+        val gridSize = 1.0f / stride
+        val expansions = Math.ceil((radius / gridSize).toDouble()).toInt() + 1
+        val testPoints = getClosePointDegrees(id, expansions)
+        val pointsWithin = LinkedHashSet<Int>()
+        val r2 = radius * radius
+        val point = vertices.getPoint(id)
+        pointsWithin.add(id)
+        testPoints.forEach {
+            it.forEach {
+                if (point.distance2(vertices[it].point) <= r2) {
+                    pointsWithin.add(it)
+                }
+            }
+        }
+        if (!keepSeed) {
+            pointsWithin.remove(id)
+        }
+        return pointsWithin
+    }
+
     fun getClosePointDegrees(id: Int, expansions: Int = 1): ArrayList<LinkedHashSet<Int>> {
         val degrees = ArrayList<LinkedHashSet<Int>>()
         val nearPoints = LinkedHashSet<Int>()

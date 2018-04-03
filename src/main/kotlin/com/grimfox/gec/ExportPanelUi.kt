@@ -26,6 +26,20 @@ fun exportPanel(ui: UserInterface) {
     val useBiomeFile = ref(false)
     val waterFlowFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useWaterFlowFile = ref(false)
+    val peakFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val usePeakFile = ref(false)
+    val riverFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useRiverFile = ref(false)
+    val biomeBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useBiomeBorderFile = ref(false)
+    val landMaskFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useLandMaskFile = ref(false)
+    val riverBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useRiverBorderFile = ref(false)
+    val mountainBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useMountainBorderFile = ref(false)
+    val coastalBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useCoastalBorderFile = ref(false)
     val meshFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useMeshFile = ref(false)
     if (DEMO_BUILD) {
@@ -75,6 +89,13 @@ fun exportPanel(ui: UserInterface) {
     soilDensityFile.reference.addListener(pngExtensionFilter(soilDensityFile))
     biomeFile.reference.addListener(pngExtensionFilter(biomeFile))
     waterFlowFile.reference.addListener(pngExtensionFilter(waterFlowFile))
+    peakFile.reference.addListener(pngExtensionFilter(peakFile))
+    riverFile.reference.addListener(pngExtensionFilter(riverFile))
+    biomeBorderFile.reference.addListener(pngExtensionFilter(biomeBorderFile))
+    landMaskFile.reference.addListener(pngExtensionFilter(landMaskFile))
+    riverBorderFile.reference.addListener(pngExtensionFilter(riverBorderFile))
+    mountainBorderFile.reference.addListener(pngExtensionFilter(mountainBorderFile))
+    coastalBorderFile.reference.addListener(pngExtensionFilter(coastalBorderFile))
     meshFile.reference.addListener(objExtensionFilter(meshFile))
     if (DEMO_BUILD) {
         useMeshFile.addListener { old, new ->
@@ -96,6 +117,13 @@ fun exportPanel(ui: UserInterface) {
             vSaveFileRowWithToggle(soilDensityFile, useSoilDensityFile, LARGE_ROW_HEIGHT, text("Soil density file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Biome file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(waterFlowFile, useWaterFlowFile, LARGE_ROW_HEIGHT, text("Water flow file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(peakFile, usePeakFile, LARGE_ROW_HEIGHT, text("Peak file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(riverFile, useRiverFile, LARGE_ROW_HEIGHT, text("River file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(biomeBorderFile, useBiomeBorderFile, LARGE_ROW_HEIGHT, text("Biome border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(landMaskFile, useLandMaskFile, LARGE_ROW_HEIGHT, text("Land mask file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(riverBorderFile, useRiverBorderFile, LARGE_ROW_HEIGHT, text("River border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(mountainBorderFile, useMountainBorderFile, LARGE_ROW_HEIGHT, text("Mountain border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(coastalBorderFile, useCoastalBorderFile, LARGE_ROW_HEIGHT, text("Coastal border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(meshFile, useMeshFile, LARGE_ROW_HEIGHT, text("Mesh file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
             val outputSizes = if (DEMO_BUILD) {
                 arrayOf(256, 256)
@@ -119,6 +147,13 @@ fun exportPanel(ui: UserInterface) {
                     soilDensityFile.reference.value = "$baseName-density-$outputSize.png"
                     biomeFile.reference.value = "$baseName-biome-$outputSize.png"
                     waterFlowFile.reference.value = "$baseName-flow-$outputSize.png"
+                    peakFile.reference.value = "$baseName-peaks-$outputSize.png"
+                    riverFile.reference.value = "$baseName-rivers-$outputSize.png"
+                    biomeBorderFile.reference.value = "$baseName-biome-borders-$outputSize.png"
+                    landMaskFile.reference.value = "$baseName-land-$outputSize.png"
+                    riverBorderFile.reference.value = "$baseName-river-borders-$outputSize.png"
+                    mountainBorderFile.reference.value = "$baseName-mountain-borders-$outputSize.png"
+                    coastalBorderFile.reference.value = "$baseName-coastal-borders-$outputSize.png"
                     meshFile.reference.value = "$baseName-mesh.obj"
                 }
             }
@@ -143,6 +178,13 @@ fun exportPanel(ui: UserInterface) {
             soilDensityFile.reference.addListener(fileNameChangeListener(useSoilDensityFile))
             biomeFile.reference.addListener(fileNameChangeListener(useBiomeFile))
             waterFlowFile.reference.addListener(fileNameChangeListener(useWaterFlowFile))
+            peakFile.reference.addListener(fileNameChangeListener(usePeakFile))
+            riverFile.reference.addListener(fileNameChangeListener(useRiverFile))
+            biomeBorderFile.reference.addListener(fileNameChangeListener(useBiomeBorderFile))
+            landMaskFile.reference.addListener(fileNameChangeListener(useLandMaskFile))
+            riverBorderFile.reference.addListener(fileNameChangeListener(useRiverBorderFile))
+            mountainBorderFile.reference.addListener(fileNameChangeListener(useMountainBorderFile))
+            coastalBorderFile.reference.addListener(fileNameChangeListener(useCoastalBorderFile))
             meshFile.reference.addListener(fileNameChangeListener(useMeshFile))
             block {
                 vSizing = Sizing.STATIC
@@ -188,6 +230,13 @@ fun exportPanel(ui: UserInterface) {
                             soilDensityFile = fileFromTextReference(useSoilDensityFile, soilDensityFile),
                             biomeFile = fileFromTextReference(useBiomeFile, biomeFile),
                             waterFlowFile = fileFromTextReference(useWaterFlowFile, waterFlowFile),
+                            peakFile = fileFromTextReference(usePeakFile, peakFile),
+                            riverFile = fileFromTextReference(useRiverFile, riverFile),
+                            biomeBorderFile = fileFromTextReference(useBiomeBorderFile, biomeBorderFile),
+                            landMaskFile = fileFromTextReference(useLandMaskFile, landMaskFile),
+                            riverBorderFile = fileFromTextReference(useRiverBorderFile, riverBorderFile),
+                            mountainBorderFile = fileFromTextReference(useMountainBorderFile, mountainBorderFile),
+                            coastalBorderFile = fileFromTextReference(useCoastalBorderFile, coastalBorderFile),
                             objFile = objFileValue)
                     export(exportFiles)
                     exportPanel.isVisible = false
