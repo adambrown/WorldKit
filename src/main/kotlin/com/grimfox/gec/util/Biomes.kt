@@ -1,12 +1,10 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.CACHE_DIR
-import com.grimfox.gec.executor
-import com.grimfox.gec.model.FloatArrayMatrix
+import com.grimfox.gec.*
+import com.grimfox.gec.model.*
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Point3F
-import com.grimfox.gec.threadCount
-import com.grimfox.gec.ui.widgets.TextureBuilder
+import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.joml.Matrix4f
@@ -15,14 +13,12 @@ import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL20.*
-import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Math.*
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
 import java.util.*
 import java.util.concurrent.Future
-import javax.imageio.ImageIO
 
 class Biomes {
 
@@ -45,29 +41,15 @@ class Biomes {
                 customSoilMobilityMap: TextureId)
     }
 
-    fun ordinalToBiome(it: Int): Biome {
-        return when (it) {
-            0 -> MOUNTAINS_BIOME
-            1 -> COASTAL_MOUNTAINS_BIOME
-            2 -> FOOTHILLS_BIOME
-            3 -> ROLLING_HILLS_BIOME
-            4 -> PLAINS_BIOME
-            5 -> PLATEAU_BIOME
-            6 -> SHARP_PLATEAU_BIOME
-            7 -> CUSTOM_BIOME
-            else -> MOUNTAINS_BIOME
-        }
-    }
-
     val DEGREES_TO_SLOPES = degreesToSlopes()
 
-    private val TALUS_ANGLES_SHARP_PLATEAU = buildParabolicTalusAngles(88.9f, 0.1f, 0.0f)
+    private val TALUS_ANGLES_SHARP_PLATEAU = buildLinearTalusAngles(88.9f, 0.1f, 0.0f)
 
-    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildParabolicTalusAngles(15.0f, 30.0f, 2.0f)
+    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildLinearTalusAngles(15.0f, 30.0f, 2.0f)
 
-    private val TALUS_ANGLES_FOOTHILLS = buildParabolicTalusAngles(20.0f, 20.0f, 2.0f)
+    private val TALUS_ANGLES_FOOTHILLS = buildLinearTalusAngles(20.0f, 20.0f, 2.0f)
 
-    private val TALUS_ANGLES_MOUNTAINS = buildParabolicTalusAngles(30.0f, 15.0f, 5.0f)
+    private val TALUS_ANGLES_MOUNTAINS = buildLinearTalusAngles(30.0f, 15.0f, 5.0f)
 
     private val TALUS_ANGLES_ROLLING_HILLS = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
 
@@ -75,9 +57,7 @@ class Biomes {
 
     private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
 
-    private val TALUS_ANGLES_BASIC = buildParabolicTalusAngles(25.0f, 25.0f, 5.0f)
-
-    private val TALUS_ANGLES_UNDERWATER = buildParabolicTalusAngles(70.0f, 15.0f, 0.0f)
+    private val TALUS_ANGLES_UNDERWATER = buildLinearTalusAngles(70.0f, 15.0f, 0.0f)
 
     private fun buildPlateauTalusAngles(): Triple<FloatArray, FloatArray, FloatArray> {
         val profile = arrayOf(
@@ -86,7 +66,12 @@ class Biomes {
                 760 to 30.0f,
                 990 to 60.0f,
                 2000 to 8.0f)
-        return Triple(FloatArray(1024) { computePlateauTalusAngle(it, profile) }, FloatArray(1024) { 0.0f }, FloatArray(1024) { computePlateauThresholds(it, profile) })
+        return buildSteppedTalusAngles(profile)
+    }
+
+    fun buildSteppedTalusAngles(profile: Array<Pair<Int, Float>>): Triple<FloatArray, FloatArray, FloatArray> {
+        val distinctSortedProfile = profile.distinctBy { it.first }.sortedBy { it.first }.toTypedArray()
+        return Triple(FloatArray(1024) { computePlateauTalusAngle(it, distinctSortedProfile) }, FloatArray(1024) { 0.0f }, FloatArray(1024) { computePlateauThresholds(it, distinctSortedProfile) })
     }
 
     private fun computePlateauTalusAngle(i: Int, profile: Array<Pair<Int, Float>>): Float {
@@ -118,7 +103,7 @@ class Biomes {
         return FloatArray(65536) { tan(toRadians(((it + 2.0) / 65540.0) * 90.0)).toFloat() }
     }
 
-    private fun buildParabolicTalusAngles(minAngle: Float, deltaAngle: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
+    fun buildLinearTalusAngles(minAngle: Float, deltaAngle: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
         val angleIncrement = deltaAngle / 1023.0f
         val baseAngles = FloatArray(1024) { ((minAngle + (it * angleIncrement)) / 90.0f).coerceIn(0.0f, 1.0f) }
         val jitters = FloatArray(1024) {
@@ -130,7 +115,7 @@ class Biomes {
         return Triple(baseAngles, jitters, null)
     }
 
-    private fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
+    fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
         val term0 = -2.0 * standardDeviation * standardDeviation
         val term1 = scale * (1.0 / Math.sqrt(Math.PI * -term0))
         val baseAngles = FloatArray(1024)
@@ -1599,26 +1584,6 @@ class Biomes {
         }
     }
 
-    val CUSTOM_BIOME = Biome(
-            name = "Custom",
-            elevationPowerShader = customElevationPowerShader,
-            startingHeightShader = customStartingHeightsShader,
-            soilMobilityShader = customSoilMobilityShader,
-            talusAngles = TALUS_ANGLES_BASIC,
-            heightMultiplier = 1.0f,
-            lowPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
-            midPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
-            highPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f))
-
     private fun applyTerrace(input: Float, steps: List<(Float) -> Float?>): Float {
         steps.forEach {
             val output = it(input)
@@ -1719,4 +1684,97 @@ class Biomes {
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
                     soilMobilityMultiplier = 0.035f))
+
+    private val currentBiomes = arrayListOf(
+            MOUNTAINS_BIOME,
+            COASTAL_MOUNTAINS_BIOME,
+            FOOTHILLS_BIOME,
+            ROLLING_HILLS_BIOME,
+            PLAINS_BIOME,
+            PLATEAU_BIOME,
+            SHARP_PLATEAU_BIOME)
+
+    fun customBiome(
+            name: String,
+            talusAngles: Triple<FloatArray, FloatArray, FloatArray?>,
+            heightMultiplier: Float,
+            largeFeaturesBlendWeight: Float,
+            largeFeaturePowerMultiplier: Float,
+            largeFeatureMobilityMultiplier: Float,
+            mediumFeaturesBlendWeight: Float,
+            mediumFeaturePowerMultiplier: Float,
+            mediumFeatureMobilityMultiplier: Float,
+            smallFeaturesBlendWeight: Float,
+            smallFeaturePowerMultiplier: Float,
+            smallFeatureMobilityMultiplier: Float) = Biome(
+            name = name,
+            elevationPowerShader = customElevationPowerShader,
+            startingHeightShader = customStartingHeightsShader,
+            soilMobilityShader = customSoilMobilityShader,
+            talusAngles = talusAngles,
+            heightMultiplier = heightMultiplier,
+            lowPassSettings = ErosionSettings(
+                    previousTierBlendWeight = largeFeaturesBlendWeight,
+                    elevationPowerMultiplier = largeFeaturePowerMultiplier,
+                    soilMobilityMultiplier = largeFeatureMobilityMultiplier),
+            midPassSettings = ErosionSettings(
+                    previousTierBlendWeight = mediumFeaturesBlendWeight,
+                    elevationPowerMultiplier = mediumFeaturePowerMultiplier,
+                    soilMobilityMultiplier = mediumFeatureMobilityMultiplier),
+            highPassSettings = ErosionSettings(
+                    previousTierBlendWeight = smallFeaturesBlendWeight,
+                    elevationPowerMultiplier = smallFeaturePowerMultiplier,
+                    soilMobilityMultiplier = smallFeatureMobilityMultiplier))
+
+    fun addCustomBiome(newBiome: Biome, biomeNames: MutableList<Text>): Biome? {
+        return if (currentBiomes.size < 64) {
+            currentBiomes.add(newBiome)
+            mapBiomeNames(biomeNames)
+            newBiome
+        } else {
+            null
+        }
+    }
+
+    fun replaceCustomBiome(newBiome: Biome, oldBiome: Biome, biomeNames: MutableList<Text>): Biome {
+        val index = currentBiomes.indexOf(oldBiome)
+        return if (index >= 0) {
+            currentBiomes[index] = newBiome
+            mapBiomeNames(biomeNames)
+            newBiome
+        } else {
+            oldBiome
+        }
+    }
+
+    fun removeCustomBiome(biome: Biome, biomeNames: MutableList<Text>): Biome? {
+        return if (currentBiomes.remove(biome)) {
+            mapBiomeNames(biomeNames)
+            null
+        } else {
+            biome
+        }
+    }
+
+    fun clearCustomBiomes(biomeNames: MutableList<Text>) {
+        if (currentBiomes.size > 7) {
+            for (i in currentBiomes.size - 1 downTo 7) {
+                currentBiomes.removeAt(i)
+            }
+        }
+        mapBiomeNames(biomeNames)
+    }
+
+    fun mapBiomeNames(biomeNames: MutableList<Text>) {
+        biomeNames.clear()
+        biomeNames.addAll(currentBiomes.mapIndexed { i, it -> text("${it.name} [$i]", TEXT_STYLE_BUTTON) })
+    }
+
+    fun ordinalToBiome(it: Int): Biome {
+        return if (it < currentBiomes.size) {
+            currentBiomes[it]
+        } else {
+            MOUNTAINS_BIOME
+        }
+    }
 }

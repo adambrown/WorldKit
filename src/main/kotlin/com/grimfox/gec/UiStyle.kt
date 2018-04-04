@@ -1,5 +1,6 @@
 package com.grimfox.gec
 
+import com.grimfox.gec.model.ObservableMutableList
 import com.grimfox.gec.ui.KeyboardHandler
 import com.grimfox.gec.ui.UiLayout
 import com.grimfox.gec.ui.UserInterface
@@ -289,6 +290,8 @@ val NORMAL_TEXT_BUTTON_STYLE = ButtonStyle(
                 vSizing = SHRINK,
                 padLeft = SMALL_SPACER_SIZE,
                 padRight = SMALL_SPACER_SIZE))
+
+val NORMAL_GLYPH_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE.copy(textNormal = TEXT_STYLE_GLYPH, textMouseOver = TEXT_STYLE_GLYPH, textMouseDown = TEXT_STYLE_GLYPH)
 
 val LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE = NORMAL_TEXT_BUTTON_STYLE.copy(
         textShapeTemplate = BlockTemplate(
@@ -614,7 +617,7 @@ fun Block.vToggleRow(value: ObservableMutableReference<Boolean>, height: Float, 
     }
 }
 
-fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, currentBrushValue: ObservableMutableReference<Byte>, menuLayer: Block, color: NPColor, values: List<Text>, selected: ObservableMutableReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
+fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, currentBrushValue: ObservableMutableReference<Byte>, menuLayer: Block, color: NPColor, values: ObservableMutableList<Text>, selected: ObservableMutableReference<Int>, index: Int, height: Float, shrinkGroup: ShrinkGroup, gap: Float): Block {
     return block {
         vSizing = STATIC
         this.height = height
@@ -663,51 +666,59 @@ fun Block.vBiomeDropdownRow(editModeOn: ObservableMutableReference<Boolean>, cur
             }
         }
         hSpacer(gap)
-        val textRef = StaticTextReference(values[selected.value])
+        val textRef = if (values.size > selected.value) {
+            StaticTextReference(values[selected.value])
+        } else {
+            StaticTextReference()
+        }
         block {
             layout = HORIZONTAL
             hSizing = GROW
+            var dropdownList: DropdownList? = null
             dropdown(textRef, menuLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                dropdownList = this
                 values.forEachIndexed { i, value ->
-                    menuItem(value) {
+                    menuItem(value, isDropdown = true) {
                         selected.value = i
                     }
                 }
             }.with {
                 vAlign = VerticalAlignment.MIDDLE
             }
+            values.addListener { event ->
+                if (event.changed) {
+                    dropdownList?.clear()
+                    values.forEachIndexed { i, value ->
+                        dropdownList?.menuItem(value, isDropdown = true) {
+                            selected.value = i
+                        }
+                    }
+                    if (selected.value < values.size) {
+                        textRef.reference.value = values[selected.value]
+                    } else {
+                        textRef.reference.value = if (values.size > 0) {
+                            values[0]
+                        } else {
+                            NO_TEXT
+                        }
+                    }
+                }
+            }
         }
         selected.addListener { old, new ->
             if (old != new) {
-                textRef.reference.value = values[new]
+                textRef.reference.value = if (values.size > new) {
+                    values[new]
+                } else {
+                    NO_TEXT
+                }
             }
         }
     }
 }
 
-
-fun Block.vLongInputRow(reference: ObservableMutableReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NPColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
-    return block {
-        val row = this
-        vSizing = STATIC
-        this.height = height
-        layout = VERTICAL
-        label(label, shrinkGroup)
-        hSpacer(gap)
-        block {
-            hSizing = GROW
-            layout = HORIZONTAL
-            val inputBox = longInputBox(reference, textStyle, textColorActive, ui, uiLayout)
-            buttons()
-            row.supplantEvents(inputBox)
-            isMouseAware = true
-            isFallThrough = true
-        }
-    }
-}
-
-private fun Block.longInputBox(reference: ObservableMutableReference<Long>, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
-    val textValue = DynamicTextReference(reference.value.toString(), 18, textStyle)
+private fun <T> Block.inputBox(reference: ObservableMutableReference<T>, sizeLimit: Int, converter: (String) -> T, keyboardHandlerBuilder: (Caret, ShapeCursor, () -> Unit) -> KeyboardHandler, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
+    val textValue = DynamicTextReference(reference.value.toString(), sizeLimit, textStyle)
     val textStyleActive = TextStyle(textStyle.size, textStyle.font, cRef(textColorActive))
     val caret = uiLayout.createCaret(textValue)
     textValue.reference.addListener { _, _ ->
@@ -778,8 +789,7 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
             cursorBlock.shape = NO_SHAPE
             textBlock.hTruncate = TRUNCATE_RIGHT
             try {
-                val newValue = BigDecimal(caret.dynamicText.reference.value)
-                reference.value = newValue.toLong()
+                reference.value = converter(caret.dynamicText.reference.value)
                 textValue.reference.value = reference.value.toString()
             } catch (ignore: Exception) {
                 textValue.reference.value = reference.value.toString()
@@ -789,7 +799,7 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
                 ui.keyboardHandler = null
             }
         }
-        keyboardHandler = integerTextInputKeyboardHandler(ui, caret, cursorShape, completeFun)
+        keyboardHandler = keyboardHandlerBuilder(caret, cursorShape, completeFun)
         onMouseOver {
             mouseOver = true
             if (!isActive) {
@@ -859,6 +869,108 @@ private fun Block.longInputBox(reference: ObservableMutableReference<Long>, text
     }
 }
 
+private fun Block.longInputBox(reference: ObservableMutableReference<Long>, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
+    return inputBox(reference, 18, { BigDecimal(it).toLong() }, { caret, cursorShape, completeFun -> integerTextInputKeyboardHandler(ui, caret, cursorShape, completeFun) }, textStyle, textColorActive, ui, uiLayout)
+}
+
+fun Block.vLongInputRow(reference: ObservableMutableReference<Long>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NPColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val inputBox = longInputBox(reference, textStyle, textColorActive, ui, uiLayout)
+            buttons()
+            row.supplantEvents(inputBox)
+            isMouseAware = true
+            isFallThrough = true
+        }
+    }
+}
+
+private fun Block.floatInputBox(reference: ObservableMutableReference<Float>, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
+    return inputBox(reference, 18, { BigDecimal(it).toFloat() }, { caret, cursorShape, completeFun -> decimalTextInputKeyboardHandler(ui, caret, cursorShape, completeFun) }, textStyle, textColorActive, ui, uiLayout)
+}
+
+fun Block.vFloatInputRow(reference: ObservableMutableReference<Float>, height: Float, label: Text, textStyle: TextStyle, textColorActive: NPColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val inputBox = floatInputBox(reference, textStyle, textColorActive, ui, uiLayout)
+            buttons()
+            row.supplantEvents(inputBox)
+            isMouseAware = true
+            isFallThrough = true
+        }
+    }
+}
+
+private fun Block.textInputBox(reference: ObservableMutableReference<String>, sizeLimit: Int, textStyle: TextStyle, textColorActive: NPColor, ui: UserInterface, uiLayout: UiLayout): Block {
+    return inputBox(reference, sizeLimit, { it }, { caret, cursorShape, completeFun -> textInputKeyboardHandler(ui, caret, cursorShape, completeFun) }, textStyle, textColorActive, ui, uiLayout)
+}
+
+fun Block.vTextInputRow(reference: ObservableMutableReference<String>, sizeLimit: Int, height: Float, label: Text, textStyle: TextStyle, textColorActive: NPColor, shrinkGroup: ShrinkGroup, gap: Float, ui: UserInterface, uiLayout: UiLayout, buttons: Block.() -> Unit = {}): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val inputBox = textInputBox(reference, sizeLimit, textStyle, textColorActive, ui, uiLayout)
+            buttons()
+            row.supplantEvents(inputBox)
+            isMouseAware = true
+            isFallThrough = true
+        }
+    }
+}
+
+fun Block.vDropdownRow(selected: ObservableMutableReference<Int>, values: List<Text>, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, menuLayer: Block): Block {
+    return block {
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            val textRef = StaticTextReference(values[selected.value])
+            dropdown(textRef, menuLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
+                values.forEachIndexed { i, value ->
+                    menuItem(value, isDropdown = true) {
+                        selected.value = i
+                    }
+                }
+            }.with {
+                vAlign = VerticalAlignment.MIDDLE
+            }
+            selected.addListener { old, new ->
+                if (old != new) {
+                    textRef.reference.value = values[new]
+                }
+            }
+        }
+    }
+}
+
+
 fun Block.vFolderRow(folder: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface): Block {
     return block {
         val row = this
@@ -918,11 +1030,63 @@ fun Block.vFileRow(file: DynamicTextReference, height: Float, label: Text, shrin
                 isMouseAware = false
             }
             hSpacer(MEDIUM_SPACER_SIZE)
-            val button = button(text("Select"), NORMAL_TEXT_BUTTON_STYLE) {
+            val button = button(text("Select file"), NORMAL_TEXT_BUTTON_STYLE) {
                 file.reference.value = selectFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { it }?.canonicalPath ?: file.reference.value
             }
             row.supplantEvents(button)
             isMouseAware = false
+        }
+        onDrop { strings ->
+            if (strings.isNotEmpty()) {
+                file.reference.value = strings.first()
+            }
+        }
+    }
+}
+
+fun Block.vSaveFileRow(file: DynamicTextReference, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, dialogLayer: Block, useDialogLayer: Boolean, ui: UserInterface, vararg extensions: String, callback: (File) -> Unit = {}): Block {
+    return block {
+        val row = this
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        label(label, shrinkGroup)
+        hSpacer(gap)
+        block {
+            hSizing = GROW
+            layout = HORIZONTAL
+            block {
+                hSizing = GROW
+                layout = HORIZONTAL
+                block {
+                    layout = HORIZONTAL
+                    hAlign = LEFT
+                    hTruncate = TRUNCATE_LEFT
+                    vAlign = MIDDLE
+                    hSizing = SHRINK
+                    vSizing = SHRINK
+                    text = file.text
+                    isMouseAware = false
+                }
+                isMouseAware = false
+            }
+            hSpacer(MEDIUM_SPACER_SIZE)
+            val button = button(text("Select file"), NORMAL_TEXT_BUTTON_STYLE) {
+                saveFile(dialogLayer, useDialogLayer, ui, File(file.reference.value).parentFile ?: preferences.projectDir, *extensions) { callbackFile ->
+                    file.reference.value = callbackFile?.canonicalPath ?: file.reference.value
+                    if (callbackFile != null && ((!callbackFile.exists() && callbackFile.parentFile.isDirectory && callbackFile.parentFile.canWrite()) || callbackFile.canWrite())) {
+                        callback(callbackFile)
+                    }
+                    callbackFile
+                }
+            }
+            row.supplantEvents(button)
+            isMouseAware = false
+        }
+        onDrop { strings ->
+            if (strings.isNotEmpty()) {
+                file.reference.value = strings.first()
+            }
         }
     }
 }
@@ -1123,6 +1287,23 @@ fun Block.vLabelRow(height: Float, label: Text): Block {
     }
 }
 
+fun Block.vLabelWithButtonRow(height: Float, label: Text, buttonLabel: Text, padding: Float, buttonStyle: ButtonStyle, onClick: () -> Unit): Block {
+    return block {
+        vSizing = STATIC
+        this.height = height
+        layout = VERTICAL
+        block {
+            hSpacer(padding)
+            label(label)
+            block {
+                layout = HORIZONTAL
+                hSizing = GROW
+            }
+            button(buttonLabel, buttonStyle, onClick)
+        }
+    }
+}
+
 fun Block.vExpandableButton(height: Float, openOrClosed: Text, openOrClosedWidth: Float, label: Text, style: ButtonStyle, onClick: () -> Unit = {}): Block {
     return block {
         vSizing = STATIC
@@ -1163,10 +1344,48 @@ fun Block.vExpandableButton(height: Float, openOrClosed: Text, openOrClosedWidth
     }
 }
 
-fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit): Block {
+fun Block.vExpandPanel(panelName: String, scroller: Reference<Block>? = null, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit = {}): Block {
     val panelNameText = text(panelName, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
     val openText = text("-", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
     val closedText = text("+", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    val isOpenText = StaticTextReference(if (expanded.value) openText else closedText)
+    val isExpanded = expanded.value
+    return block {
+        val expanderBlock = this
+        vSizing = SHRINK
+        layout = VERTICAL
+        shape = NO_SHAPE
+        vExpandableButton(LARGE_ROW_HEIGHT, isOpenText, 12.0f, panelNameText, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE) {
+            expanded.value = !expanded.value
+        }
+        val panelBlock = block {
+            hSizing = RELATIVE
+            vSizing = Sizing.SHRINK
+            layout = Layout.VERTICAL
+            panelBuilder()
+        }
+        expanded.addListener { _, new ->
+            if (new) {
+                isOpenText.reference.value = openText
+                handleExpandStateChange(panelBlock, scroller, true)
+            } else {
+                isOpenText.reference.value = closedText
+                handleExpandStateChange(panelBlock, scroller, false)
+            }
+        }
+        expanded.value = isExpanded
+    }
+}
+
+fun Block.vExpandPanel(panelName: ObservableMutableReference<String>, scroller: Reference<Block>? = null, expanded: ObservableMutableReference<Boolean> = ref(false), panelBuilder: Block.() -> Unit = {}): Block {
+    val panelNameText = StaticTextReference(text(panelName.value, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal))
+    val openText = text("-", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    val closedText = text("+", LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+    panelName.addListener { old, new ->
+        if (old != new) {
+            panelNameText.reference.value = text(new, LEFT_ALIGN_NORMAL_TEXT_BUTTON_STYLE.textNormal)
+        }
+    }
     val isOpenText = StaticTextReference(if (expanded.value) openText else closedText)
     val isExpanded = expanded.value
     return block {
@@ -1185,13 +1404,36 @@ fun Block.vExpandPanel(panelName: String, expanded: ObservableMutableReference<B
         expanded.addListener { _, new ->
             if (new) {
                 isOpenText.reference.value = openText
-                panelBlock.isVisible = true
+                handleExpandStateChange(panelBlock, scroller, true)
             } else {
                 isOpenText.reference.value = closedText
-                panelBlock.isVisible = false
+                handleExpandStateChange(panelBlock, scroller, false)
             }
         }
         expanded.value = isExpanded
+    }
+}
+
+private fun handleExpandStateChange(panelBlock: Block, scroller: Reference<Block>?, state: Boolean) {
+    if (scroller != null) {
+        doOnMainThread {
+            panelBlock.movedOrResized = true
+            panelBlock.isVisible = state
+            panelBlock.clearPositionAndSize()
+            clearPositionAndSizeBetween(panelBlock, scroller.value)
+        }
+    } else {
+        panelBlock.isVisible = state
+    }
+}
+
+private fun clearPositionAndSizeBetween(childBlock: Block, ancestorBlock: Block) {
+    val parentBlock = childBlock.parent
+    if (parentBlock != childBlock && parentBlock != childBlock.root) {
+        parentBlock.clearPositionAndSize()
+        if (parentBlock != ancestorBlock) {
+            clearPositionAndSizeBetween(parentBlock, ancestorBlock)
+        }
     }
 }
 

@@ -33,7 +33,7 @@ class MenuBar(private val block: Block,
 }
 
 class DropdownList(
-        private val block: Block,
+        val block: Block,
         private val rowHeight: Float,
         private val textStyle: TextStyle,
         private val textColorInactive: NPColor,
@@ -42,67 +42,119 @@ class DropdownList(
         private val activeItem: MutableReference<Pair<Block, () -> Unit>?>,
         private val shrink: Boolean = true) {
 
+    private var isVisible = true
+    private val children = ArrayList<Block>()
+
     private val shrinkGroup = hShrinkGroup()
+
+    fun hide() {
+        if (isVisible) {
+            children.addAll(block.layoutChildren)
+            block.layoutChildren.clear()
+            block.renderChildren.clear()
+            isVisible = false
+            block.isVisible = false
+        }
+    }
+
+    fun show() {
+        if (!isVisible) {
+            block.layoutChildren.addAll(children)
+            block.renderChildren.addAll(children)
+            children.clear()
+            isVisible = true
+            block.isVisible = true
+        }
+    }
 
     fun menuItem(
             text: Text,
             hotKey: String? = null,
             glyph: Block.() -> Block = { block { } },
             isActive: ObservableMutableReference<Boolean> = ref(true),
-            onClick: () -> Unit): Block =
-            block.menuItem(
-                    text = text,
-                    hotKey = if (hotKey != null) text(hotKey, textStyle) else NO_TEXT,
-                    glyph = glyph,
-                    height = rowHeight,
-                    shrinkGroup = shrinkGroup,
-                    textColorInactive = textColorInactive,
-                    isActive = isActive,
-                    mouseDownOnActivator = mouseDownOnActivator,
-                    deactivate = deactivate,
-                    activeItem = activeItem,
-                    shrink = shrink,
-                    onClick = onClick)
+            isDropdown: Boolean = false,
+            onClick: () -> Unit): Block {
+        val item = block.menuItem(
+                text = text,
+                hotKey = if (hotKey != null) text(hotKey, textStyle) else NO_TEXT,
+                glyph = glyph,
+                height = rowHeight,
+                shrinkGroup = shrinkGroup,
+                textColorInactive = textColorInactive,
+                isActive = isActive,
+                mouseDownOnActivator = mouseDownOnActivator,
+                deactivate = deactivate,
+                activeItem = activeItem,
+                shrink = shrink,
+                isDropdown = isDropdown,
+                onClick = onClick)
+        if (!isVisible) {
+            children.add(item)
+            block.layoutChildren.clear()
+            block.renderChildren.clear()
+        }
+        return item
+    }
 
     fun menuItem(
             text: String,
             hotKey: String? = null,
             glyph: Block.() -> Block = { block { } },
             isActive: ObservableMutableReference<Boolean> = ref(true),
-            onClick: () -> Unit): Block =
-            block.menuItem(
-                    text = text(text, textStyle),
-                    hotKey = if (hotKey != null) text(hotKey, textStyle) else NO_TEXT,
-                    glyph = glyph,
-                    height = rowHeight,
-                    shrinkGroup = shrinkGroup,
-                    textColorInactive = textColorInactive,
-                    isActive = isActive,
-                    mouseDownOnActivator = mouseDownOnActivator,
-                    deactivate = deactivate,
-                    activeItem = activeItem,
-                    shrink = shrink,
-                    onClick = onClick)
+            isDropdown: Boolean = false,
+            onClick: () -> Unit): Block {
+        val item = block.menuItem(
+                text = text(text, textStyle),
+                hotKey = if (hotKey != null) text(hotKey, textStyle) else NO_TEXT,
+                glyph = glyph,
+                height = rowHeight,
+                shrinkGroup = shrinkGroup,
+                textColorInactive = textColorInactive,
+                isActive = isActive,
+                mouseDownOnActivator = mouseDownOnActivator,
+                deactivate = deactivate,
+                activeItem = activeItem,
+                shrink = shrink,
+                isDropdown = isDropdown,
+                onClick = onClick)
+        if (!isVisible) {
+            children.add(item)
+            block.layoutChildren.clear()
+            block.renderChildren.clear()
+        }
+        return item
+    }
 
     fun subMenu(
             text: String,
             isActive: ObservableMutableReference<Boolean> = ref(true),
-            builder: DropdownList.() -> Unit): Block =
-            block.subMenu(
-                    text = text(text, textStyle),
-                    rowHeight = rowHeight,
-                    textStyle = textStyle,
-                    shrinkGroup = shrinkGroup,
-                    textColorInactive = textColorInactive,
-                    isActive = isActive,
-                    mouseDownOnActivator = mouseDownOnActivator,
-                    deactivate = deactivate,
-                    activeItem = activeItem,
-                    builder = builder)
+            builder: DropdownList.() -> Unit): Block {
+        val item = block.subMenu(
+                text = text(text, textStyle),
+                rowHeight = rowHeight,
+                textStyle = textStyle,
+                shrinkGroup = shrinkGroup,
+                textColorInactive = textColorInactive,
+                isActive = isActive,
+                mouseDownOnActivator = mouseDownOnActivator,
+                deactivate = deactivate,
+                activeItem = activeItem,
+                builder = builder)
+        if (!isVisible) {
+            children.add(item)
+            block.layoutChildren.clear()
+            block.renderChildren.clear()
+        }
+        return item
+    }
 
     fun removeItem(block: Block) {
-        this.block.layoutChildren.remove(block)
-        this.block.renderChildren.remove(block)
+        if (isVisible) {
+            this.block.layoutChildren.remove(block)
+            this.block.renderChildren.remove(block)
+        } else {
+            children.remove(block)
+        }
         val activeItemValue = activeItem.value
         if (activeItemValue != null && activeItemValue.first == block) {
             activeItemValue.second()
@@ -110,20 +162,47 @@ class DropdownList(
         }
     }
 
-    fun moveItemToIndex(block: Block, index: Int) {
-        if (index >= this.block.layoutChildren.size) {
-            throw IndexOutOfBoundsException("size: ${this.block.layoutChildren.size}, index: $index")
+    fun clear() {
+        if (isVisible) {
+            this.block.layoutChildren.clear()
+            this.block.renderChildren.clear()
+        } else {
+            children.clear()
         }
-        if (!this.block.layoutChildren.contains(block) || !this.block.renderChildren.contains(block)) {
-            throw IllegalArgumentException("Item is not contained within drop down.")
-        }
-        this.block.layoutChildren.remove(block)
-        this.block.renderChildren.remove(block)
-        this.block.layoutChildren.add(index, block)
-        this.block.renderChildren.add(index, block)
+        activeItem.value = null
     }
 
-    fun menuDivider(): Block = block.menuDivider(3.0f, shrinkGroup)
+    fun moveItemToIndex(block: Block, index: Int) {
+        if (isVisible) {
+            if (index >= this.block.layoutChildren.size) {
+                throw IndexOutOfBoundsException("size: ${this.block.layoutChildren.size}, index: $index")
+            }
+            if (!this.block.layoutChildren.contains(block) || !this.block.renderChildren.contains(block)) {
+                throw IllegalArgumentException("Item is not contained within drop down.")
+            }
+            this.block.layoutChildren.remove(block)
+            this.block.renderChildren.remove(block)
+            this.block.layoutChildren.add(index, block)
+            this.block.renderChildren.add(index, block)
+        } else {
+            if (index >= children.size) {
+                throw IndexOutOfBoundsException("size: ${children.size}, index: $index")
+            }
+            children.remove(block)
+            children.add(index, block)
+
+        }
+    }
+
+    fun menuDivider(): Block {
+        val item = block.menuDivider(3.0f, shrinkGroup)
+        if (!isVisible) {
+            children.add(item)
+            block.layoutChildren.clear()
+            block.renderChildren.clear()
+        }
+        return item
+    }
 }
 
 fun Block.menuBar(
@@ -375,7 +454,7 @@ private fun Block.dropdownMenu(
         var activator = NO_BLOCK
         var deactivator = NO_BLOCK
         var dropDownContainer = NO_BLOCK
-        var dropDownList = NO_BLOCK
+        lateinit var dropDownList: DropdownList
         vSizing = Sizing.STATIC
         vAlign = VerticalAlignment.BOTTOM
         height = buttonHeight
@@ -386,6 +465,7 @@ private fun Block.dropdownMenu(
             activeItem.value?.second?.invoke()
             dropDown.isVisible = false
             dropDown.isMouseAware = false
+            dropDownList.hide()
             activator.isMouseAware = true
             dropdownLayer.isFallThrough = true
             activator.shape = NO_SHAPE
@@ -403,6 +483,7 @@ private fun Block.dropdownMenu(
             activeMenu.value?.second?.invoke()
             dropDown.isVisible = true
             dropDown.isMouseAware = true
+            dropDownList.show()
             activator.isMouseAware = false
             dropdownLayer.isFallThrough = false
             activeMenu.value = Pair(menu, deactivateMenu)
@@ -480,30 +561,31 @@ private fun Block.dropdownMenu(
         }
         dropDown.isVisible = false
         dropDown.isMouseAware = false
+        dropDownList.hide()
 
         dropDown.onScroll { _, y ->
             var intY = y.toInt()
             if (intY < 0) {
                 intY = -intY
                 for (i in 0 until intY) {
-                    if (dropDownList.layoutChildren.isNotEmpty()) {
-                        val firstChild = dropDownList.layoutChildren.removeAt(0)
-                        dropDownList.layoutChildren.add(firstChild)
+                    if (dropDownList.block.layoutChildren.isNotEmpty()) {
+                        val firstChild = dropDownList.block.layoutChildren.removeAt(0)
+                        dropDownList.block.layoutChildren.add(firstChild)
                     }
-                    if (dropDownList.renderChildren.isNotEmpty()) {
-                        val firstChild = dropDownList.renderChildren.removeAt(0)
-                        dropDownList.renderChildren.add(firstChild)
+                    if (dropDownList.block.renderChildren.isNotEmpty()) {
+                        val firstChild = dropDownList.block.renderChildren.removeAt(0)
+                        dropDownList.block.renderChildren.add(firstChild)
                     }
                 }
             } else if (y > 0) {
                 for (i in 0 until intY) {
-                    if (dropDownList.layoutChildren.isNotEmpty()) {
-                        val lastChild = dropDownList.layoutChildren.removeAt(dropDownList.layoutChildren.size - 1)
-                        dropDownList.layoutChildren.add(0, lastChild)
+                    if (dropDownList.block.layoutChildren.isNotEmpty()) {
+                        val lastChild = dropDownList.block.layoutChildren.removeAt(dropDownList.block.layoutChildren.size - 1)
+                        dropDownList.block.layoutChildren.add(0, lastChild)
                     }
-                    if (dropDownList.renderChildren.isNotEmpty()) {
-                        val lastChild = dropDownList.renderChildren.removeAt(dropDownList.renderChildren.size - 1)
-                        dropDownList.renderChildren.add(0, lastChild)
+                    if (dropDownList.block.renderChildren.isNotEmpty()) {
+                        val lastChild = dropDownList.block.renderChildren.removeAt(dropDownList.block.renderChildren.size - 1)
+                        dropDownList.block.renderChildren.add(0, lastChild)
                     }
                 }
             }
@@ -549,6 +631,7 @@ private fun Block.menuItem(
         deactivate: () -> Unit,
         activeItem: MutableReference<Pair<Block, () -> Unit>?>,
         shrink: Boolean = true,
+        isDropdown: Boolean = false,
         onClick: () -> Unit = {}): Block {
     return block {
         val thisItem = this
@@ -561,39 +644,48 @@ private fun Block.menuItem(
         vSizing = Sizing.STATIC
         this.height = height
         layout = Layout.VERTICAL
-        block{
-            hSizing = Sizing.STATIC
-            width = 32.0f
-            layout = Layout.HORIZONTAL
-            isMouseAware = false
+        if (!isDropdown) {
             block {
-                this.hSizing = Sizing.SHRINK
-                this.vSizing = Sizing.SHRINK
-                this.hAlign = HorizontalAlignment.CENTER
-                this.vAlign = VerticalAlignment.MIDDLE
-                val glyphBlock = glyph()
-                val subGlyphBlocks = glyphBlock.descendants
-                val allTexts = arrayListOf(text, hotKey)
-                allTexts.addAll(subGlyphBlocks.map { it.text })
-                val inactiveColor = cRef(textColorInactive)
-                val textStyles = allTexts.map {
-                    Triple(it, it.style, TextStyle(it.style.size, it.style.font, inactiveColor))
-                }
-                isActive.addListener { oldVal, newVal ->
-                    if (oldVal != newVal) {
-                        if (newVal) {
-                            textStyles.forEach {
-                                it.first.style = it.second
-                            }
-                        } else {
-                            textStyles.forEach {
-                                it.first.style = it.third
+                hSizing = Sizing.STATIC
+                width = 32.0f
+                layout = Layout.HORIZONTAL
+                isMouseAware = false
+                block {
+                    this.hSizing = Sizing.SHRINK
+                    this.vSizing = Sizing.SHRINK
+                    this.hAlign = HorizontalAlignment.CENTER
+                    this.vAlign = VerticalAlignment.MIDDLE
+                    val glyphBlock = glyph()
+                    val subGlyphBlocks = glyphBlock.descendants
+                    val allTexts = arrayListOf(text, hotKey)
+                    allTexts.addAll(subGlyphBlocks.map { it.text })
+                    val inactiveColor = cRef(textColorInactive)
+                    val textStyles = allTexts.map {
+                        Triple(it, it.style, TextStyle(it.style.size, it.style.font, inactiveColor))
+                    }
+                    isActive.addListener { oldVal, newVal ->
+                        if (oldVal != newVal) {
+                            if (newVal) {
+                                textStyles.forEach {
+                                    it.first.style = it.second
+                                }
+                            } else {
+                                textStyles.forEach {
+                                    it.first.style = it.third
+                                }
                             }
                         }
                     }
+                    isActive.value = !isActive.value
+                    isActive.value = !isActive.value
                 }
-                isActive.value = !isActive.value
-                isActive.value = !isActive.value
+            }
+        } else {
+            block {
+                hSizing = Sizing.STATIC
+                width = 10.0f
+                layout = Layout.HORIZONTAL
+                isMouseAware = false
             }
         }
         block {
@@ -610,26 +702,35 @@ private fun Block.menuItem(
             layout = Layout.HORIZONTAL
             isMouseAware = false
         }
-        block {
-            hSizing = Sizing.STATIC
-            layout = Layout.HORIZONTAL
-            width = MEDIUM_SPACER_SIZE
-            isMouseAware = false
-        }
-        block {
-            hSizing = Sizing.SHRINK
-            vSizing = Sizing.SHRINK
-            hAlign = HorizontalAlignment.LEFT
-            vAlign = VerticalAlignment.MIDDLE
-            layout = Layout.HORIZONTAL
-            this.text = hotKey
-            isMouseAware = false
-        }
-        block {
-            hSizing = Sizing.STATIC
-            width = 22.0f
-            layout = Layout.HORIZONTAL
-            isMouseAware = false
+        if (!isDropdown) {
+            block {
+                hSizing = Sizing.STATIC
+                layout = Layout.HORIZONTAL
+                width = MEDIUM_SPACER_SIZE
+                isMouseAware = false
+            }
+            block {
+                hSizing = Sizing.SHRINK
+                vSizing = Sizing.SHRINK
+                hAlign = HorizontalAlignment.LEFT
+                vAlign = VerticalAlignment.MIDDLE
+                layout = Layout.HORIZONTAL
+                this.text = hotKey
+                isMouseAware = false
+            }
+            block {
+                hSizing = Sizing.STATIC
+                width = 22.0f
+                layout = Layout.HORIZONTAL
+                isMouseAware = false
+            }
+        } else {
+            block {
+                hSizing = Sizing.STATIC
+                width = 10.0f
+                layout = Layout.HORIZONTAL
+                isMouseAware = false
+            }
         }
         onMouseOver {
             mouseOver = true
@@ -984,8 +1085,8 @@ private fun Block.menuDropDownList(
         deactivate: () -> Unit,
         activeItem: MutableReference<Pair<Block, () -> Unit>?>,
         shrink: Boolean = true,
-        builder: DropdownList.() -> Unit): Pair<Block, Block> {
-    var listBlock = NO_BLOCK
+        builder: DropdownList.() -> Unit): Pair<Block, DropdownList> {
+    lateinit var dropDownList: DropdownList
     val thisBlock = block {
         layout = Layout.ABSOLUTE
         hSizing = if (shrink) Sizing.SHRINK else Sizing.STATIC
@@ -1016,7 +1117,6 @@ private fun Block.menuDropDownList(
                 shape = SHAPE_MENU_BACKGROUND
                 isFallThrough = true
                 block {
-                    listBlock = this
                     hSizing = if (shrink) Sizing.SHRINK else Sizing.RELATIVE
                     vSizing = Sizing.SHRINK
                     padLeft = 2.0f
@@ -1024,7 +1124,7 @@ private fun Block.menuDropDownList(
                     padTop = 2.0f
                     padBottom = 2.0f
                     isFallThrough = true
-                    DropdownList(
+                    dropDownList = DropdownList(
                             block = this,
                             rowHeight = rowHeight,
                             textStyle = textStyle,
@@ -1032,10 +1132,11 @@ private fun Block.menuDropDownList(
                             mouseDownOnActivator = mouseDownOnActivator,
                             deactivate = deactivate,
                             activeItem = activeItem,
-                            shrink = shrink).builder()
+                            shrink = shrink)
+                    dropDownList.builder()
                 }
             }
         }
     }
-    return thisBlock to listBlock
+    return thisBlock to dropDownList
 }

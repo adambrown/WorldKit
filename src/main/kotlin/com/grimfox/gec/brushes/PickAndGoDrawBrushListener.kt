@@ -17,6 +17,7 @@ class PickAndGoDrawBrushListener(
         val graph: Graph,
         val mask: Matrix<Byte>,
         val brushSize: Reference<Float>,
+        val borderSet: Set<Int>,
         val texture: MutableReference<TextureId>) : MeshViewport3D.BrushListener {
 
     private val maskWidth = mask.width
@@ -40,9 +41,12 @@ class PickAndGoDrawBrushListener(
         val vertices = graph.vertices
         for (x in cpStartX..cpEndX) {
             for (y in cpStartY..cpEndY) {
-                val dist = line.distance2(vertices.getPoint(y * maskWidth + x))
-                if (dist <= maxDist2) {
-                    mask[x, y] = currentValue
+                val pointId = y * maskWidth + x
+                if (!borderSet.contains(pointId)) {
+                    val dist = line.distance2(vertices.getPoint(pointId))
+                    if (dist <= maxDist2) {
+                        mask[x, y] = currentValue
+                    }
                 }
             }
         }

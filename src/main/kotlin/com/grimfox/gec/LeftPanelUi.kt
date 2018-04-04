@@ -92,8 +92,11 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
         layout = Layout.HORIZONTAL
         val scroller = ref(NO_BLOCK)
         val resetScroller: () -> Unit = {
-            val scrollerInternal = scroller.value
-            scrollerInternal.onScroll?.invoke(scrollerInternal, 0.0, 0.0)
+            doOnMainThread {
+                val scrollerInternal = scroller.value
+                scrollerInternal.clearPositionAndSize()
+                scrollerInternal.onScroll?.invoke(scrollerInternal, 0.0, 0.0)
+            }
         }
         val resetScrollerListener: (Boolean, Boolean) -> Unit = { old, new ->
             if (old != new && !new) {
@@ -105,18 +108,18 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             vSizing = Sizing.SHRINK
             layout = Layout.VERTICAL
             val regionPanelExpanded = ref(true)
-            val regionPanel = editRegionsPanel(regionPanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, ui, uiLayout, dialogLayer)
+            val regionPanel = editRegionsPanel(regionPanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, scroller, ui, uiLayout, dialogLayer)
             regionPanel.isVisible = false
-            regionPanelExpanded.listeners.add(resetScrollerListener)
+            regionPanelExpanded.addListener(resetScrollerListener)
             val splinePanelExpanded = ref(true)
-            val splinePanel = editMapPanel(splinePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, ui, dialogLayer)
+            val splinePanel = editMapPanel(splinePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, scroller, ui, dialogLayer)
             splinePanel.isVisible = false
-            splinePanelExpanded.listeners.add(resetScrollerListener)
+            splinePanelExpanded.addListener(resetScrollerListener)
             val biomePanelExpanded = ref(true)
-            val biomePanel = editBiomesPanel(biomePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, ui, uiLayout, dialogLayer)
+            val biomePanel = editBiomesPanel(biomePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, scroller, ui, uiLayout, dialogLayer)
             biomePanel.isVisible = false
-            biomePanelExpanded.listeners.add(resetScrollerListener)
-            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..20), linearClampedScaleFunctionInverse(0..20))
+            biomePanelExpanded.addListener(resetScrollerListener)
+            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..25), linearClampedScaleFunctionInverse(0..25))
             mapDetailScaleSlider.isVisible = false
             mapDetailScale.addListener { old, new ->
                 if (old != new) {
@@ -230,8 +233,8 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                                 meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
                                                 currentState.heightMapTexture.value = heightMapTexId
                                                 currentState.riverMapTexture.value = riverMapTexId
-                                                val linearDistanceScaleInKilometers = (((currentMapScale * currentMapScale) / 400.0f) * 990000 + 10000) / 1000
-                                                heightMapScaleFactor.value = ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+                                                val linearDistanceScaleInKilometers = mapScaleToLinearDistance(currentMapScale)
+                                                heightMapScaleFactor.value = linearDistanceToScaleFactor(linearDistanceScaleInKilometers)
                                                 imageMode.value = 3
                                                 displayMode.value = DisplayMode.MESH
                                             } catch (w: Exception) {

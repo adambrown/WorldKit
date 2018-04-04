@@ -596,13 +596,14 @@ abstract class Block {
     abstract val root: Block
     abstract val scale: Float
     abstract val scaleChanged: Boolean
-    abstract val parent: Block
+    abstract var parent: Block
     abstract val nvg: Long
     abstract val runId: Long
     abstract var movedOrResized: Boolean
     abstract val layoutChildren: MutableList<Block>
     abstract val renderChildren: MutableList<Block>
     abstract var isVisible: Boolean
+    abstract val isVisibleRef: ObservableReference<Boolean>
     abstract var hAlign: HorizontalAlignment
     abstract var vAlign: VerticalAlignment
     abstract var hTruncate: HorizontalTruncation
@@ -863,7 +864,7 @@ abstract class Block {
         }
     }
 
-    abstract protected fun clearPositionAndSize()
+    abstract fun clearPositionAndSize()
 
     abstract protected fun recalculatePositionAndSize()
 
@@ -1037,8 +1038,9 @@ private open class RootBlock(x: Float, y: Float, width: Float, height: Float) : 
         set(value) = ignore
     override val root: RootBlock
         get() = this
-    override val parent: RootBlock
+    override var parent: Block
         get() = this
+        set(value) = ignore
     override val layoutChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
     override val renderChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
     override var nvg: Long = -1
@@ -1046,6 +1048,7 @@ private open class RootBlock(x: Float, y: Float, width: Float, height: Float) : 
     override var isVisible: Boolean
         get() = true
         set(value) = ignore
+    override val isVisibleRef: ObservableReference<Boolean> = iRef(true)
     override var hAlign: HorizontalAlignment
         get() = LEFT
         set(value) = ignore
@@ -1156,6 +1159,7 @@ val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
     override var isVisible: Boolean
         get() = false
         set(value) = ignore
+    override val isVisibleRef: ObservableReference<Boolean> = iRef(false)
     override var inputOverride: Block?
         get() = null
         set(value) = ignore
@@ -1163,7 +1167,7 @@ val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
 
 private class DefaultBlock(
         override val root: Block,
-        override val parent: Block) : Block() {
+        override var parent: Block) : Block() {
 
     override var movedOrResized: Boolean
         get() = root.movedOrResized
@@ -1172,15 +1176,17 @@ private class DefaultBlock(
         }
     override val layoutChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
     override val renderChildren = ObservableMutableList<Block>(ArrayList()).addListener { movedOrResized = true }
-    private var _isVisible: Boolean = true
+    private var _isVisible: ObservableMutableReference<Boolean> = ref(true)
     override var isVisible: Boolean
-        get() = _isVisible
+        get() = _isVisible.value
         set(value) {
-            if (_isVisible != value) {
-                _isVisible = value
+            if (_isVisible.value != value) {
+                _isVisible.value = value
                 movedOrResized = true
             }
         }
+    override val isVisibleRef: ObservableReference<Boolean>
+        get() = _isVisible
     private var _hAlign: HorizontalAlignment = LEFT
     override var hAlign: HorizontalAlignment
         get() = _hAlign

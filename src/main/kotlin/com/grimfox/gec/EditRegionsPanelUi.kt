@@ -88,13 +88,14 @@ fun Block.editRegionsPanel(
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
+        scroller: Reference<Block>,
         ui: UserInterface,
         uiLayout: UiLayout,
         dialogLayer: Block): Block {
     onUpdateParamsFun()
     regions.addListener { _, _ -> onUpdateParamsFun() }
     islands.addListener { _, _ -> onUpdateParamsFun() }
-    return vExpandPanel("Edit regions", expanded = regionPanelExpanded) {
+    return vExpandPanel("Edit regions", scroller = scroller, expanded = regionPanelExpanded) {
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import regions") {
@@ -208,7 +209,8 @@ fun Block.editRegionsPanel(
                             }
                         }
                         currentEditBrushSize.value = regionEditBrushSize
-                        brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, textureReference)
+                        val borderPoints = currentGraph.vertices.asSequence().filter { it.cell.isBorder }.map { it.id }.toHashSet()
+                        brushListener.value = PickAndGoDrawBrushListener(currentGraph, currentMask, regionEditBrushSize, borderPoints, textureReference)
                         brushOn.value = true
                         true
                     } else {
@@ -334,9 +336,10 @@ fun Block.editMapPanel(
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
+        scroller: Reference<Block>,
         ui: UserInterface,
         dialogLayer: Block): Block {
-    val splinePanel = vExpandPanel("Edit splines", expanded = splinePanelExpanded) {
+    val splinePanel = vExpandPanel("Edit splines", scroller = scroller, expanded = splinePanelExpanded) {
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import splines") {

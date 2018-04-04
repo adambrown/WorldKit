@@ -1,6 +1,5 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.MainUi
 import com.grimfox.gec.model.Graph
 import com.grimfox.logging.LOG
 import org.lwjgl.BufferUtils
@@ -25,7 +24,7 @@ interface MutableReference<T> : Reference<T> {
 
 interface ObservableReference<T> : Reference<T> {
 
-    val listeners: MutableList<(oldValue: T, newValue: T) -> Unit>
+    val listeners: List<(oldValue: T, newValue: T) -> Unit>
 
     override val value: T
 
@@ -36,7 +35,7 @@ interface ObservableReference<T> : Reference<T> {
 
 interface ObservableMutableReference<T> : ObservableReference<T>, MutableReference<T> {
 
-    override val listeners: MutableList<(oldValue: T, newValue: T) -> Unit>
+    override val listeners: List<(oldValue: T, newValue: T) -> Unit>
 
     override var value: T
 
@@ -72,6 +71,19 @@ private class Ref<T>(value: T) : ObservableMutableReference<T> {
     }
 }
 
+private class ImmutableRef<T>(override val value: T) : ObservableReference<T> {
+
+    override val listeners: List<(oldValue: T, newValue: T) -> Unit> = emptyList()
+
+    override fun addListener(listener: (oldValue: T, newValue: T) -> Unit): ObservableReference<T> {
+        return this
+    }
+
+    override fun removeListener(listener: (T, T) -> Unit): Boolean {
+        return true
+    }
+}
+
 fun <T> cRef(value: T): Reference<T> {
     return CRef(value)
 }
@@ -82,6 +94,10 @@ fun <T> mRef(value: T): MutableReference<T> {
 
 fun <T> ref(value: T): ObservableMutableReference<T> {
     return Ref(value)
+}
+
+fun <T> iRef(value: T): ObservableReference<T> {
+    return ImmutableRef(value)
 }
 
 inline fun <reified T> printList(list: Collection<T>): String {

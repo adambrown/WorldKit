@@ -186,32 +186,7 @@ fun exportPanel(ui: UserInterface) {
             mountainBorderFile.reference.addListener(fileNameChangeListener(useMountainBorderFile))
             coastalBorderFile.reference.addListener(fileNameChangeListener(useCoastalBorderFile))
             meshFile.reference.addListener(fileNameChangeListener(useMeshFile))
-            block {
-                vSizing = Sizing.STATIC
-                this.height = LARGE_ROW_HEIGHT
-                layout = Layout.VERTICAL
-                label(text("Output size:"), shrinkGroup)
-                hSpacer(MEDIUM_SPACER_SIZE)
-                block {
-                    hSizing = Sizing.GROW
-                    layout = Layout.HORIZONTAL
-                    val textRef = StaticTextReference(outputSizesAsText[selectedOutputSize.value])
-                    dropdown(textRef, dialogDropdownLayer, SMALL_ROW_HEIGHT, MEDIUM_ROW_HEIGHT, TEXT_STYLE_BUTTON, COLOR_DISABLED_CLICKABLE) {
-                        outputSizesAsText.forEachIndexed { i, value ->
-                            menuItem(value) {
-                                selectedOutputSize.value = i
-                            }
-                        }
-                    }.with {
-                        vAlign = VerticalAlignment.MIDDLE
-                    }
-                    selectedOutputSize.addListener { old, new ->
-                        if (old != new) {
-                            textRef.reference.value = outputSizesAsText[new]
-                        }
-                    }
-                }
-            }
+            vDropdownRow(selectedOutputSize, outputSizesAsText, LARGE_ROW_HEIGHT, text("Output size:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogDropdownLayer)
             vSpacer(MEDIUM_SPACER_SIZE)
             vButtonRow(LARGE_ROW_HEIGHT) {
                 button(text("Export"), DIALOG_BUTTON_STYLE) {

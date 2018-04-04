@@ -79,18 +79,7 @@ val REGION_COLOR_INTS = Array(REGION_COLORS.size) { i ->
 
 val BIOME_TEMPLATES_REF = ref<Biomes?>(null)
 
-val BIOME_NAMES = linkedMapOf(
-        "Mountains" to 0,
-        "Coastal mountains" to 1,
-        "Foothills" to 2,
-        "Rolling hills" to 3,
-        "Plains" to 4,
-        "Plateaus" to 5,
-        "Sharp plateaus" to 6,
-        "Custom" to 7
-)
-
-val BIOME_NAMES_AS_TEXT = BIOME_NAMES.keys.map { text(it, TEXT_STYLE_BUTTON) }
+val BIOME_NAMES_AS_TEXT = ObservableMutableList(ArrayList<Text>())
 
 val RANDOM = Random()
 val DEFAULT_HEIGHT_SCALE = 50.0f
@@ -199,7 +188,7 @@ val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForward
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 val rootRef = ref(NO_BLOCK)
-val mapDetailScale = ref(4)
+val mapDetailScale = ref(8)
 
 
 val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightColorsOn, riversOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
@@ -217,6 +206,7 @@ var brushShapeInner = NO_BLOCK
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
 var aboutPanel = NO_BLOCK
+var customBiomePanel = NO_BLOCK
 val icon = ref(-1)
 
 
@@ -224,6 +214,19 @@ var onWindowResize: () -> Unit = {}
 
 val generationLock = DisableSetLock()
 val editToggleSet = ToggleSet(executor)
+
+fun mapScaleToLinearDistance(mapScale: Int): Float {
+    val adjustedScale = mapScale - 5
+    return if (adjustedScale < 0) adjustedScale * 1.95f + 10 else ((((adjustedScale) * (adjustedScale)) / 400.0f) * 990000 + 10000) / 1000
+}
+
+fun linearDistanceToScaleFactor(linearDistanceScaleInKilometers: Float): Float {
+    return if (linearDistanceScaleInKilometers < 10.0f) {
+        linearDistanceScaleInKilometers * 12.1f + 215.0015f
+    } else {
+        ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+    }
+}
 
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {
     return { scale: Float ->

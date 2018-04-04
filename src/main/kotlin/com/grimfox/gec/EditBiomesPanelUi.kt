@@ -14,7 +14,7 @@ private val biomeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
 private val useBiomeFile = ref(false)
 private val biomesBuilder = BiomesBuilder(biomeFile, useBiomeFile, displayMode)
 private val biomes = ref(emptyList<Int>())
-private val selectedBiomes = Array(64) { ref(if (it >= BIOME_NAMES.size) 0  else it) }.toList()
+private val selectedBiomes = Array(64) { ref(if (it >= 6) 0  else it) }.toList()
 
 fun syncBiomeParameterValues(parameters: BuildContinent.BiomeParameters) {
     val randomSeed = parameters.biomesSeed
@@ -44,8 +44,11 @@ fun Block.editBiomesPanel(
         generationLock: DisableSetLock,
         editToggleSet: ToggleSet,
         leftPanelLabelShrinkGroup: ShrinkGroup,
-        ui: UserInterface, uiLayout: UiLayout, dialogLayer: Block): Block {
-    val biomePanel = vExpandPanel("Edit biomes", expanded = biomePanelExpanded) {
+        scroller: Reference<Block>,
+        ui: UserInterface,
+        uiLayout: UiLayout,
+        dialogLayer: Block): Block {
+    val biomePanel = vExpandPanel("Edit biomes", scroller = scroller, expanded = biomePanelExpanded) {
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
             generationLock.disableOnLockButton(this, "Import biomes") {
@@ -77,41 +80,12 @@ fun Block.editBiomesPanel(
         }
         vSpacer(HALF_ROW_HEIGHT)
         vButtonRow(LARGE_ROW_HEIGHT) {
-            generationLock.disableOnLockButton(this, "Import custom starting height map...") {
-                editToggleSet.suspend {
-                    generationLock.doWithLock {
-                        val newTexture = importTexture(dialogLayer, preferences, ui)
-                        if (newTexture != null) {
-                            currentState.customStartingHeightsMap.value = newTexture
-                        }
-                    }
-                }
+            button(text("Manage custom biomes..."), NORMAL_TEXT_BUTTON_STYLE) {
+                panelLayer.isVisible = true
+                customBiomePanel.isVisible = true
             }
         }
-        vButtonRow(LARGE_ROW_HEIGHT) {
-            generationLock.disableOnLockButton(this, "Import custom elevation power map...") {
-                editToggleSet.suspend {
-                    generationLock.doWithLock {
-                        val newTexture = importTexture(dialogLayer, preferences, ui)
-                        if (newTexture != null) {
-                            currentState.customElevationPowerMap.value = newTexture
-                        }
-                    }
-                }
-            }
-        }
-        vButtonRow(LARGE_ROW_HEIGHT) {
-            generationLock.disableOnLockButton(this, "Import custom soil mobility map...") {
-                editToggleSet.suspend {
-                    generationLock.doWithLock {
-                        val newTexture = importTexture(dialogLayer, preferences, ui)
-                        if (newTexture != null) {
-                            currentState.customSoilMobilityMap.value = newTexture
-                        }
-                    }
-                }
-            }
-        }
+        vSpacer(HALF_ROW_HEIGHT)
         vLongInputRow(biomesSeed, LARGE_ROW_HEIGHT, text("Seed:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, ui, uiLayout) {
             hSpacer(SMALL_SPACER_SIZE)
             button(text("Randomize"), NORMAL_TEXT_BUTTON_STYLE) {
@@ -166,6 +140,21 @@ fun Block.editBiomesPanel(
             }
         }
         biomeCount.value = 6
+        vButtonRow(LARGE_ROW_HEIGHT) {
+            generationLock.disableOnLockButton(this, "Update biome assignments") {
+                editToggleSet.suspend {
+                    generationLock.doWithLock {
+                        val parameters = extractCurrentParameters()
+                        biomesBuilder.build(parameters, BIOME_TEMPLATES_REF.value!!, true)
+                        val currentGraph = currentState.biomeGraph.value
+                        val currentMask = currentState.biomeMask.value
+                        if (currentGraph != null && currentMask != null) {
+                            updateBiomesHistory(parameters, currentGraph, currentMask)
+                        }
+                    }
+                }
+            }
+        }
         vToggleRow(editBiomesMode, LARGE_ROW_HEIGHT, text("Edit mode:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE)
         editToggleSet.add(editBiomesMode,
                 {

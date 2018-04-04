@@ -125,6 +125,18 @@ class Caret(val nvg: Long, val dynamicText: DynamicTextReference, var position: 
 }
 
 fun integerTextInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape: ShapeCursor, complete: () -> Unit = {}): KeyboardHandler {
+    return textInputKeyboardHandler(ui, caret, cursorShape, { codePoint, caretPosition -> ((codePoint in 0x30..0x39) || (caretPosition == 0 && codePoint == 0x2d)) }, complete)
+}
+
+fun decimalTextInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape: ShapeCursor, complete: () -> Unit = {}): KeyboardHandler {
+    return textInputKeyboardHandler(ui, caret, cursorShape, { codePoint, caretPosition -> ((codePoint in 0x30..0x39) || codePoint == 0x2E || (caretPosition == 0 && codePoint == 0x2d)) }, complete)
+}
+
+fun textInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape: ShapeCursor, complete: () -> Unit = {}): KeyboardHandler {
+    return textInputKeyboardHandler(ui, caret, cursorShape, evaluator = { _, _ -> true }, complete = complete)
+}
+
+fun textInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape: ShapeCursor, evaluator: (Int, Int) -> Boolean = { _, _ -> true }, complete: () -> Unit = {}): KeyboardHandler {
     return KeyboardHandler(
             onChar = { codePoint ->
                 if (caret.selection != 0) {
@@ -136,7 +148,7 @@ fun integerTextInputKeyboardHandler(ui: UserInterface, caret: Caret, cursorShape
                     caret.selection = 0
                     caret.dynamicText.reference.value = caret.dynamicText.reference.value.removeRange(min, max)
                 }
-                if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && (codePoint in 0x30..0x39) || (caret.position == 0 && codePoint == 0x2d)) {
+                if (caret.position < caret.dynamicText.sizeLimit && caret.dynamicText.reference.value.length < caret.dynamicText.sizeLimit && evaluator(codePoint, caret.position)) {
                     val currentString = ArrayList(caret.dynamicText.reference.value.toCharArray().toList())
                     currentString.add(caret.position++, codePoint.toChar())
                     caret.dynamicText.reference.value = String(currentString.toCharArray())

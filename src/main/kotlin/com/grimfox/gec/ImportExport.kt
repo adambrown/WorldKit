@@ -1,22 +1,18 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.model.ByteArrayMatrix
 import com.grimfox.gec.model.HistoryQueue
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
-import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import org.lwjgl.opengl.GL11.GL_LINEAR
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.util.*
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
-import javax.imageio.ImageIO
 
 fun importProjectFile(file: File, biomeTemplates: Biomes): Project? {
     return DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
@@ -62,8 +58,8 @@ fun importProjectFile(file: File, biomeTemplates: Biomes): Project? {
             null
         }
         val historyBiomesForwardQueue = stream.readHistoryQueue { readBiomesHistoryItem() }
-        Project(
-                currentState = ref(currentState),
+        val customBiomeData = stream.readCustomBiomeData()
+        Project(currentState = ref(currentState),
                 historyRegionsBackQueue = historyRegionsBackQueue,
                 historyRegionsCurrent = ref(historyRegionsCurrentValue),
                 historyRegionsForwardQueue = historyRegionsForwardQueue,
@@ -72,7 +68,8 @@ fun importProjectFile(file: File, biomeTemplates: Biomes): Project? {
                 historySplinesForwardQueue = historySplinesForwardQueue,
                 historyBiomesBackQueue = historyBiomesBackQueue,
                 historyBiomesCurrent = ref(historyBiomesCurrentValue),
-                historyBiomesForwardQueue = historyBiomesForwardQueue)
+                historyBiomesForwardQueue = historyBiomesForwardQueue,
+                customBiomeDataForImport = customBiomeData)
     }
 }
 
@@ -139,7 +136,6 @@ fun exportProjectFileBackground(project: Project, file: File) {
         stream.writeHistoryQueue(project.historySplinesForwardQueue) {
             writeRegionSplines(it)
         }
-
         stream.writeHistoryQueue(project.historyBiomesBackQueue) {
             writeBiomesHistoryItem(it)
         }
@@ -153,6 +149,7 @@ fun exportProjectFileBackground(project: Project, file: File) {
         stream.writeHistoryQueue(project.historyBiomesForwardQueue) {
             writeBiomesHistoryItem(it)
         }
+        stream.writeCustomBiomeData(buildCustomBiomeData(project.customBiomeProperties, project.customBiomes))
     }
 }
 
@@ -243,18 +240,6 @@ fun importBiomesFile(dialogLayer: Block, preferences: Preferences, ui: UserInter
     }
 }
 
-fun importTexture(dialogLayer: Block, preferences: Preferences, ui: UserInterface): TextureId? {
-    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "png") { file ->
-        if (file == null) {
-            null
-        } else {
-            doOnMainThreadAndWait {
-                TextureId(loadTexture2D(GL_LINEAR, GL_LINEAR, ImageIO.read(file), false, true).first)
-            }
-        }
-    }
-}
-
 fun exportBiomesFile(biomes: BiomesHistoryItem?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
     if (biomes != null) {
         ui.ignoreInput = true
@@ -277,6 +262,52 @@ fun exportBiomesFile(biomes: BiomesHistoryItem?, dialogLayer: Block, preferences
         }
     }
     return false
+}
+
+fun importCustomBiomesFile(dialogLayer: Block, preferences: Preferences, ui: UserInterface): CustomBiomeData? {
+    return FileDialogs.selectFile(dialogLayer, true, ui, preferences.projectDir, "wkc") { file ->
+        if (file == null) {
+            null
+        } else {
+            DataInputStream(GZIPInputStream(file.inputStream()).buffered()).use { stream ->
+                stream.readCustomBiomeData()
+            }
+        }
+    }
+}
+
+fun exportCustomBiomesFile(customBiomes: CustomBiomeData?, dialogLayer: Block, preferences: Preferences, ui: UserInterface): Boolean {
+    if (customBiomes != null) {
+        ui.ignoreInput = true
+        dialogLayer.isVisible = true
+        try {
+            val saveFile = FileDialogs.saveFileDialog(preferences.projectDir, "wkc")
+            if (saveFile != null) {
+                val fullNameWithExtension = "${saveFile.name.removeSuffix(".wkc")}.wkc"
+                val actualFile = File(saveFile.parentFile, fullNameWithExtension)
+                DataOutputStream(GZIPOutputStream(actualFile.outputStream()).buffered()).use { stream ->
+                    stream.writeCustomBiomeData(customBiomes)
+                }
+                return true
+            } else {
+                return false
+            }
+        } finally {
+            dialogLayer.isVisible = false
+            ui.ignoreInput = false
+        }
+    }
+    return false
+}
+
+private fun DataOutputStream.writeCustomBiomeData(biomes: CustomBiomeData) {
+    writeInt(1)
+    biomes.serialize(this)
+}
+
+private fun DataInputStream.readCustomBiomeData(): CustomBiomeData {
+    readInt()
+    return CustomBiomeData.deserialize(this)
 }
 
 private fun <T> DataOutputStream.writeHistoryQueue(queue: HistoryQueue<T>, serializer: DataOutputStream.(T) -> Unit) {

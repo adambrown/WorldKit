@@ -1,5 +1,6 @@
 package com.grimfox.gec.util
 
+import com.grimfox.gec.mapScaleToLinearDistance
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.Graph.Vertices
 import com.grimfox.gec.model.geometry.*
@@ -120,11 +121,10 @@ object WaterFlows {
             }
         }
 
-        val scale = ((mapScale * mapScale) / 400.0f).coerceIn(0.0f, 1.0f)
-        val distanceScale = scale * 990000 + 10000
-        val shaderTextureScale = ((mapScale / 20.0f).coerceIn(0.0f, 1.0f) * 0.75f) + 0.25f
-        val shaderBorderDistanceScale = ((1.0f - ((mapScale / 20.0f).coerceIn(0.0f, 1.0f))) * 0.5f) + 0.5f
-        val heightScale = ((log(shaderTextureScale - 0.21) * 0.4) + 1.59).toFloat()
+        val distanceScale = mapScaleToLinearDistance(mapScale) * 1000.0f
+        val shaderTextureScale = ((mapScale / 25.0f).coerceIn(0.0f, 1.0f) * 0.9375f) + 0.0625f
+        val shaderBorderDistanceScale = ((1.0f - ((mapScale / 25.0f).coerceIn(0.0f, 1.0f))) * 0.625f) + 0.375f
+        val heightScale = if (shaderTextureScale < 0.25) shaderTextureScale * 4.3f - 0.0441739f else ((log(shaderTextureScale - 0.21) * 0.4) + 1.59).toFloat()
 
         val randomSeeds = Array(2) { random.nextLong() }
 

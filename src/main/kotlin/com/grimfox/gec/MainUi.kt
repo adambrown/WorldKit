@@ -98,7 +98,7 @@ object MainUi {
                     MemoryUtil.memUTF8(GLYPH_MAXIMIZE, false, maxRestoreGlyph, 0)
                 }
 
-                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/icon/512.png", true, true,
+                val (texId, texWidth, texHeight) = loadTexture2D(GL11.GL_LINEAR_MIPMAP_NEAREST, GL11.GL_LINEAR, "/textures/icon/512.png", true, true, 0, 0.0f,
                         "/textures/icon/256.png",
                         "/textures/icon/128.png",
                         "/textures/icon/64.png",
@@ -244,6 +244,7 @@ object MainUi {
                 preferencesPanel(ui)
                 exportPanel(ui)
                 aboutPanel(ui)
+                customBiomePanel(ui)
                 mainLayer {
                     block {
                         vSizing = STATIC
@@ -593,6 +594,7 @@ object MainUi {
                     preferences.isFirstRun = false
                     savePreferences(preferences)
                 }
+                BIOME_TEMPLATES_REF.value?.mapBiomeNames(BIOME_NAMES_AS_TEXT)
                 loadTimer.cancel()
                 generatingMessageBlock.isVisible = false
                 dialogLayer.isVisible = false

@@ -1,8 +1,6 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.model.ByteArrayMatrix
-import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.HistoryQueue
+import com.grimfox.gec.model.*
 import com.grimfox.gec.model.ObservableCollection.ModificationEvent
 import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
@@ -25,6 +23,7 @@ import java.io.*
 import java.util.*
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.collections.ArrayList
 
 class CurrentState(
         val regionParameters: ObservableMutableReference<RegionParameters?> = ref(null),
@@ -75,7 +74,10 @@ data class Project(
         val historySplinesForwardQueue: HistoryQueue<RegionSplines> = HistoryQueue(1000),
         val historyBiomesBackQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000),
         val historyBiomesCurrent: ObservableMutableReference<BiomesHistoryItem?> = ref(null),
-        val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000)) {
+        val historyBiomesForwardQueue: HistoryQueue<BiomesHistoryItem> = HistoryQueue(1000),
+        val customBiomeProperties: CustomBiomeProperties = CustomBiomeProperties(),
+        val customBiomes: ObservableMutableList<Pair<NewBiomeData, Block>> = ObservableMutableList(ArrayList()),
+        var customBiomeDataForImport: CustomBiomeData? = null) {
 
     private val valueModifiedListener: (Any?, Any?) -> Unit = { old, new ->
         if (old != new) {
@@ -104,6 +106,8 @@ data class Project(
         currentState.value.biomeParameters.addListener(valueModifiedListener)
         currentState.value.biomeGraph.addListener(valueModifiedListener)
         currentState.value.biomeMask.addListener(valueModifiedListener)
+        customBiomeProperties.addListener(valueModifiedListener)
+        customBiomes.addListener(queueModifiedListener)
     }
 
     fun copy(): Project {
@@ -119,8 +123,9 @@ data class Project(
                 historySplinesForwardQueue = historySplinesForwardQueue.copy(),
                 historyBiomesBackQueue = historyBiomesBackQueue.copy(),
                 historyBiomesCurrent = ref(historyBiomesCurrent.value?.copy()),
-                historyBiomesForwardQueue = historyBiomesForwardQueue.copy()
-        )
+                historyBiomesForwardQueue = historyBiomesForwardQueue.copy(),
+                customBiomeProperties = customBiomeProperties.copy(),
+                customBiomes = ObservableMutableList(ArrayList(customBiomes)))
     }
 }
 

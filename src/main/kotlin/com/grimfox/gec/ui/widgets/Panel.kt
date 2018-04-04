@@ -2,15 +2,15 @@ package com.grimfox.gec.ui.widgets
 
 import com.grimfox.gec.*
 
-fun Block.panel(width: Float, content: Block.() -> Unit): Block {
+fun Block.panel(width: Float, sizing: Sizing = Sizing.SHRINK, height: Float = 10000.0f, content: Block.() -> Unit): Block {
     val panel = block {
+        isVisible = true
         hAlign = HorizontalAlignment.CENTER
         vAlign = VerticalAlignment.MIDDLE
         hSizing = Sizing.STATIC
-        vSizing = Sizing.SHRINK
+        vSizing = sizing
         this.width = width
         this.height = height
-        isVisible = true
         block {
             xOffset = 4.0f
             yOffset = 4.0f
@@ -31,7 +31,7 @@ fun Block.panel(width: Float, content: Block.() -> Unit): Block {
         block {
             padLeft = LARGE_SPACER_SIZE
             padRight = LARGE_SPACER_SIZE
-            vSizing = Sizing.SHRINK
+            vSizing = sizing
             block {
                 content()
             }
