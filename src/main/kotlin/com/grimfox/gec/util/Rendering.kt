@@ -35,7 +35,7 @@ object Rendering {
         val indexData = ArrayList<Int>()
         val vertices = graph.vertices
         var vertexIndex = 0
-        for (id in 0..vertices.size - 1) {
+        for (id in 0 until vertices.size) {
             val regionId = regionMask[id]
             if (regionId < 1) {
                 continue
@@ -67,57 +67,57 @@ object Rendering {
         return Pair(vertexData, indexData)
     }
 
-    fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
+    fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int, scale: Float = 1.0f): TextureId {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
-        for (i in 0..vertices.size - 1) {
+        for (i in 0 until vertices.size) {
             val maskValue = regionMask[i]
             if (maskValue >= 1) {
                 val regionId = maskValue - 1
                 if (regions.size < maskValue) {
                     for (j in 0..regionId - regions.size) {
-                        regions.add(LinkedHashSet<Int>())
+                        regions.add(LinkedHashSet())
                     }
                 }
                 regions[regionId].add(i)
             }
         }
-        val borderEdgeFutures = (0..regions.size - 1).map { i ->
+        val borderEdgeFutures = (0 until regions.size).map { i ->
             executor.call {
                 val region = regions[i]
                 val mask = LinkedHashSet<Int>()
-                for (j in (i + 1..regions.size - 1)) {
+                for (j in (i + 1 until regions.size)) {
                     mask.addAll(regions[j])
                 }
                 graph.findBorderEdges(region, mask, false, true)
             }
         }
         val edges = borderEdgeFutures.flatMap { it.value }
-        return renderEdges(executor, edges, threadCount)
+        return renderEdges(executor, edges, threadCount, scale)
     }
 
     fun renderCoastalBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
         val land = LinkedHashSet<Int>(vertices.size)
-        for (i in 0..vertices.size - 1) {
+        for (i in 0 until vertices.size) {
             val maskValue = regionMask[i]
             if (maskValue >= 1) {
                 val regionId = maskValue - 1
                 land.add(i)
                 if (regions.size < maskValue) {
                     for (j in 0..regionId - regions.size) {
-                        regions.add(LinkedHashSet<Int>())
+                        regions.add(LinkedHashSet())
                     }
                 }
                 regions[regionId].add(i)
             }
         }
-        val borderEdgeFutures = (0..regions.size - 1).map { i ->
+        val borderEdgeFutures = (0 until regions.size).map { i ->
             executor.call {
                 val region = regions[i]
                 val mask = LinkedHashSet<Int>()
-                for (j in (i + 1..regions.size - 1)) {
+                for (j in (i + 1 until regions.size)) {
                     mask.addAll(regions[j])
                 }
                 graph.findBorderEdges(region, land, true, true)
@@ -127,13 +127,13 @@ object Rendering {
         return renderEdges(executor, borderEdges, threadCount)
     }
 
-    fun renderEdges(executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int, minFilter: Int = GL_NEAREST, magFilter: Int = GL_NEAREST): TextureId {
+    fun renderEdges(executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int, scale: Float = 1.0f, minFilter: Int = GL_NEAREST, magFilter: Int = GL_NEAREST): TextureId {
         val vertexData = FloatArray(edges.size * 60)
         val indexData = IntArray(edges.size * 60)
         val futures = ArrayList<Future<*>>(threadCount)
-        (0..threadCount - 1).mapTo(futures) {
+        (0 until threadCount).mapTo(futures) {
             executor.submit {
-                for (i in it..edges.size - 1 step threadCount) {
+                for (i in it until edges.size step threadCount) {
                     var vertexOffset = i * 60
                     var vertexIndex = i * 20
                     fun buildVertex(x: Float, y: Float, z: Float): Int {
@@ -151,44 +151,44 @@ object Rendering {
                     val spoke5 = spoke1.getPerpendicular()
                     val spoke6 = spoke2.getPerpendicular()
                     val spoke7 = spoke3.getPerpendicular()
-                    val p1 = buildVertex(edge.a.x, edge.a.y, 1.0f)
-                    val p2 = buildVertex(edge.b.x, edge.b.y, 1.0f)
+                    val p1 = buildVertex(edge.a.x * scale, edge.a.y * scale, 1.0f)
+                    val p2 = buildVertex(edge.b.x * scale, edge.b.y * scale, 1.0f)
                     val p32d = edge.b + perpendicular
-                    val p3 = buildVertex(p32d.x, p32d.y, 0.0f)
+                    val p3 = buildVertex(p32d.x * scale, p32d.y * scale, 0.0f)
                     val p42d = edge.a + perpendicular
-                    val p4 = buildVertex(p42d.x, p42d.y, 0.0f)
+                    val p4 = buildVertex(p42d.x * scale, p42d.y * scale, 0.0f)
                     val p52d = edge.a - perpendicular
-                    val p5 = buildVertex(p52d.x, p52d.y, 0.0f)
+                    val p5 = buildVertex(p52d.x * scale, p52d.y * scale, 0.0f)
                     val p62d = edge.b - perpendicular
-                    val p6 = buildVertex(p62d.x, p62d.y, 0.0f)
+                    val p6 = buildVertex(p62d.x * scale, p62d.y * scale, 0.0f)
                     val p72d = edge.a + spoke7
-                    val p7 = buildVertex(p72d.x, p72d.y, 0.0f)
+                    val p7 = buildVertex(p72d.x * scale, p72d.y * scale, 0.0f)
                     val p82d = edge.a + spoke6
-                    val p8 = buildVertex(p82d.x, p82d.y, 0.0f)
+                    val p8 = buildVertex(p82d.x * scale, p82d.y * scale, 0.0f)
                     val p92d = edge.a + spoke5
-                    val p9 = buildVertex(p92d.x, p92d.y, 0.0f)
+                    val p9 = buildVertex(p92d.x * scale, p92d.y * scale, 0.0f)
                     val p102d = edge.a - spoke4
-                    val p10 = buildVertex(p102d.x, p102d.y, 0.0f)
+                    val p10 = buildVertex(p102d.x * scale, p102d.y * scale, 0.0f)
                     val p112d = edge.a - spoke3
-                    val p11 = buildVertex(p112d.x, p112d.y, 0.0f)
+                    val p11 = buildVertex(p112d.x * scale, p112d.y * scale, 0.0f)
                     val p122d = edge.a - spoke2
-                    val p12 = buildVertex(p122d.x, p122d.y, 0.0f)
+                    val p12 = buildVertex(p122d.x * scale, p122d.y * scale, 0.0f)
                     val p132d = edge.a - spoke1
-                    val p13 = buildVertex(p132d.x, p132d.y, 0.0f)
+                    val p13 = buildVertex(p132d.x * scale, p132d.y * scale, 0.0f)
                     val p142d = edge.b - spoke7
-                    val p14 = buildVertex(p142d.x, p142d.y, 0.0f)
+                    val p14 = buildVertex(p142d.x * scale, p142d.y * scale, 0.0f)
                     val p152d = edge.b - spoke6
-                    val p15 = buildVertex(p152d.x, p152d.y, 0.0f)
+                    val p15 = buildVertex(p152d.x * scale, p152d.y * scale, 0.0f)
                     val p162d = edge.b - spoke5
-                    val p16 = buildVertex(p162d.x, p162d.y, 0.0f)
+                    val p16 = buildVertex(p162d.x * scale, p162d.y * scale, 0.0f)
                     val p172d = edge.b + spoke4
-                    val p17 = buildVertex(p172d.x, p172d.y, 0.0f)
+                    val p17 = buildVertex(p172d.x * scale, p172d.y * scale, 0.0f)
                     val p182d = edge.b + spoke3
-                    val p18 = buildVertex(p182d.x, p182d.y, 0.0f)
+                    val p18 = buildVertex(p182d.x * scale, p182d.y * scale, 0.0f)
                     val p192d = edge.b + spoke2
-                    val p19 = buildVertex(p192d.x, p192d.y, 0.0f)
+                    val p19 = buildVertex(p192d.x * scale, p192d.y * scale, 0.0f)
                     val p202d = edge.b + spoke1
-                    val p20 = buildVertex(p202d.x, p202d.y, 0.0f)
+                    val p20 = buildVertex(p202d.x * scale, p202d.y * scale, 0.0f)
 
                     var indexOffset = i * 60
                     fun buildTriangle(v1: Int, v2: Int, v3: Int) {

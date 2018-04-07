@@ -72,12 +72,7 @@ object WaterFlows {
             val underWaterMask: Matrix<Float>,
             val elevationPowerMask: Matrix<Short>,
             val startingHeightsMask: Matrix<Short>,
-            val soilMobilityMask: Matrix<Short>,
-            val biomeBorderMap: ShortArrayMatrix?,
-            val landMap: ByteBufferMatrix?,
-            val riverBorderMap: ShortArrayMatrix?,
-            val mountainBorderMap: ShortArrayMatrix?,
-            val coastalBorderMap: ShortArrayMatrix?)
+            val soilMobilityMask: Matrix<Short>)
 
     class ExportFiles(
             val outputSize: Int = 256,
@@ -281,32 +276,6 @@ object WaterFlows {
             val landMask = doOrCancel { ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096)) }
             val soilMobilityMask = doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(soilMobilityTextureId, 4096)) }
 
-            val biomeBorderMap = if (exportFiles?.biomeBorderFile != null) {
-                doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(biomeBorderTextureId, 4096)) }
-            } else {
-                null
-            }
-            val landMap = if (exportFiles?.landMaskFile != null) {
-                doOrCancel { ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096)) }
-            } else {
-                null
-            }
-            val riverBorderMap = if (exportFiles?.riverBorderFile != null) {
-                doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(riverBorderTextureId, 4096)) }
-            } else {
-                null
-            }
-            val mountainBorderMap = if (exportFiles?.mountainBorderFile != null) {
-                doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(mountainBorderTextureId, 4096)) }
-            } else {
-                null
-            }
-            val coastalBorderMap = if (exportFiles?.coastalBorderFile != null) {
-                doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(coastalBorderTextureId, 4096)) }
-            } else {
-                null
-            }
-
             riverBorderTextureId.free()
             mountainBorderTextureId.free()
             coastalBorderTextureId.free()
@@ -314,7 +283,7 @@ object WaterFlows {
             biomeBorderTextureId.free()
             elevationPowerTextureId.free()
             startingHeightsTextureId.free()
-            Masks(biomeMap, landMask, underWaterMask, elevationMask, startingHeights, soilMobilityMask, biomeBorderMap, landMap, riverBorderMap, mountainBorderMap, coastalBorderMap)
+            Masks(biomeMap, landMask, underWaterMask, elevationMask, startingHeights, soilMobilityMask)
         }
         val regionDataFuture = executor.call {
             doOrCancel { buildRegionData(flowGraphSmall, biomeMasksFuture.value.landMask) }
@@ -579,27 +548,52 @@ object WaterFlows {
             }
             val task9 = doOrCancel {
                 task {
-                    exportFiles?.biomeBorderFile?.exportMap16Bit(exportFiles.outputSize, biomeMasksFuture.value.biomeBorderMap?.array, 4096)
+                    if (exportFiles?.biomeBorderFile != null) {
+                        val scale = exportFiles.outputSize / 4096.0f
+                        val biomeBorderTextureId = doOrCancel { renderRegionBorders(executor, biomeGraph, biomeMask, threadCount, scale) }
+                        val biomeBorderMap = doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(biomeBorderTextureId, 4096)) }
+                        exportFiles.biomeBorderFile.exportMap16Bit(exportFiles.outputSize, biomeBorderMap.array, 4096)
+                    }
                 }
             }
             val task10 = doOrCancel {
                 task {
-                    exportFiles?.landMaskFile?.exportMap8BitGrey(exportFiles.outputSize, biomeMasksFuture.value.landMap?.buffer, 4096)
+                    if (exportFiles?.landMaskFile != null) {
+                        val scale = exportFiles.outputSize / 4096.0f
+                        val landMapTextureId = doOrCancel { renderLandImage(regionSplines.coastPoints, scale) }
+                        val landMap = doOrCancel { ByteBufferMatrix(4096, extractTextureRedByte(landMapTextureId, 4096)) }
+                        exportFiles.landMaskFile.exportMap8BitGrey(exportFiles.outputSize, landMap.buffer, 4096)
+                    }
                 }
             }
             val task11 = doOrCancel {
                 task {
-                    exportFiles?.riverBorderFile?.exportMap16Bit(exportFiles.outputSize, biomeMasksFuture.value.riverBorderMap?.array, 4096)
+                    if (exportFiles?.riverBorderFile != null) {
+                        val scale = exportFiles.outputSize / 4096.0f
+                        val riverBorderTextureId = doOrCancel { renderEdges(executor, regionSplines.riverEdges.flatMap { it } + regionSplines.customRiverEdges.flatMap { it }, threadCount, scale) }
+                        val riverBorderMap = doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(riverBorderTextureId, 4096)) }
+                        exportFiles.riverBorderFile.exportMap16Bit(exportFiles.outputSize, riverBorderMap.array, 4096)
+                    }
                 }
             }
             val task12 = doOrCancel {
                 task {
-                    exportFiles?.mountainBorderFile?.exportMap16Bit(exportFiles.outputSize, biomeMasksFuture.value.mountainBorderMap?.array, 4096)
+                    if (exportFiles?.mountainBorderFile != null) {
+                        val scale = exportFiles.outputSize / 4096.0f
+                        val mountainBorderTextureId = doOrCancel { renderEdges(executor, regionSplines.mountainEdges.flatMap { it } + regionSplines.customMountainEdges.flatMap { it }, threadCount, scale) }
+                        val mountainBorderMap = doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(mountainBorderTextureId, 4096)) }
+                        exportFiles.mountainBorderFile.exportMap16Bit(exportFiles.outputSize, mountainBorderMap.array, 4096)
+                    }
                 }
             }
             val task13 = doOrCancel {
                 task {
-                    exportFiles?.coastalBorderFile?.exportMap16Bit(exportFiles.outputSize, biomeMasksFuture.value.coastalBorderMap?.array, 4096)
+                    if (exportFiles?.coastalBorderFile != null) {
+                        val scale = exportFiles.outputSize / 4096.0f
+                        val coastalBorderTextureId = doOrCancel { renderEdges(executor, regionSplines.coastEdges.flatMap { it.first + it.second.flatMap { it } }, threadCount, scale) }
+                        val coastalBorderMap = doOrCancel { ShortArrayMatrix(4096, extractTextureRedShort(coastalBorderTextureId, 4096)) }
+                        exportFiles.coastalBorderFile.exportMap16Bit(exportFiles.outputSize, coastalBorderMap.array, 4096)
+                    }
                 }
             }
             task1.await()
@@ -818,7 +812,7 @@ object WaterFlows {
                                 riverLines.add(LineSegment2F(point, parentPoint))
                             }
                         }
-                        val textureId = renderEdges(executor, riverLines, threadCount)
+                        val textureId = renderEdges(executor, riverLines, threadCount, outputWidth / heightMapWidth.toFloat())
                         ShortArrayMatrix(heightMapWidth, extractTextureRedShort(textureId, heightMapWidth))
                     }
                 }
@@ -1507,7 +1501,7 @@ object WaterFlows {
     }
 
     private inline fun renderPeakMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, heightMapWidth: Int, outputWidth: Int, threadCount: Int, property: WaterNode.() -> Float): ShortArrayMatrix {
-        val outputMultiplier = outputWidth / heightMapWidth.toFloat()
+        val scale = outputWidth / heightMapWidth.toFloat()
         val graphVertices = graph.vertices
         var minHeight = Float.MAX_VALUE
         var maxHeight = 0.0f
@@ -1522,7 +1516,7 @@ object WaterFlows {
                     if (z > maxHeight) {
                         maxHeight = z
                     }
-                    Point3F(point.x * outputMultiplier, point.y * outputMultiplier, z)
+                    Point3F(point.x * scale, point.y * scale, z)
                 } else {
                     null
                 }
@@ -1533,7 +1527,7 @@ object WaterFlows {
         val deltaHeight = maxHeight - minHeight
         val edges = peaks.flatMap { peak ->
             val height = (peak.z - minHeight) / deltaHeight
-            val edgeLength = 0.0025f + 0.01f * height
+            val edgeLength = (0.0025f + 0.01f * height) * scale
             val peak2D = Point2F(peak.x, peak.y)
             listOf(LineSegment2F(Point2F(peak.x - edgeLength, peak.y + edgeLength), peak2D), LineSegment2F(peak2D, Point2F(peak.x + edgeLength, peak.y + edgeLength)))
         }
@@ -1542,7 +1536,7 @@ object WaterFlows {
     }
 
     private inline fun renderHeightMap(executor: ExecutorService, graph: Graph, nodeIndex: Array<WaterNode?>, fallback: Matrix<Float>?, defaultValue: Float, heightMapWidth: Int, outputWidth: Int, threadCount: Int, cap: Float = 1.0f, property: WaterNode.() -> Float = { height }): FloatArrayMatrix {
-        val outputMultiplier = outputWidth / heightMapWidth.toFloat()
+        val scale = outputWidth / heightMapWidth.toFloat()
         val fWidth = fallback?.width ?: 0
         val fWidthM1 = fWidth - 1
         val triangles = graph.triangles
@@ -1562,7 +1556,7 @@ object WaterFlows {
                     if (z > maxHeight) {
                         maxHeight = z
                     }
-                    vertexIndex++ to Point3F(point.x * outputMultiplier, point.y * outputMultiplier, z)
+                    vertexIndex++ to Point3F(point.x * scale, point.y * scale, z)
                 } else {
                     null
                 }
@@ -1574,7 +1568,7 @@ object WaterFlows {
                 if (z > maxHeight) {
                     maxHeight = z
                 }
-                vertexIndex++ to Point3F(point.x * outputMultiplier, point.y * outputMultiplier, z)
+                vertexIndex++ to Point3F(point.x * scale, point.y * scale, z)
             }
         }
         val deltaHeight = maxHeight - minHeight
