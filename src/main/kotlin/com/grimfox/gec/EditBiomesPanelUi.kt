@@ -163,12 +163,12 @@ fun Block.editBiomesPanel(
                     if (currentBiomeGraph != null && currentBiomeMask != null) {
                         generationLock.lock()
                         if (displayMode.value != DisplayMode.BIOMES) {
-                            val biomeTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
+                            val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, currentBiomeGraph, currentBiomeMask)
                             val currentSplines = currentState.regionSplines.value
                             val splineTextureId = if (currentSplines != null) {
-                                TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+                                TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
                             } else {
-                                TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                                TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, emptyList(), emptyList(), emptyList())
                             }
                             meshViewport.setBiomes(biomeTextureId, splineTextureId)
                             imageMode.value = 2

@@ -161,7 +161,7 @@ fun Block.editRegionsPanel(
                             updateRegionsHistory(parameters, currentGraph, currentMask)
                             val currentRegionSplines = currentState.regionSplines.value
                             if (currentRegionSplines != null && displayMode.value == DisplayMode.MAP) {
-                                val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                val regionTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
                                 meshViewport.setImage(regionTextureId)
                             }
                         }
@@ -197,7 +197,7 @@ fun Block.editRegionsPanel(
                     val currentMask = currentState.regionMask.value
                     if (currentGraph != null && currentMask != null) {
                         generationLock.lock()
-                        val regionTextureId = Rendering.renderRegions(currentGraph, currentMask)
+                        val regionTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, currentGraph, currentMask)
                         meshViewport.setRegions(regionTextureId)
                         imageMode.value = 0
                         displayMode.value = DisplayMode.REGIONS
@@ -227,7 +227,7 @@ fun Block.editRegionsPanel(
                     val currentMask = currentState.regionMask.value
                     if (currentRegionSplines != null && currentGraph != null && currentMask != null) {
                         updateRegionsHistory(parameters, currentGraph, currentMask)
-                        val mapTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                        val mapTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
                         meshViewport.setImage(mapTextureId)
                         imageMode.value = 1
                         displayMode.value = DisplayMode.MAP
@@ -423,7 +423,7 @@ fun Block.editMapPanel(
                 val splineMap = splineEditSelectorMap
                 val selectorMatrix = splineEditSelectorMatrix
                 if (editSplinesSelectionRadius.value != splineEditRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
-                    val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
+                    val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(VIEWPORT_TEXTURE_SIZE, splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), VIEWPORT_TEXTURE_SIZE)
                     for (i in 0..16777215) {
                         var offset = i * 4
                         val r = splineSelectors[offset++].toInt() and 0x000000FF
@@ -442,8 +442,8 @@ fun Block.editMapPanel(
                         splineEditSelectorMap = splineMap
                         val (textureReference, renderAsSplines) = prepareViewportForSplineEditing(currentSplines)
                         preferBiomesView = renderAsSplines
-                        val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), 4096)
-                        val selectorMatrix = ShortArrayMatrix(4096) { i ->
+                        val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(VIEWPORT_TEXTURE_SIZE, splineMap.values.map { it.first to it.third.second }, editSplinesSelectionRadius.value.toFloat()), VIEWPORT_TEXTURE_SIZE)
+                        val selectorMatrix = ShortArrayMatrix(VIEWPORT_TEXTURE_SIZE) { i ->
                             var offset = i * 4
                             val r = splineSelectors[offset++].toInt() and 0x000000FF
                             val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
@@ -489,7 +489,7 @@ fun Block.editMapPanel(
                 val splineMap = splineDeleteSelectorMap
                 val selectorMatrix = splineDeleteSelectorMatrix
                 if (deleteSplineSelectionRadius.value != splineDeleteRadiusSliderInitial && selectorMatrix != null && splineMap != null) {
-                    val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, deleteSplineSelectionRadius.value.toFloat()), 4096)
+                    val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(VIEWPORT_TEXTURE_SIZE, splineMap.values.map { it.first to it.third.second }, deleteSplineSelectionRadius.value.toFloat()), VIEWPORT_TEXTURE_SIZE)
                     for (i in 0..16777215) {
                         var offset = i * 4
                         val r = splineSelectors[offset++].toInt() and 0x000000FF
@@ -511,8 +511,8 @@ fun Block.editMapPanel(
                         executor.call {
                             drawViewportDuringSplineEditing(currentSplines, preferBiomesView)
                         }
-                        val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(splineMap.values.map { it.first to it.third.second }, 80.0f), 4096)
-                        val selectorMatrix = ShortArrayMatrix(4096) { i ->
+                        val splineSelectors = TextureBuilder.extractTextureRgbaByte(TextureBuilder.renderSplineSelectors(VIEWPORT_TEXTURE_SIZE, splineMap.values.map { it.first to it.third.second }, 80.0f), VIEWPORT_TEXTURE_SIZE)
+                        val selectorMatrix = ShortArrayMatrix(VIEWPORT_TEXTURE_SIZE) { i ->
                             var offset = i * 4
                             val r = splineSelectors[offset++].toInt() and 0x000000FF
                             val g = (splineSelectors[offset].toInt() and 0x000000FF) shl 8
@@ -619,8 +619,8 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
     val biomeMask = currentState.biomeMask.value
     val renderAsSplines: Boolean
     val textureReference = if (biomeGraph != null && biomeMask != null && displayMode.value != DisplayMode.MAP) {
-        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
-        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
         meshViewport.setBiomes(biomeTextureId, splineTextureId)
         imageMode.value = 2
         displayMode.value = DisplayMode.BIOMES
@@ -633,7 +633,7 @@ private fun prepareViewportForSplineEditing(currentSplines: RegionSplines): Pair
         renderAsSplines = true
         textureReference
     } else {
-        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        val mapTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
         meshViewport.setImage(mapTextureId)
         imageMode.value = 1
         displayMode.value = DisplayMode.MAP
@@ -654,13 +654,13 @@ private fun resetViewportAfterSplineEditing(currentSplines: RegionSplines, prefe
     val biomeGraph = currentState.biomeGraph.value
     val biomeMask = currentState.biomeMask.value
     if (biomeGraph != null && biomeMask != null && preferBiomesView) {
-        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
-        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+        val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
         meshViewport.setBiomes(biomeTextureId, splineTextureId)
         imageMode.value = 2
         displayMode.value = DisplayMode.BIOMES
     } else {
-        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
+        val mapTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints)
         meshViewport.setImage(mapTextureId)
         imageMode.value = 1
         displayMode.value = DisplayMode.MAP
@@ -672,13 +672,13 @@ private fun drawViewportDuringSplineEditing(currentSplines: RegionSplines, prefe
     val biomeGraph = currentState.biomeGraph.value
     val biomeMask = currentState.biomeMask.value
     if (biomeGraph != null && biomeMask != null && preferBiomesView) {
-        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
-        val splineTextureId = TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+        val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, biomeGraph, biomeMask)
+        val splineTextureId = TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
         meshViewport.setBiomes(biomeTextureId, splineTextureId)
         imageMode.value = 2
         displayMode.value = DisplayMode.BIOMES
     } else {
-        val mapTextureId = TextureBuilder.renderMapImage(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
+        val mapTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints, currentSplines.ignoredPoints + currentSplines.customIgnoredPoints, currentSplines.deletedPoints)
         meshViewport.setImage(mapTextureId)
         imageMode.value = 1
         displayMode.value = DisplayMode.MAP

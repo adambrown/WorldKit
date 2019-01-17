@@ -1,6 +1,6 @@
 package com.grimfox.gec.brushes
 
-import com.grimfox.gec.executor
+import com.grimfox.gec.*
 import com.grimfox.gec.model.Graph
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.LineSegment2F
@@ -47,9 +47,9 @@ class PreSelectDrawBrushListener(
         }
         executor.call {
             if (texture.value.id < 0) {
-                texture.value = renderRegions(graph, mask)
+                texture.value = renderRegions(VIEWPORT_TEXTURE_SIZE, graph, mask)
             } else {
-                texture.value = renderRegions(graph, mask, texture.value)
+                texture.value = renderRegions(VIEWPORT_TEXTURE_SIZE, graph, mask, texture.value)
             }
         }
     }

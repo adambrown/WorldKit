@@ -243,6 +243,7 @@ object MainUi {
                 }
                 preferencesPanel(ui)
                 exportPanel(ui)
+                tilePanel(ui)
                 aboutPanel(ui)
                 customBiomePanel(ui)
                 mainLayer {
@@ -292,6 +293,9 @@ object MainUi {
                                 menuDivider()
                                 menuItem("Export maps...", "Ctrl+E", isActive = doesActiveProjectExist) {
                                     exportMaps()
+                                }
+                                menuItem("Tile maps...", isActive = ref(true)) {
+                                    tileMaps()
                                 }
                                 menuDivider()
                                 menuItem("Exit", "Ctrl+Q", BLOCK_GLYPH_CLOSE) {

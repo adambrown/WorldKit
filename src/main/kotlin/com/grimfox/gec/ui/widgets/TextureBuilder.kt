@@ -8,7 +8,6 @@ import com.grimfox.joml.Matrix4f
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
-import org.lwjgl.opengl.GL13
 import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL15.*
 import org.lwjgl.opengl.GL20.*
@@ -22,6 +21,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 
 object TextureBuilder {
+
+    val RENDER_WIDTHS = intArrayOf(128, 256, 512, 1024, 2048, 4096, 8192).toList()
 
     private var nvg: Long = -1
     private var executionThread: Thread? = null
@@ -100,7 +101,8 @@ object TextureBuilder {
     private val uvAttributeNormalAndSlope = ShaderAttribute("uv")
     private var normalAndSlopeProgram: Int = 0
     private var normalAndSlopeImagePlane: ImagePlane
-    private var textureRenderer: TextureRenderer
+    private var textureRenderersLookup: List<Pair<Int, TextureRenderer>>
+    private var textureRenderers: Map<Int, TextureRenderer>
 
     init {
         val dynamicGeometryVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/dynamic-geometry.vert"))
@@ -125,7 +127,8 @@ object TextureBuilder {
 
         normalAndSlopeImagePlane = ImagePlane(1.0f, positionAttributeNormalAndSlope, uvAttributeNormalAndSlope, 0.5f)
 
-        textureRenderer = TextureRenderer(4096, 4096)
+        textureRenderersLookup = ArrayList(RENDER_WIDTHS.map { it to TextureRenderer(it, it) })
+        textureRenderers = hashMapOf(*textureRenderersLookup.toTypedArray())
     }
 
     private fun <T : Any> doDeferredOpenglWork(collector: ValueCollector<T>): T {
@@ -150,14 +153,16 @@ object TextureBuilder {
         return ShaderProgramId(doDeferredOpenglWork(ValueCollector { builder() }))
     }
 
-    fun <T : Any> render(builder: (dynamicGeometry3D: DynamicGeometry3D, dynamicGeometry2D: DynamicGeometry2D, textureRenderer: TextureRenderer) -> T): T {
+    fun <T : Any> render(resolution: Int, builder: (dynamicGeometry3D: DynamicGeometry3D, dynamicGeometry2D: DynamicGeometry2D, textureRenderer: TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
+            val textureRenderer = textureRenderers.getOrDefault(resolution, textureRenderersLookup.last().second)
             builder(dynamicGeometry3D, dynamicGeometry2D, textureRenderer)
         })
     }
 
-    private fun <T : Any> renderTrianglesInternal(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderTrianglesInternal(resolution: Int, input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
+            val textureRenderer = textureRenderers.getOrDefault(resolution, textureRenderersLookup.last().second)
             mvpMatrix.setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 2.0f)
             glDisable(GL_BLEND)
             glDisable(GL_CULL_FACE)
@@ -174,8 +179,9 @@ object TextureBuilder {
         })
     }
 
-    private fun <T : Any> renderNormalAndSlopeInternal(heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderNormalAndSlopeInternal(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
+            val textureRenderer = textureRenderers.getOrDefault(resolution, textureRenderersLookup.last().second)
             mvpMatrix.setOrtho(0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 2.0f)
             glDisable(GL_BLEND)
             glDisable(GL_CULL_FACE)
@@ -193,12 +199,13 @@ object TextureBuilder {
     }
 
 
-    private fun <T : Any> renderNvgInternal(collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderNvgInternal(resolution: Int, collector: (TextureRenderer) -> T): T {
+        val textureRenderer = textureRenderers.getOrDefault(resolution, textureRenderersLookup.last().second)
         return doDeferredOpenglWork(ValueCollector { collector(textureRenderer) })
     }
 
-    fun renderLandImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, scale: Float = 1.0f): TextureId {
-        return renderNvgInternal { textureRenderer ->
+    fun renderLandImage(resolution: Int, landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, scale: Float = 1.0f): TextureId {
+        return renderNvgInternal(resolution) { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
 
@@ -216,9 +223,9 @@ object TextureBuilder {
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
                 nvgBeginPath(nvg)
-                drawShape(nvg, it.first, true)
+                drawShape(nvg, resolution, it.first, true)
                 it.second.forEach {
-                    drawHole(nvg, it)
+                    drawHole(nvg, resolution, it)
                 }
                 nvgFill(nvg)
             }
@@ -239,8 +246,8 @@ object TextureBuilder {
         return nvgRGBAf(r, g, b, a, color)
     }
 
-    fun renderMapImage(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>>, pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
-        return renderNvgInternal { textureRenderer ->
+    fun renderMapImage(resolution: Int, landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>>, pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
+        return renderNvgInternal(resolution) { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
 
@@ -258,9 +265,9 @@ object TextureBuilder {
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
                 nvgBeginPath(nvg)
-                drawShape(nvg, it.first, true)
+                drawShape(nvg, resolution, it.first, true)
                 it.second.forEach {
-                    drawHole(nvg, it)
+                    drawHole(nvg, resolution, it)
                 }
                 nvgFill(nvg)
             }
@@ -268,35 +275,35 @@ object TextureBuilder {
             rgba(40, 45, 245, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(245, 45, 40, 255, color)
             nvgStrokeColor(nvg, color)
             mountainPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(190, 220, 190, 255, color)
             nvgStrokeColor(nvg, color)
             ignoredPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(0, 0, 0, 255, color)
             nvgStrokeColor(nvg, color)
             pendingPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(0, 0, 0, 255, color)
             nvgStrokeWidth(nvg, 6.0f)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
-                drawShape(nvg, it.first, true)
+                drawShape(nvg, resolution, it.first, true)
                 nvgStroke(nvg)
                 it.second.forEach {
-                    drawShape(nvg, it, true)
+                    drawShape(nvg, resolution, it, true)
                     nvgStroke(nvg)
                 }
             }
@@ -315,8 +322,8 @@ object TextureBuilder {
         }
     }
 
-    fun renderSplineSelectors(splines: List<Pair<Int, List<Point2F>>>, strokeWidth: Float): TextureId {
-        return renderNvgInternal { textureRenderer ->
+    fun renderSplineSelectors(resolution: Int, splines: List<Pair<Int, List<Point2F>>>, strokeWidth: Float): TextureId {
+        return renderNvgInternal(resolution) { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
 
@@ -336,7 +343,7 @@ object TextureBuilder {
                 val g = (index shr 8) and 0x000000FF
                 rgba(r, g, 0, 255, color)
                 nvgStrokeColor(nvg, color)
-                drawShape(nvg, spline, false)
+                drawShape(nvg, resolution, spline, false)
                 nvgStroke(nvg)
             }
 
@@ -348,8 +355,8 @@ object TextureBuilder {
         }
     }
 
-    fun renderSplines(landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>> = listOf(), pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
-        return renderNvgInternal { textureRenderer ->
+    fun renderSplines(resolution: Int, landBodyPolygons: List<Pair<List<Point2F>, List<List<Point2F>>>>, riverPolygons: List<List<Point2F>>, mountainPolygons: List<List<Point2F>>, ignoredPolygons: List<List<Point2F>> = listOf(), pendingPolygons: List<List<Point2F>> = listOf(), target: TextureId? = null): TextureId {
+        return renderNvgInternal(resolution) { textureRenderer ->
             val width = textureRenderer.width
             val height = textureRenderer.height
 
@@ -371,9 +378,9 @@ object TextureBuilder {
             nvgFillColor(nvg, color)
             landBodyPolygons.forEach {
                 nvgBeginPath(nvg)
-                drawShape(nvg, it.first, true)
+                drawShape(nvg, resolution, it.first, true)
                 it.second.forEach {
-                    drawHole(nvg, it)
+                    drawHole(nvg, resolution, it)
                 }
                 nvgFill(nvg)
             }
@@ -381,54 +388,54 @@ object TextureBuilder {
             rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             mountainPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             ignoredPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             pendingPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             nvgStrokeWidth(nvg, 7.0f)
             rgba(0, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(255, 255, 0, 255, color)
             nvgStrokeColor(nvg, color)
             mountainPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(190, 255, 190, 255, color)
             nvgStrokeColor(nvg, color)
             ignoredPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             rgba(0, 255, 0, 255, color)
             nvgStrokeColor(nvg, color)
             pendingPolygons.forEach {
-                drawShape(nvg, it, false)
+                drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
             nvgStrokeWidth(nvg, 7.0f)
             rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
-                drawShape(nvg, it.first, true)
+                drawShape(nvg, resolution, it.first, true)
                 nvgStroke(nvg)
                 it.second.forEach {
-                    drawShape(nvg, it, true)
+                    drawShape(nvg, resolution, it, true)
                     nvgStroke(nvg)
                 }
             }
@@ -448,16 +455,16 @@ object TextureBuilder {
         }
     }
 
-    fun drawHole(nvg: Long, points: List<Point2F>) {
-        drawLines(nvg, points, true, true, 4096.0f)
+    fun drawHole(nvg: Long, resolution: Int, points: List<Point2F>) {
+        drawLines(nvg, points, true, true, resolution.toFloat())
         nvgPathWinding(nvg, NVG_HOLE)
     }
 
-    fun drawShape(nvg: Long, points: List<Point2F>, isClosed: Boolean, isComposite: Boolean = false) {
+    fun drawShape(nvg: Long, resolution: Int, points: List<Point2F>, isClosed: Boolean, isComposite: Boolean = false) {
         if (!isComposite) {
             nvgBeginPath(nvg)
         }
-        drawLines(nvg, points, isClosed, true, 4096.0f)
+        drawLines(nvg, points, isClosed, true, resolution.toFloat())
         if (isClosed) {
             if (!isComposite) {
                 nvgPathWinding(nvg, NVG_SOLID)
@@ -481,106 +488,106 @@ object TextureBuilder {
         }
     }
 
-    fun renderNormalAndSlopeRgbaByte(heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderNormalAndSlopeInternal(heightMapTexture, heightScale, uvScale, clearColor, {
+    fun renderNormalAndSlopeRgbaByte(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderNormalAndSlopeInternal(resolution, heightMapTexture, heightScale, uvScale, clearColor, {
             val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
-            val retVal = extractTextureRgbaByte(id, 4096)
+            val retVal = extractTextureRgbaByte(id, resolution)
             id.free()
             retVal
         })
     }
 
-    fun renderTrianglesRedFloat(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
-        return renderTrianglesInternal(input, clearColor, {
+    fun renderTrianglesRedFloat(resolution: Int, input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
+        return renderTrianglesInternal(resolution, input, clearColor, {
             val id = it.newRedTextureFloat(GL_NEAREST, GL_NEAREST)
-            val retVal = extractTextureRedFloat(id, 4096)
+            val retVal = extractTextureRedFloat(id, resolution)
             id.free()
             retVal
         })
     }
 
-    fun renderTrianglesRedFloat(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
-        return renderTrianglesRedFloat(vertices to indices, clearColor)
+    fun renderTrianglesRedFloat(resolution: Int, vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): FloatArray {
+        return renderTrianglesRedFloat(resolution, vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRedShort(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
-        return renderTrianglesInternal(input, clearColor, {
+    fun renderTrianglesRedShort(resolution: Int, input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
+        return renderTrianglesInternal(resolution, input, clearColor, {
             val id = it.newRedTextureShort(GL_NEAREST, GL_NEAREST)
-            val retVal = extractTextureRedShort(id, 4096)
+            val retVal = extractTextureRedShort(id, resolution)
             id.free()
             retVal
         })
     }
 
-    fun renderTrianglesRedShort(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
-        return renderTrianglesRedShort(vertices to indices, clearColor)
+    fun renderTrianglesRedShort(resolution: Int, vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ShortArray {
+        return renderTrianglesRedShort(resolution,vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRedByte(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesInternal(input, clearColor, {
+    fun renderTrianglesRedByte(resolution: Int, input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesInternal(resolution, input, clearColor, {
             val id = it.newRedTextureByte(GL_NEAREST, GL_NEAREST)
-            val retVal = extractTextureRedByte(id, 4096)
+            val retVal = extractTextureRedByte(id, resolution)
             id.free()
             retVal
         })
     }
 
-    fun renderTrianglesRedByte(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesRedByte(vertices to indices, clearColor)
+    fun renderTrianglesRedByte(resolution: Int, vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesRedByte(resolution,vertices to indices, clearColor)
     }
 
-    fun renderTrianglesRgbaByte(input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesInternal(input, clearColor, {
+    fun renderTrianglesRgbaByte(resolution: Int, input: Pair<FloatArray, IntArray>, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesInternal(resolution, input, clearColor, {
             val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
-            val retVal = extractTextureRgbaByte(id, 4096)
+            val retVal = extractTextureRgbaByte(id, resolution)
             id.free()
             retVal
         })
     }
 
-    fun renderTrianglesRgbaByte(vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderTrianglesRgbaByte(vertices to indices, clearColor)
+    fun renderTrianglesRgbaByte(resolution: Int, vertices: FloatArray, indices: IntArray, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderTrianglesRgbaByte(resolution,vertices to indices, clearColor)
     }
 
 
-    fun renderTrianglesTexRedFloat(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, clearColor, { it.newRedTextureFloat(minFilter, magFilter) })
+    fun renderTrianglesTexRedFloat(resolution: Int, input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(resolution, input, clearColor, { it.newRedTextureFloat(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedFloat(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesTexRedFloat(vertices to indices, minFilter, magFilter, clearColor)
+    fun renderTrianglesTexRedFloat(resolution: Int, vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedFloat(resolution, vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRedShort(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, clearColor, { it.newRedTextureShort(minFilter, magFilter) })
+    fun renderTrianglesTexRedShort(resolution: Int, input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(resolution, input, clearColor, { it.newRedTextureShort(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedShort(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesTexRedShort(vertices to indices, minFilter, magFilter, clearColor)
+    fun renderTrianglesTexRedShort(resolution: Int, vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedShort(resolution, vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRedByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, clearColor, { it.newRedTextureByte(minFilter, magFilter) })
+    fun renderTrianglesTexRedByte(resolution: Int, input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(resolution, input, clearColor, { it.newRedTextureByte(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRedByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesTexRedByte(vertices to indices, minFilter, magFilter, clearColor)
+    fun renderTrianglesTexRedByte(resolution: Int, vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRedByte(resolution, vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesTexRgbaByte(input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, clearColor, { it.newRgbaTextureByte(minFilter, magFilter) })
+    fun renderTrianglesTexRgbaByte(resolution: Int, input: Pair<FloatArray, IntArray>, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(resolution, input, clearColor, { it.newRgbaTextureByte(minFilter, magFilter) })
     }
 
-    fun renderTrianglesTexRgbaByte(vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesTexRgbaByte(vertices to indices, minFilter, magFilter, clearColor)
+    fun renderTrianglesTexRgbaByte(resolution: Int, vertices: FloatArray, indices: IntArray, minFilter: Int, magFilter: Int, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesTexRgbaByte(resolution, vertices to indices, minFilter, magFilter, clearColor)
     }
 
-    fun renderTrianglesToTexture(vertices: FloatArray, indices: IntArray, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesToTexture(vertices to indices, textureId, clearColor)
+    fun renderTrianglesToTexture(resolution: Int, vertices: FloatArray, indices: IntArray, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesToTexture(resolution, vertices to indices, textureId, clearColor)
     }
 
-    fun renderTrianglesToTexture(input: Pair<FloatArray, IntArray>, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
-        return renderTrianglesInternal(input, clearColor, {
+    fun renderTrianglesToTexture(resolution: Int, input: Pair<FloatArray, IntArray>, textureId: TextureId, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): TextureId {
+        return renderTrianglesInternal(resolution, input, clearColor, {
             it.copyTexture(textureId)
             textureId
         })

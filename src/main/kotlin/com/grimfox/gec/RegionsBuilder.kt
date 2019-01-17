@@ -129,12 +129,12 @@ class RegionsBuilder(
         currentState.riverMapTexture.value = null
         if (updateView) {
             if (displayMode.value == DisplayMode.MAP || (defaultToMap.value && displayMode.value != DisplayMode.REGIONS)) {
-                val mapTextureId = TextureBuilder.renderMapImage(regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
+                val mapTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, regionSplines.coastPoints, regionSplines.riverPoints + regionSplines.customRiverPoints, regionSplines.mountainPoints + regionSplines.customMountainPoints, regionSplines.ignoredPoints + regionSplines.customIgnoredPoints)
                 meshViewport.setImage(mapTextureId)
                 imageMode.value = 1
                 displayMode.value = DisplayMode.MAP
             } else {
-                val regionTextureId = Rendering.renderRegions(regionGraph, regionMask)
+                val regionTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, regionGraph, regionMask)
                 meshViewport.setRegions(regionTextureId)
                 imageMode.value = 0
                 displayMode.value = DisplayMode.REGIONS

@@ -138,7 +138,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             val currentRegionGraph = currentState.regionGraph.value
                             val currentRegionMask = currentState.regionMask.value
                             if (currentRegionGraph != null && currentRegionMask != null) {
-                                val regionTextureId = renderRegions(currentRegionGraph, currentRegionMask)
+                                val regionTextureId = renderRegions(VIEWPORT_TEXTURE_SIZE, currentRegionGraph, currentRegionMask)
                                 meshViewport.setRegions(regionTextureId)
                                 imageMode.value = 0
                                 displayMode.value = DisplayMode.REGIONS
@@ -152,7 +152,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         generationLock.doWithLock {
                             val currentRegionSplines = currentState.regionSplines.value
                             if (currentRegionSplines != null) {
-                                val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+                                val regionTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
                                 meshViewport.setImage(regionTextureId)
                                 imageMode.value = 1
                                 displayMode.value = DisplayMode.MAP
@@ -168,11 +168,11 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                             val currentBiomeMask = currentState.biomeMask.value
                             val currentSplines = currentState.regionSplines.value
                             if (currentBiomeGraph != null && currentBiomeMask != null) {
-                                val biomeTextureId = renderRegions(currentBiomeGraph, currentBiomeMask)
+                                val biomeTextureId = renderRegions(VIEWPORT_TEXTURE_SIZE, currentBiomeGraph, currentBiomeMask)
                                 val splineTextureId = if (currentSplines != null) {
-                                    TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+                                    TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
                                 } else {
-                                    TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+                                    TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, emptyList(), emptyList(), emptyList())
                                 }
                                 meshViewport.setBiomes(biomeTextureId, splineTextureId)
                                 imageMode.value = 2
@@ -230,7 +230,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                                         customSoilMobilityMap = currentState.customSoilMobilityMap.value,
                                                         canceled = canceled,
                                                         biomeTemplates = BIOME_TEMPLATES_REF.value!!)
-                                                meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), 4096)
+                                                meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), VIEWPORT_HEIGHTMAP_SIZE)
                                                 currentState.heightMapTexture.value = heightMapTexId
                                                 currentState.riverMapTexture.value = riverMapTexId
                                                 val linearDistanceScaleInKilometers = mapScaleToLinearDistance(currentMapScale)
@@ -261,7 +261,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                     val currentHeightMap = currentState.heightMapTexture.value
                                     val currentRiverMap = currentState.riverMapTexture.value
                                     if (currentHeightMap != null && currentRiverMap != null) {
-                                        meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), 4096)
+                                        meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), VIEWPORT_HEIGHTMAP_SIZE)
                                         imageMode.value = 3
                                         displayMode.value = DisplayMode.MESH
                                     }

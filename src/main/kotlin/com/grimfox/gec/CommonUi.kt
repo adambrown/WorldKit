@@ -15,8 +15,11 @@ import java.net.*
 import java.util.*
 import java.util.concurrent.CountDownLatch
 
-const val DEMO_BUILD = true
+const val DEMO_BUILD = false
 const val EXPERIMENTAL_BUILD = false
+
+val VIEWPORT_TEXTURE_SIZE = 2048
+val VIEWPORT_HEIGHTMAP_SIZE = 2048
 
 val REGION_GRAPH_WIDTH = 128
 val REGION_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
@@ -205,6 +208,7 @@ var brushShapeInner = NO_BLOCK
 
 var preferencesPanel = NO_BLOCK
 var exportPanel = NO_BLOCK
+var tilePanel = NO_BLOCK
 var aboutPanel = NO_BLOCK
 var customBiomePanel = NO_BLOCK
 val icon = ref(-1)
@@ -393,6 +397,11 @@ fun exportMaps() {
     exportPanel.isVisible = true
 }
 
+fun tileMaps() {
+    panelLayer.isVisible = true
+    tilePanel.isVisible = true
+}
+
 fun UserInterface.closeWindowSafely() {
     if (currentProject.value != null && currentProjectHasModifications.value) {
         dialogLayer.isVisible = true
@@ -474,11 +483,11 @@ fun afterProjectOpen() {
     val currentBiomeMask = currentState.biomeMask.value
     val currentSplines = currentState.regionSplines.value
     if (currentBiomeGraph != null && currentBiomeMask != null) {
-        val biomeTextureId = Rendering.renderRegions(currentBiomeGraph, currentBiomeMask)
+        val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, currentBiomeGraph, currentBiomeMask)
         val splineTextureId = if (currentSplines != null) {
-            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+            TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
         } else {
-            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+            TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, emptyList(), emptyList(), emptyList())
         }
         meshViewport.setBiomes(biomeTextureId, splineTextureId)
         imageMode.value = 2
@@ -486,7 +495,7 @@ fun afterProjectOpen() {
     } else {
         val currentRegionSplines = currentState.regionSplines.value
         if (currentRegionSplines != null) {
-            val regionTextureId = TextureBuilder.renderMapImage(currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
+            val regionTextureId = TextureBuilder.renderMapImage(VIEWPORT_TEXTURE_SIZE, currentRegionSplines.coastPoints, currentRegionSplines.riverPoints + currentRegionSplines.customRiverPoints, currentRegionSplines.mountainPoints + currentRegionSplines.customMountainPoints, currentRegionSplines.ignoredPoints + currentRegionSplines.customIgnoredPoints)
             meshViewport.setImage(regionTextureId)
             imageMode.value = 1
             displayMode.value = DisplayMode.MAP

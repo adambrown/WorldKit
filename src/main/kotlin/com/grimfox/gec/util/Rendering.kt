@@ -18,14 +18,14 @@ import java.util.concurrent.Future
 
 object Rendering {
 
-    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
+    fun renderRegions(resolution: Int, graph: Graph, regionMask: Matrix<Byte>, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
         val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor, scale)
-        return renderTrianglesTexRedByte(vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
+        return renderTrianglesTexRedByte(resolution, vertexData.toFloatArray(), indexData.toIntArray(), GL11.GL_NEAREST, GL11.GL_NEAREST)
     }
 
-    fun renderRegions(graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
+    fun renderRegions(resolution: Int, graph: Graph, regionMask: Matrix<Byte>, textureId: TextureId, divisor: Float = 256.0f, offset: Float = 0.0f, skips: Int = 0, scale: Float = 1.0f): TextureId {
         val (vertexData, indexData) = renderInternal(offset, graph, regionMask, skips, divisor, scale)
-        renderTrianglesToTexture(vertexData.toFloatArray(), indexData.toIntArray(), textureId)
+        renderTrianglesToTexture(resolution, vertexData.toFloatArray(), indexData.toIntArray(), textureId)
         return textureId
     }
 
@@ -67,7 +67,7 @@ object Rendering {
         return Pair(vertexData, indexData)
     }
 
-    fun renderRegionBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int, scale: Float = 1.0f): TextureId {
+    fun renderRegionBorders(resolution: Int, executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int, scale: Float = 1.0f): TextureId {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
         for (i in 0 until vertices.size) {
@@ -93,10 +93,10 @@ object Rendering {
             }
         }
         val edges = borderEdgeFutures.flatMap { it.value }
-        return renderEdges(executor, edges, threadCount, scale)
+        return renderEdges(resolution, executor, edges, threadCount, scale)
     }
 
-    fun renderCoastalBorders(executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
+    fun renderCoastalBorders(resolution: Int, executor: ExecutorService, graph: Graph, regionMask: Matrix<Byte>, threadCount: Int): TextureId {
         val vertices = graph.vertices
         val regions = ArrayList<LinkedHashSet<Int>>(16)
         val land = LinkedHashSet<Int>(vertices.size)
@@ -124,10 +124,10 @@ object Rendering {
             }
         }
         val borderEdges = borderEdgeFutures.flatMap { it.value }
-        return renderEdges(executor, borderEdges, threadCount)
+        return renderEdges(resolution, executor, borderEdges, threadCount)
     }
 
-    fun renderEdges(executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int, scale: Float = 1.0f, minFilter: Int = GL_NEAREST, magFilter: Int = GL_NEAREST): TextureId {
+    fun renderEdges(resolution: Int, executor: ExecutorService, edges: List<LineSegment2F>, threadCount: Int, scale: Float = 1.0f, minFilter: Int = GL_NEAREST, magFilter: Int = GL_NEAREST): TextureId {
         val vertexData = FloatArray(edges.size * 60)
         val indexData = IntArray(edges.size * 60)
         val futures = ArrayList<Future<*>>(threadCount)
@@ -223,6 +223,6 @@ object Rendering {
             }
         }
         futures.forEach { it.join() }
-        return renderTrianglesTexRedFloat(vertexData, indexData, minFilter, magFilter)
+        return renderTrianglesTexRedFloat(resolution, vertexData, indexData, minFilter, magFilter)
     }
 }

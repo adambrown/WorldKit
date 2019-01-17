@@ -41,12 +41,12 @@ class BiomesBuilder(
         currentState.biomes.value = parameters.biomes.map { biomeTemplates.ordinalToBiome(it) }
         currentState.heightMapTexture.value = null
         currentState.riverMapTexture.value = null
-        val biomeTextureId = Rendering.renderRegions(biomeGraph, biomeMask)
+        val biomeTextureId = Rendering.renderRegions(VIEWPORT_TEXTURE_SIZE, biomeGraph, biomeMask)
         val currentSplines = currentState.regionSplines.value
         val splineTextureId = if (currentSplines != null) {
-            TextureBuilder.renderSplines(currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
+            TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, currentSplines.coastPoints, currentSplines.riverPoints + currentSplines.customRiverPoints, currentSplines.mountainPoints + currentSplines.customMountainPoints)
         } else {
-            TextureBuilder.renderSplines(emptyList(), emptyList(), emptyList())
+            TextureBuilder.renderSplines(VIEWPORT_TEXTURE_SIZE, emptyList(), emptyList(), emptyList())
         }
         meshViewport.setBiomes(biomeTextureId, splineTextureId)
         imageMode.value = 2

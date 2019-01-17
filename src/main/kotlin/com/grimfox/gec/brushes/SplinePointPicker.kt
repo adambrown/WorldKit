@@ -1,7 +1,6 @@
 package com.grimfox.gec.brushes
 
-import com.grimfox.gec.CurrentState
-import com.grimfox.gec.executor
+import com.grimfox.gec.*
 import com.grimfox.gec.model.Matrix
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
@@ -110,12 +109,14 @@ class SplinePointPicker(
                     if (renderAsSplines) {
                         if (texture.value.id < 0) {
                             texture.value = TextureBuilder.renderSplines(
+                                    VIEWPORT_TEXTURE_SIZE,
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,
                                     ignoredPoints + customIgnoredPoints)
                         } else {
                             texture.value = renderSplines(
+                                    VIEWPORT_TEXTURE_SIZE,
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,
@@ -126,12 +127,14 @@ class SplinePointPicker(
                     } else {
                         if (texture.value.id < 0) {
                             texture.value = renderMapImage(
+                                    VIEWPORT_TEXTURE_SIZE,
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,
                                     ignoredPoints + customIgnoredPoints)
                         } else {
                             texture.value = renderMapImage(
+                                    VIEWPORT_TEXTURE_SIZE,
                                     currentSplines.coastPoints,
                                     riverPoints + customRiverPoints,
                                     mountainPoints + customMountainPoints,

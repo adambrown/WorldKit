@@ -1,7 +1,6 @@
 package com.grimfox.gec.brushes
 
-import com.grimfox.gec.CurrentState
-import com.grimfox.gec.executor
+import com.grimfox.gec.*
 import com.grimfox.gec.model.geometry.LineSegment2F
 import com.grimfox.gec.model.geometry.Point2F
 import com.grimfox.gec.model.geometry.Polygon2F
@@ -118,6 +117,7 @@ class SplineDrawBrushListener(
                 if (renderAsSplines) {
                     if (texture.value.id < 0) {
                         texture.value = renderSplines(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -125,6 +125,7 @@ class SplineDrawBrushListener(
                                 pendingPoints)
                     } else {
                         texture.value = renderSplines(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -135,6 +136,7 @@ class SplineDrawBrushListener(
                 } else {
                     if (texture.value.id < 0) {
                         texture.value = renderMapImage(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -142,6 +144,7 @@ class SplineDrawBrushListener(
                                 pendingPoints)
                     } else {
                         texture.value = renderMapImage(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -256,12 +259,14 @@ class SplineDrawBrushListener(
                 if (renderAsSplines) {
                     if (texture.value.id < 0) {
                         texture.value = renderSplines(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
                                 ignoredPoints + customIgnoredPoints)
                     } else {
                         texture.value = renderSplines(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
@@ -272,12 +277,14 @@ class SplineDrawBrushListener(
                 } else {
                     if (texture.value.id < 0) {
                         texture.value = renderMapImage(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,
                                 ignoredPoints + customIgnoredPoints)
                     } else {
                         texture.value = renderMapImage(
+                                VIEWPORT_TEXTURE_SIZE,
                                 currentSplines.coastPoints,
                                 riverPoints + customRiverPoints,
                                 mountainPoints + customMountainPoints,

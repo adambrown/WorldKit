@@ -10,6 +10,7 @@ import org.lwjgl.opengl.GL11
 import java.io.*
 import java.util.*
 import javax.imageio.ImageIO
+import kotlin.collections.ArrayList
 import kotlin.math.*
 
 private val STARTING_HEIGHTS_NOISE: ObservableMutableReference<Int> = ref(0)
@@ -140,16 +141,16 @@ class TalusAngleTemplate(
 }
 
 class CustomBiomeData(
-        val startingHeightsNoise: Int,
-        val startingHeightsNoiseScale: Float,
-        val startingHeightsFile: String,
-        val elevationPowerNoise: Int,
-        val elevationPowerNoiseScale: Float,
-        val elevationPowerFile: String,
-        val soilMobilityNoise: Int,
-        val soilMobilityNoiseScale: Float,
-        val soilMobilityFile: String,
-        val customBiomes: List<CustomBiomeDataItem>) {
+        val startingHeightsNoise: Int = 0,
+        val startingHeightsNoiseScale: Float = 0.0f,
+        val startingHeightsFile: String = "",
+        val elevationPowerNoise: Int = 0,
+        val elevationPowerNoiseScale: Float = 0.0f,
+        val elevationPowerFile: String = "",
+        val soilMobilityNoise: Int = 0,
+        val soilMobilityNoiseScale: Float = 0.0f,
+        val soilMobilityFile: String = "",
+        val customBiomes: List<CustomBiomeDataItem> = ArrayList()) {
 
     companion object {
 

@@ -7,9 +7,7 @@ import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.Block
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.BuildContinent.RegionSplines
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
+import java.io.*
 import java.util.*
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -58,7 +56,11 @@ fun importProjectFile(file: File, biomeTemplates: Biomes): Project? {
             null
         }
         val historyBiomesForwardQueue = stream.readHistoryQueue { readBiomesHistoryItem() }
-        val customBiomeData = stream.readCustomBiomeData()
+        val customBiomeData = try {
+            stream.readCustomBiomeData()
+        } catch (e: EOFException) {
+            CustomBiomeData()
+        }
         Project(currentState = ref(currentState),
                 historyRegionsBackQueue = historyRegionsBackQueue,
                 historyRegionsCurrent = ref(historyRegionsCurrentValue),
