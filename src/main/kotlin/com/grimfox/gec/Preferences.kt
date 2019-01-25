@@ -20,6 +20,8 @@ val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state")
 val CACHED_GRAPH_256_FILE = File(CACHE_DIR, "cached-graph-256.graph")
 val CACHED_GRAPH_512_FILE = File(CACHE_DIR, "cached-graph-512.graph")
 val CACHED_GRAPH_1024_FILE = File(CACHE_DIR, "cached-graph-1024.graph")
+val CACHED_GRAPH_2048_FILE = File(CACHE_DIR, "cached-graph-2048.graph")
+val CACHED_GRAPH_4096_FILE = File(CACHE_DIR, "cached-graph-4096.graph")
 
 data class Preferences(
         var rememberWindowState: Boolean = true,
@@ -29,7 +31,10 @@ data class Preferences(
         var windowState: WindowState? = null,
         var cachedGraph256: Future<Graph>? = null,
         var cachedGraph512: Future<Graph>? = null,
-        var cachedGraph1024: Future<Graph>? = null
+        var cachedGraph1024: Future<Graph>? = null,
+        var cachedGraph2048: Future<Graph>? = null,
+        var cachedGraph4096: Future<Graph>? = null
+
 ) {
     val autosaveDir: File get() = File(projectDir, "autosaves").canonicalFile
 
@@ -185,6 +190,44 @@ fun loadPreferences(executor: ExecutorService): Preferences {
         graph
     }
 
+    preferences.cachedGraph2048 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_2048_FILE.exists() && CACHED_GRAPH_2048_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 2048 file.")
+                graph = Graphs.generateGraph(2048, 3L, 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_2048_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(2048, 3L, 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_2048_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
+        }
+        graph
+    }
+
+    preferences.cachedGraph4096 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_4096_FILE.exists() && CACHED_GRAPH_4096_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_4096_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 4096 file.")
+                graph = Graphs.generateGraph(4096, 4L, 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_4096_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_4096_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(4096, 4L, 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_4096_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_4096_FILE.inputStream())
+        }
+        graph
+    }
+
     return preferences
 }
 
@@ -195,7 +238,7 @@ fun savePreferences(preferences: Preferences) {
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)
         DataOutputStream(PREFERENCES_FILE.outputStream().buffered()).use {
-            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null).serialize(it)
+            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null, cachedGraph2048 = null, cachedGraph4096 = null).serialize(it)
         }
         ensureDirectoryExists(preferences.tempDir)
         val tempDir = preferences.tempDir

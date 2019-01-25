@@ -9,6 +9,8 @@ import java.io.File
 private val cachedGraph256 = preferences.cachedGraph256!!
 private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
+private val cachedGraph2048 = preferences.cachedGraph2048!!
+private val cachedGraph4096 = preferences.cachedGraph4096!!
 
 fun tilePanel(ui: UserInterface) {
     val shrinkGroup = hShrinkGroup()

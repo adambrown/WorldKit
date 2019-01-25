@@ -101,6 +101,7 @@ object WaterFlows {
             flowGraphSmall: Graph,
             flowGraphMedium: Graph,
             flowGraphLarge: Graph,
+            flowGraphSuper: Graph,
             executor: ExecutorService,
             mapScale: Int,
             biomes: List<Biome>,
@@ -319,11 +320,17 @@ object WaterFlows {
         val midWaterNodesFuture = executor.call {
             doOrCancel { prepareGraphNodesUnderWater(canceled, executor, flowGraphMedium, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
         }
-        val highNodesFuture = executor.call {
+        val largeNodesFuture = executor.call {
             doOrCancel { prepareGraphNodes(canceled, executor, flowGraphLarge, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
         }
-        val highWaterNodesFuture = executor.call {
+        val largeWaterNodesFuture = executor.call {
             doOrCancel { prepareGraphNodesUnderWater(canceled, executor, flowGraphLarge, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
+        }
+        val superNodesFuture = executor.call {
+            doOrCancel { prepareGraphNodes(canceled, executor, flowGraphSuper, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
+        }
+        val superWaterNodesFuture = executor.call {
+            doOrCancel { prepareGraphNodesUnderWater(canceled, executor, flowGraphSuper, biomeMasksFuture.value.landMask, biomeMasksFuture.value.soilMobilityMask, distanceScale) }
         }
         val midMapsFuture = executor.call {
             val (heightMap) = smallMapsFuture.value
@@ -368,9 +375,16 @@ object WaterFlows {
             }
             doOrCancel { performErosion(canceled, executor, flowGraphMedium, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.midPassSettings), 2048, mapScale, textureWidth, null, 0.0f, biomeTemplates) }
         }
-        val highWaterMapsFuture = executor.call {
+        val largeMapsFuture = executor.call {
+            val (heightMap) = midMapsFuture.value
+            val (nodeIndex, nodes, rivers) = largeNodesFuture.value
+            val erosionSettings = doOrCancel { biomes.map { it.highPassSettings } }
+            doOrCancel { applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
+            doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, 4096, mapScale, textureWidth, null, -1.0f, biomeTemplates) }
+        }
+        val largeWaterMapsFuture = executor.call {
             val (heightMap) = midWaterMapsFuture.value
-            val (nodeIndex, nodes, rivers, water, border) = highWaterNodesFuture.value
+            val (nodeIndex, nodes, rivers, water, border) = largeWaterNodesFuture.value
             doOrCancel { applyMapsToUnderWaterNodes(executor, flowGraphLarge.vertices, heightMap, nodes) }
             val unused = LinkedHashSet(water)
             val used = LinkedHashSet(border)
@@ -402,20 +416,56 @@ object WaterFlows {
                     lastUnusedCount = unused.size
                 }
             }
-            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), textureWidth, mapScale, textureWidth, null, 0.0f, biomeTemplates) }
+            doOrCancel { performErosion(canceled, executor, flowGraphLarge, null, nodeIndex, nodes, rivers, 10, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), 4096, mapScale, textureWidth, null, 0.0f, biomeTemplates) }
         }
-        val highMapsFuture = executor.call {
-            val (heightMap) = midMapsFuture.value
-            val (nodeIndex, nodes, rivers) = highNodesFuture.value
+        val superWaterMapsFuture = executor.call {
+            val (heightMap) = largeWaterMapsFuture.value
+            val (nodeIndex, nodes, rivers, water, border) = superWaterNodesFuture.value
+            doOrCancel { applyMapsToUnderWaterNodes(executor, flowGraphSuper.vertices, heightMap, nodes) }
+            val unused = LinkedHashSet(water)
+            val used = LinkedHashSet(border)
+            unused.removeAll(used)
+            val next = LinkedHashSet(border)
+            var lastUnusedCount = unused.size
+            while (unused.isNotEmpty()) {
+                doOrCancel {
+                    val nextOrder = ArrayList(next)
+                    next.clear()
+                    nextOrder.forEach { id ->
+                        val node = nodeIndex[id]!!
+                        node.adjacents.forEach { (otherNode) ->
+                            if (!used.contains(otherNode.id)) {
+                                next.add(otherNode.id)
+                                used.add(otherNode.id)
+                                unused.remove(otherNode.id)
+                            }
+                        }
+                    }
+                    if (unused.isNotEmpty() && lastUnusedCount == unused.size) {
+                        val makeSink = unused.asSequence().map { nodeIndex[it]!! }.filter { !it.isPinned }.toList().sortedBy { it.height }.first()
+                        makeSink.isExternal = true
+                        rivers.add(makeSink)
+                        used.add(makeSink.id)
+                        unused.remove(makeSink.id)
+                        next.add(makeSink.id)
+                    }
+                    lastUnusedCount = unused.size
+                }
+            }
+            doOrCancel { performErosion(canceled, executor, flowGraphSuper, null, nodeIndex, nodes, rivers, 2, listOf(biomeTemplates.UNDER_WATER_BIOME), listOf(biomeTemplates.UNDER_WATER_BIOME.highPassSettings), textureWidth, mapScale, textureWidth, null, 0.0f, biomeTemplates) }
+        }
+        val superMapsFuture = executor.call {
+            val (heightMap) = largeMapsFuture.value
+            val (nodeIndex, nodes, rivers) = superNodesFuture.value
             val erosionSettings = doOrCancel { biomes.map { it.highPassSettings } }
-            doOrCancel { applyMapsToNodes(executor, flowGraphLarge.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
-            val (underWaterMask) = highWaterMapsFuture.value
+            doOrCancel { applyMapsToNodes(executor, flowGraphSuper.vertices, heightMap, biomeMasksFuture.value.elevationPowerMask, biomeMasksFuture.value.startingHeightsMask, erosionSettings, biomeMasksFuture.value.biomeMask, nodes) }
+            val (underWaterMask) = superWaterMapsFuture.value
             val exportRivers = exportFiles?.waterFlowFile != null
             val returnRivers = exportRivers || exportFiles == null
             val returnSoilDensity = exportFiles?.soilDensityFile != null
             val returnPeaks = exportFiles?.peakFile != null
             val returnRiverLines = exportFiles?.riverFile != null
-            doOrCancel { performErosion(canceled, executor, flowGraphLarge, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, textureWidth, mapScale, textureWidth, underWaterMask, -600.0f, biomeTemplates, returnRivers, returnSoilDensity, returnPeaks, returnRiverLines, exportRivers, exportFiles?.objFile, exportFiles?.outputSize ?: textureWidth) }
+            doOrCancel { performErosion(canceled, executor, flowGraphSuper, biomeMasksFuture.value.biomeMask, nodeIndex, nodes, rivers, 25, biomes, erosionSettings, textureWidth, mapScale, textureWidth, underWaterMask, -600.0f, biomeTemplates, returnRivers, returnSoilDensity, returnPeaks, returnRiverLines, exportRivers, exportFiles?.objFile, exportFiles?.outputSize ?: textureWidth) }
         }
         val firstDeferred = doOrCancel {
             task {
@@ -426,7 +476,7 @@ object WaterFlows {
                 } else {
                     biomeMasksFuture.value.coastalDistanceMask
                 }
-                val heightMap = highMapsFuture.value.first
+                val heightMap = superMapsFuture.value.first
                 val heightMapAsShortArray = if (exportFiles == null || exportFiles.elevationFile != null || exportFiles.slopeFile != null || exportFiles.normalFile != null) {
                     writeHeightMapAsShortArray(heightMap, coastalDistanceMask)
                 } else {
@@ -440,7 +490,7 @@ object WaterFlows {
                 textureId to heightMapAsShortArray
             }
         }
-        val flowMap = highMapsFuture.value.second
+        val flowMap = superMapsFuture.value.second
         val secondDeferred = if (flowMap != null) {
             doOrCancel {
                 task {
@@ -460,7 +510,7 @@ object WaterFlows {
         } else {
             null
         }
-        val densityMap = highMapsFuture.value.third
+        val densityMap = superMapsFuture.value.third
         val thirdDeferred = if (densityMap != null) {
             doOrCancel {
                 task {
@@ -562,12 +612,12 @@ object WaterFlows {
             }
             val task7 = doOrCancel {
                 task {
-                    exportFiles?.peakFile?.exportMap16Bit(exportFiles.outputSize, highMapsFuture.value.fourth?.array, textureWidth)
+                    exportFiles?.peakFile?.exportMap16Bit(exportFiles.outputSize, superMapsFuture.value.fourth?.array, textureWidth)
                 }
             }
             val task8 = doOrCancel {
                 task {
-                    exportFiles?.riverFile?.exportMap16Bit(exportFiles.outputSize, highMapsFuture.value.fifth?.array, textureWidth)
+                    exportFiles?.riverFile?.exportMap16Bit(exportFiles.outputSize, superMapsFuture.value.fifth?.array, textureWidth)
                 }
             }
             val task9 = doOrCancel {
