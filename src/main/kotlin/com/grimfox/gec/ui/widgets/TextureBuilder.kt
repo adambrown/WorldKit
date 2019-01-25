@@ -271,7 +271,7 @@ object TextureBuilder {
                 }
                 nvgFill(nvg)
             }
-            nvgStrokeWidth(nvg, 6.0f)
+            nvgStrokeWidth(nvg, 3.0f)
             rgba(40, 45, 245, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
@@ -297,7 +297,7 @@ object TextureBuilder {
                 nvgStroke(nvg)
             }
             rgba(0, 0, 0, 255, color)
-            nvgStrokeWidth(nvg, 6.0f)
+            nvgStrokeWidth(nvg, 3.0f)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {
                 drawShape(nvg, resolution, it.first, true)
@@ -384,7 +384,7 @@ object TextureBuilder {
                 }
                 nvgFill(nvg)
             }
-            nvgStrokeWidth(nvg, 15.0f)
+            nvgStrokeWidth(nvg, 7.0f)
             rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
@@ -403,7 +403,7 @@ object TextureBuilder {
                 drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
-            nvgStrokeWidth(nvg, 7.0f)
+            nvgStrokeWidth(nvg, 3.0f)
             rgba(0, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             riverPolygons.forEach {
@@ -428,7 +428,7 @@ object TextureBuilder {
                 drawShape(nvg, resolution, it, false)
                 nvgStroke(nvg)
             }
-            nvgStrokeWidth(nvg, 7.0f)
+            nvgStrokeWidth(nvg, 3.0f)
             rgba(255, 255, 255, 255, color)
             nvgStrokeColor(nvg, color)
             landBodyPolygons.forEach {

@@ -39,7 +39,7 @@ import kotlin.math.min
 
 object WaterFlows {
 
-    private val SIMPLEX_SCALE = 96.0f
+    private const val SIMPLEX_SCALE = 96.0f
     private val threadCount = Runtime.getRuntime().availableProcessors()
 
     class WaterNode constructor(val id: Int,
@@ -73,7 +73,8 @@ object WaterFlows {
             val underWaterMask: Matrix<Float>,
             val elevationPowerMask: Matrix<Short>,
             val startingHeightsMask: Matrix<Short>,
-            val soilMobilityMask: Matrix<Short>)
+            val soilMobilityMask: Matrix<Short>,
+            val coastalDistanceMask: Matrix<Short>)
 
     class ExportFiles(
             val outputSize: Int = 256,
@@ -290,6 +291,7 @@ object WaterFlows {
             val underWaterMask = doOrCancel { FloatArrayMatrix(textureWidth, extractTextureRedFloat(underWaterTextureId, textureWidth)) }
             val landMask = doOrCancel { ByteBufferMatrix(textureWidth, extractTextureRedByte(landMapTextureId, textureWidth)) }
             val soilMobilityMask = doOrCancel { ShortArrayMatrix(textureWidth, extractTextureRedShort(soilMobilityTextureId, textureWidth)) }
+            val coastalDistanceMask = doOrCancel { ShortArrayMatrix(textureWidth, extractTextureRedShort(coastalBorderTextureId, textureWidth)) }
 
             riverBorderTextureId.free()
             mountainBorderTextureId.free()
@@ -298,7 +300,7 @@ object WaterFlows {
             biomeBorderTextureId.free()
             elevationPowerTextureId.free()
             startingHeightsTextureId.free()
-            Masks(biomeMap, landMask, underWaterMask, elevationMask, startingHeights, soilMobilityMask)
+            Masks(biomeMap, landMask, underWaterMask, elevationMask, startingHeights, soilMobilityMask, coastalDistanceMask)
         }
         val regionDataFuture = executor.call {
             doOrCancel { buildRegionData(flowGraphSmall, biomeMasksFuture.value.landMask) }
@@ -417,9 +419,16 @@ object WaterFlows {
         }
         val firstDeferred = doOrCancel {
             task {
+                val coastalDistanceMask = if (exportFiles != null) {
+                    val scale = exportFiles.outputSize / textureWidth.toFloat()
+                    val coastalBorderTextureId = doOrCancel { renderEdges(textureWidth, executor, regionSplines.coastEdges.flatMap { it.first + it.second.flatMap { it } }, threadCount, scale) }
+                    doOrCancel { ShortArrayMatrix(textureWidth, extractTextureRedShort(coastalBorderTextureId, textureWidth)) }
+                } else {
+                    biomeMasksFuture.value.coastalDistanceMask
+                }
                 val heightMap = highMapsFuture.value.first
                 val heightMapAsShortArray = if (exportFiles == null || exportFiles.elevationFile != null || exportFiles.slopeFile != null || exportFiles.normalFile != null) {
-                    writeHeightMapAsShortArray(heightMap)
+                    writeHeightMapAsShortArray(heightMap, coastalDistanceMask)
                 } else {
                     null
                 }
@@ -436,7 +445,7 @@ object WaterFlows {
             doOrCancel {
                 task {
                     val flowMapAsShortArray = if (exportFiles == null || exportFiles.waterFlowFile != null) {
-                        writeHeightMapAsShortArray(flowMap, 0.0f)
+                        writeHeightMapAsShortArray(flowMap, null,0.0f)
                     } else {
                         null
                     }
@@ -1756,8 +1765,8 @@ object WaterFlows {
         return buildTextureRedShort(output, width, GL_LINEAR, GL_LINEAR)
     }
 
-    private fun writeHeightMap(heightMap: Matrix<Float>, waterLine: Float = 0.3f): TextureId {
-        val output = writeHeightMapAsShortArray(heightMap, waterLine)
+    private fun writeHeightMap(heightMap: Matrix<Float>, coastalDistanceMask: Matrix<Short>? = null, waterLine: Float = 0.3f): TextureId {
+        val output = writeHeightMapAsShortArray(heightMap, null, waterLine)
         return heightMapToTextureId(output, heightMap)
     }
 
@@ -1765,7 +1774,7 @@ object WaterFlows {
         return buildTextureRedShort(output, heightMap.width, GL_LINEAR, GL_LINEAR)
     }
 
-    private fun writeHeightMapAsShortArray(heightMap: Matrix<Float>, waterLine: Float = 0.3f, normalize: Boolean = true): ShortArray {
+    private fun writeHeightMapAsShortArray(heightMap: Matrix<Float>, coastalDistanceMask: Matrix<Short>? = null, waterLine: Float = 0.3f, normalize: Boolean = true): ShortArray {
         val width = heightMap.width
         val output = ShortArray(width * width)
         if (normalize) {
@@ -1773,13 +1782,39 @@ object WaterFlows {
             val minWaterValue = (0 until heightMap.size.toInt()).asSequence().map { heightMap[it] }.min() ?: 0.0f
             val landFactor = (1.0f / maxLandValue) * (1.0f - waterLine)
             val waterFactor = (1.0f / minWaterValue) * waterLine
+            val maximumBeachFactor = 0.97f
+            val underwaterBeachFalloff = 250
+            val inlandBeachFalloff = 100
             for (y in (0 until width)) {
                 for (x in (0 until width)) {
                     val heightValue = heightMap[x, y]
-                    if (heightValue < 0.0f) {
-                        output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
+                    if (coastalDistanceMask != null) {
+                        val coastalDistanceValue = -((coastalDistanceMask[x, y].toInt() and 0xFFFF) - 65535)
+                        if (heightValue < 0.0f) {
+                            if (coastalDistanceValue <= underwaterBeachFalloff) {
+                                val beachFactor = ((underwaterBeachFalloff - coastalDistanceValue) / underwaterBeachFalloff.toFloat()) * maximumBeachFactor
+                                val naturalHeight = waterLine - (heightValue * waterFactor)
+                                val adjustedHeight = (beachFactor * waterLine) + ((1.0f - beachFactor) * naturalHeight)
+                                output[y * width + x] = (adjustedHeight * 65535).toInt().toShort()
+                            } else {
+                                output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
+                            }
+                        } else {
+                            if (coastalDistanceValue <= inlandBeachFalloff) {
+                                val beachFactor = ((inlandBeachFalloff - coastalDistanceValue) / inlandBeachFalloff.toFloat()) * maximumBeachFactor
+                                val naturalHeight = (heightValue * landFactor) + waterLine
+                                val adjustedHeight = (beachFactor * waterLine) + ((1.0f - beachFactor) * naturalHeight)
+                                output[y * width + x] = (adjustedHeight * 65535).toInt().toShort()
+                            } else {
+                                output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
+                            }
+                        }
                     } else {
-                        output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
+                        if (heightValue < 0.0f) {
+                            output[y * width + x] = ((waterLine - (heightValue * waterFactor)) * 65535).toInt().toShort()
+                        } else {
+                            output[y * width + x] = (((heightValue * landFactor) + waterLine) * 65535).toInt().toShort()
+                        }
                     }
                 }
             }

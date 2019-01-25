@@ -58,7 +58,7 @@ fun tilePanel(ui: UserInterface) {
         tilePanel = panel(PANEL_WIDTH) {
             vSizing = Sizing.SHRINK
             vSpacer(LARGE_SPACER_SIZE)
-            vSaveFileRow(heightInput, LARGE_ROW_HEIGHT, text("Elevation input file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui)
+            vFileRow(heightInput, LARGE_ROW_HEIGHT, text("Elevation input file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui)
             vSaveFileRow(heightOutput, LARGE_ROW_HEIGHT, text("Elevation output base:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui)
             vLongInputRow(tileSize, LARGE_ROW_HEIGHT, text("Tile size:"), TEXT_STYLE_NORMAL, COLOR_BUTTON_TEXT, shrinkGroup, MEDIUM_SPACER_SIZE, ui, ui.layout)
             vSpacer(MEDIUM_SPACER_SIZE)
