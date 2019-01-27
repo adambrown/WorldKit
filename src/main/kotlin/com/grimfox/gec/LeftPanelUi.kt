@@ -226,6 +226,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                                         flowGraphMedium = cachedGraph512.value,
                                                         flowGraphLarge = cachedGraph1024.value,
                                                         flowGraphSuper = cachedGraph2048.value,
+                                                        flowGraphMega = cachedGraph4096.value,
                                                         executor = executor,
                                                         mapScale = currentMapScale,
                                                         customElevationPowerMap = currentState.customElevationPowerMap.value,
