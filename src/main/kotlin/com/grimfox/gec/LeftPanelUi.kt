@@ -13,8 +13,6 @@ import java.util.concurrent.CancellationException
 private val cachedGraph256 = preferences.cachedGraph256!!
 private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
-private val cachedGraph2048 = preferences.cachedGraph2048!!
-private val cachedGraph4096 = preferences.cachedGraph4096!!
 
 private val leftPanelLabelShrinkGroup = hShrinkGroup()
 
@@ -225,8 +223,6 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                                                         flowGraphSmall = cachedGraph256.value,
                                                         flowGraphMedium = cachedGraph512.value,
                                                         flowGraphLarge = cachedGraph1024.value,
-                                                        flowGraphSuper = cachedGraph2048.value,
-                                                        flowGraphMega = cachedGraph4096.value,
                                                         executor = executor,
                                                         mapScale = currentMapScale,
                                                         customElevationPowerMap = currentState.customElevationPowerMap.value,

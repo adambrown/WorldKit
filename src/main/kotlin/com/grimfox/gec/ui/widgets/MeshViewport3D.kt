@@ -252,7 +252,7 @@ class MeshViewport3D(
                 listOf(positionAttributeImage, uvAttributeImage),
                 listOf(mvpMatrixUniformImage, imageTextureUniform))
 
-        heightMap = HexGrid(2560.0f, 4096, positionAttribute, uvAttribute, true)
+        heightMap = HexGrid(2560.0f, 2048, positionAttribute, uvAttribute, true)
 
         waterPlane = HexGrid(2600.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
