@@ -214,6 +214,7 @@ class Biomes {
             val lowPassSettings: ErosionSettings,
             val midPassSettings: ErosionSettings,
             val highPassSettings: ErosionSettings,
+            val detailSelector: (Float) -> Byte,
             val elevationPowerShader: Shader,
             val startingHeightShader: Shader,
             val soilMobilityShader: Shader? = null)
@@ -627,7 +628,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.4f,
-                    soilMobilityMultiplier = 1.8f))
+                    soilMobilityMultiplier = 1.8f),
+            detailSelector = { 1 })
 
     private val rollingHillsElevationShader = object : Shader {
 
@@ -766,7 +768,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.4f,
-                    soilMobilityMultiplier = 2.5f))
+                    soilMobilityMultiplier = 2.5f),
+            detailSelector = { 1 })
 
     private val foothillsElevationShader = object : Shader {
 
@@ -905,7 +908,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.25f,
-                    soilMobilityMultiplier = 2.0f))
+                    soilMobilityMultiplier = 2.0f),
+            detailSelector = { 1 })
 
     private val mountainsElevationShader = object : Shader {
 
@@ -1044,7 +1048,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.2f,
-                    soilMobilityMultiplier = 1.0f))
+                    soilMobilityMultiplier = 1.0f),
+            detailSelector = { 1 })
 
     private val plainsElevationShader = object : Shader {
 
@@ -1183,7 +1188,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 4.0f))
+                    soilMobilityMultiplier = 4.0f),
+            detailSelector = { 1 })
 
     private val plateauBiomeElevationShader = object : Shader {
 
@@ -1314,7 +1320,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.6f,
-                    soilMobilityMultiplier = 0.2f))
+                    soilMobilityMultiplier = 0.2f),
+            detailSelector = { if (it >= 120) 2 else 3 })
 
     private val sharpPlateauBiomeElevationShader = object : Shader {
 
@@ -1450,7 +1457,8 @@ class Biomes {
                         terraceFunction { input ->
                             applyTerrace(input, steps)
                         }
-                    }))
+                    }),
+            detailSelector = { 1 })
 
     private val customElevationPowerShader = object : Shader {
 
@@ -1683,7 +1691,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 0.035f))
+                    soilMobilityMultiplier = 0.035f),
+            detailSelector = { 0 })
 
     private val currentBiomes = arrayListOf(
             MOUNTAINS_BIOME,
@@ -1724,7 +1733,8 @@ class Biomes {
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = smallFeaturesBlendWeight,
                     elevationPowerMultiplier = smallFeaturePowerMultiplier,
-                    soilMobilityMultiplier = smallFeatureMobilityMultiplier))
+                    soilMobilityMultiplier = smallFeatureMobilityMultiplier),
+            detailSelector = { 1 })
 
     fun addCustomBiome(newBiome: Biome, biomeNames: MutableList<Text>): Biome? {
         return if (currentBiomes.size < 64) {

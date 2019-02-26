@@ -3,6 +3,7 @@ buildscript {
 
     ext.lwjgl_version = '3.1.6'
     ext.kotlinx_coroutines_version = '0.22.3'
+    ext.netcdf_version = '4.6.13'
 
     repositories {
         mavenLocal()
@@ -65,6 +66,9 @@ dependencyLock {
 repositories {
     mavenLocal()
     jcenter()
+    maven {
+        url 'http://repo.boundlessgeo.com/main/'
+    }
 }
 
 dependencies {
@@ -74,6 +78,8 @@ dependencies {
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-core', version: kotlinx_coroutines_version
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-jdk8', version: kotlinx_coroutines_version
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-coroutines-nio', version: kotlinx_coroutines_version
+
+    compile group: 'edu.ucar', name: 'netcdfAll', version: netcdf_version
 
     compile group: 'org.lwjgl', name: 'lwjgl', version: lwjgl_version
     compile group: 'org.lwjgl', name: 'lwjgl-glfw', version: lwjgl_version

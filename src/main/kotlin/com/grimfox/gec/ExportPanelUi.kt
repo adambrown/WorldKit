@@ -40,6 +40,8 @@ fun exportPanel(ui: UserInterface) {
     val useMountainBorderFile = ref(false)
     val coastalBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useCoastalBorderFile = ref(false)
+    val detailIndexFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useDetailIndexFile = ref(false)
     val meshFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useMeshFile = ref(false)
     if (DEMO_BUILD) {
@@ -96,6 +98,7 @@ fun exportPanel(ui: UserInterface) {
     riverBorderFile.reference.addListener(pngExtensionFilter(riverBorderFile))
     mountainBorderFile.reference.addListener(pngExtensionFilter(mountainBorderFile))
     coastalBorderFile.reference.addListener(pngExtensionFilter(coastalBorderFile))
+    detailIndexFile.reference.addListener(pngExtensionFilter(detailIndexFile))
     meshFile.reference.addListener(objExtensionFilter(meshFile))
     if (DEMO_BUILD) {
         useMeshFile.addListener { old, new ->
@@ -124,6 +127,7 @@ fun exportPanel(ui: UserInterface) {
             vSaveFileRowWithToggle(riverBorderFile, useRiverBorderFile, LARGE_ROW_HEIGHT, text("River border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(mountainBorderFile, useMountainBorderFile, LARGE_ROW_HEIGHT, text("Mountain border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(coastalBorderFile, useCoastalBorderFile, LARGE_ROW_HEIGHT, text("Coastal border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(detailIndexFile, useDetailIndexFile, LARGE_ROW_HEIGHT, text("Detail index file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(meshFile, useMeshFile, LARGE_ROW_HEIGHT, text("Mesh file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
             val outputSizes = if (DEMO_BUILD) {
                 arrayOf(256, 256)
@@ -154,6 +158,7 @@ fun exportPanel(ui: UserInterface) {
                     riverBorderFile.reference.value = "$baseName-river-borders-$outputSize.png"
                     mountainBorderFile.reference.value = "$baseName-mountain-borders-$outputSize.png"
                     coastalBorderFile.reference.value = "$baseName-coastal-borders-$outputSize.png"
+                    detailIndexFile.reference.value = "$baseName-detail-index-$outputSize.png"
                     meshFile.reference.value = "$baseName-mesh.obj"
                 }
             }
@@ -185,6 +190,7 @@ fun exportPanel(ui: UserInterface) {
             riverBorderFile.reference.addListener(fileNameChangeListener(useRiverBorderFile))
             mountainBorderFile.reference.addListener(fileNameChangeListener(useMountainBorderFile))
             coastalBorderFile.reference.addListener(fileNameChangeListener(useCoastalBorderFile))
+            detailIndexFile.reference.addListener(fileNameChangeListener(useDetailIndexFile))
             meshFile.reference.addListener(fileNameChangeListener(useMeshFile))
             vDropdownRow(selectedOutputSize, outputSizesAsText, LARGE_ROW_HEIGHT, text("Output size:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogDropdownLayer)
             vSpacer(MEDIUM_SPACER_SIZE)
@@ -212,6 +218,7 @@ fun exportPanel(ui: UserInterface) {
                             riverBorderFile = fileFromTextReference(useRiverBorderFile, riverBorderFile),
                             mountainBorderFile = fileFromTextReference(useMountainBorderFile, mountainBorderFile),
                             coastalBorderFile = fileFromTextReference(useCoastalBorderFile, coastalBorderFile),
+                            detailIndexFile = fileFromTextReference(useDetailIndexFile, detailIndexFile),
                             objFile = objFileValue)
                     export(exportFiles)
                     exportPanel.isVisible = false
