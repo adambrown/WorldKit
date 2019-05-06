@@ -7,7 +7,6 @@ import java.io.File
 import java.util.*
 
 private val cachedGraph256 = preferences.cachedGraph256!!
-private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 fun exportPanel(ui: UserInterface) {
@@ -132,7 +131,7 @@ fun exportPanel(ui: UserInterface) {
             val outputSizes = if (DEMO_BUILD) {
                 arrayOf(256, 256)
             } else {
-                arrayOf(8192, 8129, 4096, 4033, 2048, 2017, 1024, 1009, 512, 505, 256, 253)
+                arrayOf(16384, 16257, 8192, 8129, 4096, 4033, 2048, 2017, 1024, 1009, 512, 505, 256, 253)
             }
             val outputSizesAsText = if (DEMO_BUILD) {
                 listOf(text("256 x 256 px", TEXT_STYLE_BUTTON), text("Output size is limited to 256 x 256 px for the demo.", TEXT_STYLE_BUTTON))
@@ -272,7 +271,6 @@ private fun export(exportFiles: WaterFlows.ExportFiles) {
                         biomeMask = currentBiomeMask,
                         biomes = currentBiomes,
                         flowGraphSmall = cachedGraph256.value,
-                        flowGraphMedium = cachedGraph512.value,
                         flowGraphLarge = cachedGraph1024.value,
                         executor = executor,
                         mapScale = currentMapScale,
@@ -281,6 +279,7 @@ private fun export(exportFiles: WaterFlows.ExportFiles) {
                         customSoilMobilityMap = currentState.customSoilMobilityMap.value,
                         canceled = canceled,
                         biomeTemplates = BIOME_TEMPLATES_REF.value!!,
+                        renderLevel = 2,
                         exportFiles = exportFiles)
             } catch (w: Exception) {
                 if (!causedByCancellation(w)) {

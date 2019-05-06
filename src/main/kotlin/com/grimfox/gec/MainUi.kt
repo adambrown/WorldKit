@@ -378,7 +378,7 @@ object MainUi {
                                     block {
                                         val toolbar = this
                                         hSizing = STATIC
-                                        width = 300.0f
+                                        width = 500.0f
                                         var tools = NO_BLOCK
                                         var expandToolbarButton = NO_BLOCK
                                         var collapseToolbarButton = NO_BLOCK
@@ -415,12 +415,81 @@ object MainUi {
                                             vToggleRow(waterPlaneOn, LARGE_ROW_HEIGHT, text("Water:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vToggleRow(heightColorsOn, LARGE_ROW_HEIGHT, text("Colors:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vToggleRow(riversOn, LARGE_ROW_HEIGHT, text("Rivers:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(skyOn, LARGE_ROW_HEIGHT, text("Sky:"), shrinkGroup, MEDIUM_SPACER_SIZE)
+                                            vToggleRow(fogOn, LARGE_ROW_HEIGHT, text("Fog:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
-                                            vToggleRow(rotateAroundCamera, LARGE_ROW_HEIGHT, text("Rotate camera:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
+                                            vSliderRow(waterShaderParams.level, LARGE_ROW_HEIGHT, text("Water level:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
                                             vButtonRow(LARGE_ROW_HEIGHT) {
                                                 button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
                                                 button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                            }
+                                            vExpandPanel("Light") {
+                                                vSliderWithValueRow(indirectIntensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Indirect light:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 2.0f), linearClampedScaleFunctionInverse(0.0f, 2.0f))
+                                                vExpandPanel("Color") {
+                                                    vSliderWithValueRow(lightColor[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Red:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 10.0f), linearClampedScaleFunctionInverse(0.0f, 10.0f))
+                                                    vSliderWithValueRow(lightColor[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Green:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 10.0f), linearClampedScaleFunctionInverse(0.0f, 10.0f))
+                                                    vSliderWithValueRow(lightColor[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Blue:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 10.0f), linearClampedScaleFunctionInverse(0.0f, 10.0f))
+                                                }
+                                                vExpandPanel("Direction") {
+                                                    vSliderWithValueRow(lightElevation, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Elevation:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.1f, 60.0f), linearClampedScaleFunctionInverse(0.1f, 60.0f))
+                                                    vSliderWithValueRow(lightHeading, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Heading:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(-180.0f, 180.0f), linearClampedScaleFunctionInverse(-180.0f, 180.0f))
+                                                }
+                                            }
+                                            vExpandPanel("Land material") {
+                                                vExpandPanel("Color") {
+                                                    vSliderWithValueRow(baseColor[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Red:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(baseColor[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Green:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(baseColor[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Blue:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                }
+                                                vSliderWithValueRow(metallic, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Metallic:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vSliderWithValueRow(roughness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Roughness:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vSliderWithValueRow(specularIntensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Specular:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                            }
+                                            vExpandPanel("Water material") {
+                                                vExpandPanel("Color") {
+                                                    vSliderWithValueRow(waterShaderParams.color[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Red:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(waterShaderParams.color[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Green:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(waterShaderParams.color[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Blue:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                }
+                                                vSliderWithValueRow(waterShaderParams.metallic, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Metallic:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vSliderWithValueRow(waterShaderParams.roughness, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Roughness:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vSliderWithValueRow(waterShaderParams.specularIntensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Specular:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vExpandPanel("Normal offsets") {
+                                                    val highPrecisionToString = { f: Float ->
+                                                        String.format("%.6f", f)
+                                                    }
+                                                    vSliderWithValueRow(waterShaderParams.normalOffsets[0], 8, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("0:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.5f), linearClampedScaleFunctionInverse(0.0f, 0.5f), highPrecisionToString)
+                                                    vSliderWithValueRow(waterShaderParams.normalOffsets[1], 8, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("1:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.2f), linearClampedScaleFunctionInverse(0.0f, 0.2f), highPrecisionToString)
+                                                    vSliderWithValueRow(waterShaderParams.normalOffsets[2], 8, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("2:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.1f), linearClampedScaleFunctionInverse(0.0f, 0.1f), highPrecisionToString)
+                                                    vSliderWithValueRow(waterShaderParams.normalOffsets[3], 8, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("3:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.01f), linearClampedScaleFunctionInverse(0.0f, 0.01f), highPrecisionToString)
+                                                    vSliderWithValueRow(waterShaderParams.normalOffsets[4], 8, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("4:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.005f), linearClampedScaleFunctionInverse(0.0f, 0.005f), highPrecisionToString)
+                                                }
+                                                vExpandPanel("Normal strengths") {
+                                                    vSliderWithValueRow(waterShaderParams.normalStrengths[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("0:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3.0f), linearClampedScaleFunctionInverse(0.0f, 3.0f))
+                                                    vSliderWithValueRow(waterShaderParams.normalStrengths[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("1:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3.0f), linearClampedScaleFunctionInverse(0.0f, 3.0f))
+                                                    vSliderWithValueRow(waterShaderParams.normalStrengths[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("2:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3.0f), linearClampedScaleFunctionInverse(0.0f, 3.0f))
+                                                    vSliderWithValueRow(waterShaderParams.normalStrengths[3], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("3:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 10.0f), linearClampedScaleFunctionInverse(0.0f, 20.0f))
+                                                }
+                                                vExpandPanel("Fades") {
+                                                    vSliderWithValueRow(waterShaderParams.fadeStarts[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start 0:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 50.0f), linearClampedScaleFunctionInverse(0.0f, 50.0f))
+                                                    vSliderWithValueRow(waterShaderParams.fadeEnds[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("End 0:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 150.0f), linearClampedScaleFunctionInverse(0.0f, 150.0f))
+                                                    vSliderWithValueRow(waterShaderParams.fadeStarts[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start 1:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3000.0f), linearClampedScaleFunctionInverse(0.0f, 3000.0f))
+                                                    vSliderWithValueRow(waterShaderParams.fadeEnds[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("End 1:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3000.0f), linearClampedScaleFunctionInverse(0.0f, 3000.0f))
+                                                    vSliderWithValueRow(waterShaderParams.fadeStarts[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Start 2:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3000.0f), linearClampedScaleFunctionInverse(0.0f, 3000.0f))
+                                                    vSliderWithValueRow(waterShaderParams.fadeEnds[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("End 2:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 3000.0f), linearClampedScaleFunctionInverse(0.0f, 3000.0f))
+                                                }
+                                            }
+                                            vExpandPanel("Fog") {
+                                                vExpandPanel("Color") {
+                                                    vSliderWithValueRow(fogShaderParams.color[0], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Red:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(fogShaderParams.color[1], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Green:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                    vSliderWithValueRow(fogShaderParams.color[2], 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Blue:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                }
+                                                vSliderWithValueRow(fogShaderParams.atmosphericFogDensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Atmosphere density:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.2f), linearClampedScaleFunctionInverse(0.0f, 0.2f))
+                                                vSliderWithValueRow(fogShaderParams.exponentialFogDensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Fog density:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 0.2f), linearClampedScaleFunctionInverse(0.0f, 0.2f))
+                                                vSliderWithValueRow(fogShaderParams.exponentialFogHeightFalloff, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Fog falloff:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                                vSliderWithValueRow(fogShaderParams.fogHeightClampPower, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Fog clamp:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(-100.0f, 100.0f), linearClampedScaleFunctionInverse(-100.0f, 100.0f))
                                             }
                                         }
                                     }

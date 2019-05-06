@@ -49,7 +49,19 @@ object TerrainAmplification {
 
     @JvmStatic
     fun main(vararg args: String) {
-        amplify(args[3].toInt(), File(args[0]), File(args[1]), File(args[2]), args.drop(4).map { File(it) })
+        val outputTerrainFile = File(args[2])
+        val factor = args[3].toInt()
+        val dictionaryFiles = args.drop(4).map { File(it) }
+        val (maskSize, offset, dictionaries) = loadDictionaries(factor, dictionaryFiles)
+        val input = imageToMatrix(ImageIO.read(File(args[0])))
+        val inputIndex = dilateMask(imageToMask(ImageIO.read(File(args[1]))), maskSize * 2)
+        val dictionaryHeight = (input.rows + maskSize) / offset
+        val dictionaryWidth = (input.columns + maskSize) / offset
+        val inputIndexMask = inputIndexToIndexMask(maskSize, offset, dictionaryWidth, dictionaryHeight, inputIndex, dictionaries.size)
+
+        val (output, min, scale) = amplify(factor, input, inputIndexMask, maskSize, offset, dictionaries)
+
+        writeOutput(output, outputTerrainFile.parentFile, outputTerrainFile.name, input.columns * factor,input.rows * factor, maskSize * factor, min, scale)
     }
 
     private inline fun <T> time(operation: String, block: () -> T): T {
@@ -60,7 +72,25 @@ object TerrainAmplification {
         return result
     }
 
-    private fun amplify(factor :Int, inputTerrain: File, inputIndexFile: File, outputTerrain: File, dictionaryFiles: List<File>) {
+    fun amplify(factor :Int, input: RcMatrix, inputIndexMask: IntArray, maskSize: Int, offset: Int, dictionaries: List<Pair<RcMatrix, RcMatrix>>): Triple<RcMatrix, Float, Float> {
+        val dilated = dilateTerrain(input, maskSize * 2)
+        val mask = buildMask(maskSize)
+        val maskSizeHigh = maskSize * factor
+        val maskHigh = buildMask(maskSizeHigh)
+        val offsetSynthesisHigh = offset * factor
+        val divisorMask = buildDivisorMask(maskHigh, offsetSynthesisHigh)
+        val usefulIndices = buildMaskUsefulIndices(mask)
+
+        val (coefficients, means) = time("optimization") {
+             optimizeTerrainWithDictionary(dictionaries.map { it.first }, inputIndexMask, maskSize, mask, offset, dilated, usefulIndices)
+        }
+
+        return time("synthesis") {
+            synthesize(dilated, maskSize, offset, coefficients, dictionaries.map { it.second }, inputIndexMask, input, factor, maskSizeHigh, offsetSynthesisHigh, means, maskHigh, divisorMask)
+        }
+    }
+
+    fun loadDictionaries(factor: Int, dictionaryFiles: List<File>): Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>> {
         var first = true
         var maskSize = 0
         var offset = 0
@@ -89,27 +119,7 @@ object TerrainAmplification {
         if (dictionaries.isEmpty()) {
             throw RuntimeException("must specify one or more dictionary files")
         }
-        val input = imageToMatrix(ImageIO.read(inputTerrain))
-        val dilated = dilateTerrain(input, maskSize * 2)
-        val mask = buildMask(maskSize)
-        val maskSizeHigh = maskSize * factor
-        val maskHigh = buildMask(maskSizeHigh)
-        val offsetSynthesisHigh = offset * factor
-        val divisorMask = buildDivisorMask(maskHigh, offsetSynthesisHigh)
-        val usefulIndices = buildMaskUsefulIndices(mask)
-
-        val inputIndex = dilateMask(imageToMask(ImageIO.read(inputIndexFile)), maskSize * 2)
-        val inputIndexMask = inputIndexToIndexMask(maskSize, offset, dilated, inputIndex, dictionaries.size)
-
-        val (coefficients, means) = time("optimization") {
-             optimizeTerrainWithDictionary(dictionaries.map { it.first }, inputIndexMask, maskSize, mask, offset, dilated, usefulIndices)
-        }
-
-        val (output, min, scale) = time("synthesis") {
-            synthesize(dilated, maskSize, offset, coefficients, dictionaries.map { it.second }, inputIndexMask, input, factor, maskSizeHigh, offsetSynthesisHigh, means, maskHigh, divisorMask)
-        }
-
-        writeOutput(output, outputTerrain.parentFile, outputTerrain.name, input.columns * factor,input.rows * factor, maskSizeHigh, min, scale)
+        return Triple(maskSize, offset, dictionaries)
     }
 
     private fun synthesize(dilated: RcMatrix, maskSize: Int, offsetSynthesis: Int, coefficients: Coefficients, dictionaries: List<RcMatrix>, inputIndexMask: IntArray, inputTerrain: RcMatrix, factor: Int, maskSizeHigh: Int, offsetSynthesisHigh: Int, means: RcMatrix, maskHigh: RcMatrix, divisorMask: RcMatrix): Triple<RcMatrix, Float, Float> {
@@ -131,13 +141,13 @@ object TerrainAmplification {
                     val dictionary = dictionaries[inputIndexMask[coeffIndex2]]
                     val mean = means[i, j]
                     iRange.forEachIndexed { rowIndex, row ->
-                        val maskRow = row % maskSizeHigh * maskSizeHigh
+                        val maskRow = row % offsetSynthesisHigh * offsetSynthesisHigh
                         val rowIndexOff = rowIndex * maskSizeHigh
                         val rowOff = row * synthesized.columns
                         jRange.forEachIndexed { colIndex, col ->
                             val maskVal = maskHigh[rowIndexOff + colIndex]
                             if (maskVal != 0.0f) {
-                                val cur = synthesized[rowOff + col] + coefficients[coeffIndex2, (colIndex * maskSizeHigh + rowIndex), dictionary] + maskVal * mean * divisorMask[maskRow + col % maskSizeHigh]
+                                val cur = synthesized[rowOff + col] + coefficients[coeffIndex2, (colIndex * maskSizeHigh + rowIndex), dictionary] + maskVal * mean * divisorMask[maskRow + col % offsetSynthesisHigh]
                                 synthesized[rowOff + col] = cur
                                 if (cur < minLocal) {
                                     minLocal = cur
@@ -164,11 +174,13 @@ object TerrainAmplification {
 
     private fun buildDivisorMask(maskHigh: RcMatrix, offsetSynthesisHigh: Int): RcMatrix {
         val maskSizeHigh = maskHigh.rows
-        val maskWidth = 3 * offsetSynthesisHigh + maskSizeHigh
+        val offsetsPerMask = Math.round(Math.ceil(maskSizeHigh / offsetSynthesisHigh.toDouble()).toFloat())
+        val iterations = offsetsPerMask * 3
+        val maskWidth = (iterations - 1) * offsetSynthesisHigh + maskSizeHigh
         val testDivisor = RcMatrix(maskWidth, maskWidth)
-        for (i in 0 until 4) {
+        for (i in 0 until iterations) {
             val rowRange = i * offsetSynthesisHigh until i * offsetSynthesisHigh + maskSizeHigh
-            for (j in 0 until 4) {
+            for (j in 0 until iterations) {
                 val colRange = j * offsetSynthesisHigh until j * offsetSynthesisHigh + maskSizeHigh
                 rowRange.forEachIndexed { rowIndex, row ->
                     val rowIndexOff = rowIndex * maskSizeHigh
@@ -179,7 +191,7 @@ object TerrainAmplification {
                 }
             }
         }
-        val divisorRange = maskSizeHigh until maskSizeHigh + maskSizeHigh
+        val divisorRange = offsetSynthesisHigh * offsetsPerMask until offsetSynthesisHigh * offsetsPerMask + offsetSynthesisHigh
         val divisorMask = testDivisor[divisorRange, divisorRange]
         for (i in 0 until divisorMask.size) {
             divisorMask[i] = 1.0f / divisorMask[i]
@@ -233,9 +245,7 @@ object TerrainAmplification {
         return means
     }
 
-    private fun inputIndexToIndexMask(maskSize: Int, offset: Int, synthesized: RcMatrix, indices: Matrix<Byte>, dictionaryCount: Int): IntArray {
-        val dictionaryHeight = (synthesized.rows - maskSize) / offset
-        val dictionaryWidth = (synthesized.columns - maskSize) / offset
+    private fun inputIndexToIndexMask(maskSize: Int, offset: Int, dictionaryWidth: Int, dictionaryHeight: Int, indices: Matrix<Byte>, dictionaryCount: Int): IntArray {
         val indexMask = IntArray(dictionaryHeight * dictionaryWidth)
         (0 until dictionaryHeight).toList().parallelStream().forEach { i ->
             val iRange = i * offset until i * offset + maskSize
@@ -267,7 +277,7 @@ object TerrainAmplification {
         return baseAtoms
     }
 
-    private fun writeOutput(terrainToWrite: RcMatrix, outputDir: File, fileName: String, columns: Int = terrainToWrite.columns, rows: Int = terrainToWrite.rows, offset: Int = 0, min: Float = 0.0f, scale: Float = 1.0f) {
+    fun writeOutput(terrainToWrite: RcMatrix, outputDir: File, fileName: String, columns: Int = terrainToWrite.columns, rows: Int = terrainToWrite.rows, offset: Int = 0, min: Float = 0.0f, scale: Float = 1.0f) {
         val output = BufferedImage(columns, rows, BufferedImage.TYPE_USHORT_GRAY)
         val outputData = output.raster
         val colRange = offset until offset + columns

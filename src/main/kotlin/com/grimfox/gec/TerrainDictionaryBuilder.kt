@@ -22,7 +22,7 @@ object TerrainDictionaryBuilder {
 
     private fun buildLow(exampleTerrainFile: File, exampleMaskFile: File, optimizationTerrainFile: File, optimizationTerrainMaskFile: File, outputFile: File, offsetAnalysis: Int, offsetOptimization: Int) {
         val random = Random(0)
-        val maskSize = 4
+        val maskSize = 8
         val example4 = TerrainAmplification.imageToMatrix(ImageIO.read(exampleTerrainFile))
         val example2 = TerrainAmplification.downscaleImage(example4, 2)
         val exampleLow = TerrainAmplification.downscaleImage(example4, 4)
@@ -54,10 +54,10 @@ object TerrainDictionaryBuilder {
             val optimized1 = time("optimize dictionary 1") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, randomSelect(random, dictionaryLow, 4096)) }
             val optimized2 = time("optimize dictionary 2") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized1, 2048)) }
             val optimized3 = time("optimize dictionary 3") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized2, 1024)) }
-            val optimized4 = time("optimize dictionary 4") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized3, 512)) }
-            val optimized5 = time("optimize dictionary 5") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized4, 256)) }
-            val optimized6 = time("optimize dictionary 6") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized5, 128)) }
-            val newDictionaries = dictionariesFromSelection(optimized6, dictionaryLow, dictionary2, dictionary4)
+//            val optimized4 = time("optimize dictionary 4") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized3, 512)) }
+//            val optimized5 = time("optimize dictionary 5") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized4, 256)) }
+//            val optimized6 = time("optimize dictionary 6") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized5, 128)) }
+            val newDictionaries = dictionariesFromSelection(optimized3, dictionaryLow, dictionary2, dictionary4)
             for (i in 1 until newDictionaries.size) {
                 newDictionaries[i] = newDictionaries[i].asyncTranspose()
             }
@@ -106,10 +106,10 @@ object TerrainDictionaryBuilder {
 
             val optimized1 = time("optimize dictionary 1") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, randomSelect(random, dictionaryLow, 4096)) }
             val optimized2 = time("optimize dictionary 2") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized1, 2048)) }
-            val optimized3 = time("optimize dictionary 3") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized2, 1024)) }
-            val optimized4 = time("optimize dictionary 4") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized3, 512)) }
-            val optimized5 = time("optimize dictionary 5") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized4, 256)) }
-            val newDictionaries = dictionariesFromSelection(optimized5, dictionaryLow, dictionary2, dictionary4, dictionary8)
+//            val optimized3 = time("optimize dictionary 3") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized2, 1024)) }
+//            val optimized4 = time("optimize dictionary 4") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized3, 512)) }
+//            val optimized5 = time("optimize dictionary 5") { optimizeDictionary(random, dictionaryLow, dictionaryLowArrays, optimizationDictionary, optimizationDictionaryArrays, usefulIndices, 50, stronglyUniqueSelect(random, dictionaryLow, optimized4, 256)) }
+            val newDictionaries = dictionariesFromSelection(optimized2, dictionaryLow, dictionary2, dictionary4, dictionary8)
             for (i in 1 until newDictionaries.size) {
                 newDictionaries[i] = newDictionaries[i].asyncTranspose()
             }
@@ -118,7 +118,7 @@ object TerrainDictionaryBuilder {
 
         writeDictionary(dictionaries[3].asyncTranspose(), outputFile.parentFile, "visual-dictionary.png")
 
-        TerrainAmplificationDictionary(maskSize, maskSize / 2, dictionaries[0], dictionaries[1], dictionaries[2], dictionaries[3]).write(outputFile)
+        TerrainAmplificationDictionary(maskSize, 6, dictionaries[0], dictionaries[1], dictionaries[2], dictionaries[3]).write(outputFile)
     }
 
     private fun optimizeDictionary(random: Random, dictionaryLow: RcMatrix, dictionaryLowArrays: List<FloatArray>, optimizationDictionary: RcMatrix, optimizationDictionaryArrays: List<FloatArray>, usefulIndices: IntArray, maxIterations: Int, indices: IntArray): IntArray {
@@ -382,6 +382,18 @@ object TerrainDictionaryBuilder {
     }
 
     private fun dictionariesFromSelection(selection: IntArray, vararg dictionaries: RcMatrix): Array<RcMatrix> {
+        val newDictionaries = Array(dictionaries.size) { RcMatrix(dictionaries[it].rows, selection.size) }
+        for (j in 0 until dictionaries.size) {
+            val newDictionary = newDictionaries[j]
+            val dictionary = dictionaries[j]
+            for (i in 0 until selection.size) {
+                newDictionary[ALL, i] = dictionary[ALL, selection[i]]
+            }
+        }
+        return newDictionaries
+    }
+
+    private fun dictionariesFromSelectionWithTransforms(selection: IntArray, vararg dictionaries: RcMatrix): Array<RcMatrix> {
         val newDictionaries = Array(dictionaries.size) { RcMatrix(dictionaries[it].rows, selection.size * 8) }
         val maskSizes = IntArray(dictionaries.size) {
             Math.round(sqrt(newDictionaries[it].rows.toDouble())).toInt()
@@ -436,7 +448,7 @@ object TerrainDictionaryBuilder {
         writeNormalizedTestImage(output, outputDir, fileName)
     }
 
-    private fun writeNormalizedTestImage(matrixToWrite: RcMatrix, outputDir: File, fileName: String) {
+    fun writeNormalizedTestImage(matrixToWrite: RcMatrix, outputDir: File, fileName: String) {
         val output = BufferedImage(matrixToWrite.columns, matrixToWrite.rows, BufferedImage.TYPE_USHORT_GRAY)
         val outputData = output.raster
         val min = matrixToWrite.min()

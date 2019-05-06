@@ -1,19 +1,22 @@
 package com.grimfox.gec.util
 
-import com.grimfox.gec.model.Graph
-import com.grimfox.gec.model.Matrix
+import com.grimfox.gec.model.*
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.TextureBuilder.TextureId
 import com.grimfox.joml.SimplexNoise.noise
+import org.lwjgl.opengl.EXTTextureFilterAnisotropic.*
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
+import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL30.*
+import org.lwjgl.opengl.GL32.GL_TEXTURE_CUBE_MAP_SEAMLESS
 import java.awt.Transparency
 import java.awt.color.ColorSpace
 import java.awt.image.*
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.io.DataInputStream
+import java.nio.*
+import java.util.zip.GZIPInputStream
 import javax.imageio.ImageIO
 
 val BLANK_TEXTURE = TextureId(loadTexture2D(GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR, "/textures/blank.png", true, true).first)
@@ -93,6 +96,180 @@ fun loadRegionMaskAsTexture(regionMask: Matrix<Byte>): Triple<Int, Int, Int> {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
     glBindTexture(GL_TEXTURE_2D, 0)
     return Triple(textureId, width, width)
+}
+
+fun loadNormalMap(normalMap: String): Pair<TextureId, Int> {
+    val image = getResourceStream(normalMap).use { ImageIO.read(it) }
+    val width = image.width
+    val data = image.raster.dataBuffer
+    val buffer = ByteBuffer.allocateDirect(3 * width * width)
+    for (i in 0 until width * width) {
+        val offIn = i * 4
+        val offOut = i * 3
+//        val a = data.getElem(0, offIn)
+        val b = data.getElem(0, offIn + 1)
+        val g = data.getElem(0, offIn + 2)
+        val r = data.getElem(0, offIn + 3)
+        buffer.put(offOut, r.toByte())
+        buffer.put(offOut + 1, g.toByte())
+        buffer.put(offOut + 2, b.toByte())
+    }
+    val textureId = glGenTextures()
+    glBindTexture(GL_TEXTURE_2D, textureId)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, width, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer)
+    glBindTexture(GL_TEXTURE_2D, 0)
+    return TextureId(textureId) to width
+}
+
+fun loadTextureF32(texture: String): Pair<TextureId, Int> {
+    val textureId = glGenTextures()
+    var width = 0
+    DataInputStream(GZIPInputStream(getResourceStream(texture))).use {
+        val mips = it.readInt()
+        width = it.readInt()
+        glBindTexture(GL_TEXTURE_2D, textureId)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 8)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, if (mips == 1) GL_LINEAR else GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        var currentWidth = width
+        for (mip in 0 until mips) {
+            val texSize = currentWidth * currentWidth * 3
+            val buffer = FloatArray(texSize)
+            for (p in 0 until texSize) {
+                buffer[p] = it.readFloat()
+            }
+            glTexImage2D(GL_TEXTURE_2D, mip, GL_RGB32F, currentWidth, currentWidth, 0, GL_RGB, GL_FLOAT, buffer)
+            currentWidth /= 2
+        }
+        var mip = mips
+        if (mips > 1) {
+            while (currentWidth > 0) {
+                val texSize = currentWidth * currentWidth * 3
+                val buffer = FloatArray(texSize)
+                glTexImage2D(GL_TEXTURE_2D, mip, GL_RGB32F, currentWidth, currentWidth, 0, GL_RGB, GL_FLOAT, buffer)
+                currentWidth /= 2
+                mip++
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, 0)
+    }
+    return TextureId(textureId) to width
+}
+
+fun loadBrdfMap(brdfMap: String): Pair<TextureId, Int> {
+    val textureId = glGenTextures()
+    var width = 0
+    DataInputStream(GZIPInputStream(getResourceStream(brdfMap))).use {
+        val mips = it.readInt()
+        width = it.readInt()
+        glBindTexture(GL_TEXTURE_2D, textureId)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 8)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, if (mips == 1) GL_LINEAR else GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        var currentWidth = width
+        for (mip in 0 until mips) {
+            val texSize = currentWidth * currentWidth * 2
+            val buffer = FloatArray(texSize)
+            for (p in 0 until texSize) {
+                buffer[p] = it.readFloat()
+            }
+            glTexImage2D(GL_TEXTURE_2D, mip, GL_RG32F, currentWidth, currentWidth, 0, GL_RG, GL_FLOAT, buffer)
+            currentWidth /= 2
+        }
+        var mip = mips
+        if (mips > 1) {
+            while (currentWidth > 0) {
+                val texSize = currentWidth * currentWidth * 2
+                val buffer = FloatArray(texSize)
+                glTexImage2D(GL_TEXTURE_2D, mip, GL_RG32F, currentWidth, currentWidth, 0, GL_RG, GL_FLOAT, buffer)
+                currentWidth /= 2
+                mip++
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, 0)
+    }
+    return TextureId(textureId) to width
+}
+
+fun loadCubeMap3DF8(cubeMap: String): Pair<TextureId, Int> {
+    val textureId = glGenTextures()
+    var width = 0
+    DataInputStream(GZIPInputStream(getResourceStream(cubeMap))).use {
+        val mips = it.readInt()
+        width = it.readInt()
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureId)
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_ANISOTROPY_EXT, glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT))
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, if (mips == 1) GL_LINEAR else GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS)
+        for (i in 0 until 6) {
+            var currentWidth = width
+            for (mip in 0 until mips) {
+                val texSize = currentWidth * currentWidth * 3
+                val buffer = ByteBuffer.allocateDirect(texSize)
+                for (p in 0 until texSize) {
+                    buffer.put(p, it.readByte())
+                }
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, mip, GL_RGB8, currentWidth, currentWidth, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer)
+                currentWidth /= 2
+            }
+            var mip = mips
+            if (mips > 1) {
+                while (currentWidth > 0) {
+                    val texSize = currentWidth * currentWidth * 3
+                    val buffer = FloatArray(texSize)
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, mip, GL_RGB8, currentWidth, currentWidth, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer)
+                    currentWidth /= 2
+                    mip++
+                }
+            }
+        }
+    }
+    return TextureId(textureId) to width
+}
+
+fun loadCubeMap3DF32(cubeMap: String): Pair<TextureId, Int> {
+    val textureId = glGenTextures()
+    var width = 0
+    DataInputStream(GZIPInputStream(getResourceStream(cubeMap))).use {
+        val mips = it.readInt()
+        width = it.readInt()
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureId)
+        glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_ANISOTROPY_EXT, glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT))
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, if (mips == 1) GL_LINEAR else GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS)
+        for (i in 0 until 6) {
+            var currentWidth = width
+            for (mip in 0 until mips) {
+                val texSize = currentWidth * currentWidth * 3
+                val buffer = FloatArray(texSize)
+                for (p in 0 until texSize) {
+                    buffer[p] = it.readFloat()
+                }
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, mip, GL_RGB32F, currentWidth, currentWidth, 0, GL_RGB, GL_FLOAT, buffer)
+                currentWidth /= 2
+            }
+            var mip = mips
+            if (mips > 1) {
+                while (currentWidth > 0) {
+                    val texSize = currentWidth * currentWidth * 3
+                    val buffer = FloatArray(texSize)
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, mip, GL_RGB32F, currentWidth, currentWidth, 0, GL_RGB, GL_FLOAT, buffer)
+                    currentWidth /= 2
+                    mip++
+                }
+            }
+        }
+    }
+    return TextureId(textureId) to width
 }
 
 fun loadTexture2D(minFilter: Int, magFilter: Int, baseImage: String, generateMipMaps: Boolean, clampToEdge: Boolean, noiseAmount: Int = 0, noiseScale: Float = 0.0f, vararg mipMaps: String): Triple<Int, Int, Int> {

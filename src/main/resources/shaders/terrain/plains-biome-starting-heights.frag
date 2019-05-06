@@ -11,7 +11,7 @@ in VertexData {
     vec2 uv;
 } VertexIn;
 
-const float minStart = 0.5;
+const float minStart = 0.0000001;
 
 layout(location = 0) out vec4 colorOut;
 
@@ -35,9 +35,7 @@ void main() {
         } else {
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
-                float height = 0.0000001;
-                height += minStart;
-                colorOut = vec4(height, height, height, 1.0);
+                colorOut = vec4(0.0000001, 0.0000001, 0.0000001, 1.0);
             } else {
                 float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.05) / 300.0;
                 height += minStart;

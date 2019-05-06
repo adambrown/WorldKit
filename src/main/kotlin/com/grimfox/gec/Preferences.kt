@@ -1,6 +1,6 @@
 package com.grimfox.gec
 
-import com.grimfox.gec.model.Graph
+import com.grimfox.gec.model.*
 import com.grimfox.gec.util.*
 import com.grimfox.logging.LOG
 import java.io.*
@@ -18,8 +18,16 @@ val PREFERENCES_FILE = File(CONFIG_DIR, "preferences")
 val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects")
 val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state")
 val CACHED_GRAPH_256_FILE = File(CACHE_DIR, "cached-graph-256.graph")
-val CACHED_GRAPH_512_FILE = File(CACHE_DIR, "cached-graph-512.graph")
 val CACHED_GRAPH_1024_FILE = File(CACHE_DIR, "cached-graph-1024.graph")
+
+val LOW_DATABASE_0 = File(WORLD_KIT_APP_DIR, "undersea-dictionary-low.bin")
+val LOW_DATABASE_1 = File(WORLD_KIT_APP_DIR, "mountain-dictionary-low.bin")
+val LOW_DATABASE_2 = File(WORLD_KIT_APP_DIR, "canyon-dictionary-low.bin")
+
+val HIGH_DATABASE_0 = File(WORLD_KIT_APP_DIR, "undersea-dictionary-high.bin")
+val HIGH_DATABASE_1 = File(WORLD_KIT_APP_DIR, "mountain-dictionary-high.bin")
+val HIGH_DATABASE_2 = File(WORLD_KIT_APP_DIR, "canyon-top-dictionary-high.bin")
+val HIGH_DATABASE_3 = File(WORLD_KIT_APP_DIR, "canyon-dictionary-high.bin")
 
 data class Preferences(
         var rememberWindowState: Boolean = true,
@@ -28,8 +36,10 @@ data class Preferences(
         var isFirstRun: Boolean = true,
         var windowState: WindowState? = null,
         var cachedGraph256: Future<Graph>? = null,
-        var cachedGraph512: Future<Graph>? = null,
-        var cachedGraph1024: Future<Graph>? = null
+        var cachedGraph1024: Future<Graph>? = null,
+        var lowDictionaries4: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null,
+        var highDictionaries4: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null,
+        var highDictionaries8: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null
 ) {
     val autosaveDir: File get() = File(projectDir, "autosaves").canonicalFile
 
@@ -147,25 +157,6 @@ fun loadPreferences(executor: ExecutorService): Preferences {
         graph
     }
 
-    preferences.cachedGraph512 = executor.call {
-        var graph: Graph
-        if (CACHED_GRAPH_512_FILE.exists() && CACHED_GRAPH_512_FILE.canRead()) {
-            try {
-                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
-            } catch (e: Exception) {
-                LOG.warn("Error reading from cached graph 512 file.")
-                graph = Graphs.generateGraph(512, 1L, 0.8, false, false)
-                Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
-                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
-            }
-        } else {
-            graph = Graphs.generateGraph(512, 1L, 0.8, false, false)
-            Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
-            graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
-        }
-        graph
-    }
-
     preferences.cachedGraph1024 = executor.call {
         var graph: Graph
         if (CACHED_GRAPH_1024_FILE.exists() && CACHED_GRAPH_1024_FILE.canRead()) {
@@ -185,6 +176,21 @@ fun loadPreferences(executor: ExecutorService): Preferences {
         graph
     }
 
+    preferences.lowDictionaries4 = executor.call {
+        val (maskSize, offset, dictionaries) = TerrainAmplification.loadDictionaries(4, listOf(LOW_DATABASE_0, LOW_DATABASE_1, LOW_DATABASE_2))
+        Triple(maskSize, offset, listOf(dictionaries[0], dictionaries[1], dictionaries[2], dictionaries[2]))
+    }
+
+    preferences.highDictionaries4 = executor.call {
+        val (maskSize, offset, dictionaries) = TerrainAmplification.loadDictionaries(4, listOf(HIGH_DATABASE_0, HIGH_DATABASE_1, HIGH_DATABASE_2, HIGH_DATABASE_3))
+        Triple(maskSize, offset, listOf(dictionaries[0], dictionaries[1], dictionaries[2], dictionaries[3]))
+    }
+
+    preferences.highDictionaries8 = executor.call {
+        val (maskSize, offset, dictionaries) = TerrainAmplification.loadDictionaries(8, listOf(HIGH_DATABASE_0, HIGH_DATABASE_1, HIGH_DATABASE_2, HIGH_DATABASE_3))
+        Triple(maskSize, offset, listOf(dictionaries[0], dictionaries[1], dictionaries[2], dictionaries[3]))
+    }
+
     return preferences
 }
 
@@ -195,7 +201,7 @@ fun savePreferences(preferences: Preferences) {
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)
         DataOutputStream(PREFERENCES_FILE.outputStream().buffered()).use {
-            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null).serialize(it)
+            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph1024 = null, lowDictionaries4 = null, highDictionaries4 = null, highDictionaries8 = null).serialize(it)
         }
         ensureDirectoryExists(preferences.tempDir)
         val tempDir = preferences.tempDir

@@ -32,7 +32,7 @@ void main() {
             minBorderDistInverse = 1.0 - minBorderDist;
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > minBorderDistInverse) {
-                colorOut = vec4(0.002, 0.002, 0.002, 1.0);
+                colorOut = vec4(0.0000001, 0.0000001, 0.0000001, 1.0);
             } else {
                 colorOut = vec4(0.0029333, 0.0029333, 0.0029333, 1.0);
             }

@@ -1224,11 +1224,12 @@ fun <T> Block.vSliderRow(value: ObservableMutableReference<T>, height: Float, la
     }
 }
 
-fun <T> Block.vSliderWithValueRow(value: ObservableMutableReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float): Block {
+fun <T> Block.vSliderWithValueRow(value: ObservableMutableReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float, toString: (T) -> String = { it.toString() }): Block {
     val dynamicText = DynamicTextReference(value.value.toString(), valueSize, textStyle)
-    value.addListener { _, new ->
-        dynamicText.reference.value = new.toString()
+    val listener: (oldValue: T, newValue: T) -> Unit = { _, new ->
+        dynamicText.reference.value = toString(new)
     }
+    value.addListener(listener)
     return block {
         val row = this
         vSizing = STATIC
@@ -1493,13 +1494,13 @@ fun Block.meshViewport3D(meshViewport: MeshViewport3D, ui: UserInterface): Block
         layout = ABSOLUTE
         shape = ShapeMeshViewport3D(meshViewport)
         onMouseDown { button, x, y, _ ->
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && brushOn.value || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
                 ui.keyboardHandler = meshViewport.keyboardHandler
             }
             meshViewport.onMouseDown(button, x, y)
         }
         onMouseRelease { button, x, y, _ ->
-            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && brushOn.value || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
                 ui.keyboardHandler = null
             }
             meshViewport.clearKeysPressed()
@@ -1552,6 +1553,24 @@ interface DisableSet {
     fun disable()
 
     fun enable()
+}
+
+fun disablePairs(vararg disableSet: DisableSet) : DisableSet {
+
+    return object: DisableSet {
+
+        override fun hide() {
+            disableSet.forEach(DisableSet::hide)
+        }
+
+        override fun disable() {
+            disableSet.forEach(DisableSet::disable)
+        }
+
+        override fun enable() {
+            disableSet.forEach(DisableSet::enable)
+        }
+    }
 }
 
 fun disablePair(enabled: Block, disabled: Block, shouldDisable: () -> Boolean = { false }) : DisableSet {

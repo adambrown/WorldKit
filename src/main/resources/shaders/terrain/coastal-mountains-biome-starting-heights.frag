@@ -33,8 +33,7 @@ void main() {
             } else {
                 float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
                 if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
-                    float height = 0.000033333 + noise;
-                    colorOut = vec4(height, height, height, 1.0);
+                    colorOut = vec4(0.0000001, 0.0000001, 0.0000001, 1.0);
                 } else if (coastDistance > 0.97) {
                     float height = 0.00083333 + noise;
                     colorOut = vec4(height, height, height, 1.0);

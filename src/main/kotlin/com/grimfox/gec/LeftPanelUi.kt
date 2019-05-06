@@ -11,7 +11,6 @@ import java.util.concurrent.CancellationException
 
 
 private val cachedGraph256 = preferences.cachedGraph256!!
-private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 private val leftPanelLabelShrinkGroup = hShrinkGroup()
@@ -119,7 +118,7 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             val biomePanel = editBiomesPanel(biomePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, scroller, ui, uiLayout, dialogLayer)
             biomePanel.isVisible = false
             biomePanelExpanded.addListener(resetScrollerListener)
-            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0..25), linearClampedScaleFunctionInverse(0..25))
+            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..25), linearClampedScaleFunctionInverse(1..25))
             mapDetailScaleSlider.isVisible = false
             mapDetailScale.addListener { old, new ->
                 if (old != new) {
@@ -181,96 +180,39 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                     }
                 }
-                generationLock.disableOnLockSet({ if (currentState.heightMapTexture.value != null && currentState.riverMapTexture.value != null) 1 else 0 },
-                        disableButton("Build mesh", { currentState.regionGraph.value == null || currentState.regionMask.value == null || currentState.regionSplines.value == null || currentState.biomeGraph.value == null || currentState.biomeGraph.value == null }) {
-                            editToggleSet.suspend {
-                                generationLock.doWithLock {
-                                    val currentParameters = currentState.regionParameters.value
-                                    val currentRegionGraph = currentState.regionGraph.value
-                                    val currentRegionMask = currentState.regionMask.value
-                                    val currentRegionSplines = currentState.regionSplines.value
-                                    val currentBiomeGraph = currentState.biomeGraph.value
-                                    val currentBiomeMask = currentState.biomeMask.value
-                                    val currentBiomes = currentState.biomes.value
-                                    val currentMapScale = mapDetailScale.value
-                                    if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
-                                        dialogLayer.isVisible = true
-                                        generatingPrimaryMessage.reference.value = text("Generating mesh... 0:00", TEXT_STYLE_LARGE_MESSAGE)
-                                        generatingSecondaryMessage.reference.value = text("Press ESC to cancel.", TEXT_STYLE_SMALL_MESSAGE)
-                                        generatingMessageBlock.isVisible = true
-                                        val startTime = System.currentTimeMillis()
-                                        val generationTimer = Timer(true)
-                                        generationTimer.schedule(object: TimerTask() {
-                                            override fun run() {
-                                                val currentTime = System.currentTimeMillis()
-                                                val elapsedTime = (currentTime - startTime)
-                                                val seconds = String.format("%02d", (elapsedTime / 1000).toInt() % 60)
-                                                val minutes = (elapsedTime / (1000 * 60) % 60).toInt()
-                                                generatingPrimaryMessage.reference.value = text("Generating mesh... $minutes:$seconds", TEXT_STYLE_LARGE_MESSAGE)
-                                                root.movedOrResized = true
-                                            }
-                                        }, 1000, 1000)
-                                        try {
-                                            val canceled = ref(false)
-                                            cancelCurrentRunningTask.value = canceled
-                                            try {
-                                                val (heightMapTexId, riverMapTexId) = generateWaterFlows(
-                                                        parameterSet = currentParameters,
-                                                        regionSplines = currentRegionSplines,
-                                                        biomeGraph = currentBiomeGraph,
-                                                        biomeMask = currentBiomeMask,
-                                                        biomes = currentBiomes,
-                                                        flowGraphSmall = cachedGraph256.value,
-                                                        flowGraphMedium = cachedGraph512.value,
-                                                        flowGraphLarge = cachedGraph1024.value,
-                                                        executor = executor,
-                                                        mapScale = currentMapScale,
-                                                        customElevationPowerMap = currentState.customElevationPowerMap.value,
-                                                        customStartingHeightsMap = currentState.customStartingHeightsMap.value,
-                                                        customSoilMobilityMap = currentState.customSoilMobilityMap.value,
-                                                        canceled = canceled,
-                                                        biomeTemplates = BIOME_TEMPLATES_REF.value!!)
-                                                meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), VIEWPORT_HEIGHTMAP_SIZE)
-                                                currentState.heightMapTexture.value = heightMapTexId
-                                                currentState.riverMapTexture.value = riverMapTexId
-                                                val linearDistanceScaleInKilometers = mapScaleToLinearDistance(currentMapScale)
-                                                heightMapScaleFactor.value = linearDistanceToScaleFactor(linearDistanceScaleInKilometers)
-                                                imageMode.value = 3
-                                                displayMode.value = DisplayMode.MESH
-                                            } catch (w: Exception) {
-                                                if (!causedByCancellation(w)) {
-                                                    throw w
-                                                }
-                                            } finally {
-                                                if (cancelCurrentRunningTask.value == canceled) {
-                                                    cancelCurrentRunningTask.value = null
-                                                }
-                                            }
-                                        } finally {
-                                            generationTimer.cancel()
-                                            generatingMessageBlock.isVisible = false
-                                            dialogLayer.isVisible = false
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        disableButton("Show mesh", { displayMode.value == DisplayMode.MESH }) {
-                            editToggleSet.suspend {
-                                generationLock.doWithLock {
-                                    val currentHeightMap = currentState.heightMapTexture.value
-                                    val currentRiverMap = currentState.riverMapTexture.value
-                                    if (currentHeightMap != null && currentRiverMap != null) {
-                                        meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), VIEWPORT_HEIGHTMAP_SIZE)
-                                        imageMode.value = 3
-                                        displayMode.value = DisplayMode.MESH
-                                    }
-                                }
+                generationLock.disableOnLockButton(this, "Show mesh", { currentState.heightMapTexture.value != null && currentState.riverMapTexture.value != null && displayMode.value == DisplayMode.MESH }) {
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            val currentHeightMap = currentState.heightMapTexture.value
+                            val currentRiverMap = currentState.riverMapTexture.value
+                            if (currentHeightMap != null && currentRiverMap != null) {
+                                meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), VIEWPORT_HEIGHTMAP_SIZE)
+                                imageMode.value = 3
+                                displayMode.value = DisplayMode.MESH
                             }
                         }
-                )
+                    }
+                }
             }
             mainButtonsRow.isVisible = false
+            val outputQualitySlider = vSliderWithValueRow(outputQuality, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Output quality:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6))
+            outputQualitySlider.isVisible = false
+            mapDetailScale.addListener { old, new ->
+                if (old != new) {
+                    editToggleSet.suspend {
+                        generationLock.doWithLock {
+                            currentState.heightMapTexture.value = null
+                            currentState.riverMapTexture.value = null
+                        }
+                    }
+                }
+            }
+            val buildButtonsRow = vButtonRow(LARGE_ROW_HEIGHT) {
+                generationLock.disableOnLockButton(this, "Build mesh", { currentState.regionGraph.value == null || currentState.regionMask.value == null || currentState.regionSplines.value == null || currentState.biomeGraph.value == null || currentState.biomeGraph.value == null }) {
+                    addBuildButton(dialogLayer, outputQuality.value - 1)
+                }
+            }
+            buildButtonsRow.isVisible = false
             val newProjectPanel = block {
                 layout = Layout.ABSOLUTE
                 vSizing = Sizing.SHRINK
@@ -288,7 +230,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     splinePanel.isVisible = true
                     biomePanel.isVisible = true
                     mapDetailScaleSlider.isVisible = true
+                    outputQualitySlider.isVisible = true
                     mainButtonsRow.isVisible = true
+                    buildButtonsRow.isVisible = true
                     resetScroller()
                     generationLock.enable()
                 } else {
@@ -296,7 +240,9 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                     splinePanel.isVisible = false
                     biomePanel.isVisible = false
                     mapDetailScaleSlider.isVisible = false
+                    outputQualitySlider.isVisible = false
                     mainButtonsRow.isVisible = false
+                    buildButtonsRow.isVisible = false
                     newProjectPanel.isVisible = true
                     resetScroller()
                     generationLock.enable()
@@ -321,6 +267,80 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
         onWindowResize = {
             oldWindowResize()
             resetScroller()
+        }
+    }
+}
+
+private fun Block.addBuildButton(dialogLayer: Block, level: Int) {
+    editToggleSet.suspend {
+        generationLock.doWithLock {
+            val currentParameters = currentState.regionParameters.value
+            val currentRegionGraph = currentState.regionGraph.value
+            val currentRegionMask = currentState.regionMask.value
+            val currentRegionSplines = currentState.regionSplines.value
+            val currentBiomeGraph = currentState.biomeGraph.value
+            val currentBiomeMask = currentState.biomeMask.value
+            val currentBiomes = currentState.biomes.value
+            val currentMapScale = mapDetailScale.value
+            if (currentParameters != null && currentRegionGraph != null && currentRegionMask != null && currentRegionSplines != null && currentBiomeGraph != null && currentBiomeMask != null && currentBiomes != null) {
+                dialogLayer.isVisible = true
+                generatingPrimaryMessage.reference.value = text("Generating mesh... 0:00", TEXT_STYLE_LARGE_MESSAGE)
+                generatingSecondaryMessage.reference.value = text("Press ESC to cancel.", TEXT_STYLE_SMALL_MESSAGE)
+                generatingMessageBlock.isVisible = true
+                val startTime = System.currentTimeMillis()
+                val generationTimer = Timer(true)
+                generationTimer.schedule(object : TimerTask() {
+                    override fun run() {
+                        val currentTime = System.currentTimeMillis()
+                        val elapsedTime = (currentTime - startTime)
+                        val seconds = String.format("%02d", (elapsedTime / 1000).toInt() % 60)
+                        val minutes = (elapsedTime / (1000 * 60) % 60).toInt()
+                        generatingPrimaryMessage.reference.value = text("Generating mesh... $minutes:$seconds", TEXT_STYLE_LARGE_MESSAGE)
+                        root.movedOrResized = true
+                    }
+                }, 1000, 1000)
+                try {
+                    val canceled = ref(false)
+                    cancelCurrentRunningTask.value = canceled
+                    try {
+                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(
+                                parameterSet = currentParameters,
+                                regionSplines = currentRegionSplines,
+                                biomeGraph = currentBiomeGraph,
+                                biomeMask = currentBiomeMask,
+                                biomes = currentBiomes,
+                                flowGraphSmall = cachedGraph256.value,
+                                flowGraphLarge = cachedGraph1024.value,
+                                executor = executor,
+                                mapScale = currentMapScale,
+                                customElevationPowerMap = currentState.customElevationPowerMap.value,
+                                customStartingHeightsMap = currentState.customStartingHeightsMap.value,
+                                customSoilMobilityMap = currentState.customSoilMobilityMap.value,
+                                canceled = canceled,
+                                biomeTemplates = BIOME_TEMPLATES_REF.value!!,
+                                renderLevel = level)
+                        meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), VIEWPORT_HEIGHTMAP_SIZE)
+                        currentState.heightMapTexture.value = heightMapTexId
+                        currentState.riverMapTexture.value = riverMapTexId
+                        val linearDistanceScaleInKilometers = mapScaleToLinearDistance(currentMapScale)
+                        heightMapScaleFactor.value = linearDistanceToScaleFactor(linearDistanceScaleInKilometers)
+                        imageMode.value = 3
+                        displayMode.value = DisplayMode.MESH
+                    } catch (w: Exception) {
+                        if (!causedByCancellation(w)) {
+                            throw w
+                        }
+                    } finally {
+                        if (cancelCurrentRunningTask.value == canceled) {
+                            cancelCurrentRunningTask.value = null
+                        }
+                    }
+                } finally {
+                    generationTimer.cancel()
+                    generatingMessageBlock.isVisible = false
+                    dialogLayer.isVisible = false
+                }
+            }
         }
     }
 }

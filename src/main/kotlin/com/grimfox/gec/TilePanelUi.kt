@@ -7,7 +7,6 @@ import com.grimfox.gec.util.*
 import java.io.File
 
 private val cachedGraph256 = preferences.cachedGraph256!!
-private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
 
 fun tilePanel(ui: UserInterface) {

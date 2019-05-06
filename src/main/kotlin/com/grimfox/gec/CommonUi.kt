@@ -1,7 +1,7 @@
 package com.grimfox.gec
 
 import com.grimfox.gec.model.*
-import com.grimfox.gec.ui.*
+import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.nvgproxy.*
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
@@ -19,7 +19,7 @@ const val DEMO_BUILD = false
 const val EXPERIMENTAL_BUILD = false
 
 val VIEWPORT_TEXTURE_SIZE = 2048
-val VIEWPORT_HEIGHTMAP_SIZE = 2048
+val VIEWPORT_HEIGHTMAP_SIZE = 4096
 
 val REGION_GRAPH_WIDTH = 128
 val REGION_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
@@ -85,11 +85,13 @@ val BIOME_TEMPLATES_REF = ref<Biomes?>(null)
 val BIOME_NAMES_AS_TEXT = ObservableMutableList(ArrayList<Text>())
 
 val RANDOM = Random()
-val DEFAULT_HEIGHT_SCALE = 50.0f
-val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
-val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
-val HEIGHT_SCALE_CONST = DEFAULT_HEIGHT_SCALE * 0.968746f
-val HEIGHT_SCALE_MULTIPLIER = DEFAULT_HEIGHT_SCALE * 32.00223
+const val DEFAULT_HEIGHT_SCALE = 50.0f
+const val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
+const val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
+const val HEIGHT_SCALE_CONST = DEFAULT_HEIGHT_SCALE * 0.968746f
+const val HEIGHT_SCALE_MULTIPLIER = DEFAULT_HEIGHT_SCALE * 32.00223
+const val DEFAULT_LIGHT_ELEVATION = 20.0f
+const val DEFAULT_LIGHT_HEADING = 0.0f
 
 val heightScaleFunction = { scale: Float ->
     Math.min(MAX_HEIGHT_SCALE, Math.max(MIN_HEIGHT_SCALE, if (scale <= 0.5f) {
@@ -153,15 +155,94 @@ class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, va
     }
 }
 
+class WaterShaderParams(
+        val level: ObservableMutableReference<Float> = ref(0.3f),
+        val color: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.21f), ref(0.38f), ref(0.373f)),
+        val metallic: ObservableMutableReference<Float> = ref(0.86f),
+        val roughness: ObservableMutableReference<Float> = ref(0.065f),
+        val specularIntensity: ObservableMutableReference<Float> = ref(0.925f),
+        val normalOffsets: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.3f), ref(0.065f), ref(0.008f), ref(0.0004f), ref(0.00004f), ref(0.00333f), ref(0.6f), ref(0.000233245f), ref(0.8f)),
+        val fadeStarts: Array<ObservableMutableReference<Float>> = arrayOf(ref(10.0f), ref(60.0f), ref(200.0f)),
+        val fadeEnds: Array<ObservableMutableReference<Float>> = arrayOf(ref(70.0f), ref(280.0f), ref(2000.0f)),
+        val normalStrengths: Array<ObservableMutableReference<Float>> = arrayOf(ref(1.8f), ref(1.25f), ref(1.0f), ref(10.0f)),
+        private val allParams: Array<ObservableMutableReference<Float>> = arrayOf(
+                level,
+                color[0],
+                color[1],
+                color[2],
+                metallic,
+                roughness,
+                specularIntensity,
+                normalOffsets[0],
+                normalOffsets[1],
+                normalOffsets[2],
+                normalOffsets[3],
+                normalOffsets[4],
+                normalOffsets[5],
+                normalOffsets[6],
+                normalOffsets[7],
+                normalOffsets[8],
+                fadeStarts[0],
+                fadeStarts[1],
+                fadeStarts[2],
+                fadeEnds[0],
+                fadeEnds[1],
+                fadeEnds[2],
+                normalStrengths[0],
+                normalStrengths[1],
+                normalStrengths[2],
+                normalStrengths[3]
+        )
+) {
+
+    fun addListener(listener: (Float, Float) -> Unit) {
+        allParams.forEach { it.addListener(listener) }
+    }
+}
+
+class FogShaderParams(
+        val color: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.2f), ref(0.3f), ref(0.45f)),
+        val atmosphericFogDensity: ObservableMutableReference<Float> = ref(0.007f),
+        val exponentialFogDensity: ObservableMutableReference<Float> = ref(0.02f),
+        val exponentialFogHeightFalloff: ObservableMutableReference<Float> = ref(0.2f),
+        val fogHeightClampPower: ObservableMutableReference<Float> = ref(-20.0f),
+        val fogOn: ObservableMutableReference<Float> = ref(1.0f),
+        private val allParams: Array<ObservableMutableReference<Float>> = arrayOf(
+                color[0],
+                color[1],
+                color[2],
+                atmosphericFogDensity,
+                exponentialFogDensity,
+                exponentialFogHeightFalloff,
+                fogHeightClampPower
+        )
+) {
+
+    fun addListener(listener: (Float, Float) -> Unit) {
+        allParams.forEach { it.addListener(listener) }
+    }
+}
+
 val currentState: CurrentState get() = currentProject.value?.currentState?.value ?: CurrentState()
 
+val waterShaderParams = WaterShaderParams()
+val fogShaderParams = FogShaderParams()
 val experimentalWidgets: MutableList<Block> = ArrayList()
 val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
+val lightColor = Array(3) { ref(5.0f) }
+val lightElevation = ref(DEFAULT_LIGHT_ELEVATION)
+val lightHeading = ref(DEFAULT_LIGHT_HEADING)
+val indirectIntensity = ref(0.5f)
+val baseColor = Array(3) { ref(1.0f) }
+val metallic = ref(0.0f)
+val roughness = ref(0.9f)
+val specularIntensity = ref(0.5f)
 val waterPlaneOn = ref(true)
 val perspectiveOn = ref(true)
 val heightColorsOn = ref(true)
 val riversOn = ref(true)
-val rotateAroundCamera = ref(false)
+val skyOn = ref(true)
+val fogOn = ref(true)
 val resetView = mRef(false)
 val imageMode = ref(3)
 val disableCursor = ref(false)
@@ -192,9 +273,39 @@ val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 val rootRef = ref(NO_BLOCK)
 val mapDetailScale = ref(8)
+val outputQuality = ref(1)
 
 
-val meshViewport = MeshViewport3D(resetView, rotateAroundCamera, perspectiveOn, waterPlaneOn, heightColorsOn, riversOn, heightMapScaleFactor, imageMode, disableCursor, hideCursor, brushOn, brushActive, brushListener, brushSize, currentEditBrushSize, pickerOn, pointPicker, rootRef)
+val meshViewport = MeshViewport3D(
+        resetView = resetView,
+        perspectiveOn = perspectiveOn,
+        waterPlaneOn = waterPlaneOn,
+        heightColorsOn = heightColorsOn,
+        riversOn = riversOn,
+        skyOn = skyOn,
+        fogOn = fogOn,
+        heightMapScaleFactor = heightMapScaleFactor,
+        lightColor = lightColor,
+        lightElevation = lightElevation,
+        lightHeading = lightHeading,
+        indirectIntensity = indirectIntensity,
+        baseColor = baseColor,
+        metallic = metallic,
+        roughness = roughness,
+        specularIntensity = specularIntensity,
+        waterParams = waterShaderParams,
+        fogParams = fogShaderParams,
+        imageMode = imageMode,
+        disableCursor = disableCursor,
+        hideCursor = hideCursor,
+        brushOn = brushOn,
+        brushActive = brushActive,
+        brushListener = brushListener,
+        brushSize = brushSize,
+        editBrushSizeRef = currentEditBrushSize,
+        pickerOn = pickerOn,
+        pointPicker = pointPicker,
+        uiRoot = rootRef)
 
 var mainLayer = NO_BLOCK
 var panelLayer = NO_BLOCK

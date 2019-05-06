@@ -1311,16 +1311,16 @@ class Biomes {
             heightMultiplier = 8.5f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
+                    elevationPowerMultiplier = 1.6f,
+                    soilMobilityMultiplier = 0.4f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.9f,
                     soilMobilityMultiplier = 0.2f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.6f,
-                    soilMobilityMultiplier = 0.2f),
+                    elevationPowerMultiplier = 0.65f,
+                    soilMobilityMultiplier = 0.25f),
             detailSelector = { if (it >= 120) 2 else 3 })
 
     private val sharpPlateauBiomeElevationShader = object : Shader {
@@ -1683,15 +1683,15 @@ class Biomes {
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 0.2f),
+                    soilMobilityMultiplier = 0.02f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
                     soilMobilityMultiplier = 0.03f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 0.035f),
+                    elevationPowerMultiplier = 4.0f,
+                    soilMobilityMultiplier = 0.12f),
             detailSelector = { 0 })
 
     private val currentBiomes = arrayListOf(

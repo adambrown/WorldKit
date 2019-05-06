@@ -859,7 +859,6 @@ object BuildContinent {
             biomeMask: Matrix<Byte>,
             biomes: List<Biome>,
             flowGraphSmall: Graph,
-            flowGraphMedium: Graph,
             flowGraphLarge: Graph,
             executor: ExecutorService,
             mapScale: Int,
@@ -868,6 +867,7 @@ object BuildContinent {
             customSoilMobilityMap: TextureId,
             canceled: Reference<Boolean>,
             biomeTemplates: Biomes,
+            renderLevel: Int,
             exportFiles: WaterFlows.ExportFiles? = null): Pair<TextureId?, TextureId?> {
         return generateWaterFlows(
                 random = Random(parameterSet.regionsSeed),
@@ -875,7 +875,6 @@ object BuildContinent {
                 biomeGraph = biomeGraph,
                 biomeMask = biomeMask,
                 flowGraphSmall = flowGraphSmall,
-                flowGraphMedium = flowGraphMedium,
                 flowGraphLarge = flowGraphLarge,
                 executor = executor,
                 mapScale = mapScale,
@@ -885,6 +884,7 @@ object BuildContinent {
                 customSoilMobilityMap = customSoilMobilityMap,
                 canceled = canceled,
                 biomeTemplates = biomeTemplates,
+                renderLevel = renderLevel,
                 exportFiles = exportFiles)
     }
 }

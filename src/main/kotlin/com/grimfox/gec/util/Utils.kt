@@ -7,8 +7,7 @@ import java.io.InputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
-import java.nio.file.Files
-import java.nio.file.Paths
+import java.nio.file.*
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 
@@ -212,7 +211,7 @@ inline fun <reified T> timeIt(message: String?, accumulator: AtomicLong?, callba
         val ret = callback()
         val totalNano = System.nanoTime() - time
         if (message != null) {
-            println("$message: ${totalNano / 1000000.0}")
+            println("$message: ${(totalNano / 1000000) / 1000.0f}s")
         }
         accumulator?.addAndGet(totalNano)
         return ret
@@ -244,7 +243,7 @@ class StopWatch(var message: String? = null, var accumulator: AtomicLong? = null
     fun stop(): Long {
         val totalNano = System.nanoTime() - time
         if (message != null) {
-            println("$message: ${totalNano / 1000000.0}")
+            println("$message: ${(totalNano / 1000000) / 1000.0f}s")
         }
         accumulator?.addAndGet(totalNano)
         return totalNano
