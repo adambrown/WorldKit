@@ -107,7 +107,7 @@ fun nvgSave(ctx: Long) {
 }
 
 fun nvgBeginFrame(ctx: Long, windowWidth: Int, windowHeight: Int, devicePixelRatio: Float) {
-    NanoVG.nvgBeginFrame(ctx, windowWidth, windowHeight, devicePixelRatio)
+    NanoVG.nvgBeginFrame(ctx, windowWidth.toFloat(), windowHeight.toFloat(), devicePixelRatio)
 }
 
 fun nvgEndFrame(ctx: Long) {

@@ -21,7 +21,7 @@ import com.grimfox.gec.util.Rendering.renderRegionBorders
 import com.grimfox.gec.util.Rendering.renderRegions
 import com.grimfox.gec.util.geometry.renderTriangle
 import com.grimfox.joml.SimplexNoise.noise
-import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.*
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL11.*
 import java.awt.image.BufferedImage
@@ -80,10 +80,10 @@ object WaterFlows {
             val biomeMask: Matrix<Byte>,
             val landMask: Matrix<Byte>,
             val underWaterMask: Matrix<Float>,
-            val elevationPowerMask: Matrix<Short>,
-            val startingHeightsMask: Matrix<Short>,
-            val soilMobilityMask: Matrix<Short>,
-            val coastalDistanceMask: Matrix<Short>)
+            val elevationPowerMask: ShortArrayMatrix,
+            val startingHeightsMask: ShortArrayMatrix,
+            val soilMobilityMask: ShortArrayMatrix,
+            val coastalDistanceMask: ShortArrayMatrix)
 
     class ExportFiles(
             val outputSize: Int = 256,

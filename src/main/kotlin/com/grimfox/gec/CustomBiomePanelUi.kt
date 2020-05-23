@@ -5,7 +5,7 @@ import com.grimfox.gec.ui.UserInterface
 import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import com.grimfox.gec.util.Biomes.Biome
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.runBlocking
 import org.lwjgl.opengl.GL11
 import java.io.*
 import java.util.*

@@ -2,7 +2,7 @@ package com.grimfox.gec
 
 import com.grimfox.gec.model.*
 import com.grimfox.gec.util.clamp
-import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.*
 import java.awt.image.BufferedImage
 import java.io.*
 import java.lang.Math.*
@@ -73,13 +73,13 @@ object TerrainAmplification {
     }
 
     fun amplify(factor :Int, input: RcMatrix, inputIndexMask: IntArray, maskSize: Int, offset: Int, dictionaries: List<Pair<RcMatrix, RcMatrix>>): Triple<RcMatrix, Float, Float> {
-        val dilated = dilateTerrain(input, maskSize * 2)
-        val mask = buildMask(maskSize)
+        val dilated = time("dilateTerrain") { dilateTerrain(input, maskSize * 2) }
+        val mask = time("buildMask") { buildMask(maskSize) }
         val maskSizeHigh = maskSize * factor
-        val maskHigh = buildMask(maskSizeHigh)
+        val maskHigh = time("buildMaskHigh") { buildMask(maskSizeHigh) }
         val offsetSynthesisHigh = offset * factor
-        val divisorMask = buildDivisorMask(maskHigh, offsetSynthesisHigh)
-        val usefulIndices = buildMaskUsefulIndices(mask)
+        val divisorMask = time("buildDivisorMask") { buildDivisorMask(maskHigh, offsetSynthesisHigh) }
+        val usefulIndices = time("buildMaskUsefulIndices") { buildMaskUsefulIndices(mask) }
 
         val (coefficients, means) = time("optimization") {
              optimizeTerrainWithDictionary(dictionaries.map { it.first }, inputIndexMask, maskSize, mask, offset, dilated, usefulIndices)
@@ -423,34 +423,38 @@ object TerrainAmplification {
 
     fun matching(dictionary: RcMatrix, atoms: RcMatrix, usefulIndices: IntArray): Coefficients {
         val gamma = Coefficients(atoms.columns, dictionary.columns)
-        runBlocking(CommonPool) {
-            (0 until atoms.columns).chunked(atoms.columns / 512).map { chunk ->
-                async {
-                    chunk.forEach { signal ->
-                        val (pos, max) = matTVecMaxAbs(dictionary, atoms, signal, usefulIndices)
-                        if (max >= 0.0000001f) {
-                            gamma[signal, pos] = max
-                        }
-                    }
+        val step = atoms.columns / 512
+        val chunks = ArrayList<IntRange>()
+        for (i in 0 until atoms.columns step step) {
+            chunks.add(i..(i + step - 1).coerceAtMost(atoms.columns - 1))
+        }
+
+        chunks.parallelStream().forEach {
+            for (signal in it) {
+                val (pos, max) = matTVecMaxAbs(dictionary, atoms, signal, usefulIndices)
+                if (max >= 0.0000001f) {
+                    gamma[signal, pos] = max
                 }
-            }.map { it.await() }
+            }
         }
         return gamma
     }
 
     private fun matching(dictionaries: List<RcMatrix>, inputIndexMask: IntArray, atoms: RcMatrix, usefulIndices: IntArray): Coefficients {
         val gamma = Coefficients(atoms.columns, dictionaries.map { it.columns }.max()!!)
-        runBlocking(CommonPool) {
-            (0 until atoms.columns).chunked(atoms.columns / 512).map { chunk ->
-                async {
-                    chunk.forEach { signal ->
-                        val (pos, max) = matTVecMaxAbs(dictionaries[inputIndexMask[signal]], atoms, signal, usefulIndices)
-                        if (max >= 0.0000001f) {
-                            gamma[signal, pos] = max
-                        }
-                    }
+        val step = atoms.columns / 512
+        val chunks = ArrayList<IntRange>()
+        for (i in 0 until atoms.columns step step) {
+            chunks.add(i..(i + step - 1).coerceAtMost(atoms.columns - 1))
+        }
+
+        chunks.parallelStream().forEach {
+            for (signal in it) {
+                val (pos, max) = matTVecMaxAbs(dictionaries[inputIndexMask[signal]], atoms, signal, usefulIndices)
+                if (max >= 0.0000001f) {
+                    gamma[signal, pos] = max
                 }
-            }.map { it.await() }
+            }
         }
         return gamma
     }

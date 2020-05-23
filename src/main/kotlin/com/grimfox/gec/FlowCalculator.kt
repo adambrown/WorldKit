@@ -3,7 +3,7 @@ package com.grimfox.gec
 import com.grimfox.gec.model.*
 import com.grimfox.gec.model.geometry.Vector2D
 import com.grimfox.gec.util.task
-import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.*
 import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*

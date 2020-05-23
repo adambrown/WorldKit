@@ -1,7 +1,8 @@
 package com.grimfox.logging
 
 import com.grimfox.logging.LoggingLevel.*
-import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -252,7 +253,7 @@ private object InternalLogging {
         if (level.ordinal >= LOGGING_LEVEL.ordinal) {
             if (message != null || error != null) {
                 val logTime = System.currentTimeMillis()
-                async {
+                GlobalScope.async {
                     val messageValue = message?.invoke()
                     when {
                         message != null && error != null -> {

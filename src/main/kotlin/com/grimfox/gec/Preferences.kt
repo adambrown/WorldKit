@@ -3,6 +3,7 @@ package com.grimfox.gec
 import com.grimfox.gec.model.*
 import com.grimfox.gec.util.*
 import com.grimfox.logging.LOG
+import kotlinx.coroutines.asCoroutineDispatcher
 import java.io.*
 import java.util.concurrent.*
 
@@ -103,6 +104,7 @@ data class WindowState(
 
 val threadCount = Runtime.getRuntime().availableProcessors()
 val executor: ExecutorService = Executors.newWorkStealingPool()
+val dispatcher = executor.asCoroutineDispatcher()
 val preferences = loadPreferences(executor)
 
 fun loadPreferences(executor: ExecutorService): Preferences {
