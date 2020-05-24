@@ -23,7 +23,7 @@ fun aboutPanel(ui: UserInterface) {
                     vLabelRow(LARGE_ROW_HEIGHT, text("WorldKit", TEXT_STYLE_LARGE_MESSAGE))
                     vSpacer(LARGE_SPACER_SIZE)
                     vLabelRow(LARGE_ROW_HEIGHT, text("Version: 0.14.1-alpha", TEXT_STYLE_NORMAL))
-                    vLabelRow(LARGE_ROW_HEIGHT, text("Copyright 2018 Intellirithmic Inc. All rights reserved.", TEXT_STYLE_NORMAL))
+                    vLabelRow(LARGE_ROW_HEIGHT, text("Copyright 2015-2020 Adam Brown (https://github.com/adambrown) All rights reserved.", TEXT_STYLE_NORMAL))
                 }
             }
             vSpacer(MEDIUM_SPACER_SIZE)

@@ -319,27 +319,9 @@ object MainUi {
                                 }
                             }
                             menu("Help") {
-                                menuItem("Help", "Ctrl+F1", BLOCK_GLYPH_HELP) {
-                                    openHelp(errorHandler)
-                                }
-                                menuDivider()
-                                menuItem("Online help") {
-                                    openWebPage("https://www.intellirithmic.com/worldkit/help", errorHandler)
-                                }
-                                menuItem("Getting started") {
-                                    openWebPage("https://www.intellirithmic.com/worldkit/help/getting-started.html", errorHandler)
-                                }
-                                menuItem("Tutorials") {
-                                    openWebPage("https://www.intellirithmic.com/worldkit/help/tutorials.html", errorHandler)
-                                }
                                 menuItem("Website") {
-                                    openWebPage("https://www.intellirithmic.com/worldkit", errorHandler)
+                                    openWebPage("https://github.com/adambrown/WorldKit", errorHandler)
                                 }
-                                menuDivider()
-                                menuItem("Install offline help") {
-                                    downloadOfflineHelp(errorHandler)
-                                }
-                                menuDivider()
                                 menuItem("About WorldKit") {
                                     openAboutPanel()
                                 }
