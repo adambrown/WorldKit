@@ -23,7 +23,7 @@ void main() {
         if (coastDistance > minBorderDistInverse) {
             colorOut = vec4(0.001, 0.001, 0.001, 1.0);
         } else {
-            colorOut = vec4(0.0001, 0.0001, 0.0001, 1.0);
+            colorOut = vec4(0.001, 0.001, 0.001, 1.0);
         }
     }
 }

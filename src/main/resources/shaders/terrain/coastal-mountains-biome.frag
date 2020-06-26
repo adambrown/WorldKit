@@ -31,7 +31,8 @@ void main() {
                 if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
                     colorOut = vec4(0.009, 0.009, 0.009, 1.0);
                 } else if (coastDistance > 0.97) {
-                    colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+//                    colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+                    colorOut = vec4(0.4, 0.4, 0.4, 1.0);
                 } else {
                     colorOut = vec4(0.4, 0.4, 0.4, 1.0);
                 }

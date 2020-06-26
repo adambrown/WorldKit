@@ -77,9 +77,10 @@ object BuildContinent {
                     RegionIterationParameters(32, 0.40f, 0.2f, 6, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
 //                    Parameters(80, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f)
                     RegionIterationParameters(64, 0.40f, 0.1f, 4, 0.1f, 0.05f, 0.035f, 2.0f, 0.005f),
-                    RegionIterationParameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+                    RegionIterationParameters(128, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f),
 //                    Parameters(140, 0.39f, 0.03f, 2, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
-//                    RegionIterationParameters(256, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+                    RegionIterationParameters(256, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
+//                    RegionIterationParameters(512, 0.39f, 0.05f, 3, 0.1f, 0.05f, 0.035f, 2.0f, 0.01f)
             ),
             var currentIteration: Int = 0) {
 
@@ -858,8 +859,10 @@ object BuildContinent {
             biomeGraph: Graph,
             biomeMask: Matrix<Byte>,
             biomes: List<Biome>,
-            flowGraphSmall: Graph,
-            flowGraphLarge: Graph,
+            flowGraph1: Graph,
+            flowGraph2: Graph,
+            flowGraph3: Graph,
+            flowGraph4: Graph,
             executor: ExecutorService,
             mapScale: Int,
             customElevationPowerMap: TextureId,
@@ -868,14 +871,17 @@ object BuildContinent {
             canceled: Reference<Boolean>,
             biomeTemplates: Biomes,
             renderLevel: Int,
-            exportFiles: WaterFlows.ExportFiles? = null): Pair<TextureId?, TextureId?> {
+            colorHeightScaleFactor: MutableReference<Float>? = null,
+            exportFiles: WaterFlows.ExportFiles? = null): Triple<TextureId?, TextureId?, TextureId?> {
         return generateWaterFlows(
                 random = Random(parameterSet.regionsSeed),
                 regionSplines = regionSplines,
                 biomeGraph = biomeGraph,
                 biomeMask = biomeMask,
-                flowGraphSmall = flowGraphSmall,
-                flowGraphLarge = flowGraphLarge,
+                flowGraph1 = flowGraph1,
+                flowGraph2 = flowGraph2,
+                flowGraph3 = flowGraph3,
+                flowGraph4 = flowGraph4,
                 executor = executor,
                 mapScale = mapScale,
                 biomes = biomes,
@@ -885,6 +891,7 @@ object BuildContinent {
                 canceled = canceled,
                 biomeTemplates = biomeTemplates,
                 renderLevel = renderLevel,
+                colorHeightScaleFactor = colorHeightScaleFactor,
                 exportFiles = exportFiles)
     }
 }

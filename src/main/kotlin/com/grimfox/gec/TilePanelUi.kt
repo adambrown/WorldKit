@@ -6,9 +6,6 @@ import com.grimfox.gec.ui.widgets.*
 import com.grimfox.gec.util.*
 import java.io.File
 
-private val cachedGraph256 = preferences.cachedGraph256!!
-private val cachedGraph1024 = preferences.cachedGraph1024!!
-
 fun tilePanel(ui: UserInterface) {
     val shrinkGroup = hShrinkGroup()
     val heightInput = DynamicTextReference("${preferences.projectDir}${File.separator}exports${File.separator}export", 1024, TEXT_STYLE_NORMAL)

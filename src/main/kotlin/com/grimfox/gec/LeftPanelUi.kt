@@ -11,7 +11,10 @@ import java.util.concurrent.CancellationException
 
 
 private val cachedGraph256 = preferences.cachedGraph256!!
+private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
+private val cachedGraph2048 = preferences.cachedGraph2048!!
+private val cachedGraph4096 = preferences.cachedGraph4096!!
 
 private val leftPanelLabelShrinkGroup = hShrinkGroup()
 
@@ -118,13 +121,16 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
             val biomePanel = editBiomesPanel(biomePanelExpanded, generationLock, editToggleSet, leftPanelLabelShrinkGroup, scroller, ui, uiLayout, dialogLayer)
             biomePanel.isVisible = false
             biomePanelExpanded.addListener(resetScrollerListener)
-            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..25), linearClampedScaleFunctionInverse(1..25))
+            val mapDetailScaleSlider = vSliderWithValueRow(mapDetailScale, 6, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Map detail scale:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(mapDetailScales.indices), linearClampedScaleFunctionInverse(mapDetailScales.indices)) {
+                "${mapDetailScales[it]} km"
+            }
             mapDetailScaleSlider.isVisible = false
             mapDetailScale.addListener { old, new ->
                 if (old != new) {
                     editToggleSet.suspend {
                         generationLock.doWithLock {
                             currentState.heightMapTexture.value = null
+                            currentState.normalAoMapTexture.value = null
                             currentState.riverMapTexture.value = null
                         }
                     }
@@ -180,13 +186,14 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                         }
                     }
                 }
-                generationLock.disableOnLockButton(this, "Show mesh", { currentState.heightMapTexture.value != null && currentState.riverMapTexture.value != null && displayMode.value == DisplayMode.MESH }) {
+                generationLock.disableOnLockButton(this, "Show mesh", { currentState.heightMapTexture.value != null && currentState.riverMapTexture.value != null && currentState.normalAoMapTexture.value != null && displayMode.value == DisplayMode.MESH }) {
                     editToggleSet.suspend {
                         generationLock.doWithLock {
                             val currentHeightMap = currentState.heightMapTexture.value
                             val currentRiverMap = currentState.riverMapTexture.value
+                            val currentNormalAoMap = currentState.normalAoMapTexture.value
                             if (currentHeightMap != null && currentRiverMap != null) {
-                                meshViewport.setHeightmap(Pair(currentHeightMap, currentRiverMap), VIEWPORT_HEIGHTMAP_SIZE)
+                                meshViewport.setHeightmap(Triple(currentHeightMap, currentRiverMap, currentNormalAoMap), VIEWPORT_HEIGHTMAP_SIZE)
                                 imageMode.value = 3
                                 displayMode.value = DisplayMode.MESH
                             }
@@ -195,13 +202,14 @@ private fun Block.leftPanelWidgets(ui: UserInterface, uiLayout: UiLayout, dialog
                 }
             }
             mainButtonsRow.isVisible = false
-            val outputQualitySlider = vSliderWithValueRow(outputQuality, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Output quality:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..6), linearClampedScaleFunctionInverse(1..6))
+            val outputQualitySlider = vSliderWithValueRow(outputQuality, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Output quality:"), leftPanelLabelShrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(1..9), linearClampedScaleFunctionInverse(1..9))
             outputQualitySlider.isVisible = false
             mapDetailScale.addListener { old, new ->
                 if (old != new) {
                     editToggleSet.suspend {
                         generationLock.doWithLock {
                             currentState.heightMapTexture.value = null
+                            currentState.normalAoMapTexture.value = null
                             currentState.riverMapTexture.value = null
                         }
                     }
@@ -303,14 +311,16 @@ private fun Block.addBuildButton(dialogLayer: Block, level: Int) {
                     val canceled = ref(false)
                     cancelCurrentRunningTask.value = canceled
                     try {
-                        val (heightMapTexId, riverMapTexId) = generateWaterFlows(
+                        val (heightMapTexId, riverMapTexId, normalAoTexId) = generateWaterFlows(
                                 parameterSet = currentParameters,
                                 regionSplines = currentRegionSplines,
                                 biomeGraph = currentBiomeGraph,
                                 biomeMask = currentBiomeMask,
                                 biomes = currentBiomes,
-                                flowGraphSmall = cachedGraph256.value,
-                                flowGraphLarge = cachedGraph1024.value,
+                                flowGraph1 = cachedGraph512.value,
+                                flowGraph2 = cachedGraph1024.value,
+                                flowGraph3 = cachedGraph2048.value,
+                                flowGraph4 = cachedGraph4096.value,
                                 executor = executor,
                                 mapScale = currentMapScale,
                                 customElevationPowerMap = currentState.customElevationPowerMap.value,
@@ -318,12 +328,16 @@ private fun Block.addBuildButton(dialogLayer: Block, level: Int) {
                                 customSoilMobilityMap = currentState.customSoilMobilityMap.value,
                                 canceled = canceled,
                                 biomeTemplates = BIOME_TEMPLATES_REF.value!!,
-                                renderLevel = level)
-                        meshViewport.setHeightmap(Pair(heightMapTexId, riverMapTexId), VIEWPORT_HEIGHTMAP_SIZE)
+                                renderLevel = level,
+                                colorHeightScaleFactor = colorHeightScaleFactor)
+                        meshViewport.setHeightmap(Triple(heightMapTexId, riverMapTexId, normalAoTexId), VIEWPORT_HEIGHTMAP_SIZE)
                         currentState.heightMapTexture.value = heightMapTexId
+                        currentState.normalAoMapTexture.value = normalAoTexId
                         currentState.riverMapTexture.value = riverMapTexId
-                        val linearDistanceScaleInKilometers = mapScaleToLinearDistance(currentMapScale)
-                        heightMapScaleFactor.value = linearDistanceToScaleFactor(linearDistanceScaleInKilometers)
+                        val mapScaleMeters = mapScaleToLinearDistanceMeters(currentMapScale)
+                        heightRangeMeters.value = mapScaleToHeightRangeMeters(currentMapScale)
+                        heightMapScaleFactor.value = linearDistanceMetersToViewportScaleFactor(mapScaleMeters, heightRangeMeters.value)
+                        waterShaderParams.level.value = linearDistanceMetersToRenderScale(linearDistanceMetersToWaterLevelMeters(mapScaleMeters), heightRangeMeters.value)
                         imageMode.value = 3
                         displayMode.value = DisplayMode.MESH
                     } catch (w: Exception) {

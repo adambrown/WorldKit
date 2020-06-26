@@ -158,8 +158,8 @@ object Graphs {
     fun generateGraph(stride: Int, seed: Long, constraint: Double, cacheVertices: Boolean = true, cacheTriangles: Boolean = true): Graph {
         val random = Random(seed)
         val polygon = Polygon(stride * stride)
-        generateSemiUniformPointsD(stride, 1.0, random, constraint) { _, x, y ->
-            polygon.add(Vertex(x, y))
+        generateSemiUniformPointsD(stride, 1.0, random, constraint) { i, x, y ->
+            polygon.add(Vertex(x, y, id = i))
         }
         val mesh = polygon.triangulate()
         return buildGraph(seed, mesh, stride, null, cacheVertices, cacheTriangles)
@@ -187,7 +187,7 @@ object Graphs {
         val triangleToTriangles = IntArray(triangles.size * 3)
         val triangleToVertices = IntArray(triangles.size * 3)
         val vertexToTrianglesTemp = ArrayList<ArrayList<Int>>(points.size)
-        for (i in 0..points.size - 1) {
+        for (i in points.indices) {
             vertexToTrianglesTemp.add(ArrayList(5))
         }
         if (width == null) {

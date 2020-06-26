@@ -34,7 +34,9 @@ void main() {
             minBorderDistInverse = 1.0 - minBorderDist;
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > minBorderDistInverse) {
-                colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+//                colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+                float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.275) * 0.4;
+                colorOut = vec4(height, height, height, 1.0);
             } else {
                 float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.275) * 0.4;
                 colorOut = vec4(height, height, height, 1.0);

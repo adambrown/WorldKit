@@ -1,6 +1,6 @@
 package com.grimfox.triangle.geometry
 
-open class Vertex(x: Double = 0.0, y: Double = 0.0, mark: Int = 0) : Point(x, y, mark, 0) {
+open class Vertex(x: Double = 0.0, y: Double = 0.0, mark: Int = 0, id: Int = 0) : Point(x, y, mark, id) {
 
     enum class VertexType {
         INPUT_VERTEX,

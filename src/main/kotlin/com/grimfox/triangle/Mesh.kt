@@ -168,7 +168,7 @@ class Mesh(private val config: Configuration) {
         var id: Int
         if (num === NodeNumbering.LINEAR) {
             id = 0
-            for (node in _vertices.values) {
+            for (node in _vertices.values.sortedBy { it.id }) {
                 node.id = id++
             }
         } else if (num === NodeNumbering.CUTHILL_MCKEE) {

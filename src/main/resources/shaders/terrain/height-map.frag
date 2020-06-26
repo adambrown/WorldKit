@@ -22,12 +22,15 @@ uniform float specularIntensity;
 uniform float waterSpecularIntensity;
 uniform float indirectIntensity;
 uniform float heightScale;
+uniform float heightScaleMeters;
+uniform float colorHeightScale;
 uniform float uvScale;
 uniform float horizonBlend;
 uniform float lightMaxFogEffect;
 uniform mat3 fogParams;
 uniform int renderOptions;
 uniform sampler2D heightMapTexture;
+uniform sampler2D normalAoTexture;
 uniform sampler2D riverMapTexture;
 uniform sampler2D brdfMap;
 uniform samplerCube irradianceMap;
@@ -52,8 +55,6 @@ const float iGamma = 1 / gamma;
 
 const float pi = 3.1415926538;
 
-const float f0 = 0.08;
-
 const float skyDistance = 100;
 
 const float lightPower = 4;
@@ -74,6 +75,16 @@ vec3 toGamma(vec3 v) {
 
 vec4 toGamma(vec4 v) {
   return vec4(toGamma(v.rgb), v.a);
+}
+
+float dggx(float nDotH, float a2) {
+    float temp  = (nDotH * nDotH * (a2 - 1.0) + 1.0);
+    return a2 / (pi * temp * temp);
+}
+
+float gggx(float nDotV, float nDotL, float k)
+{
+    return (nDotV / (nDotV * (1.0 - k) + k)) * (nDotL / (nDotL * (1.0 - k) + k));
 }
 
 vec3 applyFog(vec3 worldPosition, vec3 pixelColor) {
@@ -114,49 +125,16 @@ void main() {
 
     float uvScale2 = uvScale * 2;
     vec2 size = vec2(uvScale2, 0.0);
-    float unscaledHeight = texture(heightMapTexture, VertexIn.uv).r;
-    float height = unscaledHeight * heightScale;
-    float westPixel = textureOffset(heightMapTexture, VertexIn.uv, off.xy).r * heightScale;
-    float eastPixel = textureOffset(heightMapTexture, VertexIn.uv, off.zy).r * heightScale;
-    float northPixel = textureOffset(heightMapTexture, VertexIn.uv, off.yx).r * heightScale;
-    float southPixel = textureOffset(heightMapTexture, VertexIn.uv, off.yz).r * heightScale;
-    float northWestPixel = textureOffset(heightMapTexture, VertexIn.uv, off.xx).r * heightScale;
-    float southEastPixel = textureOffset(heightMapTexture, VertexIn.uv, off.zz).r * heightScale;
-    float northEastPixel = textureOffset(heightMapTexture, VertexIn.uv, off.zx).r * heightScale;
-    float southWestPixel = textureOffset(heightMapTexture, VertexIn.uv, off.xz).r * heightScale;
-    vec3 va = normalize(vec3(size.xy, eastPixel - westPixel));
-    vec3 vb = normalize(vec3(size.yx, southPixel - northPixel));
-    vec3 vc = normalize(vec3(size.xx, southEastPixel - northWestPixel));
-    vec3 vd = normalize(vec3(size.x, -size.x, southWestPixel - northEastPixel));
-    vec3 crossNormal = cross(va, vb);
-    crossNormal = normalize(vec3(crossNormal.x, -crossNormal.y, crossNormal.z));
-    vec3 xNormal = cross(vd, vc);
-    xNormal = normalize(vec3(xNormal.y, -xNormal.x, xNormal.z));
-    vec3 normal = normalize(xNormal + crossNormal);
 
-    vec3 worldPosition = vec3(VertexIn.position.xy, height);
-    float occlusion = 1 - clamp((
-        max(dot(normal, normalize(vec3(-uvScale, 0.0, westPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale, 0.0, eastPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(0.0, uvScale, northPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(0.0, -uvScale, southPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale, uvScale, northWestPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale, -uvScale, southEastPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale, uvScale, northEastPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale, -uvScale, southWestPixel - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale2, -uvScale, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(-2, -1)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale2, 0, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(-2, 0)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale2, uvScale, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(-2, 1)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale, uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(-1, 2)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(0, uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(0, 2)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale, uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(1, 2)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale2, uvScale, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(2, 1)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale2, 0, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(2, 0)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale2, -uvScale, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(2, -1)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(uvScale, -uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(1, -2)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(0, -uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(0, -2)).r * heightScale) - height))), 0) +
-        max(dot(normal, normalize(vec3(-uvScale, -uvScale2, (textureOffset(heightMapTexture, VertexIn.uv, ivec2(-1, -2)).r * heightScale) - height))), 0)
-    ) / 20.0, 0, 1);
+    float unscaledHeight = texture(heightMapTexture, VertexIn.uv).r;
+    float colorHeight = unscaledHeight * colorHeightScale;
+    float viewHeight = unscaledHeight * heightScale;
+
+    vec3 fragmentPosition = vec3(VertexIn.position.xy, viewHeight);
+
+    vec4 normalAoColor = texture(normalAoTexture, VertexIn.uv);
+    vec3 normal = normalize((normalAoColor.rgb - 0.5) * 2.0);
+    float occlusion = normalAoColor.a;
 
     float adjustedMetallic = waterMetallic;
     float adjustedRoughness = waterRoughness;
@@ -182,46 +160,46 @@ void main() {
         hasRivers = true;
     }
     if (hasColor) {
-        if (unscaledHeight <= 0.05) {
+        if (colorHeight <= 0.05) {
             lowColor = color1;
             highColor = color1;
             interpolation = 0.5;
-        } else if (unscaledHeight <= 0.19) {
+        } else if (colorHeight <= 0.19) {
             lowColor = color1;
             highColor = color2;
-            interpolation = (unscaledHeight - 0.05) * 7.1426;
-        } else if (unscaledHeight <= 0.24) {
+            interpolation = (colorHeight - 0.05) * 7.1426;
+        } else if (colorHeight <= 0.24) {
             lowColor = color2;
             highColor = color2;
             interpolation = 0.5;
-        } else if (unscaledHeight <= 0.38) {
+        } else if (colorHeight <= 0.38) {
             lowColor = color2;
             highColor = color3;
-            interpolation = (unscaledHeight - 0.24) * 7.1426;
-        } else if (unscaledHeight <= 0.43) {
+            interpolation = (colorHeight - 0.24) * 7.1426;
+        } else if (colorHeight <= 0.43) {
             lowColor = color3;
             highColor = color3;
             interpolation = 0.5;
-        } else if (unscaledHeight <= 0.57) {
+        } else if (colorHeight <= 0.57) {
             lowColor = color3;
             highColor = color4;
-            interpolation = (unscaledHeight - 0.43) * 7.1426;
-        } else if (unscaledHeight <= 0.62) {
+            interpolation = (colorHeight - 0.43) * 7.1426;
+        } else if (colorHeight <= 0.62) {
             lowColor = color4;
             highColor = color4;
             interpolation = 0.5;
-        } else if (unscaledHeight <= 0.76) {
+        } else if (colorHeight <= 0.76) {
             lowColor = color4;
             highColor = color5;
-            interpolation = (unscaledHeight - 0.62) * 7.1426;
-        } else if (unscaledHeight <= 0.81) {
+            interpolation = (colorHeight - 0.62) * 7.1426;
+        } else if (colorHeight <= 0.81) {
             lowColor = color5;
             highColor = color5;
             interpolation = 0.5;
-        } else if (unscaledHeight <= 0.95) {
+        } else if (colorHeight <= 0.95) {
             lowColor = color5;
             highColor = color6;
-            interpolation = (unscaledHeight - 0.81) * 7.1426;
+            interpolation = (colorHeight - 0.81) * 7.1426;
         } else {
             lowColor = color6;
             highColor = color6;
@@ -246,35 +224,39 @@ void main() {
         adjustedSpecIntensity = specularIntensity;
     }
 
-    vec3 viewDirection = normalize(cameraPosition - vec3(VertexIn.position.xy, height));
-    vec3 h = normalize(lightDirection + viewDirection);
-    float nDotL = dot(normal, lightDirection);
-    float nDotV = dot(normal, viewDirection);
-    float nDotH = dot(normal, h);
-    float vDotH = dot(viewDirection, h);
-    vec3 reflect = 2 * nDotV * normal - viewDirection;
+    vec3 viewDirection = normalize(cameraPosition - fragmentPosition);
+    vec3 halfVector = normalize(lightDirection + viewDirection);
+    vec3 reflectVector = reflect(-viewDirection, normal);
+    float nDotL = max(dot(normal, lightDirection), 0.0);
+    float nDotV = max(dot(normal, viewDirection), 0.0);
+    float nDotH = max(dot(normal, halfVector), 0.0);
+    float vDotH = max(dot(viewDirection, halfVector), 0.0);
 
     float a = adjustedRoughness * adjustedRoughness;
     float a2 = a * a;
-    float k = ((adjustedRoughness + 1) * (adjustedRoughness + 1)) / 8;
 
-    vec3 directDiffuse = clamp(nDotL, 0.0, 1.0) * lightColor.rgb;
-    directDiffuse = directDiffuse * (1 - clamp(pow(dot(lightDirection, vec3(0, 0, 1)), 7), 0.4, 1.0));
-    vec3 indirectDiffuse = texture(irradianceMap, normal.xzy).rgb * indirectIntensity;
-    vec3 totalDiffuse = ((directDiffuse + indirectDiffuse) * finalBaseColor.rgb * (1 - adjustedMetallic)) / pi;
+    float d = dggx(nDotH, a2);
 
-    float temp = (nDotH * nDotH * (a2 - 1) + 1);
-    float specD = a2 / (pi * temp * temp);
-    float specG = (nDotV / (nDotV * (1 - k) + k)) * (nDotL / (nDotL * (1 - k) + k));
-    vec3 f0Vec = mix(vec3(f0 * adjustedSpecIntensity), finalBaseColor.rgb, adjustedMetallic);
-    vec3 specF = f0Vec + ((vec3(1.0) - f0Vec) * pow(2, ((-5.55473 * vDotH) - 6.98316) * vDotH));
-    vec3 specular = max((vec3(specD) * vec3(specG) * specF) / (4 * nDotL * nDotV), 0.0);
+    float k = ((adjustedRoughness + 1.0) * (adjustedRoughness + 1.0)) / 8.0;
+    float g = gggx(nDotV, nDotL, k);
 
-    vec3 specReflect = textureLod(specularMap, reflect.xzy, adjustedRoughness * 6).rgb * indirectIntensity;
-    vec2 envBrdf = texture(brdfMap, vec2(adjustedRoughness, clamp(nDotV, 0.0, 1.0))).rg;
-    vec3 specIbl = specReflect * (specF * envBrdf.x + envBrdf.y);
+    vec3 f0 = mix(vec3(0.08 * specularIntensity), finalBaseColor.rgb, adjustedMetallic);
+    vec3 f = f0 + (max(vec3(1.0 - adjustedRoughness), f0) - f0) * pow(1.0 - vDotH, 5.0);
 
-    vec3 totalSpecular = specular * lightColor.rgb + specIbl * clamp(adjustedMetallic, 0.08 * adjustedSpecIntensity, 1.0);
+    vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 0.001);
 
-    colorOut = vec4(toGamma(applyFog(worldPosition, (totalDiffuse + totalSpecular) * occlusion * occlusion * occlusion)), 1.0);
+    vec3 kD = (vec3(1.0) - f) * (1 - adjustedMetallic);
+
+    vec3 directLight = (kD * finalBaseColor.rgb / pi + specular) * lightColor.rgb * nDotL;
+
+    vec3 irradiance = texture(irradianceMap, normal.xzy).rgb * indirectIntensity;
+    vec3 diffuse = irradiance * finalBaseColor.rgb;
+
+    vec3 specReflect = textureLod(specularMap, reflectVector.xzy, adjustedRoughness * 6).rgb * indirectIntensity;
+    vec2 envBrdf = texture(brdfMap, vec2(nDotV, adjustedRoughness)).rg;
+    vec3 specIbl = specReflect * (f * envBrdf.x + envBrdf.y);
+
+    vec3 ambient = (kD * diffuse + specIbl) * occlusion;
+
+    colorOut = vec4(toGamma(applyFog(fragmentPosition, directLight + ambient)), 1.0);
 }

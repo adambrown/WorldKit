@@ -308,9 +308,9 @@ object Utils {
         val quarterSquare = gridSquare * realConstraint
         val margin = (gridSquare * (1.0 - realConstraint)) * 0.5
         var i = 0
-        for (y in 0..stride - 1) {
+        for (y in 0 until stride) {
             val oy = (y * gridSquare) + margin
-            for (x in 0..stride - 1) {
+            for (x in 0 until stride) {
                 callback(i++, (x * gridSquare) + margin + (random.nextDouble() * quarterSquare), oy + (random.nextDouble() * quarterSquare))
             }
         }
@@ -322,7 +322,7 @@ object Utils {
 
     fun <T, ML : MutableList<T>> ML.init(size: Int, init: (Int) -> T): ML {
         this.clear()
-        for (i in 0..size - 1) {
+        for (i in 0 until size) {
             this.add(init(i))
         }
         return this

@@ -35,7 +35,8 @@ void main() {
                 if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
                     colorOut = vec4(0.0000001, 0.0000001, 0.0000001, 1.0);
                 } else if (coastDistance > 0.97) {
-                    float height = 0.00083333 + noise;
+//                    float height = 0.00083333 + noise;
+                    float height = 0.0015 + noise;
                     colorOut = vec4(height, height, height, 1.0);
                 } else {
                     float height = 0.0015 + noise;

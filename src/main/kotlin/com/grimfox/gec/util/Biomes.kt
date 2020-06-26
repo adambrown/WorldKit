@@ -10,8 +10,6 @@ import com.grimfox.gec.ui.widgets.TextureBuilder.buildTextureRedShort
 import com.grimfox.joml.Matrix4f
 import com.grimfox.joml.SimplexNoise.noise
 import org.lwjgl.BufferUtils
-import org.lwjgl.opengl.GL11.*
-import org.lwjgl.opengl.GL13.*
 import org.lwjgl.opengl.GL20.*
 import java.io.File
 import java.lang.Math.*
@@ -45,19 +43,21 @@ class Biomes {
 
     private val TALUS_ANGLES_SHARP_PLATEAU = buildLinearTalusAngles(88.9f, 0.1f, 0.0f)
 
-    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildLinearTalusAngles(15.0f, 30.0f, 2.0f)
+    private val TALUS_ANGLES_COASTAL_MOUNTAINS = buildLinearTalusAngles(25.0f, 20.0f, 3.0f)
 
     private val TALUS_ANGLES_FOOTHILLS = buildLinearTalusAngles(20.0f, 20.0f, 2.0f)
 
     private val TALUS_ANGLES_MOUNTAINS = buildLinearTalusAngles(30.0f, 15.0f, 5.0f)
 
-    private val TALUS_ANGLES_ROLLING_HILLS = buildNormalTalusAngles(30000.0f, 270.0f, 512.0f, 0.05f)
+    private val TALUS_ANGLES_ROLLING_HILLS = buildLinearTalusAngles(16.0f, -15.5f, 3.0f)
 
-    private val TALUS_ANGLES_PLAINS = buildNormalTalusAngles(20000.0f, 310.0f, 512.0f, 0.005f)
+    private val TALUS_ANGLES_PLAINS = buildLinearTalusAngles(4.0f, -3.5f, 3.0f)
 
-    private val TALUS_ANGLES_PLATEAU = buildPlateauTalusAngles()
+//    private val TALUS_ANGLES_PLATEAU = buildExpTalusAngles(83.0f, -82.5f, 4.0f, 3.0f)
+//    private val TALUS_ANGLES_PLATEAU = buildLogisticTalusAngles(83.0f, -82.5f, 90.0f, 4.0f, 0.089f, 3.0f)
+    private val TALUS_ANGLES_PLATEAU = buildSplitTalusAngles(50.0f, -49.0f, 0.3f, 2.0f, 10.0f, 3.0f)
 
-    private val TALUS_ANGLES_UNDERWATER = buildLinearTalusAngles(70.0f, 15.0f, 0.0f)
+    private val TALUS_ANGLES_UNDERWATER = buildLinearTalusAngles(40.0f, 15.0f, 0.0f)
 
     private fun buildPlateauTalusAngles(): Triple<FloatArray, FloatArray, FloatArray> {
         val profile = arrayOf(
@@ -114,6 +114,52 @@ class Biomes {
         }
         return Triple(baseAngles, jitters, null)
     }
+
+    fun buildExpTalusAngles(minAngle: Float, deltaAngle: Float, exp: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
+        val baseAngles = FloatArray(1024) { ((minAngle + Math.pow(it / 1023.0, exp.toDouble()).toFloat() * deltaAngle) / 90.0f).coerceIn(0.0f, 1.0f) }
+        val jitters = FloatArray(1024) {
+            val baseAngle = baseAngles[it]
+            val low = Math.abs(baseAngle)
+            val high = Math.abs(1.0f - baseAngle)
+            Math.min(jitter / 90.0f, Math.min(low, high)).coerceIn(0.0f, 1.0f)
+        }
+        return Triple(baseAngles, jitters, null)
+    }
+
+    fun buildLogisticTalusAngles(minAngle: Float, deltaAngle: Float, c1: Float, c2: Float, c3: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
+        val baseAngles = FloatArray(1024) { ((minAngle + logistic(it / 1023.0f, c1, c2, c3) * deltaAngle) / 90.0f).coerceIn(0.0f, 1.0f) }
+        val jitters = FloatArray(1024) {
+            val baseAngle = baseAngles[it]
+            val low = Math.abs(baseAngle)
+            val high = Math.abs(1.0f - baseAngle)
+            Math.min(jitter / 90.0f, Math.min(low, high)).coerceIn(0.0f, 1.0f)
+        }
+        return Triple(baseAngles, jitters, null)
+    }
+
+    private fun logistic(x: Float, c1: Float, c2: Float, c3: Float): Float {
+        return (1 / (pow(1 + pow(2.7182818284590452353602875, (c1.toDouble() * x.toDouble()) - c2.toDouble()), c3.toDouble()))).toFloat().coerceIn(0.0f, 1.0f)
+    }
+
+    private fun buildSplitTalusAngles(minAngle: Float, deltaAngle: Float, split: Float, left: Float, right: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
+        val baseAngles = FloatArray(1024) { ((minAngle + splitFunction(it / 1023.0f, split, left, right) * deltaAngle) / 90.0f).coerceIn(0.0f, 1.0f) }
+        val jitters = FloatArray(1024) {
+            val baseAngle = baseAngles[it]
+            val low = Math.abs(baseAngle)
+            val high = Math.abs(1.0f - baseAngle)
+            Math.min(jitter / 90.0f, Math.min(low, high)).coerceIn(0.0f, 1.0f)
+        }
+        return Triple(baseAngles, jitters, null)
+    }
+
+    private fun splitFunction(x: Float, split: Float, left: Float, right: Float): Float {
+        return if (x < split) {
+            abs(pow((x - split).toDouble() * (1.0 / split), left.toDouble())).toFloat()
+        } else {
+            abs(pow((x - split).toDouble() * (1.0 / (1.0 - split)), right.toDouble())).toFloat()
+        }
+    }
+
 
     fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, jitter: Float): Triple<FloatArray, FloatArray, FloatArray?> {
         val term0 = -2.0 * standardDeviation * standardDeviation
@@ -182,17 +228,17 @@ class Biomes {
 
     interface TerraceFunction {
 
-        fun apply(input: Float): Float
+        fun apply(input: Float, simplexX: Float, simplexY: Float, jitter: Float): Float
     }
 
-    class BasicTerraceFunction(val implementation: (Float) -> Float) : TerraceFunction {
+    class BasicTerraceFunction(val implementation: (Float, Float, Float, Float) -> Float) : TerraceFunction {
 
-        override fun apply(input: Float): Float {
-            return implementation(input)
+        override fun apply(input: Float, simplexX: Float, simplexY: Float, jitter: Float): Float {
+            return implementation(input, simplexX, simplexY, jitter)
         }
     }
 
-    fun terraceFunction(apply: (Float) -> Float): TerraceFunction {
+    fun terraceFunction(apply: (Float, Float, Float, Float) -> Float): TerraceFunction {
         return BasicTerraceFunction(apply)
     }
 
@@ -205,6 +251,9 @@ class Biomes {
             val previousTierBlendWeight: Float,
             val elevationPowerMultiplier: Float,
             val soilMobilityMultiplier: Float,
+            val talusOverride: Float? = null,
+            val terraceJitter: Float = 0.0f,
+            val terraceJitterFrequency: Float = 1.0f,
             val terraceFunction: ((Float, Float) -> TerraceFunction)? = null)
 
     class Biome(
@@ -619,16 +668,17 @@ class Biomes {
             heightMultiplier = 1.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 2.0f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.8f,
-                    soilMobilityMultiplier = 3.0f),
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 2.0f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.4f,
-                    soilMobilityMultiplier = 1.8f),
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.08f,
+                    talusOverride = 0.55f),
             detailSelector = { 1 })
 
     private val rollingHillsElevationShader = object : Shader {
@@ -756,19 +806,20 @@ class Biomes {
             elevationPowerShader = rollingHillsElevationShader,
             startingHeightShader = rollingHillsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_ROLLING_HILLS,
-            heightMultiplier = 30.0f,
+            heightMultiplier = 10.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 8.0f),
+                    elevationPowerMultiplier = 0.45f,
+                    soilMobilityMultiplier = 2.25f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.4f,
-                    soilMobilityMultiplier = 4.0f),
+                    elevationPowerMultiplier = 0.45f,
+                    soilMobilityMultiplier = 2.25f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.4f,
-                    soilMobilityMultiplier = 2.5f),
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.15f,
+                    talusOverride = 0.3f),
             detailSelector = { 1 })
 
     private val foothillsElevationShader = object : Shader {
@@ -899,16 +950,17 @@ class Biomes {
             heightMultiplier = 1.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
-            midPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.5f,
+                    elevationPowerMultiplier = 0.25f,
                     soilMobilityMultiplier = 2.0f),
-            highPassSettings = ErosionSettings(
+            midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 0.25f,
                     soilMobilityMultiplier = 2.0f),
+            highPassSettings = ErosionSettings(
+                    previousTierBlendWeight = 1.0f,
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.1f,
+                    talusOverride = 0.5f),
             detailSelector = { 1 })
 
     private val mountainsElevationShader = object : Shader {
@@ -1039,16 +1091,17 @@ class Biomes {
             heightMultiplier = 1.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 1.0f),
+                    elevationPowerMultiplier = 0.3f,
+                    soilMobilityMultiplier = 1.5f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.5f,
-                    soilMobilityMultiplier = 1.0f),
+                    elevationPowerMultiplier = 0.3f,
+                    soilMobilityMultiplier = 1.5f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.2f,
-                    soilMobilityMultiplier = 1.0f),
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.075f,
+                    talusOverride = 0.65f),
             detailSelector = { 1 })
 
     private val plainsElevationShader = object : Shader {
@@ -1176,19 +1229,20 @@ class Biomes {
             elevationPowerShader = plainsElevationShader,
             startingHeightShader = plainsStartingHeightsShader,
             talusAngles = TALUS_ANGLES_PLAINS,
-            heightMultiplier = 20.0f,
+            heightMultiplier = 15.0f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 6.0f),
+                    soilMobilityMultiplier = 1.0f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 6.0f),
+                    soilMobilityMultiplier = 1.0f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 4.0f),
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.03f,
+                    talusOverride = 0.08f),
             detailSelector = { 1 })
 
     private val plateauBiomeElevationShader = object : Shader {
@@ -1308,19 +1362,48 @@ class Biomes {
             elevationPowerShader = plateauBiomeElevationShader,
             startingHeightShader = plateauBiomeStartingHeightsShader,
             talusAngles = TALUS_ANGLES_PLATEAU,
-            heightMultiplier = 8.5f,
+            heightMultiplier = 4.5f,
             lowPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.6f,
-                    soilMobilityMultiplier = 0.4f),
+                    elevationPowerMultiplier = 2.5f,
+                    soilMobilityMultiplier = 0.35f,
+                    terraceJitter = 15.0f,
+                    terraceJitterFrequency = 80.0f,
+                    terraceFunction = { min, max ->
+                        val delta = max - min
+                        val steps = listOf(
+                                addTerraceStep(0.025f, 0.05f, 1.0f, min, delta, 2743.0f),
+                                addTerraceStep(0.19f, 0.28f, 0.4f, min, delta, 430.0f),
+                                addTerraceStep(0.44f, 0.22f, 0.4f, min, delta, 8483.0f),
+                                addTerraceStep(0.7f, 0.3f, 0.4f, min, delta, 3294.0f),
+                                addTerraceStep(0.925f, 0.15f, 0.4f, min, delta, 39.0f))
+                        terraceFunction { input, simplexX, simplexY, jitter ->
+                            applyTerrace(input, simplexX, simplexY, jitter, steps)
+                        }
+                    }),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.9f,
-                    soilMobilityMultiplier = 0.2f),
+                    elevationPowerMultiplier = 2.5f,
+                    soilMobilityMultiplier = 0.3f,
+                    terraceJitter = 15.0f,
+                    terraceJitterFrequency = 80.0f,
+                    terraceFunction = { min, max ->
+                        val delta = max - min
+                        val steps = listOf(
+                                addTerraceStep(0.025f, 0.05f, 1.0f, min, delta, 2743.0f),
+                                addTerraceStep(0.19f, 0.28f, 0.4f, min, delta, 430.0f),
+                                addTerraceStep(0.44f, 0.22f, 0.4f, min, delta, 8483.0f),
+                                addTerraceStep(0.7f, 0.3f, 0.4f, min, delta, 3294.0f),
+                                addTerraceStep(0.925f, 0.15f, 0.4f, min, delta, 39.0f))
+                        terraceFunction { input, simplexX, simplexY, jitter ->
+                            applyTerrace(input, simplexX, simplexY, jitter, steps)
+                        }
+                    }),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.65f,
-                    soilMobilityMultiplier = 0.25f),
+                    elevationPowerMultiplier = 0.0f,
+                    soilMobilityMultiplier = 0.07f,
+                    talusOverride = 0.95f),
             detailSelector = { if (it >= 120) 2 else 3 })
 
     private val sharpPlateauBiomeElevationShader = object : Shader {
@@ -1436,13 +1519,35 @@ class Biomes {
             talusAngles = TALUS_ANGLES_SHARP_PLATEAU,
             heightMultiplier = 1.0f,
             lowPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 0.7f,
-                    soilMobilityMultiplier = 0.1f),
+                    previousTierBlendWeight = 0.15f,
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 0.15f,
+                    terraceFunction = { min, max ->
+                        val delta = max - min
+                        val steps = listOf(
+                                addTerraceStep(0.22f, 0.32f, 0.1f, min, delta),
+                                addTerraceStep(0.50f, 0.24f, 0.1f, min, delta),
+                                addTerraceStep(0.70f, 0.16f, 0.2f, min, delta),
+                                addTerraceStep(0.81f, 0.06f, 0.35f, min, delta))
+                        terraceFunction { input, simplexX, simplexY, jitter ->
+                            applyTerrace(input, simplexX, simplexY, jitter, steps)
+                        }
+                    }),
             midPassSettings = ErosionSettings(
-                    previousTierBlendWeight = 0.4f,
-                    elevationPowerMultiplier = 0.5f,
-                    soilMobilityMultiplier = 0.01f),
+                    previousTierBlendWeight = 0.15f,
+                    elevationPowerMultiplier = 0.4f,
+                    soilMobilityMultiplier = 0.15f,
+                    terraceFunction = { min, max ->
+                        val delta = max - min
+                        val steps = listOf(
+                                addTerraceStep(0.22f, 0.32f, 0.1f, min, delta),
+                                addTerraceStep(0.50f, 0.24f, 0.1f, min, delta),
+                                addTerraceStep(0.70f, 0.16f, 0.2f, min, delta),
+                                addTerraceStep(0.81f, 0.06f, 0.35f, min, delta))
+                        terraceFunction { input, simplexX, simplexY, jitter ->
+                            applyTerrace(input, simplexX, simplexY, jitter, steps)
+                        }
+                    }),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 0.15f,
                     elevationPowerMultiplier = 0.4f,
@@ -1454,8 +1559,8 @@ class Biomes {
                                 addTerraceStep(0.50f, 0.24f, 0.1f, min, delta),
                                 addTerraceStep(0.70f, 0.16f, 0.2f, min, delta),
                                 addTerraceStep(0.81f, 0.06f, 0.35f, min, delta))
-                        terraceFunction { input ->
-                            applyTerrace(input, steps)
+                        terraceFunction { input, simplexX, simplexY, jitter ->
+                            applyTerrace(input, simplexX, simplexY, jitter, steps)
                         }
                     }),
             detailSelector = { 1 })
@@ -1592,9 +1697,9 @@ class Biomes {
         }
     }
 
-    private fun applyTerrace(input: Float, steps: List<(Float) -> Float?>): Float {
+    private fun applyTerrace(input: Float, simplexX: Float, simplexY: Float, jitter: Float, steps: List<(Float, Float, Float, Float) -> Float?>): Float {
         steps.forEach {
-            val output = it(input)
+            val output = it(input, simplexX, simplexY, jitter)
             if (output != null) {
                 return output
             }
@@ -1602,15 +1707,20 @@ class Biomes {
         return input
     }
 
-    private fun addTerraceStep(height: Float, coverage: Float, compression: Float, min: Float, delta: Float): (Float) -> Float? {
+    private fun addTerraceStep(height: Float, coverage: Float, compression: Float, min: Float, delta: Float, noiseOffset: Float = 0.0f): (Float, Float, Float, Float) -> Float? {
         val midpoint = height * delta + min
         val adjustedCoverage = coverage * delta
         val halfCoverage = adjustedCoverage * 0.5f
         val minExtreme = midpoint - halfCoverage
         val maxExtreme = midpoint + halfCoverage
-        return { input ->
-            if (input > minExtreme && input <= maxExtreme) {
-                ((input - minExtreme) * compression) + midpoint
+        return { input, simplexX, simplexY, jitter ->
+            val variance = noise(simplexX + noiseOffset, simplexY + noiseOffset)
+            val normalized = ((input - min) / delta).coerceIn(0.0f, 1.0f)
+            val heightMultiplier = 1 - abs(pow((normalized - 0.5) * 2, 3.0))
+            val adjustedJitter = variance * jitter * heightMultiplier.toFloat()
+            val adjusted = input - adjustedJitter
+            if (adjusted > minExtreme && adjusted <= maxExtreme) {
+                ((adjusted - minExtreme) * compression) + midpoint + adjustedJitter
             } else {
                 null
             }
@@ -1686,8 +1796,8 @@ class Biomes {
                     soilMobilityMultiplier = 0.02f),
             midPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
-                    elevationPowerMultiplier = 1.0f,
-                    soilMobilityMultiplier = 0.03f),
+                    elevationPowerMultiplier = 4.0f,
+                    soilMobilityMultiplier = 0.12f),
             highPassSettings = ErosionSettings(
                     previousTierBlendWeight = 1.0f,
                     elevationPowerMultiplier = 4.0f,
