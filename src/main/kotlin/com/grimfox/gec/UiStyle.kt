@@ -1225,7 +1225,7 @@ fun <T> Block.vSliderRow(value: ObservableMutableReference<T>, height: Float, la
 }
 
 fun <T> Block.vSliderWithValueRow(value: ObservableMutableReference<T>, valueSize: Int, textStyle: TextStyle, height: Float, label: Text, shrinkGroup: ShrinkGroup, gap: Float, function: (Float) -> T, inverseFunction: (T) -> Float, toString: (T) -> String = { it.toString() }): Block {
-    val dynamicText = DynamicTextReference(value.value.toString(), valueSize, textStyle)
+    val dynamicText = DynamicTextReference(toString(value.value), valueSize, textStyle)
     val listener: (oldValue: T, newValue: T) -> Unit = { _, new ->
         dynamicText.reference.value = toString(new)
     }

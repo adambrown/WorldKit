@@ -57,6 +57,16 @@ vec3 toGamma(vec3 v) {
     return pow(v, vec3(iGamma));
 }
 
+float dggx(float nDotH, float a2) {
+    float temp  = (nDotH * nDotH * (a2 - 1.0) + 1.0);
+    return a2 / (pi * temp * temp);
+}
+
+float gggx(float nDotV, float nDotL, float k)
+{
+    return (nDotV / (nDotV * (1.0 - k) + k)) * (nDotL / (nDotL * (1.0 - k) + k));
+}
+
 vec3 skyLookup(vec3 reflect, vec3 worldPosition) {
     vec3 viewDir = reflect;
     vec3 pixelColor = toLinear(textureLod(skyMap, viewDir.xzy, 0).rgb);
@@ -132,8 +142,8 @@ void main() {
     uv.y = 1 - uv.y;
     float unscaledHeight = (uv.x >= 0 && uv.x <= 1 && uv.y >= 0 && uv.y <= 1) ? texture(heightMapTexture, uv).r : 0.0;
     float depth = clamp(waterLevel - unscaledHeight, 0.0, 1.0);
-    float depth1 = smoothstep(0.01, 0.11, depth);
-    float depthAlpha = 1 - pow(depth1, iGamma);
+    float depth1 = smoothstep(-0.002, 0.07, depth);
+    float depthAlpha = 1 - pow(depth1, 0.11);
 
     vec3 viewVector = cameraPosition - VertexIn.position;
     float viewDist = length(viewVector);
@@ -151,42 +161,40 @@ void main() {
     vec3 normalHigh5 = texture(waterNormalTexture, VertexIn.position.xy * normalOffsets[1][1]).xyz * 2 - 1;
     vec3 normal = normalize(vec3(normalHigh1.xy * normalStrengths.x + normalHigh2.xy * normalStrengths.y + normalHigh3.xy * normalStrengths.z + normalHigh4.xy + normalHigh5.xy, normalStrengths.w));
 
-    vec3 h = normalize(lightDirection + viewDirection);
-    float nDotL = dot(normal, lightDirection);
-    float nDotV = dot(normal, viewDirection);
-    float nDotH = dot(normal, h);
-    float vDotH = dot(viewDirection, h);
-    vec3 reflect = 2 * nDotV * normal - viewDirection;
+    vec3 adjustedColor = mix(baseColor.rgb, vec3(0.36, 0.94, 0.81), depthAlpha);
 
-    float critical = clamp(abs(nDotV) - 0.24, 0, 1);
-
-    float shallowAlpha = critical * depthAlpha;
-
-    vec3 adjustedColor = mix(baseColor.rgb, vec3(0.4, 0.98, 0.89), shallowAlpha);
-
-    float adjustedMetallic = mix(metallic, 0.04, critical);
+    vec3 halfVector = normalize(lightDirection + viewDirection);
+    vec3 reflectVector = reflect(-viewDirection, normal);
+    float nDotL = max(dot(normal, lightDirection), 0.0);
+    float nDotV = max(dot(normal, viewDirection), 0.0);
+    float nDotH = max(dot(normal, halfVector), 0.0);
+    float vDotH = max(dot(viewDirection, halfVector), 0.0);
 
     float a = roughness * roughness;
     float a2 = a * a;
-    float k = ((roughness + 1) * (roughness + 1)) / 8;
 
-    vec3 directDiffuse = clamp(nDotL, 0.0, 1.0) * lightColor.rgb;
-    vec3 indirectDiffuse = texture(irradianceMap, normal.xzy).rgb * indirectIntensity;
-    vec3 totalDiffuse = ((directDiffuse + indirectDiffuse) * adjustedColor.rgb * (1 - adjustedMetallic)) / pi;
+    float d = dggx(nDotH, a2);
 
-    float temp = (nDotH * nDotH * (a2 - 1) + 1);
-    float specD = max(a2 / (pi * temp * temp), 0.0);
-    float specG = max((nDotV / (nDotV * (1 - k) + k)) * (nDotL / (nDotL * (1 - k) + k)), 0.0);
-    vec3 f0Vec = mix(vec3(f0 * specularIntensity), adjustedColor.rgb, adjustedMetallic);
-    vec3 specF = max(f0Vec + ((vec3(1.0) - f0Vec) * pow(2, ((-5.55473 * vDotH) - 6.98316) * vDotH)), 0.0);
-    vec3 specular = max((vec3(specD) * vec3(specG) * specF) / (4 * nDotL * nDotV), 0.0);
+    float k = ((roughness + 1.0) * (roughness + 1.0)) / 8.0;
+    float g = gggx(nDotV, nDotL, k);
 
-    vec3 specReflect = skyLookup(reflect, VertexIn.position) * indirectIntensity;
-//    vec3 specReflect = textureLod(specularMap, reflect.xzy, roughness * 6).rgb * indirectIntensity;
-    vec2 envBrdf = texture(brdfMap, vec2(roughness, clamp(nDotV, 0.0, 1.0))).rg;
-    vec3 specIbl = specReflect * (specF * envBrdf.x + envBrdf.y);
+    vec3 f0 = mix(vec3(0.08 * specularIntensity), adjustedColor.rgb, metallic);
+    vec3 f = f0 + (max(vec3(1.0 - roughness), f0) - f0) * pow(1.0 - vDotH, 5.0);
 
-    vec3 totalSpecular = specular * lightColor.rgb + specIbl * clamp(adjustedMetallic, 0.08 * specularIntensity, 1.0);
+    vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 0.001);
 
-    colorOut = vec4(toGamma(applyFog(VertexIn.position, totalDiffuse + totalSpecular)), 1.0);
+    vec3 kD = (vec3(1.0) - f) * (1 - metallic);
+
+    vec3 directLight = (kD * adjustedColor.rgb / pi + specular) * lightColor.rgb * nDotL;
+
+    vec3 irradiance = texture(irradianceMap, VertexIn.position).rgb * indirectIntensity;
+    vec3 diffuse = irradiance * adjustedColor.rgb;
+
+    vec3 specReflect = skyLookup(reflectVector, VertexIn.position).rgb * indirectIntensity;
+    vec2 envBrdf = texture(brdfMap, vec2(nDotV, roughness)).rg;
+    vec3 specIbl = specReflect * (f * envBrdf.x + envBrdf.y);
+
+    vec3 ambient = kD * diffuse + specIbl;
+
+    colorOut = vec4(toGamma(applyFog(VertexIn.position, directLight + ambient)), 1.0);
 }

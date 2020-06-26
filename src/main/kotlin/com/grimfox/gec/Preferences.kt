@@ -18,8 +18,12 @@ val OFFLINE_HELP_INDEX_FILE = File(OFFLINE_HELP_DIR, "index.html")
 val PREFERENCES_FILE = File(CONFIG_DIR, "preferences")
 val RECENT_PROJECTS_FILE = File(CACHE_DIR, "recent-projects")
 val WINDOW_STATE_FILE = File(CONFIG_DIR, "window-state")
+val CACHED_GRAPH_128_FILE = File(CACHE_DIR, "cached-graph-128.graph")
 val CACHED_GRAPH_256_FILE = File(CACHE_DIR, "cached-graph-256.graph")
+val CACHED_GRAPH_512_FILE = File(CACHE_DIR, "cached-graph-512.graph")
 val CACHED_GRAPH_1024_FILE = File(CACHE_DIR, "cached-graph-1024.graph")
+val CACHED_GRAPH_2048_FILE = File(CACHE_DIR, "cached-graph-2048.graph")
+val CACHED_GRAPH_4096_FILE = File(CACHE_DIR, "cached-graph-4096.graph")
 
 val LOW_DATABASE_0 = File(WORLD_KIT_APP_DIR, "undersea-dictionary-low.bin")
 val LOW_DATABASE_1 = File(WORLD_KIT_APP_DIR, "mountain-dictionary-low.bin")
@@ -36,8 +40,11 @@ data class Preferences(
         var tempDir: File = DEFAULT_TEMP_DIR,
         var isFirstRun: Boolean = true,
         var windowState: WindowState? = null,
+        var cachedGraph128: Future<Graph>? = null,
         var cachedGraph256: Future<Graph>? = null,
+        var cachedGraph512: Future<Graph>? = null,
         var cachedGraph1024: Future<Graph>? = null,
+        var cachedGraph2048: Future<Graph>? = null,
         var lowDictionaries4: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null,
         var highDictionaries4: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null,
         var highDictionaries8: Future<Triple<Int, Int, List<Pair<RcMatrix, RcMatrix>>>>? = null
@@ -140,6 +147,25 @@ fun loadPreferences(executor: ExecutorService): Preferences {
     }))
     ensureDirectoryExists(preferences.projectDir)
 
+    preferences.cachedGraph128 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_128_FILE.exists() && CACHED_GRAPH_128_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_128_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 128 file.")
+                graph = Graphs.generateGraph(128, 43L, 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_128_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_128_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(128, 43L, 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_128_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_128_FILE.inputStream())
+        }
+        graph
+    }
+
     preferences.cachedGraph256 = executor.call {
         var graph: Graph
         if (CACHED_GRAPH_256_FILE.exists() && CACHED_GRAPH_256_FILE.canRead()) {
@@ -159,6 +185,25 @@ fun loadPreferences(executor: ExecutorService): Preferences {
         graph
     }
 
+    preferences.cachedGraph512 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_512_FILE.exists() && CACHED_GRAPH_512_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 512 file.")
+                graph = Graphs.generateGraph(512, 15L, 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(512, 15L, 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_512_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_512_FILE.inputStream())
+        }
+        graph
+    }
+
     preferences.cachedGraph1024 = executor.call {
         var graph: Graph
         if (CACHED_GRAPH_1024_FILE.exists() && CACHED_GRAPH_1024_FILE.canRead()) {
@@ -174,6 +219,25 @@ fun loadPreferences(executor: ExecutorService): Preferences {
             graph = Graphs.generateGraph(1024, 2L, 0.8, false, false)
             Graphs.serialize(graph, CACHED_GRAPH_1024_FILE.outputStream())
             graph = Graphs.deserialize(CACHED_GRAPH_1024_FILE.inputStream())
+        }
+        graph
+    }
+
+    preferences.cachedGraph2048 = executor.call {
+        var graph: Graph
+        if (CACHED_GRAPH_2048_FILE.exists() && CACHED_GRAPH_2048_FILE.canRead()) {
+            try {
+                graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
+            } catch (e: Exception) {
+                LOG.warn("Error reading from cached graph 2048 file.")
+                graph = Graphs.generateGraph(2048, 4L, 0.8, false, false)
+                Graphs.serialize(graph, CACHED_GRAPH_2048_FILE.outputStream())
+                graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
+            }
+        } else {
+            graph = Graphs.generateGraph(2048, 4L, 0.8, false, false)
+            Graphs.serialize(graph, CACHED_GRAPH_2048_FILE.outputStream())
+            graph = Graphs.deserialize(CACHED_GRAPH_2048_FILE.inputStream())
         }
         graph
     }
@@ -203,7 +267,7 @@ fun savePreferences(preferences: Preferences) {
         ensureDirectoryExists(OFFLINE_HELP_DIR)
         ensureDirectoryExists(CACHE_DIR)
         DataOutputStream(PREFERENCES_FILE.outputStream().buffered()).use {
-            preferences.copy(windowState = null, cachedGraph256 = null, cachedGraph1024 = null, lowDictionaries4 = null, highDictionaries4 = null, highDictionaries8 = null).serialize(it)
+            preferences.copy(windowState = null, cachedGraph128 = null, cachedGraph256 = null, cachedGraph512 = null, cachedGraph1024 = null, cachedGraph2048 = null, lowDictionaries4 = null, highDictionaries4 = null, highDictionaries8 = null).serialize(it)
         }
         ensureDirectoryExists(preferences.tempDir)
         val tempDir = preferences.tempDir

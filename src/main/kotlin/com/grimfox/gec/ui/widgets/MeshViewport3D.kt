@@ -25,6 +25,8 @@ class MeshViewport3D(
         private val skyOn: ObservableMutableReference<Boolean>,
         private val fogOn: ObservableMutableReference<Boolean>,
         private val heightMapScaleFactor: Reference<Float>,
+        private val heightRangeMeters: Reference<Float>,
+        private val colorHeightScaleFactor: Reference<Float>,
         private val lightColor: Array<ObservableMutableReference<Float>>,
         private val lightElevation: ObservableReference<Float>,
         private val lightHeading: ObservableReference<Float>,
@@ -70,9 +72,9 @@ class MeshViewport3D(
     private val mvpMatrix = Matrix4f()
     private val normalMatrix = Matrix3f()
 
-    private val defaultCameraPosition = Vector3f(0.0f, 0.0f, 50.0f)
-    private val defaultCameraInclination = toRadians((5.0f).toDouble()).toFloat()
-    private val defaultCameraHeading = toRadians((-180.0f).toDouble()).toFloat()
+    private val defaultCameraPosition = Vector3f(0.903f, 0.0f, 0.303f).mul(VIEWPORT_MESH_SCALE)
+    private val defaultCameraInclination = kotlin.math.atan2(defaultCameraPosition.z, Vector3f(defaultCameraPosition.x, defaultCameraPosition.y, 0.0f).length())
+    private val defaultCameraHeading = kotlin.math.atan2(-defaultCameraPosition.y, -defaultCameraPosition.x)
     private val defaultLookVector = Vector3f(1.0f, 0.0f, 0.0f).rotateAxis(defaultCameraInclination, 0.0f, 1.0f, 0.0f).rotateAxis(defaultCameraHeading, 0.0f, 0.0f, 1.0f).normalize()
 
     private val cameraPosition = Vector3f(defaultCameraPosition)
@@ -119,11 +121,14 @@ class MeshViewport3D(
     private val waterSpecularIntensityUniform = ShaderUniform("waterSpecularIntensity")
     private val indirectIntensityUniform = ShaderUniform("indirectIntensity")
     private val heightScaleUniform = ShaderUniform("heightScale")
+    private val heightScaleMetersUniform = ShaderUniform("heightScaleMeters")
+    private val colorHeightScaleUniform = ShaderUniform("colorHeightScale")
     private val uvScaleUniform = ShaderUniform("uvScale")
     private val renderOptionsUniform = ShaderUniform("renderOptions")
     private val horizonBlendUniform = ShaderUniform("horizonBlend")
     private val lightMaxFogEffectUniform = ShaderUniform("lightMaxFogEffect")
     private val heightMapTextureUniform = ShaderUniform("heightMapTexture")
+    private val normalAoTextureUniform = ShaderUniform("normalAoTexture")
     private val fogParamsUniform = ShaderUniform("fogParams")
     private val riverMapTextureUniform = ShaderUniform("riverMapTexture")
     private val brdfMapUniform = ShaderUniform("brdfMap")
@@ -209,6 +214,7 @@ class MeshViewport3D(
     private val textureLock = Object()
     private var hasHeightmap = false
     private var heightMapId: TextureId? = null
+    private var normalAoMapId: TextureId? = null
     private var rivermapId: TextureId? = null
     private var heightMapResolution = 0
 
@@ -392,11 +398,14 @@ class MeshViewport3D(
                         waterSpecularIntensityUniform,
                         indirectIntensityUniform,
                         heightScaleUniform,
+                        heightScaleMetersUniform,
+                        colorHeightScaleUniform,
                         uvScaleUniform,
                         renderOptionsUniform,
                         horizonBlendUniform,
                         lightMaxFogEffectUniform,
                         heightMapTextureUniform,
+                        normalAoTextureUniform,
                         fogParamsUniform,
                         riverMapTextureUniform,
                         brdfMapUniform,
@@ -469,15 +478,15 @@ class MeshViewport3D(
                         inscatterHorizonTextureUniformSky
                 ))
 
-        heightMap = HexGrid(2560.0f, 6400, positionAttribute, uvAttribute, true)
+        heightMap = HexGrid(VIEWPORT_MESH_SCALE - 40.0f, 10000, positionAttribute, uvAttribute, true)
 
         waterPlane = HexGrid(100000.0f, 16, positionAttributeWater, uvAttributeWater, true)
 
-        imagePlane = ImagePlane(2600.0f, positionAttributeImage, uvAttributeImage)
+        imagePlane = ImagePlane(VIEWPORT_MESH_SCALE, positionAttributeImage, uvAttributeImage)
 
-        regionPlane = ImagePlane(2600.0f, positionAttributeRegion, uvAttributeRegion)
+        regionPlane = ImagePlane(VIEWPORT_MESH_SCALE, positionAttributeRegion, uvAttributeRegion)
 
-        biomePlane = ImagePlane(2600.0f, positionAttributeBiome, uvAttributeBiome)
+        biomePlane = ImagePlane(VIEWPORT_MESH_SCALE, positionAttributeBiome, uvAttributeBiome)
 
         skyPlane = ImagePlane(2.0f, positionAttributeSky, uvAttributeSky)
 
@@ -494,6 +503,7 @@ class MeshViewport3D(
         synchronized(textureLock) {
             hasHeightmap = false
             heightMapId = null
+            normalAoMapId = null
             rivermapId = null
             heightMapResolution = 0
             hasRegions = false
@@ -507,10 +517,11 @@ class MeshViewport3D(
         refreshUi()
     }
 
-    fun setHeightmap(newTexture: Pair<TextureId?, TextureId?>, resolution: Int) {
+    fun setHeightmap(newTexture: Triple<TextureId?, TextureId?, TextureId?>, resolution: Int) {
         synchronized(textureLock) {
             hasHeightmap = true
             heightMapId = newTexture.first
+            normalAoMapId = newTexture.third
             rivermapId = newTexture.second
             heightMapResolution = resolution
         }
@@ -959,7 +970,7 @@ class MeshViewport3D(
                     cameraInclination = defaultCameraInclination
                     cameraHeading = defaultCameraHeading
                     lookVector.set(defaultLookVector)
-                    waterParams.level.value = 0.3f
+                    waterParams.level.value = defaultWaterLevel
                 }
 
                 if (eliminateMovement) {
@@ -1120,7 +1131,9 @@ class MeshViewport3D(
         glUniform1f(waterSpecularIntensityUniform.location, waterParams.specularIntensity.value)
         glUniform1f(indirectIntensityUniform.location, indirectIntensity.value)
         glUniform1f(heightScaleUniform.location, heightMapScaleFactor.value)
-        glUniform1f(uvScaleUniform.location, heightMap.width / heightMapResolution)
+        glUniform1f(heightScaleMetersUniform.location, heightRangeMeters.value)
+        glUniform1f(colorHeightScaleUniform.location, colorHeightScaleFactor.value)
+        glUniform1f(uvScaleUniform.location, (1.0f / ((heightMapScaleFactor.value / heightRangeMeters.value) / VIEWPORT_MESH_SCALE)) / heightMapResolution)
         glUniform1i(renderOptionsUniform.location, renderOptions)
         glUniform1f(horizonBlendUniform.location, 1.0f - clamp(toRadians(lightElevation.value.toDouble()).toFloat() * 5.0f, 0.0f, 1.0f))
         glUniform1f(lightMaxFogEffectUniform.location, lightColor.fourth)
@@ -1137,26 +1150,29 @@ class MeshViewport3D(
         glUniform1i(heightMapTextureUniform.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, heightMapId?.id ?: -1)
-        glUniform1i(riverMapTextureUniform.location, 1)
+        glUniform1i(normalAoTextureUniform.location, 1)
         glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, rivermapId?.id ?: -1)
-        glUniform1i(brdfMapUniform.location, 2)
+        glBindTexture(GL_TEXTURE_2D, normalAoMapId?.id ?: -1)
+        glUniform1i(riverMapTextureUniform.location, 2)
         glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, brdfMap.id)
-        glUniform1i(irradianceMapUniform.location, 3)
+        glBindTexture(GL_TEXTURE_2D, rivermapId?.id ?: -1)
+        glUniform1i(brdfMapUniform.location, 3)
         glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap.id)
-        glUniform1i(specularMapUniform.location, 4)
+        glBindTexture(GL_TEXTURE_2D, brdfMap.id)
+        glUniform1i(irradianceMapUniform.location, 4)
         glActiveTexture(GL_TEXTURE4)
-        glBindTexture(GL_TEXTURE_CUBE_MAP, specularMap.id)
-        glUniform1i(lossTextureUniform.location, 5)
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap.id)
+        glUniform1i(specularMapUniform.location, 5)
         glActiveTexture(GL_TEXTURE5)
-        glBindTexture(GL_TEXTURE_2D, lossTexture.id)
-        glUniform1i(inscatterTextureUniform.location, 6)
+        glBindTexture(GL_TEXTURE_CUBE_MAP, specularMap.id)
+        glUniform1i(lossTextureUniform.location, 6)
         glActiveTexture(GL_TEXTURE6)
-        glBindTexture(GL_TEXTURE_2D, inscatterTexture.id)
-        glUniform1i(inscatterHorizonTextureUniform.location, 7)
+        glBindTexture(GL_TEXTURE_2D, lossTexture.id)
+        glUniform1i(inscatterTextureUniform.location, 7)
         glActiveTexture(GL_TEXTURE7)
+        glBindTexture(GL_TEXTURE_2D, inscatterTexture.id)
+        glUniform1i(inscatterHorizonTextureUniform.location, 8)
+        glActiveTexture(GL_TEXTURE8)
         glBindTexture(GL_TEXTURE_2D, inscatterHorizonTexture.id)
 
         heightMap.render()

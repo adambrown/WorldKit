@@ -401,10 +401,10 @@ object MainUi {
                                             vToggleRow(fogOn, LARGE_ROW_HEIGHT, text("Fog:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vToggleRow(perspectiveOn, LARGE_ROW_HEIGHT, text("Perspective:"), shrinkGroup, MEDIUM_SPACER_SIZE)
                                             vSliderRow(heightMapScaleFactor, LARGE_ROW_HEIGHT, text("Height scale:"), shrinkGroup, MEDIUM_SPACER_SIZE, heightScaleFunction, heightScaleFunctionInverse)
-                                            vSliderRow(waterShaderParams.level, LARGE_ROW_HEIGHT, text("Water level:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 1.0f), linearClampedScaleFunctionInverse(0.0f, 1.0f))
+                                            vSliderRow(waterShaderParams.level, LARGE_ROW_HEIGHT, text("Water level:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.003f, 0.175f), linearClampedScaleFunctionInverse(0.003f, 0.175f))
                                             vButtonRow(LARGE_ROW_HEIGHT) {
                                                 button(text("Reset view"), NORMAL_TEXT_BUTTON_STYLE) { resetView.value = true }
-                                                button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = DEFAULT_HEIGHT_SCALE }
+                                                button(text("Reset height"), NORMAL_TEXT_BUTTON_STYLE) { heightMapScaleFactor.value = defaultHeightScale }
                                             }
                                             vExpandPanel("Light") {
                                                 vSliderWithValueRow(indirectIntensity, 5, TEXT_STYLE_NORMAL, LARGE_ROW_HEIGHT, text("Indirect light:"), shrinkGroup, MEDIUM_SPACER_SIZE, linearClampedScaleFunction(0.0f, 2.0f), linearClampedScaleFunctionInverse(0.0f, 2.0f))

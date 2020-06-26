@@ -18,16 +18,17 @@ import java.util.concurrent.CountDownLatch
 const val DEMO_BUILD = false
 const val EXPERIMENTAL_BUILD = false
 
-val VIEWPORT_TEXTURE_SIZE = 2048
-val VIEWPORT_HEIGHTMAP_SIZE = 4096
+const val VIEWPORT_TEXTURE_SIZE = 2048
+const val VIEWPORT_HEIGHTMAP_SIZE = 8192
+const val VIEWPORT_MESH_SCALE = 2600.0f
 
-val REGION_GRAPH_WIDTH = 128
-val REGION_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
-val REGION_GRAPH_WIDTH_F = REGION_GRAPH_WIDTH.toFloat()
+const val REGION_GRAPH_WIDTH = 512
+const val REGION_GRAPH_WIDTH_M1 = REGION_GRAPH_WIDTH - 1
+const val REGION_GRAPH_WIDTH_F = REGION_GRAPH_WIDTH.toFloat()
 
-val BIOME_GRAPH_WIDTH = 128
-val BIOME_GRAPH_WIDTH_M1 = BIOME_GRAPH_WIDTH - 1
-val BIOME_GRAPH_WIDTH_F = BIOME_GRAPH_WIDTH.toFloat()
+const val BIOME_GRAPH_WIDTH = 512
+const val BIOME_GRAPH_WIDTH_M1 = BIOME_GRAPH_WIDTH - 1
+const val BIOME_GRAPH_WIDTH_F = BIOME_GRAPH_WIDTH.toFloat()
 
 val REGION_COLORS = arrayListOf(
         color(0.0f, 0.0f, 0.0f),
@@ -85,28 +86,31 @@ val BIOME_TEMPLATES_REF = ref<Biomes?>(null)
 val BIOME_NAMES_AS_TEXT = ObservableMutableList(ArrayList<Text>())
 
 val RANDOM = Random()
-const val DEFAULT_HEIGHT_SCALE = 50.0f
-const val MAX_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 10
-const val MIN_HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE * 0
-const val HEIGHT_SCALE_CONST = DEFAULT_HEIGHT_SCALE * 0.968746f
-const val HEIGHT_SCALE_MULTIPLIER = DEFAULT_HEIGHT_SCALE * 32.00223
+
 const val DEFAULT_LIGHT_ELEVATION = 20.0f
 const val DEFAULT_LIGHT_HEADING = 0.0f
 
+const val DEFAULT_OUTPUT_QUALITY = 1
+const val DEFAULT_MAP_DETAIL_SCALE = 6
+
+val heightRanges = listOf(300, 400, 500, 700, 800, 1000, 1300, 1600, 1900, 2600, 3200, 3200, 3200, 3200, 3200, 3200)
+
+val mapDetailScales = listOf(1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 128)
+val maxLinearDistanceMeters = 1024.0f * mapDetailScales.last()
+val defaultHeightScale = linearDistanceMetersToViewportScaleFactor(mapScaleToLinearDistanceMeters(DEFAULT_MAP_DETAIL_SCALE), mapScaleToHeightRangeMeters(DEFAULT_MAP_DETAIL_SCALE))
+val maxHeightScale = linearDistanceMetersToViewportScaleFactor(mapScaleToLinearDistanceMeters(0), mapScaleToHeightRangeMeters(0)) * 1.2f
+val defaultHeightRangeMeters = mapScaleToHeightRangeMeters(DEFAULT_MAP_DETAIL_SCALE)
+
+const val DEFAULT_COLOR_HEIGHT_SCALE = 4.0f
+
+val defaultWaterLevel = linearDistanceMetersToRenderScale(linearDistanceMetersToWaterLevelMeters(mapScaleToLinearDistanceMeters(DEFAULT_MAP_DETAIL_SCALE)), mapScaleToHeightRangeMeters(DEFAULT_MAP_DETAIL_SCALE))
+
 val heightScaleFunction = { scale: Float ->
-    Math.min(MAX_HEIGHT_SCALE, Math.max(MIN_HEIGHT_SCALE, if (scale <= 0.5f) {
-        scale * (2 * DEFAULT_HEIGHT_SCALE)
-    } else {
-        (HEIGHT_SCALE_CONST + (HEIGHT_SCALE_MULTIPLIER * Math.pow(scale - 0.46874918, 2.0))).toFloat()
-    }))
+    scale * maxHeightScale
 }
 
 val heightScaleFunctionInverse = { value: Float ->
-    Math.min(1.0f, Math.max(0.0f, if (value <= DEFAULT_HEIGHT_SCALE) {
-        value / (2 * DEFAULT_HEIGHT_SCALE)
-    } else {
-        (Math.sqrt((value - HEIGHT_SCALE_CONST) / HEIGHT_SCALE_MULTIPLIER) + 0.46874918).toFloat()
-    }))
+    value / maxHeightScale
 }
 
 class RegionsHistoryItem(val parameters: RegionParameters, val graphSeed: Long, val mask: ByteArrayMatrix) {
@@ -156,11 +160,11 @@ class BiomesHistoryItem(val parameters: BiomeParameters, val graphSeed: Long, va
 }
 
 class WaterShaderParams(
-        val level: ObservableMutableReference<Float> = ref(0.3f),
-        val color: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.21f), ref(0.38f), ref(0.373f)),
-        val metallic: ObservableMutableReference<Float> = ref(0.86f),
-        val roughness: ObservableMutableReference<Float> = ref(0.065f),
-        val specularIntensity: ObservableMutableReference<Float> = ref(0.925f),
+        val level: ObservableMutableReference<Float> = ref(defaultWaterLevel),
+        val color: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.03f), ref(0.12f), ref(0.15f)),
+        val metallic: ObservableMutableReference<Float> = ref(0.97f),
+        val roughness: ObservableMutableReference<Float> = ref(0.03f),
+        val specularIntensity: ObservableMutableReference<Float> = ref(1.0f),
         val normalOffsets: Array<ObservableMutableReference<Float>> = arrayOf(ref(0.3f), ref(0.065f), ref(0.008f), ref(0.0004f), ref(0.00004f), ref(0.00333f), ref(0.6f), ref(0.000233245f), ref(0.8f)),
         val fadeStarts: Array<ObservableMutableReference<Float>> = arrayOf(ref(10.0f), ref(60.0f), ref(200.0f)),
         val fadeEnds: Array<ObservableMutableReference<Float>> = arrayOf(ref(70.0f), ref(280.0f), ref(2000.0f)),
@@ -228,14 +232,15 @@ val currentState: CurrentState get() = currentProject.value?.currentState?.value
 val waterShaderParams = WaterShaderParams()
 val fogShaderParams = FogShaderParams()
 val experimentalWidgets: MutableList<Block> = ArrayList()
-val heightMapScaleFactor = ref(DEFAULT_HEIGHT_SCALE)
+val heightMapScaleFactor = ref(defaultHeightScale)
+val colorHeightScaleFactor = ref(DEFAULT_COLOR_HEIGHT_SCALE)
 val lightColor = Array(3) { ref(5.0f) }
 val lightElevation = ref(DEFAULT_LIGHT_ELEVATION)
 val lightHeading = ref(DEFAULT_LIGHT_HEADING)
-val indirectIntensity = ref(0.5f)
+val indirectIntensity = ref(1.0f)
 val baseColor = Array(3) { ref(1.0f) }
 val metallic = ref(0.0f)
-val roughness = ref(0.9f)
+val roughness = ref(0.95f)
 val specularIntensity = ref(0.5f)
 val waterPlaneOn = ref(true)
 val perspectiveOn = ref(true)
@@ -272,8 +277,9 @@ val historyBiomesForwardQueue get() = currentProject.value?.historyBiomesForward
 val displayMode = ref(DisplayMode.MAP)
 val defaultToMap = ref(true)
 val rootRef = ref(NO_BLOCK)
-val mapDetailScale = ref(8)
-val outputQuality = ref(1)
+val mapDetailScale = ref(DEFAULT_MAP_DETAIL_SCALE)
+val heightRangeMeters = ref(defaultHeightRangeMeters)
+val outputQuality = ref(DEFAULT_OUTPUT_QUALITY)
 
 
 val meshViewport = MeshViewport3D(
@@ -285,6 +291,8 @@ val meshViewport = MeshViewport3D(
         skyOn = skyOn,
         fogOn = fogOn,
         heightMapScaleFactor = heightMapScaleFactor,
+        heightRangeMeters = heightRangeMeters,
+        colorHeightScaleFactor = colorHeightScaleFactor,
         lightColor = lightColor,
         lightElevation = lightElevation,
         lightHeading = lightHeading,
@@ -330,17 +338,33 @@ var onWindowResize: () -> Unit = {}
 val generationLock = DisableSetLock()
 val editToggleSet = ToggleSet(executor)
 
-fun mapScaleToLinearDistance(mapScale: Int): Float {
-    val adjustedScale = mapScale - 5
-    return if (adjustedScale < 0) adjustedScale * 1.95f + 10 else ((((adjustedScale) * (adjustedScale)) / 400.0f) * 990000 + 10000) / 1000
+fun mapScaleToLinearDistanceMeters(mapScale: Int): Float {
+    return 1024.0f * mapDetailScales[mapScale]
+//    val adjustedScale = mapScale - 5
+//    return if (adjustedScale < 0) adjustedScale * 1.95f + 10 else ((((adjustedScale) * (adjustedScale)) / 400.0f) * 990000 + 10000) / 1000
 }
 
-fun linearDistanceToScaleFactor(linearDistanceScaleInKilometers: Float): Float {
-    return if (linearDistanceScaleInKilometers < 10.0f) {
-        linearDistanceScaleInKilometers * 12.1f + 215.0015f
-    } else {
-        ((-Math.log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
-    }
+fun mapScaleToHeightRangeMeters(mapScale: Int): Float {
+    return heightRanges[mapScale].toFloat()
+}
+
+fun linearDistanceMetersToViewportScaleFactor(linearDistanceMeters: Float, heightRangeMeters: Float): Float {
+    return heightRangeMeters * (VIEWPORT_MESH_SCALE / linearDistanceMeters)
+
+//    val linearDistanceScaleInKilometers = linearDistanceScaleInMeters / 1000.0f
+//    return if (linearDistanceScaleInKilometers < 10.0f) {
+//        linearDistanceScaleInKilometers * 12.1f + 215.0015f
+//    } else {
+//        ((-log10(linearDistanceScaleInKilometers - 9.0) - 1) * 28 + 122).toFloat()
+//    }
+}
+
+fun linearDistanceMetersToRenderScale(linearDistanceMeters: Float, heightRangeMeters: Float): Float {
+    return linearDistanceMeters / heightRangeMeters
+}
+
+fun linearDistanceMetersToWaterLevelMeters(linearDistanceMeters: Float): Float {
+    return (((linearDistanceMeters - mapScaleToLinearDistanceMeters(0)) / 60.0f) + 30.0f).coerceIn(30.0f, 500.0f)
 }
 
 fun linearClampedScaleFunction(range: IntRange): (Float) -> Int {

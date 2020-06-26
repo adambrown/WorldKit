@@ -38,6 +38,7 @@ class CurrentState(
         val customStartingHeightsMap: ObservableMutableReference<TextureId> = ref(BLANK_TEXTURE),
         val customSoilMobilityMap: ObservableMutableReference<TextureId> = ref(BLANK_TEXTURE),
         val heightMapTexture: ObservableMutableReference<TextureId?> = ref(null),
+        val normalAoMapTexture: ObservableMutableReference<TextureId?> = ref(null),
         val riverMapTexture: ObservableMutableReference<TextureId?> = ref(null)) {
 
     fun copy(): CurrentState {

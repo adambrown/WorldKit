@@ -25,17 +25,20 @@ void main() {
         minBorderDistInverse = 1.0 - minBorderDist;
         float mountainBorderDistance = texture(mountainBorderDistanceMask, VertexIn.uv).r;
         if (mountainBorderDistance > minBorderDistInverse) {
-            float multiplier = (mountainBorderDistance - minBorderDistInverse) * 25 + 0.05;
+            float multiplier = (mountainBorderDistance - minBorderDistInverse) * 25 + 0.07;
             float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * multiplier) * 0.053;
-            height = max(height, 0.00398);
+            height = max(height, 0.05);
             colorOut = vec4(height, height, height, 1.0);
         } else {
             float coastDistance = texture(coastDistanceMask, VertexIn.uv).r;
             if (coastDistance > 1.0 - (0.001 * borderDistanceScale)) {
-                colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+//                colorOut = vec4(0.001, 0.001, 0.001, 1.0);
+                float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.07) * 0.053;
+                height = max(height, 0.05);
+                colorOut = vec4(height, height, height, 1.0);
             } else {
                 float height = (texture(noiseMask1, VertexIn.uv * textureScale).r * 0.05) * 0.053;
-                height = max(height, 0.00398);
+                height = max(height, 0.05);
                 colorOut = vec4(height, height, height, 1.0);
             }
         }

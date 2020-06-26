@@ -6,8 +6,11 @@ import com.grimfox.gec.util.*
 import java.io.File
 import java.util.*
 
+private val cachedGraph128 = preferences.cachedGraph128!!
 private val cachedGraph256 = preferences.cachedGraph256!!
+private val cachedGraph512 = preferences.cachedGraph512!!
 private val cachedGraph1024 = preferences.cachedGraph1024!!
+private val cachedGraph2048 = preferences.cachedGraph1024!!
 
 fun exportPanel(ui: UserInterface) {
     val shrinkGroup = hShrinkGroup()
@@ -17,6 +20,8 @@ fun exportPanel(ui: UserInterface) {
     val useElevationFile = ref(false)
     val slopeFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useSlopeFile = ref(false)
+    val aoFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useAoFile = ref(false)
     val normalFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useNormalFile = ref(false)
     val soilDensityFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
@@ -29,6 +34,8 @@ fun exportPanel(ui: UserInterface) {
     val usePeakFile = ref(false)
     val riverFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useRiverFile = ref(false)
+    val riverSplinesFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
+    val useRiverSplinesFile = ref(false)
     val biomeBorderFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
     val useBiomeBorderFile = ref(false)
     val landMaskFile = DynamicTextReference("", 1024, TEXT_STYLE_NORMAL)
@@ -86,12 +93,14 @@ fun exportPanel(ui: UserInterface) {
     }
     elevationFile.reference.addListener(pngExtensionFilter(elevationFile))
     slopeFile.reference.addListener(pngExtensionFilter(slopeFile))
+    aoFile.reference.addListener(pngExtensionFilter(aoFile))
     normalFile.reference.addListener(pngExtensionFilter(normalFile))
     soilDensityFile.reference.addListener(pngExtensionFilter(soilDensityFile))
     biomeFile.reference.addListener(pngExtensionFilter(biomeFile))
     waterFlowFile.reference.addListener(pngExtensionFilter(waterFlowFile))
     peakFile.reference.addListener(pngExtensionFilter(peakFile))
     riverFile.reference.addListener(pngExtensionFilter(riverFile))
+    riverSplinesFile.reference.addListener(objExtensionFilter(riverSplinesFile))
     biomeBorderFile.reference.addListener(pngExtensionFilter(biomeBorderFile))
     landMaskFile.reference.addListener(pngExtensionFilter(landMaskFile))
     riverBorderFile.reference.addListener(pngExtensionFilter(riverBorderFile))
@@ -115,12 +124,14 @@ fun exportPanel(ui: UserInterface) {
             vSaveFileRowWithToggle(baseFile, useBaseFile, LARGE_ROW_HEIGHT, text("Base name:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui)
             vSaveFileRowWithToggle(elevationFile, useElevationFile, LARGE_ROW_HEIGHT, text("Elevation file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(normalFile, useNormalFile, LARGE_ROW_HEIGHT, text("Normal file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(aoFile, useAoFile, LARGE_ROW_HEIGHT, text("Occlusion file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(slopeFile, useSlopeFile, LARGE_ROW_HEIGHT, text("Slope file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(soilDensityFile, useSoilDensityFile, LARGE_ROW_HEIGHT, text("Soil density file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(biomeFile, useBiomeFile, LARGE_ROW_HEIGHT, text("Biome file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(waterFlowFile, useWaterFlowFile, LARGE_ROW_HEIGHT, text("Water flow file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(peakFile, usePeakFile, LARGE_ROW_HEIGHT, text("Peak file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(riverFile, useRiverFile, LARGE_ROW_HEIGHT, text("River file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
+            vSaveFileRowWithToggle(riverSplinesFile, useRiverSplinesFile, LARGE_ROW_HEIGHT, text("River splines file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "obj")
             vSaveFileRowWithToggle(biomeBorderFile, useBiomeBorderFile, LARGE_ROW_HEIGHT, text("Biome border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(landMaskFile, useLandMaskFile, LARGE_ROW_HEIGHT, text("Land mask file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
             vSaveFileRowWithToggle(riverBorderFile, useRiverBorderFile, LARGE_ROW_HEIGHT, text("River border file:"), shrinkGroup, MEDIUM_SPACER_SIZE, dialogLayer, true, ui, "png")
@@ -146,12 +157,14 @@ fun exportPanel(ui: UserInterface) {
                     val outputSize = outputSizes[selectedOutputSize.value]
                     elevationFile.reference.value = "$baseName-elevation-$outputSize.png"
                     slopeFile.reference.value = "$baseName-slope-$outputSize.png"
+                    aoFile.reference.value = "$baseName-ao-$outputSize.png"
                     normalFile.reference.value = "$baseName-normal-$outputSize.png"
                     soilDensityFile.reference.value = "$baseName-density-$outputSize.png"
                     biomeFile.reference.value = "$baseName-biome-$outputSize.png"
                     waterFlowFile.reference.value = "$baseName-flow-$outputSize.png"
                     peakFile.reference.value = "$baseName-peaks-$outputSize.png"
                     riverFile.reference.value = "$baseName-rivers-$outputSize.png"
+                    riverSplinesFile.reference.value = "$baseName-river-splines.obj"
                     biomeBorderFile.reference.value = "$baseName-biome-borders-$outputSize.png"
                     landMaskFile.reference.value = "$baseName-land-$outputSize.png"
                     riverBorderFile.reference.value = "$baseName-river-borders-$outputSize.png"
@@ -178,12 +191,14 @@ fun exportPanel(ui: UserInterface) {
             }
             elevationFile.reference.addListener(fileNameChangeListener(useElevationFile))
             slopeFile.reference.addListener(fileNameChangeListener(useSlopeFile))
+            aoFile.reference.addListener(fileNameChangeListener(useAoFile))
             normalFile.reference.addListener(fileNameChangeListener(useNormalFile))
             soilDensityFile.reference.addListener(fileNameChangeListener(useSoilDensityFile))
             biomeFile.reference.addListener(fileNameChangeListener(useBiomeFile))
             waterFlowFile.reference.addListener(fileNameChangeListener(useWaterFlowFile))
             peakFile.reference.addListener(fileNameChangeListener(usePeakFile))
             riverFile.reference.addListener(fileNameChangeListener(useRiverFile))
+            riverSplinesFile.reference.addListener(fileNameChangeListener(useRiverSplinesFile))
             biomeBorderFile.reference.addListener(fileNameChangeListener(useBiomeBorderFile))
             landMaskFile.reference.addListener(fileNameChangeListener(useLandMaskFile))
             riverBorderFile.reference.addListener(fileNameChangeListener(useRiverBorderFile))
@@ -206,12 +221,14 @@ fun exportPanel(ui: UserInterface) {
                             outputSize = outputSize,
                             elevationFile = fileFromTextReference(useElevationFile, elevationFile),
                             slopeFile = fileFromTextReference(useSlopeFile, slopeFile),
+                            aoFile = fileFromTextReference(useAoFile, aoFile),
                             normalFile = fileFromTextReference(useNormalFile, normalFile),
                             soilDensityFile = fileFromTextReference(useSoilDensityFile, soilDensityFile),
                             biomeFile = fileFromTextReference(useBiomeFile, biomeFile),
                             waterFlowFile = fileFromTextReference(useWaterFlowFile, waterFlowFile),
                             peakFile = fileFromTextReference(usePeakFile, peakFile),
                             riverFile = fileFromTextReference(useRiverFile, riverFile),
+                            riverSplinesFile = fileFromTextReference(useRiverSplinesFile, riverSplinesFile),
                             biomeBorderFile = fileFromTextReference(useBiomeBorderFile, biomeBorderFile),
                             landMaskFile = fileFromTextReference(useLandMaskFile, landMaskFile),
                             riverBorderFile = fileFromTextReference(useRiverBorderFile, riverBorderFile),
@@ -270,8 +287,10 @@ private fun export(exportFiles: WaterFlows.ExportFiles) {
                         biomeGraph = currentBiomeGraph,
                         biomeMask = currentBiomeMask,
                         biomes = currentBiomes,
-                        flowGraphSmall = cachedGraph256.value,
-                        flowGraphLarge = cachedGraph1024.value,
+                        flowGraph1 = cachedGraph256.value,
+                        flowGraph2 = cachedGraph512.value,
+                        flowGraph3 = cachedGraph1024.value,
+                        flowGraph4 = cachedGraph2048.value,
                         executor = executor,
                         mapScale = currentMapScale,
                         customElevationPowerMap = currentState.customElevationPowerMap.value,
@@ -279,7 +298,7 @@ private fun export(exportFiles: WaterFlows.ExportFiles) {
                         customSoilMobilityMap = currentState.customSoilMobilityMap.value,
                         canceled = canceled,
                         biomeTemplates = BIOME_TEMPLATES_REF.value!!,
-                        renderLevel = 2,
+                        renderLevel = outputQuality.value - 1,
                         exportFiles = exportFiles)
             } catch (w: Exception) {
                 if (!causedByCancellation(w)) {

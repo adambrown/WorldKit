@@ -6,11 +6,8 @@ import com.grimfox.gec.util.*
 import com.grimfox.logging.LOG
 import com.grimfox.joml.Matrix4f
 import org.lwjgl.BufferUtils
-import org.lwjgl.opengl.GL11.*
+import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
-import org.lwjgl.opengl.GL13.*
-import org.lwjgl.opengl.GL15.*
-import org.lwjgl.opengl.GL20.*
 import org.lwjgl.opengl.GL30.*
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.MemoryUtil.NULL
@@ -93,14 +90,14 @@ object TextureBuilder {
     private var dynamicGeometryProgram: Int = 0
     private var dynamicGeometry3D: DynamicGeometry3D
     private var dynamicGeometry2D: DynamicGeometry2D
-    private val mvpMatrixUniformNormalAndSlope = ShaderUniform("modelViewProjectionMatrix")
-    private val heightScaleUniformNormalAndSlope = ShaderUniform("heightScale")
-    private val uvScaleUniformNormalAndSlope = ShaderUniform("uvScale")
-    private val heightMapTextureUniformNormalAndSlope = ShaderUniform("heightMapTexture")
-    private val positionAttributeNormalAndSlope = ShaderAttribute("position")
-    private val uvAttributeNormalAndSlope = ShaderAttribute("uv")
-    private var normalAndSlopeProgram: Int = 0
-    private var normalAndSlopeImagePlane: ImagePlane
+    private val mvpMatrixUniformNormalAndAo = ShaderUniform("modelViewProjectionMatrix")
+    private val heightScaleUniformNormalAndAo = ShaderUniform("heightScale")
+    private val uvScaleUniformNormalAndAo = ShaderUniform("uvScale")
+    private val heightMapTextureUniformNormalAndAo = ShaderUniform("heightMapTexture")
+    private val positionAttributeNormalAndAo = ShaderAttribute("position")
+    private val uvAttributeNormalAndAo = ShaderAttribute("uv")
+    private var normalAndAoProgram: Int = 0
+    private var normalAndAoImagePlane: ImagePlane
     private var textureRenderersLookup: List<Pair<Int, TextureRenderer>>
     private var textureRenderers: Map<Int, TextureRenderer>
 
@@ -113,19 +110,19 @@ object TextureBuilder {
                 listOf(positionAttributeDynamicGeometry),
                 listOf(mvpMatrixUniformDynamicGeometry))
 
-        val normalAndSlopeVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/normal-slope.vert"))
-        val normalAndSlopeFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/normal-slope.frag"))
+        val normalAndAoVertexShader = compileShader(GL_VERTEX_SHADER, loadShaderSource("/shaders/terrain/normal.vert"))
+        val normalAndAoFragmentShader = compileShader(GL_FRAGMENT_SHADER, loadShaderSource("/shaders/terrain/normal-ao.frag"))
 
-        normalAndSlopeProgram = createAndLinkProgram(
-                listOf(normalAndSlopeVertexShader, normalAndSlopeFragmentShader),
-                listOf(positionAttributeNormalAndSlope, uvAttributeNormalAndSlope),
-                listOf(mvpMatrixUniformNormalAndSlope, heightScaleUniformNormalAndSlope, uvScaleUniformNormalAndSlope, heightMapTextureUniformNormalAndSlope))
+        normalAndAoProgram = createAndLinkProgram(
+                listOf(normalAndAoVertexShader, normalAndAoFragmentShader),
+                listOf(positionAttributeNormalAndAo, uvAttributeNormalAndAo),
+                listOf(mvpMatrixUniformNormalAndAo, heightScaleUniformNormalAndAo, uvScaleUniformNormalAndAo, heightMapTextureUniformNormalAndAo))
 
 
         dynamicGeometry3D = DynamicGeometry3D()
         dynamicGeometry2D = DynamicGeometry2D()
 
-        normalAndSlopeImagePlane = ImagePlane(1.0f, positionAttributeNormalAndSlope, uvAttributeNormalAndSlope, 0.5f)
+        normalAndAoImagePlane = ImagePlane(1.0f, positionAttributeNormalAndAo, uvAttributeNormalAndAo, 0.5f)
 
         textureRenderersLookup = ArrayList(RENDER_WIDTHS.map { it to TextureRenderer(it, it) })
         textureRenderers = hashMapOf(*textureRenderersLookup.toTypedArray())
@@ -179,7 +176,7 @@ object TextureBuilder {
         })
     }
 
-    private fun <T : Any> renderNormalAndSlopeInternal(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
+    private fun <T : Any> renderNormalAndAoInternal(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f), collector: (TextureRenderer) -> T): T {
         return doDeferredOpenglWork(ValueCollector {
             val textureRenderer = textureRenderers.getOrDefault(resolution, textureRenderersLookup.last().second)
             mvpMatrix.setOrtho(0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 2.0f)
@@ -191,7 +188,7 @@ object TextureBuilder {
             textureRenderer.bind()
             glClearColor(clearColor.first, clearColor.second, clearColor.third, clearColor.fourth)
             glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-            drawNormalsAndSlope(heightMapTexture, heightScale, uvScale)
+            drawNormalsAndSAo(heightMapTexture, heightScale, uvScale)
             val retVal = collector(textureRenderer)
             textureRenderer.unbind()
             retVal
@@ -488,8 +485,8 @@ object TextureBuilder {
         }
     }
 
-    fun renderNormalAndSlopeRgbaByte(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
-        return renderNormalAndSlopeInternal(resolution, heightMapTexture, heightScale, uvScale, clearColor, {
+    fun renderNormalAndAoRgbaByte(resolution: Int, heightMapTexture: TextureId, heightScale: Float, uvScale: Float, clearColor: QuadFloat = QuadFloat(0.0f, 0.0f, 0.0f, 1.0f)): ByteBuffer {
+        return renderNormalAndAoInternal(resolution, heightMapTexture, heightScale, uvScale, clearColor, {
             val id = it.newRgbaTextureByte(GL_NEAREST, GL_NEAREST)
             val retVal = extractTextureRgbaByte(id, resolution)
             id.free()
@@ -644,6 +641,21 @@ object TextureBuilder {
         })
     }
 
+    fun buildTextureRgbFloat(data: FloatArray, width: Int, minFilter: Int, magFilter: Int): TextureId {
+        return doDeferredOpenglWork(ValueCollector {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, width, 0, GL_RGB, GL_FLOAT, data)
+            glBindTexture(GL_TEXTURE_2D, 0)
+            TextureId(newTexId)
+        })
+    }
+
     fun buildTextureRedFloat(data: FloatBuffer, width: Int, minFilter: Int, magFilter: Int): TextureId {
         return doDeferredOpenglWork(ValueCollector {
             val newTexId = glGenTextures()
@@ -697,8 +709,23 @@ object TextureBuilder {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 2)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, width, 0, GL_RED, GL_UNSIGNED_BYTE, data)
+            glBindTexture(GL_TEXTURE_2D, 0)
+            TextureId(newTexId)
+        })
+    }
+
+    fun buildTextureRgbaByte(data: ByteBuffer, width: Int, minFilter: Int, magFilter: Int): TextureId {
+        return doDeferredOpenglWork(ValueCollector {
+            val newTexId = glGenTextures()
+            glBindTexture(GL_TEXTURE_2D, newTexId)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, width, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
             glBindTexture(GL_TEXTURE_2D, 0)
             TextureId(newTexId)
         })
@@ -738,15 +765,15 @@ object TextureBuilder {
         dynamicGeometry3D.render(triangles.first, triangles.second, positionAttributeDynamicGeometry)
     }
 
-    private fun drawNormalsAndSlope(heightMapTexture: TextureId, heightScale: Float, uvScale: Float) {
-        glUseProgram(normalAndSlopeProgram)
-        glUniformMatrix4fv(mvpMatrixUniformNormalAndSlope.location, false, mvpMatrix.get(0, floatBuffer))
-        glUniform1f(heightScaleUniformNormalAndSlope.location, heightScale)
-        glUniform1f(uvScaleUniformNormalAndSlope.location, uvScale)
-        glUniform1i(heightMapTextureUniformNormalAndSlope.location, 0)
+    private fun drawNormalsAndSAo(heightMapTexture: TextureId, heightScale: Float, uvScale: Float) {
+        glUseProgram(normalAndAoProgram)
+        glUniformMatrix4fv(mvpMatrixUniformNormalAndAo.location, false, mvpMatrix.get(0, floatBuffer))
+        glUniform1f(heightScaleUniformNormalAndAo.location, heightScale)
+        glUniform1f(uvScaleUniformNormalAndAo.location, uvScale)
+        glUniform1i(heightMapTextureUniformNormalAndAo.location, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, heightMapTexture.id)
-        normalAndSlopeImagePlane.render()
+        normalAndAoImagePlane.render()
     }
 
     class TextureRenderer(val width: Int, val height: Int) {

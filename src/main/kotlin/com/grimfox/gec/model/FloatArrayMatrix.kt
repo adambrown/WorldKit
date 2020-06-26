@@ -1,10 +1,8 @@
 package com.grimfox.gec.model
 
-import com.grimfox.gec.util.Utils.pow
-
 class FloatArrayMatrix(override val width: Int, array: FloatArray? = null, init: ((Int) -> Float)? = null) : Matrix<Float> {
 
-    override val size = width.toLong().pow(2)
+    override val size = width.toLong() * width.toLong()
 
     val array = array ?: if (init != null) FloatArray(size.toInt(), init) else FloatArray(size.toInt())
 
