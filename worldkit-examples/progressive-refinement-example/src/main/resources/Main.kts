@@ -182,6 +182,21 @@ fun batchGenerateAreaIndices() = batchGenerateRandomAreaIndices(
 fun clearCache() = cache.clear()
 
 @Output
+fun landShape() = runBlocking { refinedLandShape.value.await().toImageDisplayData() }
+
+@Output
+fun areaIndex() = runBlocking { areaIndex.value.await().toIndexDisplayData() }
+
+@Output
+fun landSdf() = runBlocking { landSdf.value.await().copy().normalize().toImageDisplayData() }
+
+@Output
+fun upliftMap() = runBlocking { upliftMap.value.await().copy().normalize().toImageDisplayData() }
+
+@Output
+fun startingHeights() = runBlocking { startingHeights.value.await().copy().normalize().toImageDisplayData() }
+
+@Output
 fun terrainA() = runBlocking { displayA.value.await() }
 
 @Output
@@ -200,22 +215,22 @@ fun terrainE() = runBlocking { displayE.value.await() }
 fun terrainF() = runBlocking { displayF.value.await() }
 
 @Output
-fun terrainAHeight() = runBlocking { displayA.value.await().heightMap.toImageDisplayData() }
+fun terrainAHeight() = runBlocking { displayA.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
-fun terrainBHeight() = runBlocking { displayB.value.await().heightMap.toImageDisplayData() }
+fun terrainBHeight() = runBlocking { displayB.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
-fun terrainCHeight() = runBlocking { displayC.value.await().heightMap.toImageDisplayData() }
+fun terrainCHeight() = runBlocking { displayC.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
-fun terrainDHeight() = runBlocking { displayD.value.await().heightMap.toImageDisplayData() }
+fun terrainDHeight() = runBlocking { displayD.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
-fun terrainEHeight() = runBlocking { displayE.value.await().heightMap.toImageDisplayData() }
+fun terrainEHeight() = runBlocking { displayE.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
-fun terrainFHeight() = runBlocking { displayF.value.await().heightMap.toImageDisplayData() }
+fun terrainFHeight() = runBlocking { displayF.value.await().heightMap.copy().normalize().toImageDisplayData() }
 
 @Output
 fun terrainANormals() = runBlocking { displayA.value.await().normalMap.toImageDisplayData() }
