@@ -19,8 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 import kotlin.collections.ArrayList
-import kotlin.concurrent.withLock
 import kotlin.concurrent.thread
+import kotlin.concurrent.withLock
 
 private object IoWaiter {
 
@@ -88,6 +88,7 @@ fun waitForBackgroundIo() {
     }
 }
 
+@PublicApi
 fun finishIoTasksOnShutdown() {
     IoWaiter.running = false
 }

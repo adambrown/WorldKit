@@ -4,8 +4,10 @@ import org.joml.SimplexNoise
 import wk.internal.ext.fastFloor
 import wk.internal.ext.fastFloorI
 import java.io.File
-import kotlin.collections.ArrayList
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 typealias DistanceFun = (ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float) -> Float
@@ -293,6 +295,7 @@ private fun <T : Comparable<T>, M : Matrix<T>, N : Comparable<N>, D : Matrix<N>>
     return output
 }
 
+@PublicApi
 fun Matrix<Byte>.distortByCurl(frequency: Float, power: Float): ByteArrayMatrix {
     val input = this
     val widthInverse = 1.0f / width
@@ -312,6 +315,7 @@ fun Matrix<Byte>.distortByCurl(frequency: Float, power: Float): ByteArrayMatrix 
     return buffer
 }
 
+@PublicApi
 fun Matrix<Byte>.distortByCurl(octaves: Int, randomSeed: Long, frequency: Float, power: Float): ByteArrayMatrix {
     val input = this
     val widthInverse = 1.0f / width
@@ -334,14 +338,16 @@ fun Matrix<Byte>.distortByCurl(octaves: Int, randomSeed: Long, frequency: Float,
     return buffer
 }
 
-fun getNoiseOffsets(octaves: Int, randomSeed: Long, multiplier: Float = 1000.0f): FloatArray {
+@PublishedApi
+internal fun getNoiseOffsets(octaves: Int, randomSeed: Long, multiplier: Float = 1000.0f): FloatArray {
     val random = Random(randomSeed)
     return FloatArray(octaves * 2) {
         random.nextFloat() * multiplier
     }
 }
 
-fun getNoiseScales(octaves: Int, start: Float = 1.0f, multiplier: Float = 2.0f): FloatArray {
+@PublishedApi
+internal fun getNoiseScales(octaves: Int, start: Float = 1.0f, multiplier: Float = 2.0f): FloatArray {
     var scale = start
     return FloatArray(octaves) {
         val temp = scale
@@ -350,7 +356,8 @@ fun getNoiseScales(octaves: Int, start: Float = 1.0f, multiplier: Float = 2.0f):
     }
 }
 
-fun getNoiseCoefficients(octaves: Int, sum: Float = 1.0f, multiplier: Float = 0.5f): FloatArray {
+@PublishedApi
+internal fun getNoiseCoefficients(octaves: Int, sum: Float = 1.0f, multiplier: Float = 0.5f): FloatArray {
     val m = 1.0f / multiplier
     var coeffSum = 0.0f
     var coeff = 1.0f
@@ -477,7 +484,7 @@ private fun getIqBasisRandom(randomSeed: Long, width: Int): FloatArrayMatrix {
 
 private val basicNoiseFunction: NoiseFunction = { it }
 
-fun getIqBasisSimplex(randomSeed: Long, width: Int, frequency: Float): FloatArrayMatrix {
+private fun getIqBasisSimplex(randomSeed: Long, width: Int, frequency: Float): FloatArrayMatrix {
     return generateNoiseMultifractal(
             randomSeed = randomSeed,
             octaves = 6,
@@ -748,6 +755,7 @@ inline fun generateNoiseWorley(
     )
 }
 
+@PublicApi
 inline fun generateNoiseWorley(
         randomSeed: Long,
         octaves: Int,
@@ -1017,30 +1025,19 @@ sealed class NoiseSource {
 
 @PublicApi
 enum class DistanceFunction(val function: DistanceFun) {
-
-    @PublicApi
     Euclidean(squaredDistFun),
-
-    @PublicApi
     Manhattan(rectilinearDistFun),
-
-    @PublicApi
     Chebyshev(maxValueDistFun)
 }
 
 @PublicApi
 enum class FractalFunction(val function: FractalFun) {
-
-    @PublicApi
     Fbm(fbmFractalFun),
-
-    @PublicApi
     Terrain(terrainFractalFun),
-
-    @PublicApi
     FbmTerrain(fbmTerrainFractalFun)
 }
 
+@PublicApi
 inline fun generateNoiseMultifractal(
         randomSeed: Long,
         octaves: Int,

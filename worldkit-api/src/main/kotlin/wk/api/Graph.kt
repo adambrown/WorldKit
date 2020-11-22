@@ -4,34 +4,39 @@ import cern.colt.list.IntArrayList
 import wk.internal.ext.intList
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.EOFException
-import java.lang.IllegalArgumentException
 import kotlin.math.*
 
 private typealias Point = Pair<Double, Double>
 private typealias Triangle = Triple<Int, Int, Int>
 private typealias Edge = Pair<Point, Point>
 
+@PublicApi
 class GraphLite(
+        @PublicApi
         val stride: Int,
+        @PublicApi
         val width: Float,
-        val maxConnections: Int,
-        val minConnectionDist: Float,
-        val connectionDelta: Float,
-        val minArea: Float,
-        val areaDelta: Float,
-        val points: ShortArray,
-        val connectionsAreas: IntArray,
-        val connectionDists: ByteArray) {
+        private val maxConnections: Int,
+        private val minConnectionDist: Float,
+        private val connectionDelta: Float,
+        private val minArea: Float,
+        private val areaDelta: Float,
+        private val points: ShortArray,
+        @PublishedApi
+        internal val connectionsAreas: IntArray,
+        private val connectionDists: ByteArray) {
 
     companion object {
 
+        @PublicApi
         const val SELF_OFFSET: Byte = 12
 
+        @PublicApi
         fun from(seed: Long, stride: Int, width: Double = 1.0, constraint: Double = 0.85): GraphLite {
             return from(stride, width.toFloat(), generateSemiRandomPoints(seed, width, stride, constraint))
         }
 
+        @PublicApi
         fun from(stride: Int, width: Float, points: DoubleArray): GraphLite {
             val pointCount = points.size / 2
             val strideM1 = stride - 1
@@ -169,6 +174,7 @@ class GraphLite(
                     connectionDists = connectionDists)
         }
 
+        @PublicApi
         fun deserializeFrom(input: DataInputStream): GraphLite {
             val stride = input.readInt()
             val width = input.readFloat()
@@ -201,61 +207,9 @@ class GraphLite(
                     connectionsAreas = connectionsAreas,
                     connectionDists = connectionDists)
         }
-
-        fun deserializeFromLE(input: DataInputStream): GraphLite {
-            val stride = input.readIntLE()
-            val width = input.readFloatLE()
-            val maxConnections = input.readByte().toInt() and 0xFF
-            val minConnectionDist = input.readFloatLE()
-            val connectionDelta = input.readFloatLE()
-            val minArea = input.readFloatLE()
-            val areaDelta = input.readFloatLE()
-            var count = input.readIntLE()
-            val points = ShortArray(count) {
-                input.readShortLE()
-            }
-            count = input.readIntLE()
-            val connectionsAreas = IntArray(count) {
-                input.readIntLE()
-            }
-            count = input.readIntLE()
-            val connectionDists = ByteArray(count) {
-                input.readByte()
-            }
-            return GraphLite(
-                    stride = stride,
-                    width = width,
-                    maxConnections = maxConnections,
-                    minConnectionDist = minConnectionDist,
-                    connectionDelta = connectionDelta,
-                    minArea = minArea,
-                    areaDelta = areaDelta,
-                    points = points,
-                    connectionsAreas = connectionsAreas,
-                    connectionDists = connectionDists)
-        }
-
-        private fun DataInputStream.readIntLE(): Int {
-            val ch1: Int = read()
-            val ch2: Int = read()
-            val ch3: Int = read()
-            val ch4: Int = read()
-            if (ch1 or ch2 or ch3 or ch4 < 0) throw EOFException()
-            return (ch1 shl 0) or (ch2 shl 8) or (ch3 shl 16) or (ch4 shl 24)
-        }
-
-        private fun DataInputStream.readFloatLE(): Float {
-            return java.lang.Float.intBitsToFloat(readIntLE())
-        }
-
-        private fun DataInputStream.readShortLE(): Short {
-            val ch1: Int = read()
-            val ch2: Int = read()
-            if (ch1 or ch2 < 0) throw EOFException()
-            return ((ch1 shl 0) or (ch2 shl 8)).toShort()
-        }
     }
 
+    @PublicApi
     fun serializeTo(output: DataOutputStream) {
         output.writeInt(stride)
         output.writeFloat(width)
@@ -278,6 +232,7 @@ class GraphLite(
         }
     }
 
+    @PublicApi
     val size = stride * stride
     private val strideM1 = stride - 1
     private val pixelWidth = width / strideM1
@@ -285,6 +240,7 @@ class GraphLite(
     private val areaIncrement = areaDelta / 255.0f
     private val connectionDistIncrement = connectionDelta / 255.0f
 
+    @PublicApi
     fun getIdFromOffset(id: Int, offset: Byte): Int {
         val index = offset.toInt()
         if (index == 12) return id
@@ -293,6 +249,7 @@ class GraphLite(
         return oy * stride + ox
     }
 
+    @PublicApi
     fun getIdAndDistanceFromOffset(id: Int, offset: Byte, retVal: M2<Int, Float>): M2<Int, Float> {
         val index = offset.toInt()
         if (index == 12) {
@@ -317,6 +274,7 @@ class GraphLite(
         return retVal
     }
 
+    @PublicApi
     fun getOffsetFromAdjacentIds(centerId: Int, adjacentId: Int): Byte {
         val cx = centerId % stride
         val cy = centerId / stride
@@ -327,6 +285,7 @@ class GraphLite(
         return (dy * 5 + dx).toByte()
     }
 
+    @PublicApi
     inline fun forEachAdjacent(id: Int, callback: (adjacent: Int) -> Any?) {
         val x = id % stride
         val y = id / stride
@@ -341,6 +300,7 @@ class GraphLite(
         }
     }
 
+    @PublicApi
     fun getPoint2F(id: Int, outPoint: Point2F = point2()): Point2F {
         val x = id % stride
         val y = id / stride
@@ -356,12 +316,14 @@ class GraphLite(
         return outPoint
     }
 
+    @PublicApi
     fun getArea(id: Int): Float {
         val x = id % stride
         val y = id / stride
         return if (x == 0 || x == strideM1 || y == 0 || y == strideM1) 0.0f else (connectionsAreas[id] ushr 24) * areaIncrement + minArea
     }
 
+    @PublicApi
     fun getBorder(): MutableList<Int> {
         val borderIds = intList(strideM1 * 4)
         borderIds.addAll(0 until stride)
@@ -373,83 +335,6 @@ class GraphLite(
         borderIds.addAll((stride * strideM1) until size)
         return borderIds
     }
-}
-
-class Graph(
-        val stride: Int,
-        val width: Float,
-        val points: FloatArray,
-        val triangles: IntArray,
-        val halfedges: IntArray,
-        val pointToHalfEdgeIndex: IntArray,
-        val circumcenters: FloatArray,
-        val cellAreas: FloatArray) {
-
-    companion object {
-
-        fun from(stride: Int, width: Float, points: DoubleArray): Graph {
-            val result = triangulate(points, stride)
-            val floatPoints = points.map { it.toFloat() }.toFloatArray()
-            val triangles = result.triangles.elements()
-            val halfedges = result.halfedges.elements()
-            val pointToHalfedgeIndex = constructPointToHalfedgeIndex(points, triangles, halfedges)
-            val circumcenters = constructCircumcenters(points, triangles)
-            val cellAreas = constructCellAreas(points, halfedges, pointToHalfedgeIndex, circumcenters)
-            return Graph(
-                    stride = stride,
-                    width = width,
-                    points = floatPoints,
-                    triangles = triangles,
-                    halfedges = halfedges,
-                    pointToHalfEdgeIndex = pointToHalfedgeIndex,
-                    circumcenters = circumcenters,
-                    cellAreas = cellAreas)
-        }
-    }
-
-    fun isBorderPoint(pointId: Int) = isBorderPoint(stride, pointId)
-
-    fun getEdgesOfTriangle(triangleId: Int) = wk.api.getEdgesOfTriangle(triangleId)
-
-    fun getTriangleOfEdge(edgeId: Int) = wk.api.getTriangleOfEdge(edgeId)
-
-    fun getNextHalfedge(edgeId: Int) = nextHalfedge(edgeId)
-
-    fun getPreviousHalfedge(edgeId: Int) = previousHalfedge(edgeId)
-
-    fun getPointsOfTriangle(triangleId: Int) = getPointsOfTriangle(triangles, triangleId)
-
-    fun getPointsAdjacentToPoint(pointId: Int) = PointsAdjacentToPointIterator(getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId), triangles)
-
-    fun getPointsAdjacentToPoint(pointId: Int, iterator: PointsAdjacentToPointIterator) = iterator.reuse(getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId), triangles)
-
-    fun getTrianglesAdjacentToTriangle(triangleId: Int): Triple<Int, Int, Int> {
-        val (a, b, c) = getEdgesOfTriangle(triangleId)
-        return Triple(
-                if (halfedges[a] != NONE) getTriangleOfEdge(halfedges[a]) else NONE,
-                if (halfedges[b] != NONE) getTriangleOfEdge(halfedges[b]) else NONE,
-                if (halfedges[c] != NONE) getTriangleOfEdge(halfedges[c]) else NONE)
-    }
-
-    fun getEdgesAroundPoint(pointId: Int) = getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId)
-
-    fun getEdgesAroundPoint(pointId: Int, iterator: EdgesAroundPointIterator) = getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId, iterator)
-
-    fun getTrianglesAroundPoint(pointId: Int) = TrianglesAroundPointIterator(getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId))
-
-    fun getTrianglesAroundPoint(pointId: Int, iterator: TrianglesAroundPointIterator) = iterator.reuse(getEdgesAroundPoint(halfedges, pointToHalfEdgeIndex, pointId))
-}
-
-
-fun isBorderPoint(stride: Int, pointId: Int): Boolean {
-    val x = pointId % stride
-    val y = pointId / stride
-    return x == 0 || y == 0 || x == stride - 1 || y == stride - 1
-}
-
-private fun getEdgesOfTriangle(triangleId: Int): Triple<Int, Int, Int> {
-    val i = 3 * triangleId
-    return Triple(i, i + 1, i + 2)
 }
 
 private fun getTriangleOfEdge(edgeId: Int): Int {
@@ -529,20 +414,11 @@ private fun getPointsOfTriangle(triangles: IntArray, triangleId: Int): Triangle 
     return Triangle(triangles[i], triangles[i + 1], triangles[i + 2])
 }
 
-private fun getEdgesAroundPoint(halfedges: IntArray, pointToHalfedgeIndex: IntArray, pointId: Int): EdgesAroundPointIterator {
-    return EdgesAroundPointIterator(halfedges, pointToHalfedgeIndex, pointId)
-}
-
 private fun getEdgesAroundPoint(halfedges: IntArray, pointToHalfedgeIndex: IntArray, pointId: Int, iterator: EdgesAroundPointIterator): EdgesAroundPointIterator {
     return iterator.reuse(halfedges, pointToHalfedgeIndex, pointId)
 }
 
-class EdgesAroundPointIterator(private var halfedges: IntArray = intArrayOf(), private var start: Int = NONE, private var incoming: Int = start) : Iterator<Int> {
-
-    constructor(
-            halfedges: IntArray,
-            pointToHalfedgeIndex: IntArray,
-            pointId: Int) : this(halfedges, pointToHalfedgeIndex[pointId])
+private class EdgesAroundPointIterator(private var halfedges: IntArray = intArrayOf(), private var start: Int = NONE, private var incoming: Int = start) : Iterator<Int> {
 
     private var next: Int? = null
 
@@ -582,13 +458,6 @@ class EdgesAroundPointIterator(private var halfedges: IntArray = intArrayOf(), p
         next = primeNext()
     }
 
-    fun reuse(halfedges: IntArray, start: Int): EdgesAroundPointIterator {
-        this.halfedges = halfedges
-        this.start = start
-        reset()
-        return this
-    }
-
     fun reuse(halfedges: IntArray, pointToHalfedgeIndex: IntArray, pointId: Int): EdgesAroundPointIterator {
         this.halfedges = halfedges
         this.start = pointToHalfedgeIndex[pointId]
@@ -597,7 +466,7 @@ class EdgesAroundPointIterator(private var halfedges: IntArray = intArrayOf(), p
     }
 }
 
-class PointsAdjacentToPointIterator(private var edges: EdgesAroundPointIterator = EdgesAroundPointIterator(), private var triangles: IntArray = intArrayOf()): Iterator<Int> {
+private class PointsAdjacentToPointIterator(private var edges: EdgesAroundPointIterator = EdgesAroundPointIterator(), private var triangles: IntArray = intArrayOf()): Iterator<Int> {
 
     override fun next(): Int {
         return triangles[edges.next()]
@@ -619,28 +488,7 @@ class PointsAdjacentToPointIterator(private var edges: EdgesAroundPointIterator 
     }
 }
 
-class TrianglesAroundPointIterator(private var edges: EdgesAroundPointIterator = EdgesAroundPointIterator()) : Iterator<Int> {
-
-    override fun next(): Int {
-        return getTriangleOfEdge(edges.next())
-    }
-
-    override fun hasNext(): Boolean {
-        return edges.hasNext()
-    }
-
-    fun reset() {
-        edges.reset()
-    }
-
-    fun reuse(edges: EdgesAroundPointIterator): TrianglesAroundPointIterator {
-        this.edges = edges
-        reset()
-        return this
-    }
-}
-
-class VoronoiEdgesAroundPointIterator(
+private class VoronoiEdgesAroundPointIterator(
         private var edges: EdgesAroundPointIterator = EdgesAroundPointIterator(),
         private var circumcenters: FloatArray = floatArrayOf(),
         private var start: Int = NONE,
@@ -710,7 +558,7 @@ class VoronoiEdgesAroundPointIterator(
     }
 }
 
-class PointToPointIterator(
+private class PointToPointIterator(
         private var stride: Int = 0,
         private var x: Int = 0,
         private var y: Int = 0,
@@ -807,7 +655,7 @@ private fun circumdelta(points: DoubleArray, a: Int, b: Int, c: Int): Point {
     return x to y
 }
 
-fun orient(points: DoubleArray, a: Int, q: Int, r: Int): Boolean {
+private fun orient(points: DoubleArray, a: Int, q: Int, r: Int): Boolean {
     val (ax, ay) = points.unpack(a)
     val (qx, qy) = points.unpack(q)
     val (rx, ry) = points.unpack(r)
@@ -846,7 +694,7 @@ private fun nearlyEquals(points: DoubleArray, p0: Int, p1: Int): Boolean {
     return abs(p0x - p1x) <= EPSILON && abs(p0y - p1y) <= EPSILON
 }
 
-fun nextHalfedge(edgeId: Int): Int {
+private fun nextHalfedge(edgeId: Int): Int {
     return if (edgeId % 3 == 2) {
         edgeId - 2
     } else {
@@ -854,7 +702,7 @@ fun nextHalfedge(edgeId: Int): Int {
     }
 }
 
-fun previousHalfedge(edgeId: Int): Int {
+private fun previousHalfedge(edgeId: Int): Int {
     return if (edgeId % 3 == 0) {
         edgeId + 2
     } else {
@@ -862,7 +710,7 @@ fun previousHalfedge(edgeId: Int): Int {
     }
 }
 
-class Triangulation(val triangles: IntArrayList, val halfedges: IntArrayList, val hull: IntArrayList) {
+private class Triangulation(val triangles: IntArrayList, val halfedges: IntArrayList, val hull: IntArrayList) {
 
     constructor(n: Int) : this(
             triangles = IntArrayList((2 * n - 5) * 3),
@@ -902,21 +750,6 @@ class Triangulation(val triangles: IntArrayList, val halfedges: IntArrayList, va
     fun legalize(a: Int, points: DoubleArray, hull: Hull): Int {
         val b = halfedges.getQuick(a)
 
-        // if the pair of triangles doesn't satisfy the Delaunay condition
-        // (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
-        // then do the same check/flip recursively for the new pair of triangles
-        //
-        //           pl                    pl
-        //          /||\                  /  \
-        //       al/ || \bl            al/    \a
-        //        /  ||  \              /      \
-        //       /  a||b  \    flip    /---ar---\
-        //     p0\   ||   /p1   =>   p0\---bl---/p1
-        //        \  ||  /              \      /
-        //       ar\ || /br             b\    /br
-        //          \||/                  \  /
-        //           pr                    pr
-        //
         val ar = previousHalfedge(a)
 
         if (b == NONE) {
@@ -939,7 +772,6 @@ class Triangulation(val triangles: IntArrayList, val halfedges: IntArrayList, va
             val hbl = halfedges.getQuick(bl)
             val har = halfedges.getQuick(ar)
 
-            // edge swapped on the other side of the hull (rare); fix the halfedge reference
             if (hbl == NONE) {
                 var e = hull.start
                 while (true) {
@@ -977,7 +809,7 @@ class Triangulation(val triangles: IntArrayList, val halfedges: IntArrayList, va
     }
 }
 
-class Hull(val points: DoubleArray, val prev: IntArray, val next: IntArray, val tri: IntArray, val hash: IntArray, var start: Int, private var centerX: Double, private var centerY: Double) {
+private class Hull(val points: DoubleArray, val prev: IntArray, val next: IntArray, val tri: IntArray, val hash: IntArray, var start: Int, private var centerX: Double, private var centerY: Double) {
 
     constructor(n: Int, centerX: Double, centerY: Double, i0: Int, i1: Int, i2: Int, points: DoubleArray) : this(
             points = points,

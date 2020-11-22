@@ -13,7 +13,6 @@ import wk.internal.ext.intList
 import wk.internal.ext.intListOf
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.collections.ArrayList
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -24,11 +23,13 @@ private const val NO_BIOME_ID: Byte = -2
 
 private val threadCount = Runtime.getRuntime().availableProcessors()
 
+@PublicApi
 class RegionData(
         val landIndex: BitMatrix<*>,
         val beach: List<Int>
 )
 
+@PublicApi
 class TerraformNodeData(
         internal val nodeIndex: ByteBuffer,
         internal val landIndex: BitMatrix<*>,
@@ -36,6 +37,7 @@ class TerraformNodeData(
         internal val borderIds: WkMutableIntList
 )
 
+@PublicApi
 class TerraformResult(
         val heightMap: FloatArrayMatrix,
         val graphId: Int,
@@ -49,13 +51,17 @@ private class TerrainUpliftValues(
         val valueScale: Float,
         val textureWidthM1: Int)
 
+@PublicApi
 fun TerraformResult.toStandardizedHeightMap(mapScale: MapScale) = heightMap.toStandardizedHeightMap(mapScale)
 
+@PublicApi
 fun TerraformResult.toOcclusionMap(mapScale: MapScale) = heightMap.toOcclusion(mapScale)
 
+@PublicApi
 fun TerraformResult.toNormalMap(mapScale: MapScale) = heightMap.toNormalMap(mapScale)
 
 
+@PublicApi
 fun buildUpliftMap(outputWidth: Int, areaIndex: Matrix<Byte>, terrainProfiles: List<TerrainProfile>): ShortArrayMatrix {
     val landMaskWidthInverse = 1.0f / outputWidth
     val uplifts = ArrayList<TerrainUpliftValues>()
@@ -97,6 +103,7 @@ fun buildUpliftMap(outputWidth: Int, areaIndex: Matrix<Byte>, terrainProfiles: L
     return upliftMap
 }
 
+@PublicApi
 fun buildStartingHeights(
         randomSeed: Long,
         outputWidth: Int,
@@ -172,11 +179,13 @@ fun buildStartingHeights(
             blur = 1.0f).heightMap
 }
 
+@PublicApi
 enum class TerraformRenderMode {
     Cubic,
     Gaussian
 }
 
+@PublicApi
 fun terraform(
         randomSeed: Long,
         mapScale: MapScale,
@@ -255,7 +264,7 @@ fun terraform(
     }
 }
 
-fun buildHeightMap(
+private fun buildHeightMap(
         flowGraphId: Int,
         nodeData: TerraformNodeData,
         mapScale: MapScale,
@@ -329,7 +338,7 @@ fun buildHeightMap(
     return TerraformResult(heightMap, flowGraphId, nodeData)
 }
 
-fun prepareGraphNodes(flowGraphId: Int, landSdf: Matrix<Short>, distanceScale: Float): TerraformNodeData {
+private fun prepareGraphNodes(flowGraphId: Int, landSdf: Matrix<Short>, distanceScale: Float): TerraformNodeData {
     val graph = getFlowGraph(flowGraphId)
     val landIndex = BitMatrix64(graph.stride)
     splitLandAndWaterIds(graph, landSdf, landIndex)
@@ -1268,6 +1277,7 @@ private inline fun calculateHeight(graph: GraphLite, nodePtr: TerraformNode, par
     }
 }
 
+@PublicApi
 enum class MapScale(
         private val mapSizeKilometers: Int,
         val heightRangeMeters: Float,
@@ -1292,14 +1302,17 @@ enum class MapScale(
     MapScale128K(128,  3200.0f);
 
     companion object {
+        @PublicApi
         val indices = values().indices
 
+        @PublicApi
         operator fun get(ordinal: Int): MapScale {
             return values()[ordinal]
         }
     }
 }
 
+@PublicApi
 class TerrainDisplayData(
         val mapScale: MapScale,
         val normalizedScaleFactor: Float,

@@ -2,6 +2,13 @@ package wk.internal.ui.widgets
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import org.joml.Vector4f
+import org.lwjgl.BufferUtils
+import org.lwjgl.system.MemoryStack.stackPush
+import org.lwjgl.system.MemoryUtil
+import org.lwjgl.system.MemoryUtil.memAddress
+import wk.api.*
+import wk.internal.application.LOG
 import wk.internal.ui.ObservableMutableList
 import wk.internal.ui.nvgproxy.*
 import wk.internal.ui.widgets.HorizontalAlignment.*
@@ -10,13 +17,6 @@ import wk.internal.ui.widgets.Layout.*
 import wk.internal.ui.widgets.Sizing.*
 import wk.internal.ui.widgets.VerticalAlignment.*
 import wk.internal.ui.widgets.VerticalTruncation.*
-import org.joml.Vector4f
-import org.lwjgl.BufferUtils
-import org.lwjgl.system.MemoryStack.stackPush
-import org.lwjgl.system.MemoryUtil
-import org.lwjgl.system.MemoryUtil.memAddress
-import wk.api.*
-import wk.internal.application.LOG
 import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.CancellationException
@@ -1091,7 +1091,7 @@ private open class RootBlock(x: Float, y: Float, width: Float, height: Float) : 
     override var isVisible: Boolean
         get() = true
         set(_) = ignore
-    override val isVisibleRef: ObservableReference<Boolean> = iRef(true)
+    override val isVisibleRef: ObservableReference<Boolean> = oRef(true)
     override var hAlign: HorizontalAlignment
         get() = LEFT
         set(_) = ignore
@@ -1202,7 +1202,7 @@ val NO_BLOCK: Block = object : RootBlock(-1.0f, -1.0f, -1.0f, -1.0f) {
     override var isVisible: Boolean
         get() = false
         set(_) = ignore
-    override val isVisibleRef: ObservableReference<Boolean> = iRef(false)
+    override val isVisibleRef: ObservableReference<Boolean> = oRef(false)
     override var inputOverride: Block?
         get() = null
         set(_) = ignore

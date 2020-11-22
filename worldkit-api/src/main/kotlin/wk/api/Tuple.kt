@@ -2,6 +2,7 @@ package wk.api
 
 import kotlin.math.sqrt
 
+@PublicApi
 interface C2<A, B> {
     val first: A
     val second: B
@@ -11,29 +12,34 @@ interface C2<A, B> {
     operator fun component2(): B
 }
 
+@PublicApi
 interface M2<A, B> : C2<A, B> {
     override var first: A
     override var second: B
 }
 
+@PublicApi
 interface C3<A, B, C>  : C2<A, B> {
     val third: C
 
     operator fun component3(): C
 }
 
+@PublicApi
 interface M3<A, B, C> : C3<A, B, C>, M2<A, B> {
     override var first: A
     override var second: B
     override var third: C
 }
 
+@PublicApi
 interface C4<A, B, C, D>  : C3<A, B, C> {
     val fourth: D
 
     operator fun component4(): D
 }
 
+@PublicApi
 interface M4<A, B, C, D> : C4<A, B, C, D>, M3<A, B, C> {
     override var first: A
     override var second: B
@@ -41,17 +47,20 @@ interface M4<A, B, C, D> : C4<A, B, C, D>, M3<A, B, C> {
     override var fourth: D
 }
 
+@PublicApi
 data class T2<A, B>(
         override var first: A,
         override var second: B
 ) : M2<A, B>
 
+@PublicApi
 data class T3<A, B, C>(
         override var first: A,
         override var second: B,
         override var third: C
 ) : M3<A, B, C>
 
+@PublicApi
 data class T4<A, B, C, D>(
         override var first: A,
         override var second: B,
@@ -102,108 +111,148 @@ inline val Vec4C.g get() = second
 inline val Vec4C.b get() = third
 inline val Vec4C.a get() = fourth
 
+@PublicApi
 fun vec2(x: Float = 0.0f, y: Float = 0.0f): Vec2 = T2(x, y)
 
+@PublicApi
 fun point2(x: Float = 0.0f, y: Float = 0.0f): Point2F = T2(x, y)
 
+@PublicApi
 fun vec3(x: Float = 0.0f, y: Float = 0.0f, z: Float = 0.0f): Vec3 = T3(x, y, z)
 
+@PublicApi
 fun point3(x: Float = 0.0f, y: Float = 0.0f, z: Float = 0.0f): Point3F = T3(x, y, z)
 
+@PublicApi
 fun vec4(x: Float = 0.0f, y: Float = 0.0f, z: Float = 0.0f, w: Float = 0.0f): Vec4 = T4(x, y, z, w)
 
+@PublicApi
 fun color(r: Float, g: Float, b: Float, a: Float): ColorF = T4(r, g, b, a)
 
+@PublicApi
 fun vec2C(x: Float, y: Float): Vec2C = T2(x, y)
 
+@PublicApi
 fun point2C(x: Float, y: Float): Point2FC = T2(x, y)
 
+@PublicApi
 fun vec3C(x: Float, y: Float, z: Float): Vec3C = T3(x, y, z)
 
+@PublicApi
 fun point3C(x: Float, y: Float, z: Float): Point3FC = T3(x, y, z)
 
+@PublicApi
 fun vec4C(x: Float, y: Float, z: Float, w: Float): Vec4C = T4(x, y, z, w)
 
+@PublicApi
 operator fun C2<Float, Float>.plus(other: C2<Float, Float>) = T2(first + other.first, second + other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.plus(f: Float) = T2(first + f, second + f)
 
+@PublicApi
 operator fun Float.plus(other: C2<Float, Float>) = T2(this + other.first, this + other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.minus(other: C2<Float, Float>) = T2(first - other.first, second - other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.minus(f: Float) = T2(first - f, second - f)
 
+@PublicApi
 operator fun Float.minus(other: C2<Float, Float>) = T2(this - other.first, this - other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.times(other: C2<Float, Float>) = T2(first * other.first, second * other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.times(f: Float) = T2(first * f, second * f)
 
+@PublicApi
 operator fun Float.times(other: C2<Float, Float>) = T2(this * other.first, this * other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.div(other: C2<Float, Float>) = T2(first / other.first, second / other.second)
 
+@PublicApi
 operator fun C2<Float, Float>.div(f: Float) = T2(first / f, second / f)
 
+@PublicApi
 operator fun Float.div(other: C2<Float, Float>) = T2(this / other.first, this / other.second)
 
+@PublicApi
 fun M2<Float, Float>.set(other: M2<Float, Float>) {
     first = other.first
     second = other.second
 }
 
+@PublicApi
 fun M2<Float, Float>.set(x: Float, y: Float) {
     first = x
     second = y
 }
 
-
+@PublicApi
 operator fun C3<Float, Float, Float>.plus(other: C3<Float, Float, Float>) = T3(first + other.first, second + other.second, third + other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.plus(f: Float) = T3(first + f, second + f, third + f)
 
+@PublicApi
 operator fun Float.plus(other: C3<Float, Float, Float>) = T3(this + other.first, this + other.second, this + other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.minus(other: C3<Float, Float, Float>) = T3(first - other.first, second - other.second, third - other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.minus(f: Float) = T3(first - f, second - f, third - f)
 
+@PublicApi
 operator fun Float.minus(other: C3<Float, Float, Float>) = T3(this - other.first, this - other.second, this - other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.times(other: C3<Float, Float, Float>) = T3(first * other.first, second * other.second, third * other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.times(f: Float) = T3(first * f, second * f, third * f)
 
+@PublicApi
 operator fun Float.times(other: C3<Float, Float, Float>) = T3(this * other.first, this * other.second, this * other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.div(other: C3<Float, Float, Float>) = T3(first / other.first, second / other.second, third / other.third)
 
+@PublicApi
 operator fun C3<Float, Float, Float>.div(f: Float) = T3(first / f, second / f, third / f)
 
+@PublicApi
 operator fun Float.div(other: C3<Float, Float, Float>) = T3(this / other.first, this / other.second, this / other.third)
 
+@PublicApi
 fun M3<Float, Float, Float>.set(other: M3<Float, Float, Float>) {
     first = other.first
     second = other.second
     third = other.third
 }
 
+@PublicApi
 fun M3<Float, Float, Float>.set(x: Float, y: Float, z: Float) {
     first = x
     second = y
     third = z
 }
 
-
 inline val Vec2C.length2 get() = x * x + y * y
 
 inline val Vec2C.length get() = sqrt(length2)
 
+@PublicApi
 infix fun Point2FC.dist2(other: Point2FC) = (x - other.x) * (x - other.x) + (y - other.y) * (y - other.y)
 
+@PublicApi
 infix fun Point2FC.dist(other: Point2FC) = sqrt(dist2(other))
 
+@PublicApi
 fun Vec2.toUnit(): Vec2 {
     val length = length
     x /= length
@@ -213,6 +262,7 @@ fun Vec2.toUnit(): Vec2 {
 
 inline val Vec2C.unit get() = vec2(x, y).toUnit()
 
+@PublicApi
 infix fun Vec2C.dot(other: Vec2C) = x * other.x + y * other.y
 
 
@@ -220,10 +270,13 @@ inline val Vec3C.length2 get() = x * x + y * y + z * z
 
 inline val Vec3C.length get() = sqrt(length2)
 
+@PublicApi
 infix fun Point3FC.dist2(other: Point3FC) = (x - other.x) * (x - other.x) + (y - other.y) * (y - other.y) + (z - other.z) * (z - other.z)
 
+@PublicApi
 infix fun Point3FC.dist(other: Point3FC) = sqrt(dist2(other))
 
+@PublicApi
 fun Vec3.toUnit(): Vec3 {
     val length = length
     x /= length
@@ -234,4 +287,5 @@ fun Vec3.toUnit(): Vec3 {
 
 inline val Vec3C.unit get() = vec3(x, y, z).toUnit()
 
+@PublicApi
 infix fun Vec3C.dot(other: Vec3C) = x * other.x + y * other.y + z * other.z

@@ -14,8 +14,10 @@ private const val byte0: Byte = 0
 
 private val anglesToSlopes = FloatArray(65536) { tan(Math.toRadians(((it + 2.0) / 65540.0) * 90.0)).toFloat() }
 
+@PublicApi
 class ControlValues(val base: Float, val variance: Float)
 
+@PublicApi
 operator fun List<ControlValues>.get(f: Float): Pair<Float, Float> {
     val lookup = f.coerceIn(0.0f, 1.0f) * (size - 1.0f)
     val i1 = fastFloorI(lookup)
@@ -27,6 +29,7 @@ operator fun List<ControlValues>.get(f: Float): Pair<Float, Float> {
     return Pair(cv1.base * alpha1 + cv2.base * alpha2, cv1.variance * alpha1 + cv2.variance * alpha2)
 }
 
+@PublicApi
 class ErosionSettings(
         val upliftPower: Float,
         val erosionPower: Float,
@@ -35,6 +38,7 @@ class ErosionSettings(
         val terraceJitterFrequency: Float = 1.0f,
         val terraceFunction: ((Float, Float) -> TerraceFunction)? = null)
 
+@PublicApi
 class TerrainProfile(
         val talusAngles: List<ControlValues>,
         val upliftConstant: Float,
@@ -42,6 +46,7 @@ class TerrainProfile(
         val heightScale: Float,
         val erosionSettings: List<ErosionSettings>)
 
+@PublicApi
 class UnderwaterProfile(
         val talusAngles: List<ControlValues>,
         val seaFloorNoise: ShortArrayMatrix,
@@ -49,8 +54,10 @@ class UnderwaterProfile(
         val erosionPowers: List<Float>)
 
 
+@PublicApi
 fun angleToSlope(normalizedTalusAngle: Float) = anglesToSlopes[(normalizedTalusAngle * 65535.0f).roundToInt().coerceIn(0, 65535)]
 
+@PublicApi
 fun buildLinearTalusAngles(minAngleDegrees: Float, deltaAngleDegrees: Float, varianceDegrees: Float): List<ControlValues> {
     val angleIncrement = deltaAngleDegrees / 1023.0f
     val angles = ArrayList<ControlValues>(1024)
@@ -64,6 +71,7 @@ fun buildLinearTalusAngles(minAngleDegrees: Float, deltaAngleDegrees: Float, var
     return angles
 }
 
+@PublicApi
 fun buildSplitTalusAngles(minAngleDegrees: Float, deltaAngleDegrees: Float, split: Float, left: Float, right: Float, varianceDegrees: Float): List<ControlValues> {
     val angles = ArrayList<ControlValues>(1024)
     (0..1023).forEach {
@@ -76,6 +84,7 @@ fun buildSplitTalusAngles(minAngleDegrees: Float, deltaAngleDegrees: Float, spli
     return angles
 }
 
+@PublicApi
 fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, varianceDegrees: Float): List<ControlValues> {
     val term0 = -2.0 * standardDeviation * standardDeviation
     val term1 = scale * (1.0 / sqrt(PI * -term0))
@@ -86,6 +95,7 @@ fun buildNormalTalusAngles(scale: Float, standardDeviation: Float, mean: Float, 
     return angles
 }
 
+@PublicApi
 fun buildLinearControlValues(multiplier: Float, offset: Float, variance: Float): List<ControlValues> {
     val values = ArrayList<ControlValues>(1024)
     (0..1023).forEach {
@@ -95,6 +105,7 @@ fun buildLinearControlValues(multiplier: Float, offset: Float, variance: Float):
     return values
 }
 
+@PublicApi
 fun buildLogisticControlValues(horizontalScale: Float, horizontalShift: Float, verticalShift: Float, shape: Float, variance: Float): List<ControlValues> {
     val values = ArrayList<ControlValues>(1024)
     (0..1023).forEach {
@@ -104,6 +115,7 @@ fun buildLogisticControlValues(horizontalScale: Float, horizontalShift: Float, v
     return values
 }
 
+@PublicApi
 fun buildCubicControlValues(radius: Float, variance: Float): List<ControlValues> {
     val values = ArrayList<ControlValues>(1024)
     val r2i = 1.0f / (radius * radius)
@@ -120,6 +132,7 @@ fun buildCubicControlValues(radius: Float, variance: Float): List<ControlValues>
     return values
 }
 
+@PublicApi
 fun List<ControlValues>.toTexture(): ByteArrayMatrix {
     val buffer = ByteArrayMatrix(1024)
     (0 until 1024).forEach { x ->
@@ -137,6 +150,7 @@ fun List<ControlValues>.toTexture(): ByteArrayMatrix {
     return buffer
 }
 
+@PublicApi
 fun ByteArrayMatrix.toControlValues(): List<ControlValues> {
     val output = ArrayList<ControlValues>(1024)
     (0 until 1024).forEach { x ->
@@ -165,6 +179,7 @@ fun ByteArrayMatrix.toControlValues(): List<ControlValues> {
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.toControlValuesCleanup(): List<ControlValues> {
     val output = ArrayList<ControlValues>(1024)
     (0 until 1024).forEach { x ->
@@ -184,8 +199,10 @@ fun ByteArrayMatrix.toControlValuesCleanup(): List<ControlValues> {
     return output
 }
 
+@PublicApi
 class TerraceStep(val range: Float, val compression: Float, val noiseOffset: Float)
 
+@PublicApi
 fun buildRandomTerraceFunction(randomSeed: Long, minCount: Int, maxCount: Int, easeIn: Float, easeOut: Float, minSpacing: Float, maxSpacing: Float, minCompression: Float, maxCompression: Float): (Float, Float) -> TerraceFunction {
     val random = Random(randomSeed)
     val hasEaseIn = easeIn > 0.0f
@@ -218,6 +235,7 @@ fun buildRandomTerraceFunction(randomSeed: Long, minCount: Int, maxCount: Int, e
     return buildTerraceFunction(terraceSteps)
 }
 
+@PublicApi
 fun buildTerraceFunction(terraceSteps: List<TerraceStep>): (Float, Float) -> TerraceFunction {
     var rangeSum = 0.0f
     terraceSteps.forEach { rangeSum += it.range }

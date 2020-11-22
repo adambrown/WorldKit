@@ -3,12 +3,20 @@ package wk.api
 import java.io.File
 import java.nio.ByteBuffer
 import java.text.DecimalFormat
-import kotlin.math.ceil
 
 typealias PolyLine = ArrayList<Point3F>
 
+@PublicApi
 fun TerraformResult.toRiverLines(mapScale: MapScale) =
         buildRivers(nodeData.nodeIndex, nodeData.landIndex, graphId, mapScale.mapSizeMeters)
+
+@PublicApi
+fun List<PolyLine>.writePolyLines(fileName: String, outputScale: Float) {
+    val file = File(fileName)
+    if ((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) {
+        writePolyLineObj(this, file, outputScale)
+    }
+}
 
 private fun buildRivers(nodeIndex: ByteBuffer, landIndex: BitMatrix<*>, flowGraphId: Int, distanceScale: Float): List<PolyLine> {
     val graph = getFlowGraph(flowGraphId)
@@ -181,106 +189,4 @@ private fun writePolyLineObj(polyLines: List<List<Point3F>>, outputFile: File, s
             writer.write("\n")
         }
     }
-}
-
-fun List<PolyLine>.writePolyLines(fileName: String, outputScale: Float) {
-    val file = File(fileName)
-    if ((!file.exists() && file.parentFile.isDirectory && file.parentFile.canWrite()) || file.canWrite()) {
-        writePolyLineObj(this, file, outputScale)
-    }
-}
-
-fun buildOpenEdges(points: List<Point2F>, segmentSize: Float, smoothFactor: Int): List<Point2F> {
-    return buildEdges(getCurvePoints(points, false, segmentSize, smoothFactor), isClosed = false, moveToFirst = true)
-}
-
-private fun buildEdges(inPoints: List<Point2F>, isClosed: Boolean, moveToFirst: Boolean): MutableList<Point2F> {
-    val outPoints = ArrayList<Point2F>()
-    val start = inPoints.first()
-    if (moveToFirst) {
-        outPoints.add(start)
-    }
-    for (i in if (isClosed) 1..inPoints.size else 1 until inPoints.size) {
-        val id = i % inPoints.size
-        val lastId = i - 1
-        val lastPoint = inPoints[lastId]
-        val point = inPoints[id]
-        if (i == 1 && moveToFirst) {
-            outPoints[0] = lastPoint
-        }
-        outPoints.add(point)
-    }
-    return outPoints
-}
-
-private fun getCurvePoints(points: List<Point2F>, isClosed: Boolean, segmentSize: Float, smoothFactor: Int): List<Point2F> {
-
-    val newPoints = ArrayList<Point2F>()
-    val copyPoints = ArrayList(points)
-
-    val firstPoint = copyPoints.first()
-    if (isClosed) {
-        copyPoints.add(firstPoint)
-    }
-
-    newPoints.add(point2(firstPoint.x, (1.0f - firstPoint.y)))
-    for (i in 1 until copyPoints.size) {
-
-        val lastPoint = copyPoints[i - 1]
-        val thisPoint = copyPoints[i]
-
-        val vector = thisPoint - lastPoint
-        val length = vector.length
-        if (length > segmentSize) {
-            val segments = ceil(length / segmentSize.toDouble()).toInt()
-            val offset = vector / segments.toFloat()
-            (1 until segments)
-                    .map { lastPoint + (offset * it.toFloat()) }
-                    .mapTo(newPoints) { point2(it.x, (1.0f - it.y)) }
-        }
-        newPoints.add(point2(thisPoint.x, (1.0f - thisPoint.y)))
-    }
-
-    val newPoints2 = newPoints.mapTo(ArrayList(newPoints.size)) { point2(it.x, it.y) }
-    var output: MutableList<Point2F> = newPoints2
-    var input: MutableList<Point2F>
-    var size = newPoints.size
-
-    if (size > 3) {
-        (1..smoothFactor).forEach { iteration ->
-            input = if (iteration % 2 == 0) {
-                output = newPoints
-                newPoints2
-            } else {
-                output = newPoints2
-                newPoints
-            }
-            if (iteration % 5 == 0) {
-                if (size > 3) {
-                    for (i in if (isClosed) size - 2 downTo 0 step 2 else size - 3 downTo 1 step 2) {
-                        input.removeAt(i)
-                        output.removeAt(i)
-                    }
-                    size = input.size
-                }
-            }
-            for (i in if (isClosed) 1..size else 1..size - 2) {
-                val initialPosition = input[i % size]
-                var affectingPoint = input[i - 1]
-                var x = affectingPoint.x
-                var y = affectingPoint.y
-                affectingPoint = input[(i + 1) % size]
-                x += affectingPoint.x
-                y += affectingPoint.y
-                x *= 0.325f
-                y *= 0.325f
-                x += initialPosition.x * 0.35f
-                y += initialPosition.y * 0.35f
-                val nextPosition = output[i % size]
-                nextPosition.x = x
-                nextPosition.y = y
-            }
-        }
-    }
-    return output.map { point2(it.x, 1.0f - it.y) }
 }

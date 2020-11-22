@@ -1,26 +1,34 @@
 package wk.api
 
+@PublicApi
 interface BitMatrix<T> : Matrix<Boolean>, Iterable<Boolean> {
 
     val wordCount: Int
 
     val bitsPerWord: Int
 
+    @PublicApi
     fun setWord(i: Int, word: T)
 
+    @PublicApi
     fun getWord(i: Int): T
 
+    @PublicApi
     fun setBitIterator(): Iterator<Int>
 
+    @PublicApi
     fun unsetBitIterator(): Iterator<Int>
 }
 
+@PublicApi
 inline fun BitMatrix<*>.forEachSetBit(apply: (Int) -> Unit) = setBitIterator().forEach(apply)
 
+@PublicApi
 inline fun BitMatrix<*>.forEachUnsetBit(apply: (Int) -> Unit) = unsetBitIterator().forEach(apply)
 
 private const val maskSet64 = 0b1L shl 63
 
+@PublicApi
 class BitMatrix64(override val width: Int, override val height: Int = width, init: ((Int) -> Long)? = null) : BitMatrix<Long> {
 
     override val bitsPerWord = 64
@@ -29,6 +37,7 @@ class BitMatrix64(override val width: Int, override val height: Int = width, ini
 
     override val wordCount = (size ushr 6) + if ((size and 0b111111) == 0) 0 else 1
 
+    @PublicApi
     val array = if (init != null) LongArray(wordCount, init) else LongArray(size)
 
     override fun set(i: Int, value: Boolean) {

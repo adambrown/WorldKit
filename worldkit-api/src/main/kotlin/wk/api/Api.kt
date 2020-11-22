@@ -1,12 +1,12 @@
 package wk.api
 
-import wk.internal.application.taskYield as _taskYield
 import wk.internal.application.lookupProjectPath
 import java.io.File
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.min
+import wk.internal.application.taskYield as _taskYield
 
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FIELD, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
@@ -71,6 +71,7 @@ annotation class Executable(val index: Int = 0)
 @Target(AnnotationTarget.FILE)
 @Retention(AnnotationRetention.SOURCE)
 @Repeatable
+@Suppress("unused")
 annotation class DependsOn(val path: String)
 
 @PublicApi
@@ -84,7 +85,7 @@ fun Any.resolveProjectPath() = lookupProjectPath()
 @PublicApi
 fun taskYield() = _taskYield()
 
-
+@PublicApi
 data class GenerateLandShapeParams(
         val octaves: Int,
         val width: Int,
@@ -102,6 +103,7 @@ data class GenerateLandShapeParams(
         val noiseFunctionPositional: NoiseFunction
 )
 
+@PublicApi
 fun batchGenerateLandShapes(
         startSeed: Long,
         count: Int,
@@ -141,6 +143,7 @@ fun batchGenerateLandShapes(
     return output
 }
 
+@PublicApi
 fun generateLandShape(
         seed: Long,
         params: GenerateLandShapeParams,
@@ -169,6 +172,7 @@ fun generateLandShape(
     }
 }
 
+@PublicApi
 fun ByteArrayMatrix.refineLandShape(
         randomSeed: Long,
         octaves: Int,

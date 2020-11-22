@@ -3,6 +3,7 @@ package wk.api
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
+@PublicApi
 fun Matrix<Byte>.toSdf(sdfWidth: Float = width.toFloat(), sdfMax: Float = sdfWidth * 0.5f): ShortArrayMatrix {
     val mask = this
     val distanceFactor = (sdfWidth / width) / sdfMax
@@ -124,22 +125,31 @@ private fun sdfHorizontalStripe(sdf: FloatArrayMatrix, buffer: FloatArray, inter
 
 typealias SdfApplyFun<T> = (Float, T) -> Float
 
+@PublicApi
 fun ByteArrayMatrix.applySdf(sdf: ByteArrayMatrix, output: ByteArrayMatrix = this, apply: SdfApplyFun<Byte>) = applySdf(sdf, this, output, apply, byteToFloat, floatToByteRaw)
 
+@PublicApi
 fun ByteArrayMatrix.applySdf(sdf: ShortArrayMatrix, output: ByteArrayMatrix = this, apply: SdfApplyFun<Byte>) = applySdf(sdf, this, output, apply, shortToFloat, floatToByteRaw)
 
+@PublicApi
 fun ByteArrayMatrix.applySdf(sdf: FloatArrayMatrix, output: ByteArrayMatrix = this, apply: SdfApplyFun<Byte>) = applySdf(sdf, this, output, apply, floatToFloat, floatToByteRaw)
 
+@PublicApi
 fun ShortArrayMatrix.applySdf(sdf: ByteArrayMatrix, output: ShortArrayMatrix = this, apply: SdfApplyFun<Short>) = applySdf(sdf, this, output, apply, byteToFloat, floatToShortRaw)
 
+@PublicApi
 fun ShortArrayMatrix.applySdf(sdf: ShortArrayMatrix, output: ShortArrayMatrix = this, apply: SdfApplyFun<Short>) = applySdf(sdf, this, output, apply, shortToFloat, floatToShortRaw)
 
+@PublicApi
 fun ShortArrayMatrix.applySdf(sdf: FloatArrayMatrix, output: ShortArrayMatrix = this, apply: SdfApplyFun<Short>) = applySdf(sdf, this, output, apply, floatToFloat, floatToShortRaw)
 
+@PublicApi
 fun FloatArrayMatrix.applySdf(sdf: ByteArrayMatrix, output: FloatArrayMatrix = this, apply: SdfApplyFun<Float>) = applySdf(sdf, this, output, apply, byteToFloat, floatToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.applySdf(sdf: ShortArrayMatrix, output: FloatArrayMatrix = this, apply: SdfApplyFun<Float>) = applySdf(sdf, this, output, apply, shortToFloat, floatToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.applySdf(sdf: FloatArrayMatrix, output: FloatArrayMatrix = this, apply: SdfApplyFun<Float>) = applySdf(sdf, this, output, apply, floatToFloat, floatToFloat)
 
 private inline fun <F, S : Matrix<F>, T, M : Matrix<T>> applySdf(sdf: S, input: M, output: M, crossinline apply: SdfApplyFun<T>, crossinline sdfToFloat: (F) -> Float, crossinline fromFloat: (Float) -> T): M {

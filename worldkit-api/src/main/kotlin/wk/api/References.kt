@@ -1,8 +1,7 @@
 package wk.api
 
 import java.io.File
-import java.lang.IllegalArgumentException
-import java.util.ArrayList
+import java.util.*
 import kotlin.reflect.KProperty
 import kotlin.reflect.KProperty0
 import kotlin.reflect.jvm.isAccessible
@@ -10,6 +9,7 @@ import kotlin.reflect.jvm.isAccessible
 typealias Listener<T> = (oldValue: T, newValue: T) -> Unit
 typealias NullListener<T> = (oldValue: T?, newValue: T) -> Unit
 
+@PublicApi
 interface Reference<out T> {
 
     val value: T
@@ -17,6 +17,7 @@ interface Reference<out T> {
     operator fun getValue(thisRef: Any?, property: KProperty<*>): T
 }
 
+@PublicApi
 interface MutableReference<T> : Reference<T> {
 
     override var value: T
@@ -24,6 +25,7 @@ interface MutableReference<T> : Reference<T> {
     operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T)
 }
 
+@PublicApi
 interface ObservableReference<T> : Reference<T> {
 
     val listeners: List<(oldValue: T, newValue: T) -> Unit>
@@ -37,6 +39,7 @@ interface ObservableReference<T> : Reference<T> {
     fun removeListener(listener: Listener<T>): Boolean
 }
 
+@PublicApi
 interface ObservableMutableReference<T> : ObservableReference<T>, MutableReference<T> {
 
     override val listeners: List<Listener<T>>
@@ -175,30 +178,42 @@ private class ImmutableRef<T>(override val value: T) : ObservableReference<T> {
     override fun getValue(thisRef: Any?, property: KProperty<*>): T = value
 }
 
+@PublicApi
 fun <T> cRef(value: T): Reference<T> {
     return CRef(value)
 }
 
+@PublicApi
 fun <T> mRef(value: T): MutableReference<T> {
     return MRef(value)
 }
 
+@PublicApi
+fun <T> oRef(value: T): ObservableReference<T> {
+    return ImmutableRef(value)
+}
+
+@PublicApi
 fun <T : Any> ref(): ObservableMutableReference<T> {
     return LazyRef()
 }
 
+@PublicApi
 fun <T> ref(value: T): ObservableMutableReference<T> {
     return Ref(value)
 }
 
+@PublicApi
 fun <T> ref(get: () -> T): ObservableMutableReference<T> {
     return EvalRef(get, {})
 }
 
+@PublicApi
 fun <T> ref(get: () -> T, set: (T) -> Unit): ObservableMutableReference<T> {
     return EvalRef(get, set)
 }
 
+@PublicApi
 fun <T : Any> after(waitFor: KProperty0<*>, eval: () -> T): ObservableMutableReference<T> {
     waitFor.isAccessible = true
     if (waitFor.getDelegate() !is ObservableReference<*>) {
@@ -209,20 +224,19 @@ fun <T : Any> after(waitFor: KProperty0<*>, eval: () -> T): ObservableMutableRef
     return lazyRef
 }
 
+@PublicApi
 fun dir(path: String): String {
     val file = File(path)
     file.mkdirs()
     return file.absolutePath
 }
 
+@PublicApi
 fun dir(get: () -> String): ObservableMutableReference<String> {
     return ref { dir(get()) }
 }
 
+@PublicApi
 fun dir(dependsOn: KProperty0<*>, path: () -> String): ObservableMutableReference<String> {
     return after(dependsOn) { dir(path()) }
-}
-
-fun <T> iRef(value: T): ObservableReference<T> {
-    return ImmutableRef(value)
 }

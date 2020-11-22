@@ -1,31 +1,40 @@
 package wk.api
 
-import kotlin.Comparator
-import kotlin.collections.ArrayList
 import kotlin.math.*
 
+@PublicApi
 class IndexDisplayData(val image: ByteArrayMatrix)
 
+@PublicApi
 fun ByteArrayMatrix.toIndexDisplayData() = IndexDisplayData(this)
 
+@PublicApi
 sealed class ImageDisplayData(val isRgb: Boolean) {
     abstract val image: Any
 
+    @PublicApi
     class Rgb8(override val image: IntArrayMatrix) : ImageDisplayData(true)
 
+    @PublicApi
     class GrayU8(override val image: ByteArrayMatrix) : ImageDisplayData(false)
 
+    @PublicApi
     class GrayU16(override val image: ShortArrayMatrix) : ImageDisplayData(false)
 
+    @PublicApi
     class GrayF32(override val image: FloatArrayMatrix) : ImageDisplayData(false)
 }
 
+@PublicApi
 fun IntArrayMatrix.toImageDisplayData() = ImageDisplayData.Rgb8(this)
 
+@PublicApi
 fun ByteArrayMatrix.toImageDisplayData() = ImageDisplayData.GrayU8(this)
 
+@PublicApi
 fun ShortArrayMatrix.toImageDisplayData() = ImageDisplayData.GrayU16(this)
 
+@PublicApi
 fun FloatArrayMatrix.toImageDisplayData() = ImageDisplayData.GrayF32(this)
 
 internal val floatToByteRaw = { f: Float -> f.roundToInt().coerceIn(0, 255).toByte() }
@@ -70,13 +79,16 @@ private val combinerScreen: Combiner = { a, b -> 1.0f - (1.0f - a) * (1.0f - b) 
 private val combinerOverlay: Combiner = { a, b -> if (a < 0.5f) 2.0f * a * b else 1.0f - 2.0f * (1.0f - a) * (1.0f - b) }
 private val combinerDifference: Combiner = { a, b -> abs(a - b) }
 
+@PublicApi
 fun ByteArrayMatrix.upSample(outputWidth: Int) = upSample(this, outputWidth, newByteMatrixNonUniform, floatToByteRaw, byteToFloatRaw)
 
+@PublicApi
 fun ShortArrayMatrix.upSample(outputWidth: Int) = upSample(this, outputWidth, newShortMatrixNonUniform, floatToShortRaw, shortToFloatRaw)
 
+@PublicApi
 fun FloatArrayMatrix.upSample(outputWidth: Int) = upSample(this, outputWidth, newFloatMatrixNonUniform, floatToFloat, floatToFloat)
 
-inline fun <T : Number, M : Matrix<T>> upSample(input: Matrix<T>, outputWidth: Int, matrix: (Int, Int) -> M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
+private inline fun <T : Number, M : Matrix<T>> upSample(input: Matrix<T>, outputWidth: Int, matrix: (Int, Int) -> M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
     val textureWidth = input.width
     val scale = textureWidth * 1.2f
     val outputWidthInverse = 1.0f / (outputWidth - 1)
@@ -133,19 +145,25 @@ inline fun <T : Number, M : Matrix<T>> upSample(input: Matrix<T>, outputWidth: I
     return output2
 }
 
+@PublicApi
 fun ByteArrayMatrix.blur(sigma: Double, repeat: Int = 1) = blur(this, newByteMatrixUniform, floatToByteRaw, byteToFloatRaw, buildBlurKernel(sigma), repeat)
 
+@PublicApi
 fun ShortArrayMatrix.blur(sigma: Double, repeat: Int = 1) = blur(this, newShortMatrixUniform, floatToShortRaw, shortToFloatRaw, buildBlurKernel(sigma), repeat)
 
+@PublicApi
 fun FloatArrayMatrix.blur(sigma: Double, repeat: Int = 1) = blur(this, newFloatMatrixUniform, floatToFloat, floatToFloat, buildBlurKernel(sigma), repeat)
 
+@PublicApi
 fun ByteArrayMatrix.blur(kernel: FloatArray, repeat: Int = 1) = blur(this, newByteMatrixUniform, floatToByteRaw, byteToFloatRaw, kernel, repeat)
 
+@PublicApi
 fun ShortArrayMatrix.blur(kernel: FloatArray, repeat: Int = 1) = blur(this, newShortMatrixUniform, floatToShortRaw, shortToFloatRaw, kernel, repeat)
 
+@PublicApi
 fun FloatArrayMatrix.blur(kernel: FloatArray, repeat: Int = 1) = blur(this, newFloatMatrixUniform, floatToFloat, floatToFloat, kernel, repeat)
 
-inline fun <T : Number, M : Matrix<T>> blur(input: Matrix<T>, matrix: (Int) -> M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float, kernel: FloatArray, times: Int = 1): M {
+private inline fun <T : Number, M : Matrix<T>> blur(input: Matrix<T>, matrix: (Int) -> M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float, kernel: FloatArray, times: Int = 1): M {
     val width = input.width
     var current = input
     val output1 = matrix(width)
@@ -194,13 +212,16 @@ inline fun <T : Number, M : Matrix<T>> blur(input: Matrix<T>, matrix: (Int) -> M
     return output2
 }
 
+@PublicApi
 fun ByteArrayMatrix.threshold(threshold: Byte = Byte.MAX_VALUE, on: Byte = -1, off: Byte = 0, output: ByteArrayMatrix = this) = threshold(this, threshold, on, off, byteComparator, output)
 
+@PublicApi
 fun ShortArrayMatrix.threshold(threshold: Short = Short.MAX_VALUE, on: Short = -1, off: Short = 0, output: ShortArrayMatrix = this) = threshold(this, threshold, on, off, shortComparator, output)
 
+@PublicApi
 fun FloatArrayMatrix.threshold(threshold: Float = 0.5f, on: Float = 1.0f, off: Float = 0.0f, output: FloatArrayMatrix = this) = threshold(this, threshold, on, off, floatComparator, output)
 
-fun <T : Comparable<T>, M : Matrix<T>> threshold(input: M, threshold: T, on: T, off: T, comparator: Comparator<T>, output: M = input): M {
+private fun <T : Comparable<T>, M : Matrix<T>> threshold(input: M, threshold: T, on: T, off: T, comparator: Comparator<T>, output: M = input): M {
     (0 until input.height).inParallel { y ->
         taskYield()
         val yOff = y * input.width
@@ -212,22 +233,31 @@ fun <T : Comparable<T>, M : Matrix<T>> threshold(input: M, threshold: T, on: T, 
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.applyMask(target: ByteArrayMatrix, threshold: Byte = Byte.MAX_VALUE, on: (Byte) -> Byte = byteToByte, off: (Byte) -> Byte = { 0 }, output: ByteArrayMatrix = target) = applyMaskB(target, output, threshold, on, off)
 
+@PublicApi
 fun ByteArrayMatrix.applyMask(target: ShortArrayMatrix, threshold: Byte = Byte.MAX_VALUE, on: (Short) -> Short = shortToShort, off: (Short) -> Short = { 0 }, output: ShortArrayMatrix  = target) = applyMaskB(target, output, threshold, on, off)
 
+@PublicApi
 fun ByteArrayMatrix.applyMask(target: FloatArrayMatrix, threshold: Byte = Byte.MAX_VALUE, on: (Float) -> Float = floatToFloat, off: (Float) -> Float = { 0.0f }, output: FloatArrayMatrix  = target) = applyMaskB(target, output, threshold, on, off)
 
+@PublicApi
 fun ShortArrayMatrix.applyMask(target: ByteArrayMatrix, threshold: Short = Short.MAX_VALUE, on: (Byte) -> Byte = byteToByte, off: (Byte) -> Byte = { 0 }, output: ByteArrayMatrix = target) = applyMaskS(target, output, threshold, on, off)
 
+@PublicApi
 fun ShortArrayMatrix.applyMask(target: ShortArrayMatrix, threshold: Short = Short.MAX_VALUE, on: (Short) -> Short = shortToShort, off: (Short) -> Short = { 0 }, output: ShortArrayMatrix = target) = applyMaskS(target, output, threshold, on, off)
 
+@PublicApi
 fun ShortArrayMatrix.applyMask(target: FloatArrayMatrix, threshold: Short = Short.MAX_VALUE, on: (Float) -> Float = floatToFloat, off: (Float) -> Float = { 0.0f }, output: FloatArrayMatrix = target) = applyMaskS(target, output, threshold, on, off)
 
+@PublicApi
 fun FloatArrayMatrix.applyMask(target: ByteArrayMatrix, threshold: Float = 0.5f, on: (Byte) -> Byte = byteToByte, off: (Byte) -> Byte = { 0 }, output: ByteArrayMatrix = target) = applyMaskF(target, output, threshold, on, off)
 
+@PublicApi
 fun FloatArrayMatrix.applyMask(target: ShortArrayMatrix, threshold: Float = 0.5f, on: (Short) -> Short = shortToShort, off: (Short) -> Short = { 0 }, output: ShortArrayMatrix = target) = applyMaskF(target, output, threshold, on, off)
 
+@PublicApi
 fun FloatArrayMatrix.applyMask(target: FloatArrayMatrix, threshold: Float = 0.5f, on: (Float) -> Float = floatToFloat, off: (Float) -> Float = { 0.0f }, output: FloatArrayMatrix = target) = applyMaskF(target, output, threshold, on, off)
 
 private inline fun <T, M : Matrix<T>> ByteArrayMatrix.applyMaskB(target: M, output: M, threshold: Byte, crossinline on: (T) -> T, crossinline off: (T) -> T) = applyMask(this, target, output, threshold, on, off, byteComparator)
@@ -251,6 +281,7 @@ private inline fun <T : Comparable<T>, M : Matrix<T>, V, O : Matrix<V>> applyMas
 private const val OFF: Byte = 0
 private const val ON: Byte = -1
 
+@PublicApi
 fun <M : Matrix<Byte>> M.removeSmallIslands(minIsland: Int, whiteOnBlack: Boolean = true, invert: Boolean = false): Boolean {
     val buffer = this
     val oceanSearch = if (whiteOnBlack) OFF else ON
@@ -362,6 +393,7 @@ private inline fun forEachAdjacent(width: Int, i: Int, x: Int, y: Int, callback:
     }
 }
 
+@PublicApi
 fun buildBlurKernel(sigma: Double = 1.0): FloatArray {
     val rawKernelWidth: Int = (6 * sigma).roundToInt()
     val width = if (rawKernelWidth % 2 == 0) rawKernelWidth + 1 else rawKernelWidth
@@ -408,13 +440,16 @@ fun buildBlurKernel(sigma: Double = 1.0): FloatArray {
     return kernel
 }
 
+@PublicApi
 fun ByteArrayMatrix.frame(outputWidth: Int, frameValue: Byte) = frame(this, outputWidth, frameValue, newByteMatrixUniform)
 
+@PublicApi
 fun ShortArrayMatrix.frame(outputWidth: Int, frameValue: Short) = frame(this, outputWidth, frameValue, newShortMatrixUniform)
 
+@PublicApi
 fun FloatArrayMatrix.frame(outputWidth: Int, frameValue: Float) = frame(this, outputWidth, frameValue, newFloatMatrixUniform)
 
-inline fun <T : Number, M : Matrix<T>> frame(input: Matrix<T>, outputWidth: Int, frameValue: T, matrix: (Int) -> M): M {
+private inline fun <T : Number, M : Matrix<T>> frame(input: Matrix<T>, outputWidth: Int, frameValue: T, matrix: (Int) -> M): M {
     val buffer = matrix(outputWidth)
     val xOffset = (outputWidth - input.width) / 2
     val yOffset = (outputWidth - input.height) / 2
@@ -437,10 +472,13 @@ inline fun <T : Number, M : Matrix<T>> frame(input: Matrix<T>, outputWidth: Int,
     return buffer
 }
 
+@PublicApi
 fun ByteArrayMatrix.normalize(keepZero: Boolean = false) = normalize(this, floatToByte, byteToFloatRaw, keepZero)
 
+@PublicApi
 fun ShortArrayMatrix.normalize(keepZero: Boolean = false) = normalize(this, floatToShort, shortToFloatRaw, keepZero)
 
+@PublicApi
 fun FloatArrayMatrix.normalize(keepZero: Boolean = false) = normalize(this, floatToFloat, floatToFloat, keepZero)
 
 private inline fun <T, M : Matrix<T>> normalize(input: M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float, keepZero: Boolean): M {
@@ -454,6 +492,7 @@ private inline fun <T, M : Matrix<T>> normalize(input: M, crossinline fromFloat:
     return input
 }
 
+@PublicApi
 fun ByteArrayMatrix.compressIndex(forceIncludeZero: Boolean = false): ByteArrayMatrix {
     val mapping = ByteArray(256)
     if (forceIncludeZero) {
@@ -479,13 +518,22 @@ fun ByteArrayMatrix.compressIndex(forceIncludeZero: Boolean = false): ByteArrayM
     return this
 }
 
+@PublicApi
 fun ByteArrayMatrix.toShortMatrix(output: ShortArrayMatrix = ShortArrayMatrix(width, height)) = convert(this, output, byteToShort)
+
+@PublicApi
 fun ByteArrayMatrix.toFloatMatrix(output: FloatArrayMatrix = FloatArrayMatrix(width, height)) = convert(this, output, byteToFloat)
 
+@PublicApi
 fun ShortArrayMatrix.toByteMatrix(output: ByteArrayMatrix = ByteArrayMatrix(width, height)) = convert(this, output, shortToByte)
+
+@PublicApi
 fun ShortArrayMatrix.toFloatMatrix(output: FloatArrayMatrix = FloatArrayMatrix(width, height)) = convert(this, output, shortToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.toByteMatrix(output: ByteArrayMatrix = ByteArrayMatrix(width, height)) = convert(this, output, floatToByte)
+
+@PublicApi
 fun FloatArrayMatrix.toShortMatrix(output: ShortArrayMatrix = ShortArrayMatrix(width, height)) = convert(this, output, floatToShort)
 
 private inline fun <S, I : Matrix<S>, T, O : Matrix<T>> convert(input: I, output: O, crossinline convert: (S) -> T): O {
@@ -499,6 +547,7 @@ private inline fun <S, I : Matrix<S>, T, O : Matrix<T>> convert(input: I, output
     return output
 }
 
+@PublicApi
 fun FloatArrayMatrix.toStandardizedHeightMap(mapScale: MapScale, output: ShortArrayMatrix = ShortArrayMatrix(width, height)): Pair<ShortArrayMatrix, Float> {
     val scale = 1.0f / mapScale.heightRangeMeters
     val min = -mapScale.waterDepthMeters
@@ -526,10 +575,13 @@ fun FloatArrayMatrix.toStandardizedHeightMap(mapScale: MapScale, output: ShortAr
 }
 
 
+@PublicApi
 fun ByteArrayMatrix.blend(other: ByteArrayMatrix, alpha: Float = 0.5f, output: ByteArrayMatrix = this) = blend(this, other, output, alpha, floatToByteRaw, byteToFloatRaw)
 
+@PublicApi
 fun ShortArrayMatrix.blend(other: ShortArrayMatrix, alpha: Float = 0.5f, output: ShortArrayMatrix = this) = blend(this, other, output, alpha, floatToShortRaw, shortToFloatRaw)
 
+@PublicApi
 fun FloatArrayMatrix.blend(other: FloatArrayMatrix, alpha: Float = 0.5f, output: FloatArrayMatrix = this) = blend(this, other, output, alpha, floatToFloat, floatToFloat)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>> blend(input1: M, input2: M, output: M, alpha: Float, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
@@ -544,22 +596,31 @@ private inline fun <T : Comparable<T>, M : Matrix<T>> blend(input1: M, input2: M
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.blend(other: ByteArrayMatrix, blendMask: ByteArrayMatrix, output: ByteArrayMatrix = this) = blend(this, other, output, blendMask, floatToByteRaw, byteToFloatRaw, byteToFloat)
 
+@PublicApi
 fun ByteArrayMatrix.blend(other: ByteArrayMatrix, blendMask: ShortArrayMatrix, output: ByteArrayMatrix = this) = blend(this, other, output, blendMask, floatToByteRaw, byteToFloatRaw, shortToFloat)
 
+@PublicApi
 fun ByteArrayMatrix.blend(other: ByteArrayMatrix, blendMask: FloatArrayMatrix, output: ByteArrayMatrix = this) = blend(this, other, output, blendMask, floatToByteRaw, byteToFloatRaw, floatToFloat)
 
+@PublicApi
 fun ShortArrayMatrix.blend(other: ShortArrayMatrix, blendMask: ByteArrayMatrix, output: ShortArrayMatrix = this) = blend(this, other, output, blendMask, floatToShortRaw, shortToFloatRaw, byteToFloat)
 
+@PublicApi
 fun ShortArrayMatrix.blend(other: ShortArrayMatrix, blendMask: ShortArrayMatrix, output: ShortArrayMatrix = this) = blend(this, other, output, blendMask, floatToShortRaw, shortToFloatRaw, shortToFloat)
 
+@PublicApi
 fun ShortArrayMatrix.blend(other: ShortArrayMatrix, blendMask: FloatArrayMatrix, output: ShortArrayMatrix = this) = blend(this, other, output, blendMask, floatToShortRaw, shortToFloatRaw, floatToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.blend(other: FloatArrayMatrix, blendMask: ByteArrayMatrix, output: FloatArrayMatrix = this) = blend(this, other, output, blendMask, floatToFloat, floatToFloat, byteToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.blend(other: FloatArrayMatrix, blendMask: ShortArrayMatrix, output: FloatArrayMatrix = this) = blend(this, other, output, blendMask, floatToFloat, floatToFloat, shortToFloat)
 
+@PublicApi
 fun FloatArrayMatrix.blend(other: FloatArrayMatrix, blendMask: FloatArrayMatrix, output: FloatArrayMatrix = this) = blend(this, other, output, blendMask, floatToFloat, floatToFloat, floatToFloat)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>, A : Comparable<A>, B : Matrix<A>> blend(input1: M, input2: M, output: M, blendMask: B, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float, crossinline toAlpha: (A) -> Float): M {
@@ -575,58 +636,85 @@ private inline fun <T : Comparable<T>, M : Matrix<T>, A : Comparable<A>, B : Mat
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.add(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerAdd)
 
+@PublicApi
 fun ShortArrayMatrix.add(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerAdd)
 
+@PublicApi
 fun FloatArrayMatrix.add(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerAdd)
 
+@PublicApi
 fun ByteArrayMatrix.subtract(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerSubtract)
 
+@PublicApi
 fun ShortArrayMatrix.subtract(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerSubtract)
 
+@PublicApi
 fun FloatArrayMatrix.subtract(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerSubtract)
 
+@PublicApi
 fun ByteArrayMatrix.multiply(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerMultiply)
 
+@PublicApi
 fun ShortArrayMatrix.multiply(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerMultiply)
 
+@PublicApi
 fun FloatArrayMatrix.multiply(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerMultiply)
 
+@PublicApi
 fun ByteArrayMatrix.divide(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerDivide)
 
+@PublicApi
 fun ShortArrayMatrix.divide(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerDivide)
 
+@PublicApi
 fun FloatArrayMatrix.divide(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerDivide)
 
+@PublicApi
 fun ByteArrayMatrix.min(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerMin)
 
+@PublicApi
 fun ShortArrayMatrix.min(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerMin)
 
+@PublicApi
 fun FloatArrayMatrix.min(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerMin)
 
+@PublicApi
 fun ByteArrayMatrix.max(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerMax)
 
+@PublicApi
 fun ShortArrayMatrix.max(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerMax)
 
+@PublicApi
 fun FloatArrayMatrix.max(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerMax)
 
+@PublicApi
 fun ByteArrayMatrix.screen(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerScreen)
 
+@PublicApi
 fun ShortArrayMatrix.screen(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerScreen)
 
+@PublicApi
 fun FloatArrayMatrix.screen(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerScreen)
 
+@PublicApi
 fun ByteArrayMatrix.overlay(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerOverlay)
 
+@PublicApi
 fun ShortArrayMatrix.overlay(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerOverlay)
 
+@PublicApi
 fun FloatArrayMatrix.overlay(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerOverlay)
 
+@PublicApi
 fun ByteArrayMatrix.difference(other: ByteArrayMatrix, output: ByteArrayMatrix = this) = combine(this, other, output, floatToByte, byteToFloat, combinerDifference)
 
+@PublicApi
 fun ShortArrayMatrix.difference(other: ShortArrayMatrix, output: ShortArrayMatrix = this) = combine(this, other, output, floatToShort, shortToFloat, combinerDifference)
 
+@PublicApi
 fun FloatArrayMatrix.difference(other: FloatArrayMatrix, output: FloatArrayMatrix = this) = combine(this, other, output, floatToFloat, floatToFloat, combinerDifference)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>> combine(input1: M, input2: M, output: M, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float, crossinline combiner: (Float, Float) -> Float): M {
@@ -640,10 +728,13 @@ private inline fun <T : Comparable<T>, M : Matrix<T>> combine(input1: M, input2:
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.adjust(multiply: Float = 2.0f, add: Float = -1.0f, range: ClosedFloatingPointRange<Float> = 0.0f..1.0f, output: ByteArrayMatrix = this) = adjust(this, output, multiply, add, range, floatToByte, byteToFloatRaw)
 
+@PublicApi
 fun ShortArrayMatrix.adjust(multiply: Float = 2.0f, add: Float = -1.0f, range: ClosedFloatingPointRange<Float> = 0.0f..1.0f, output: ShortArrayMatrix = this) = adjust(this, output, multiply, add, range, floatToShort, shortToFloatRaw)
 
+@PublicApi
 fun FloatArrayMatrix.adjust(multiply: Float = 2.0f, add: Float = -1.0f, range: ClosedFloatingPointRange<Float> = 0.0f..1.0f, output: FloatArrayMatrix = this) = adjust(this, output, multiply, add, range, floatToFloat, floatToFloat)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>> adjust(input1: M, output: M, multiply: Float, add: Float, range: ClosedFloatingPointRange<Float> = 0.0f..1.0f, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
@@ -657,10 +748,13 @@ private inline fun <T : Comparable<T>, M : Matrix<T>> adjust(input1: M, output: 
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.step(steps: Int, output: ByteArrayMatrix = this) = step(this, output, steps, floatToByte, byteToFloatRaw)
 
+@PublicApi
 fun ShortArrayMatrix.step(steps: Int, output: ShortArrayMatrix = this) = step(this, output, steps, floatToShort, shortToFloatRaw)
 
+@PublicApi
 fun FloatArrayMatrix.step(steps: Int, output: FloatArrayMatrix = this) = step(this, output, steps, floatToFloat, floatToFloat)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>> step(input1: M, output: M, steps: Int, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
@@ -676,10 +770,13 @@ private inline fun <T : Comparable<T>, M : Matrix<T>> step(input1: M, output: M,
     return output
 }
 
+@PublicApi
 fun ByteArrayMatrix.levels(range: ClosedFloatingPointRange<Float>, gamma: Float, output: ByteArrayMatrix = this) = levels(this, output, range, gamma, floatToByte, byteToFloatRaw)
 
+@PublicApi
 fun ShortArrayMatrix.levels(range: ClosedFloatingPointRange<Float>, gamma: Float, output: ShortArrayMatrix = this) = levels(this, output, range, gamma, floatToShort, shortToFloatRaw)
 
+@PublicApi
 fun FloatArrayMatrix.levels(range: ClosedFloatingPointRange<Float>, gamma: Float, output: FloatArrayMatrix = this) = levels(this, output, range, gamma, floatToFloat, floatToFloat)
 
 private inline fun <T : Comparable<T>, M : Matrix<T>> levels(input1: M, output: M, range: ClosedFloatingPointRange<Float>, gamma: Float, crossinline fromFloat: (Float) -> T, crossinline toFloat: (T) -> Float): M {
@@ -705,6 +802,7 @@ interface TextureId {
     fun free()
 }
 
+@PublicApi
 fun FloatArrayMatrix.decompose(levels: Int): List<FloatArrayMatrix> {
     if (width == 0) throw IllegalArgumentException("Cannot decompose zero area matrix.")
     if (width != height) throw IllegalArgumentException("Cannot decompose rectangular matrix.")

@@ -8,8 +8,8 @@ import wk.internal.application.cacheDir
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
-import java.lang.IndexOutOfBoundsException
 
+@PublicApi
 data class FlowGraphSpec(val width: Int, val graphDeferred: Deferred<GraphLite>) {
     val graph by lazy { runBlocking { graphDeferred.await() } }
 }
@@ -37,10 +37,13 @@ private val flowGraphs = arrayOf(
         altGraph( 4096),
         altGraph(8192))
 
+@PublicApi
 fun getFlowGraphIndices() = flowGraphs.indices
 
+@PublicApi
 fun isValidFlowGraphIndex(index: Int) = index in flowGraphs.indices
 
+@PublicApi
 fun getFlowGraphSpec(index: Int): FlowGraphSpec {
     if (isValidFlowGraphIndex(index)) {
         return flowGraphs[index]
@@ -49,8 +52,11 @@ fun getFlowGraphSpec(index: Int): FlowGraphSpec {
     }
 }
 
+@PublicApi
 fun getFlowGraph(index: Int) = getFlowGraphSpec(index).graph
 
+@PublicApi
 fun getFlowGraphAsync(index: Int) = getFlowGraphSpec(index).graphDeferred
 
+@PublicApi
 fun getFlowGraphWidth(index: Int) = getFlowGraphSpec(index).width

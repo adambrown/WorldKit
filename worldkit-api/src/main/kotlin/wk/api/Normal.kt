@@ -3,8 +3,10 @@ package wk.api
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+@PublicApi
 fun Matrix<Float>.toNormalMap(normalScale: Float) = computeNormal(this, normalScale)
 
+@PublicApi
 fun Matrix<Float>.toNormalMap(mapScale: MapScale) = computeNormal(this, mapScale.mapSizeMeters / width)
 
 private fun computeNormal(heightMap: Matrix<Float>, normalScale: Float): IntArrayMatrix {

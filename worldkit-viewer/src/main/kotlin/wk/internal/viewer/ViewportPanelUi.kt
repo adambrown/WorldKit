@@ -2,21 +2,20 @@ package wk.internal.viewer
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import org.lwjgl.BufferUtils
+import org.lwjgl.opengl.GL11
+import wk.api.*
 import wk.internal.ui.UserInterface
-import wk.internal.ui.style.*
+import wk.internal.ui.style.SHAPE_BORDER_ONLY
+import wk.internal.ui.style.meshViewport3D
 import wk.internal.ui.widgets.*
 import wk.internal.ui.widgets.TextureBuilder.buildTextureRedByte
 import wk.internal.ui.widgets.TextureBuilder.buildTextureRedFloat
 import wk.internal.ui.widgets.TextureBuilder.buildTextureRedShort
 import wk.internal.ui.widgets.TextureBuilder.buildTextureRgbaByte
 import wk.internal.ui.widgets.ViewportMode.*
-import org.lwjgl.BufferUtils
-import org.lwjgl.opengl.GL11
-import wk.api.*
-import wk.api.TextureId
-import wk.api.ByteArrayMatrix
-import wk.api.ByteBufferMatrix
 import java.nio.ByteBuffer
+import kotlin.math.ceil
 
 fun Block.viewportPanel(ui: UserInterface) {
     block {
@@ -133,7 +132,7 @@ private fun TerrainDisplayData.toDisplayTextures(): TerrainDisplayTextures {
             val textureId = TextureBuilder.renderSplines(
                     width,
                     riverPolyLines.map {
-                        buildOpenEdges(it, 0.00035f, 2)
+                        buildEdges(getCurvePoints(it))
                     },
                     3.0f)
             ByteBufferMatrix(width, buffer = TextureBuilder.extractTextureRedByte(textureId, width))
@@ -186,3 +185,92 @@ private fun normalAndAoToTextureId(input: ByteBuffer, width: Int): TextureId {
 private operator fun ByteBuffer.set(i: Int, b: Byte) = put(i, b)
 
 val MapScale.viewportScale: Float get() = heightRangeMeters * (VIEWPORT_MESH_SCALE / mapSizeMeters)
+
+private fun buildEdges(inPoints: List<Point2F>): MutableList<Point2F> {
+    val outPoints = ArrayList<Point2F>()
+    val start = inPoints.first()
+    outPoints.add(start)
+    for (i in 1 until inPoints.size) {
+        val id = i % inPoints.size
+        val lastId = i - 1
+        val lastPoint = inPoints[lastId]
+        val point = inPoints[id]
+        if (i == 1) {
+            outPoints[0] = lastPoint
+        }
+        outPoints.add(point)
+    }
+    return outPoints
+}
+
+private const val segmentSize = 0.00035
+private const val smoothFactor = 2
+
+private fun getCurvePoints(points: List<Point2F>): List<Point2F> {
+
+    val newPoints = ArrayList<Point2F>()
+    val copyPoints = ArrayList(points)
+
+    val firstPoint = copyPoints.first()
+
+    newPoints.add(point2(firstPoint.x, (1.0f - firstPoint.y)))
+    for (i in 1 until copyPoints.size) {
+
+        val lastPoint = copyPoints[i - 1]
+        val thisPoint = copyPoints[i]
+
+        val vector = thisPoint - lastPoint
+        val length = vector.length
+        if (length > segmentSize) {
+            val segments = ceil(length / segmentSize).toInt()
+            val offset = vector / segments.toFloat()
+            (1 until segments)
+                    .map { lastPoint + (offset * it.toFloat()) }
+                    .mapTo(newPoints) { point2(it.x, (1.0f - it.y)) }
+        }
+        newPoints.add(point2(thisPoint.x, (1.0f - thisPoint.y)))
+    }
+
+    val newPoints2 = newPoints.mapTo(ArrayList(newPoints.size)) { point2(it.x, it.y) }
+    var output: MutableList<Point2F> = newPoints2
+    var input: MutableList<Point2F>
+    var size = newPoints.size
+
+    if (size > 3) {
+        (1..smoothFactor).forEach { iteration ->
+            input = if (iteration % 2 == 0) {
+                output = newPoints
+                newPoints2
+            } else {
+                output = newPoints2
+                newPoints
+            }
+            if (iteration % 5 == 0) {
+                if (size > 3) {
+                    for (i in size - 3 downTo 1 step 2) {
+                        input.removeAt(i)
+                        output.removeAt(i)
+                    }
+                    size = input.size
+                }
+            }
+            for (i in 1..size - 2) {
+                val initialPosition = input[i % size]
+                var affectingPoint = input[i - 1]
+                var x = affectingPoint.x
+                var y = affectingPoint.y
+                affectingPoint = input[(i + 1) % size]
+                x += affectingPoint.x
+                y += affectingPoint.y
+                x *= 0.325f
+                y *= 0.325f
+                x += initialPosition.x * 0.35f
+                y += initialPosition.y * 0.35f
+                val nextPosition = output[i % size]
+                nextPosition.x = x
+                nextPosition.y = y
+            }
+        }
+    }
+    return output.map { point2(it.x, 1.0f - it.y) }
+}

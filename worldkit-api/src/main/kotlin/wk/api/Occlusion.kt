@@ -25,11 +25,13 @@ private val scanDeltas = intArrayOf(
         -1, -2
 )
 
+@PublicApi
 fun Matrix<Float>.toOcclusion(occlusionScale: Float = 1.0f) = computeOcclusion(this, occlusionScale)
 
+@PublicApi
 fun Matrix<Float>.toOcclusion(mapScale: MapScale) = computeOcclusion(this, mapScale.mapSizeMeters / width)
 
-fun computeOcclusion(heightMap: Matrix<Float>, occlusionScale: Float): ByteArrayMatrix {
+private fun computeOcclusion(heightMap: Matrix<Float>, occlusionScale: Float): ByteArrayMatrix {
     val result = FloatArrayMatrix(heightMap.width, heightMap.height)
     val startPoints = IntArray(6 * max(heightMap.width, heightMap.height))
     for (i in 0 until SCAN_COUNT * 2 step 2) {
@@ -46,7 +48,7 @@ fun computeOcclusion(heightMap: Matrix<Float>, occlusionScale: Float): ByteArray
     return ret
 }
 
-fun horizonScan(heightmap: Matrix<Float>, result: FloatArrayMatrix, startPoints: IntArray, dx: Int, dy: Int, occlusionScale: Float) {
+private fun horizonScan(heightmap: Matrix<Float>, result: FloatArrayMatrix, startPoints: IntArray, dx: Int, dy: Int, occlusionScale: Float) {
     val width = heightmap.width
     val height = heightmap.height
     val (sweepCount, pathLength) = initSweep(startPoints, dx, dy, width, height)
