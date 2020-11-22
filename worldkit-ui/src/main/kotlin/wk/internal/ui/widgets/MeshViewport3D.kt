@@ -672,14 +672,6 @@ class MeshViewport3D(
         synchronized(textureLock) {
             hasIndex = true
             indexTextureId = textureId
-            lastImageZoom = 1.0f
-            imageZoom = 1.0f
-            imageOffsetX = 0.0f
-            imageOffsetY = 0.0f
-            startImageOffsetX = 0.0f
-            startImageOffsetY = 0.0f
-            mouseDownX = mouseX
-            mouseDownY = mouseY
         }
         refreshUi()
     }
@@ -689,14 +681,6 @@ class MeshViewport3D(
             hasImage = true
             isImageRgb = isRgb
             imageTextureId = textureId
-            lastImageZoom = 1.0f
-            imageZoom = 1.0f
-            imageOffsetX = 0.0f
-            imageOffsetY = 0.0f
-            startImageOffsetX = 0.0f
-            startImageOffsetY = 0.0f
-            mouseDownX = mouseX
-            mouseDownY = mouseY
         }
         refreshUi()
     }
