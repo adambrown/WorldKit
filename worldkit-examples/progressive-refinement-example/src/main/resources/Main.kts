@@ -102,7 +102,8 @@ val landSdf = cache.grayU16(landSdfFile) {
 }
 
 val areaIndex = cache.grayU8(areaIndexFile) {
-    landSdf.value.await().applyMask(areaIndexSource.value.await(), 32_760)
+    landSdf.value.await()
+            .applyMask(areaIndexSource.value.await(), 32_760, output = ByteArrayMatrix(outputWidth))
             .compressIndex(true)
 }
 

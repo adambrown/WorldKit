@@ -201,27 +201,28 @@ fun terraform(
     val random = Random(randomSeed)
     val noiseOffsetX = random.nextFloat() * 10000
     val noiseOffsetY = random.nextFloat() * 10000
-    val convertId = landSdf.width.toFloat() / previousMap.width
-    val widthInverse = 1.0f / previousMap.width
+    val previousMapCopy = previousMap.copy()
+    val convertId = landSdf.width.toFloat() / previousMapCopy.width
+    val widthInverse = 1.0f / previousMapCopy.width
     val noiseTextureScale = widthInverse * sdfNoiseFrequency
     timeIt(timer("terraform.applyBeachFunctions")) {
-        (0 until previousMap.width).toList().parallelStream().forEach { y ->
+        (0 until previousMapCopy.width).toList().parallelStream().forEach { y ->
             taskYield()
-            val yOff = y * previousMap.width
+            val yOff = y * previousMapCopy.width
             val v = y * noiseTextureScale + noiseOffsetY
             val sy = (y * convertId).roundToInt().coerceIn(0 until landSdf.width)
             val syOff = sy * landSdf.width
-            (0 until previousMap.width).forEach { x ->
+            (0 until previousMapCopy.width).forEach { x ->
                 val i = yOff + x
                 val u = x * noiseTextureScale + noiseOffsetX
                 val sx = (x * convertId).roundToInt().coerceIn(0 until landSdf.width)
                 val si = syOff + sx
                 val sdfDistance = landSdf.sdfFloat(si)
                 if (sdfDistance < 0.0f) {
-                    val currentValue = previousMap[i]
-                    previousMap[i] = beachFunction(currentValue, sdfDistance, mapScale.waterDepthMeters)
+                    val currentValue = previousMapCopy[i]
+                    previousMapCopy[i] = beachFunction(currentValue, sdfDistance, mapScale.waterDepthMeters)
                 } else {
-                    previousMap[i] = max(0.0f, previousMap[i] + 0.0f.coerceAtLeast((sdfDistance + SimplexNoise.noise(u, v) * sdfNoiseAmplitude) * sdfMultiplier))
+                    previousMapCopy[i] = max(0.0f, previousMapCopy[i] + 0.0f.coerceAtLeast((sdfDistance + SimplexNoise.noise(u, v) * sdfNoiseAmplitude) * sdfMultiplier))
                 }
             }
         }
@@ -230,7 +231,7 @@ fun terraform(
         applyMapsToNodes(
                 flowGraphId = flowGraphId,
                 nodeData = nodeData,
-                heightMap = previousMap,
+                heightMap = previousMapCopy,
                 elevationPowerMask = upliftMap,
                 erosionSettings = terrainProfiles.map { it.erosionSettings[erosionSettingsIndex] },
                 areaIndex = areaIndex,

@@ -102,7 +102,8 @@ val landSdf = cache.grayU16(landSdfFile) {
 }
 
 val areaIndex = cache.grayU8(areaIndexFile) {
-    landSdf.value.await().applyMask(areaIndexSource.value.await(), 32_760)
+    landSdf.value.await()
+            .applyMask(areaIndexSource.value.await(), 32_760, output = ByteArrayMatrix(outputWidth))
             .compressIndex(true)
 }
 
@@ -206,7 +207,7 @@ fun terrainNormals() = runBlocking { terrain.value.await().normalMap.toImageDisp
 fun terrainOcclusion() = runBlocking { terrain.value.await().occlusionMap.toImageDisplayData() }
 
 @Output
-fun areaIndexSource() = runBlocking { areaIndexSource.value.await().toImageDisplayData() }
+fun areaIndexSource() = runBlocking { areaIndexSource.value.await().copy().compressIndex(true).toIndexDisplayData() }
 
 @Output
 fun landShapeSource() = runBlocking { landShapeSource.value.await().toImageDisplayData() }
@@ -215,10 +216,10 @@ fun landShapeSource() = runBlocking { landShapeSource.value.await().toImageDispl
 fun refinedLandShape() = runBlocking { refinedLandShape.value.await().toImageDisplayData() }
 
 @Output
-fun landSdf() = runBlocking { landSdf.value.await().normalize().toImageDisplayData() }
+fun landSdf() = runBlocking { landSdf.value.await().copy().normalize().toImageDisplayData() }
 
 @Output
 fun areaIndex() = runBlocking { areaIndex.value.await().toIndexDisplayData() }
 
 @Output
-fun upliftMap() = runBlocking { upliftMap.value.await().normalize().toImageDisplayData() }
+fun upliftMap() = runBlocking { upliftMap.value.await().copy().normalize().toImageDisplayData() }
