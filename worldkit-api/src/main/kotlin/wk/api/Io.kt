@@ -20,6 +20,77 @@ import java.util.concurrent.locks.ReentrantLock
 import javax.imageio.ImageIO
 import kotlin.collections.ArrayList
 import kotlin.concurrent.withLock
+import kotlin.concurrent.thread
+
+private object IoWaiter {
+
+    @Volatile
+    var running = true
+
+    val ioTasks: MutableList<Job> = Collections.synchronizedList(ArrayList())
+
+    val ioWaiters: MutableList<() -> Unit> = Collections.synchronizedList(ArrayList())
+
+    val ioWaitThread: Thread
+
+    init {
+        ioWaitThread = thread(
+                start = true,
+                isDaemon = false,
+                name = "io-wait"
+        ) {
+            runBlocking {
+                while (running) {
+                    try {
+                        Thread.sleep(200)
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                    val watchList = synchronized(ioTasks) { ArrayList(ioTasks) }
+                    watchList.forEach {
+                        it.join()
+                    }
+                    synchronized(ioTasks) {
+                        for (i in ioTasks.indices.reversed()) {
+                            if (ioTasks[i].isCompleted) {
+                                ioTasks.removeAt(i)
+                            }
+                        }
+                        if (ioTasks.isEmpty()) {
+                            synchronized(ioWaiters) {
+                                ioWaiters.forEach { it() }
+                                ioWaiters.clear()
+                            }
+                        }
+                    }
+                }
+                val waitForAll = synchronized(ioTasks) { ArrayList(ioTasks) }
+                waitForAll.forEach {
+                    it.join()
+                }
+            }
+        }
+    }
+}
+
+@PublicApi
+fun waitForBackgroundIo() {
+    var done = false
+    IoWaiter.ioWaiters.add {
+        done = true
+    }
+    while (!done) {
+        try {
+            Thread.sleep(200)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+}
+
+fun finishIoTasksOnShutdown() {
+    IoWaiter.running = false
+}
 
 private fun CharSequence.ensureSuffix(suffix: CharSequence, ignoreCase: Boolean = false): String {
     return if (endsWith(suffix, ignoreCase)) this.toString() else this.toString() + suffix
@@ -215,7 +286,7 @@ private inline fun <T> readOrCache(fileName: String, read: (String) -> T, crossi
 }
 
 private inline fun launchIo(crossinline task: () -> Unit) {
-    GlobalScope.launch(IO) {
+    IoWaiter.ioTasks.add(GlobalScope.launch(IO) {
         try {
             task()
         } catch (t: Throwable) {
@@ -223,7 +294,7 @@ private inline fun launchIo(crossinline task: () -> Unit) {
         } finally {
             System.gc()
         }
-    }
+    })
 }
 
 @PublicApi
@@ -242,7 +313,7 @@ private class CachedImpl<T>(private val file: File, private val generate: Corout
         return if (fv1 != null) {
             GlobalScope.async { fv1 }
         } else {
-            GlobalScope.async(IO) {
+            val job = GlobalScope.async(IO) {
                 lock.withLock {
                     val fv2 = v
                     if (fv2 != null) {
@@ -254,6 +325,8 @@ private class CachedImpl<T>(private val file: File, private val generate: Corout
                     }
                 }
             }
+            IoWaiter.ioTasks.add(job)
+            job
         }
     }
 

@@ -10,9 +10,11 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.CancellationException
 import kotlin.reflect.KFunction
 import kotlin.reflect.jvm.kotlinFunction
-import kotlin.system.exitProcess
 
 object ReplConsole {
+
+    @Volatile
+    private var running = true
 
     private val mainScript: ObservableMutableReference<Any?> = ref(null)
     private val scripts = LinkedHashMap<String, () -> Unit>()
@@ -35,11 +37,12 @@ object ReplConsole {
             handleLine(it)
         }
         print("\n===[ Starting WorldKit console ]===\n> ")
-        while (true) {
+        while (running) {
             val line = readLine()!!
             handleLine(line)
             print("> ")
         }
+        finishIoTasksOnShutdown()
     }
 
     private fun handleLine(line: String) {
@@ -52,10 +55,11 @@ object ReplConsole {
                 ""
             }
             when (command) {
-                "quit" -> exitProcess(0)
+                "quit" -> running = false
                 "load" -> loadProject(args)
                 "reload" -> loadProject(loadedProject ?: "")
                 "list" -> listScripts()
+                "waitIo" -> waitIo()
                 "run" -> runCancellableTask(args)
                 else -> runCancellableTask(command)
             }
@@ -85,6 +89,10 @@ object ReplConsole {
             println("  Unrecognized command: $scriptName")
             return
         }
+        runCancellableTask(script)
+    }
+
+    private fun runCancellableTask(script: () -> Unit) {
         runBlocking {
             val task = async {
                 doWithCancellationSupport {
@@ -133,8 +141,11 @@ object ReplConsole {
                             && func.canAccess(script)
                             && func.parameterCount == 0) {
                         val execAnn = func.annotations.find { it is Executable } as? Executable
+                        val outputAnn = func.annotations.find { it is Output } as? Output
                         if (execAnn != null) {
                             executableFunctions.add(func.kotlinFunction!! to execAnn.index)
+                        } else if (outputAnn != null) {
+                            executableFunctions.add(func.kotlinFunction!! to outputAnn.index)
                         }
                     }
                 }
@@ -151,23 +162,36 @@ object ReplConsole {
                             timeIt("  Finished running in") { it.call(localScript) }
                         }
                     } catch (t: Throwable) {
-                        var c: Throwable? = t
-                        while (c?.cause != null) c = c.cause
-                        if (c is CancellationException) {
-                            println("  Cancelled")
-                        } else {
-                            if (c?.message != null) {
-                                println("  Error executing task.\n  ${c.message}")
-                            } else {
-                                t.printStackTrace()
-                            }
-                        }
+                        handleTaskError(t)
                     }
                 }
             }
             loadedProject = projectPath
             System.gc()
             println("  Finished loading")
+        }
+    }
+
+    private fun waitIo() {
+        println("  Waiting for background IO tasks to complete")
+        try {
+            timeIt("  IO tasks completed in") { waitForBackgroundIo() }
+        } catch (t: Throwable) {
+            handleTaskError(t)
+        }
+    }
+
+    private fun handleTaskError(t: Throwable) {
+        var c: Throwable? = t
+        while (c?.cause != null) c = c.cause
+        if (c is CancellationException) {
+            println("  Cancelled")
+        } else {
+            if (c?.message != null) {
+                println("  Error executing task.\n  ${c.message}")
+            } else {
+                t.printStackTrace()
+            }
         }
     }
 }
