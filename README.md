@@ -9,7 +9,7 @@ A toolkit for generating virtual worlds.
 5. Create a new run configuration in IntelliJ.
     * For Main class, browse and select `Viewer`.
     * Under VM options use `-Xms1g -Xmx16g -Dwk.log.to.sys.out=true`.
-    * Choose a Working directory. I use a directory called `playground` or `io` under the root of the project, and those are ignored by `.gitignore`.
+    * Choose a Working directory. I use a directory called `playground` under the root of the project, and that is ignored by `.gitignore`.
     * For Use classpath of module, select `worldkit.worldkit-viewer.main`.
     * For JRE select GraalVM. You may need to set it up as a JDK in IntelliJ.
     * Click OK when finished.
@@ -22,7 +22,7 @@ A toolkit for generating virtual worlds.
     * For "VM options" use `-Xms1g -Xmx16g -Dwk.log.to.sys.out=true`.
     * For "Program arguments" you can optionally provide a list of automation commands separated by semicolons. It can be handy to load a project and list scripts on start-up using something like: `load C:/Users/x/Documents/WorldKit/Projects/test-project/project.json; list` 
     * For "Working directory" choose any location that suits you. I use a directory called `playground` under the root of the project, and that is ignored by `.gitignore`.
-    * For "Use classpath of module" select `worldkit.worldkit-viewer.main`.
+    * For "Use classpath of module" select `worldkit.worldkit-cli.main`.
     * For "JRE" select GraalVM. You may need to set it up as a JDK in IntelliJ.
     * Click OK when finished.
 3. Click the run button beside the run configuration to launch the Console. The first time it loads it will take some time to generate and cache flow graphs.
