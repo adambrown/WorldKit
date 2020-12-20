@@ -275,6 +275,90 @@ val terrainF = cache.terraformResult(terrainFFile) {
     terraformPassF(terrainE.value.await().heightMap, sdfDeferred.await(), areaIndex, upliftMap)
 }
 
+val erosionBase = cache.grayF32("$ioPath/erosionTestBase") {
+    terrainF.value.await().heightMap
+}
+
+val erosion1 = cache.grayF32("$ioPath/erosionTestOutput1") {
+    erosionBase.value.await()
+        .blur(4.0)
+        .erode(
+            mapScale = MapScale.MapScale20K,
+            randomSeed = 2364895,
+            easeInSteps = 5,
+            minSteps = 200,
+            maxSteps = 300,
+            chaosFrequency = 0.2f,
+            chaosPower = 0.5f,
+            minRadius = 0.0f,
+            maxRadius = 1.0f,
+            minVolume = 0.4f,
+            maxVolume = 1.0f,
+            minDrag = 0.2f,
+            maxDrag = 0.5f,
+            minInertia = 0.2f,
+            maxInertia = 0.5f,
+            minRandomSediment = 0.02f,
+            maxRandomSediment = 0.1f,
+            particleCount = 5000000
+        )
+        .blur(2.0)
+}
+
+val erosion2 = cache.grayF32("$ioPath/erosionTestOutput2") {
+    erosion1.value.await()
+        .upSample(16384)
+        .erode(
+            mapScale = MapScale.MapScale32K,
+            randomSeed = 2364895,
+            easeInSteps = 5,
+            minSteps = 300,
+            maxSteps = 400,
+            chaosFrequency = 0.2f,
+            chaosPower = 0.5f,
+            minRadius = 0.0f,
+            maxRadius = 1.0f,
+            minVolume = 0.4f,
+            maxVolume = 1.0f,
+            minDrag = 0.2f,
+            maxDrag = 0.5f,
+            minInertia = 0.2f,
+            maxInertia = 0.5f,
+            minRandomSediment = 0.02f,
+            maxRandomSediment = 0.1f,
+            particleCount = 5000000
+        )
+        .blur(1.0)
+}
+
+val erosion3 = cache.grayF32("$ioPath/erosionTestOutput3") {
+    erosion2.value.await()
+        .blur(2.0)
+        .upSample(32768)
+        .erode(
+            mapScale = MapScale.MapScale32K,
+            randomSeed = 2364895,
+            easeInSteps = 5,
+            minSteps = 300,
+            maxSteps = 400,
+            chaosFrequency = 0.2f,
+            chaosPower = 0.5f,
+            minRadius = 0.0f,
+            maxRadius = 1.0f,
+            minVolume = 0.4f,
+            maxVolume = 1.0f,
+            minDrag = 0.2f,
+            maxDrag = 0.5f,
+            minInertia = 0.2f,
+            maxInertia = 0.5f,
+            minRandomSediment = 0.02f,
+            maxRandomSediment = 0.1f,
+            particleCount = 5000000
+        )
+        .blur(1.0)
+        .halfRes()
+}
+
 val terrainADisplay = cache.terrainDisplayData(displayAFile) {
     terrainA.value.await().toTerrainDisplayData(mapScale)
 }
@@ -357,3 +441,27 @@ fun terrainE() = runBlocking { terrainEDisplay.value.await() }
 
 @Output
 fun terrainF() = runBlocking { terrainFDisplay.value.await() }
+
+@Executable
+fun clearErosion1() {
+    erosion1.evict()
+}
+
+@Executable
+fun clearErosion2() {
+    erosion2.evict()
+}
+
+@Executable
+fun clearErosion3() {
+    erosion3.evict()
+}
+
+@Output
+fun erosion1() = runBlocking { erosion1.value.await().toTerrainDisplayData() }
+
+@Output
+fun erosion2() = runBlocking { erosion2.value.await().toTerrainDisplayData() }
+
+@Output
+fun erosion3() = runBlocking { erosion3.value.await().toTerrainDisplayData() }

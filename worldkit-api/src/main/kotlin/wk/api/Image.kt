@@ -864,3 +864,25 @@ private fun nextPowerOfTwo(i: Int): Int {
     v = v or (v shr 16)
     return v + 1
 }
+
+@PublicApi
+fun FloatArrayMatrix.halfRes(): FloatArrayMatrix {
+    val high = this
+    val halfWidth = width / 2
+    val halfHeight = height / 2
+    val halfRes = FloatArrayMatrix(halfWidth, halfHeight)
+    (0 until halfHeight).inParallel { y ->
+        val lowYOff = y * halfWidth
+        val y2 = y * 2 * width
+        val y3 = y2 + width
+        for (x in 0 until halfWidth) {
+            val x2 = x * 2
+            val i1 = y2 + x2
+            val i2 = i1 + 1
+            val i3 = y3 + x2
+            val i4 = i3 + 1
+            halfRes[lowYOff + x] = (high[i1] + high[i2] + high[i3] + high[i4]) * 0.25f
+        }
+    }
+    return halfRes
+}

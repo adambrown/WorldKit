@@ -286,7 +286,7 @@ class GraphLite(
     }
 
     @PublicApi
-    inline fun forEachAdjacent(id: Int, callback: (adjacent: Int) -> Any?) {
+    inline fun forEachAdjacent(id: Int, callback: (adjacent: Int) -> Unit) {
         val x = id % stride
         val y = id / stride
         val bitSet = connectionsAreas[id]

@@ -21,10 +21,12 @@ typealias NoiseFunction = (Float) -> Float
 private const val ON: Byte = -1
 private const val OFF: Byte = 0
 
-private fun curl(x: Float, y: Float, frequency: Float, power: Float, eps: Float = 1.0f): Pair<Float, Float> {
+internal fun curl(x: Float, y: Float, frequency: Float, power: Float, eps: Float, result: Vec2): Vec2 {
     val a = (simplexNoise(x * frequency, (y + eps) * frequency) - simplexNoise(x * frequency, (y - eps) * frequency)) / (2 * eps)
     val b = (simplexNoise((x + eps) * frequency, y * frequency) - simplexNoise((x - eps) * frequency, y * frequency)) / (2 * eps)
-    return a * power to -b * power
+    result.x = a * power
+    result.y = -b * power
+    return result
 }
 
 private fun curlOctaves(octaves: Int, x: Float, y: Float, frequency: Float, power: Float, scales: FloatArray, offsets: FloatArray, coefficients: FloatArray, eps: Float = 1.0f): Pair<Float, Float> {
@@ -300,13 +302,15 @@ fun Matrix<Byte>.distortByCurl(frequency: Float, power: Float): ByteArrayMatrix 
     val input = this
     val widthInverse = 1.0f / width
     val buffer = ByteArrayMatrix(width)
-    (0 until width).inParallel { y ->
+    (0 until width).inParallel(
+        context = { vec2() }
+    ) { vec2, y ->
         taskYield()
         val yOff = y * width
         val v = y * widthInverse
         for (x in 0 until width) {
             val u = x * widthInverse
-            val (cu, cv) = curl(u, v, frequency, power)
+            val (cu, cv) = curl(u, v, frequency, power, 1.0f, vec2)
             val ui = ((u + cu) * width).roundToInt().coerceIn(0, width - 1)
             val vi = ((v + cv) * width).roundToInt().coerceIn(0, width - 1)
             buffer[yOff + x] = input[vi * width + ui]
@@ -436,20 +440,25 @@ fun generateRandomAreaIndex(
             remainingWeight -= slice
             count++
         }
-        fun curl(uv: Pair<Float, Float>, frequency: Float, power: Float): Pair<Float, Float> {
-            val (u, v) = uv
-            val (cu, cv) = curl(u, v, frequency, power)
-            return (u + cu) to (v + cv)
+
+        fun curl(uv: Vec2, frequency: Float, power: Float, temp: Vec2, result: Vec2): Vec2 {
+            curl(uv.x, uv.y, frequency, power, 1.0f, temp)
+            result.x = uv.x + temp.x
+            result.y = uv.y + temp.y
+            return result
         }
 
         val biomeMap = ByteArrayMatrix(width)
-        (0 until width).toList().parallelStream().forEach { y ->
+        (0 until width).inParallel(
+            context = { Triple(vec2(), vec2(), vec2()) }
+        ) { (t1, t2, t3), y ->
             taskYield()
             val yOff = y * width
-            val v = y * maskWidthInverse
+            val uvy = y * maskWidthInverse
             for (x in 0 until width) {
-                val u = x * maskWidthInverse
-                val (cu, cv) = curl(curl(u to v, frequency1, power1), frequency2, power2)
+                t1.y = uvy
+                t1.x = x * maskWidthInverse
+                val (cu, cv) = curl(curl(t1, frequency1, power1, t2, t3), frequency2, power2, t1, t2)
                 val ui = (cu * width)
                 val vi = (cv * width)
                 for (biomeNoise in noiseValues) {
